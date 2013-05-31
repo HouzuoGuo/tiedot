@@ -23,7 +23,7 @@ func Open(name string, growth uint64) (file *File, err error) {
 		return
 	}
 	file = &File{Name: name, Growth: growth}
-	if file.Fh, err = os.OpenFile(name, os.O_RDWR, 0); err != nil {
+	if file.Fh, err = os.OpenFile(name, os.O_RDWR|os.O_CREATE, 0600); err != nil {
 		return
 	}
 	fsize, err := file.Fh.Seek(0, os.SEEK_END)
@@ -34,10 +34,9 @@ func Open(name string, growth uint64) (file *File, err error) {
 	if int(fsize) < 0 {
 		panic(fmt.Sprintf("File %s is too large to open", file.Name))
 	}
-	if file.Buf, err = syscall.Mmap(int(file.Fh.Fd()), 0, int(fsize), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED); err != nil {
+	if file.Buf, err = syscall.Mmap(int(file.Fh.Fd()), 0, int(file.Size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED); err != nil {
 		return
 	}
-
 	// find append position (closest byte 0 to position 0)
 	if file.Size == 0 {
 		err = file.Ensure(file.Growth)
@@ -74,8 +73,10 @@ func (file *File) Ensure(more uint64) (err error) {
 	}
 
 	// there is not enough room
-	if err = syscall.Munmap(file.Buf); err != nil {
-		return
+	if file.Buf != nil {
+		if err = syscall.Munmap(file.Buf); err != nil {
+			return
+		}
 	}
 	if _, err = file.Fh.Seek(0, os.SEEK_END); err != nil {
 		return
