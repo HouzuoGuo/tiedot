@@ -1,9 +1,15 @@
 package file
 
 import (
+	"math/rand"
 	"os"
 	"strings"
 	"testing"
+	"time"
+)
+
+const (
+  BENCH_SIZE = 1000000
 )
 
 func TestInsertRead(t *testing.T) {
@@ -97,4 +103,97 @@ func TestInsertDeleteRead(t *testing.T) {
 		t.Errorf("Failed to read: %v", err)
 	}
 	col.File.Close()
+}
+
+func BenchmarkInsert(b *testing.B) {
+	tmp := "/tmp/tiedot_benchmark_insert"
+	defer os.Remove(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+	}
+	load := []byte("abcdefghijklmnopqrstuvwxyz")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err = col.Insert(load); err != nil {
+			b.Errorf("Failed to insert: %v", err)
+		}
+	}
+}
+
+func BenchmarkRead(b *testing.B) {
+	// Open collection
+	tmp := "/tmp/tiedot_benchmark_read"
+	defer os.Remove(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+	}
+	// Insert 1 million documents
+	load := []byte("abcdefghijklmnopqrstuvwxyz")
+	ids := make([]uint64, BENCH_SIZE)
+	for id := range ids {
+		if ids[id], err = col.Insert(load); err != nil {
+			b.Errorf("Failed to insert: %v", err)
+		}
+	}
+	// Read documents at random ID
+	rand.Seed(time.Now().UTC().UnixNano())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err = col.Read(ids[rand.Int63n(BENCH_SIZE)]); err != nil {
+			b.Errorf("Failed to read: %v", err)
+		}
+	}
+}
+
+func BenchmarkUpdate(b *testing.B) {
+	// Open collection
+	tmp := "/tmp/tiedot_benchmark_update"
+	defer os.Remove(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+	}
+	// Insert 10 million documents
+	load := []byte("abcdefghijklmnopqrstuvwxyz")
+	ids := make([]uint64, BENCH_SIZE)
+	for id := range ids {
+		if ids[id], err = col.Insert(load); err != nil {
+			b.Errorf("Failed to insert: %v", err)
+		}
+	}
+	// Update document at random ID
+	rand.Seed(time.Now().UTC().UnixNano())
+	newDoc := []byte("0123456789")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err = col.Update(ids[rand.Int63n(BENCH_SIZE)], newDoc); err != nil {
+			b.Errorf("Failed to update: %v", err)
+		}
+	}
+}
+
+func BenchmarkDelete(b *testing.B) {
+	// Open collection
+	tmp := "/tmp/tiedot_benchmark_delete"
+	defer os.Remove(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+	}
+	// Insert 1 million documents
+	load := []byte("abcdefghijklmnopqrstuvwxyz")
+	ids := make([]uint64, BENCH_SIZE)
+	for id := range ids {
+		if ids[id], err = col.Insert(load); err != nil {
+			b.Errorf("Failed to insert: %v", err)
+		}
+	}
+	// Update documents using random ID
+	rand.Seed(time.Now().UTC().UnixNano())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		col.Delete(ids[rand.Int63n(BENCH_SIZE)])
+	}
 }
