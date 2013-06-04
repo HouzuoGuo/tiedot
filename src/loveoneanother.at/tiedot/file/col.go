@@ -1,4 +1,4 @@
-/* A collection file. */
+/* Document collection file. */
 package file
 
 import (
@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	COL_FILE_GROWTH = uint64(134217728)
-	DOC_MAX_ROOM    = 33554432
-	DOC_HEADER      = 9
+	COL_FILE_GROWTH = uint64(134217728) // Grows every 128MB
+	DOC_MAX_ROOM    = 33554432          // Maximum single document size
+	DOC_HEADER      = 1 + 8             // byte(validity), uint64(document room)
 	DOC_VALID       = byte(1)
 	DOC_INVALID     = byte(0)
 )

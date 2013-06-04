@@ -9,11 +9,12 @@ import (
 )
 
 const (
-  BENCH_SIZE = 1000000
+	BENCH_SIZE = 1000000
 )
 
 func TestInsertRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
+	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
@@ -40,6 +41,7 @@ func TestInsertRead(t *testing.T) {
 
 func TestInsertUpdateRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
+	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
@@ -73,6 +75,7 @@ func TestInsertUpdateRead(t *testing.T) {
 
 func TestInsertDeleteRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
+	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
@@ -107,6 +110,7 @@ func TestInsertDeleteRead(t *testing.T) {
 
 func BenchmarkInsert(b *testing.B) {
 	tmp := "/tmp/tiedot_benchmark_insert"
+	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
@@ -124,6 +128,7 @@ func BenchmarkInsert(b *testing.B) {
 func BenchmarkRead(b *testing.B) {
 	// Open collection
 	tmp := "/tmp/tiedot_benchmark_read"
+	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
@@ -150,6 +155,7 @@ func BenchmarkRead(b *testing.B) {
 func BenchmarkUpdate(b *testing.B) {
 	// Open collection
 	tmp := "/tmp/tiedot_benchmark_update"
+	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
@@ -177,6 +183,7 @@ func BenchmarkUpdate(b *testing.B) {
 func BenchmarkDelete(b *testing.B) {
 	// Open collection
 	tmp := "/tmp/tiedot_benchmark_delete"
+	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
