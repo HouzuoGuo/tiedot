@@ -26,74 +26,53 @@ func OpenCol(name string) (*ColFile, error) {
 }
 
 // Retrieve document data given its ID.
-func (col *ColFile) Read(id uint64) ([]byte, error) {
-	if id < 0 || id > col.File.Append {
-		return nil, errors.New(fmt.Sprintf("No such document %d in %s\n", id, col.File.Name))
+func (col *ColFile) Read(id uint64) []byte {
+	if id < 0 || id > col.File.Append || col.File.Buf[id] != DOC_VALID {
+		return nil
 	}
-	switch col.File.Buf[id] {
-	case DOC_INVALID:
-		return nil, nil
-	case DOC_VALID:
-		if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+4]); room < 0 || room > DOC_MAX_ROOM {
-			return nil, errors.New(fmt.Sprintf("No such document %d in %s\n", id, col.File.Name))
-		} else {
-			return col.File.Buf[id+DOC_HEADER : id+DOC_HEADER+room], nil
-		}
-	default:
-		return nil, errors.New(fmt.Sprintf("No such document %d in %s\n", id, col.File.Name))
+	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+9]); room > DOC_MAX_ROOM {
+		return nil
+	} else {
+		return col.File.Buf[id+DOC_HEADER : id+DOC_HEADER+room]
 	}
 }
 
 // Insert a document, return its ID.
 func (col *ColFile) Insert(data []byte) (uint64, error) {
 	var (
-		len64      = uint64(len(data))
-		room       = len64 + len64
-		id         = col.File.Append
-		dataBegin  = id + DOC_HEADER
-		dataEnd    = dataBegin + len64
-		paddingEnd = dataEnd + len64
+		len64 = uint64(len(data))
+		room  = len64 + len64
+		id    = col.File.Append
 	)
 	if room > DOC_MAX_ROOM {
 		return 0, errors.New(fmt.Sprintf("Document is too large"))
 	}
 	col.File.Ensure(DOC_HEADER + room)
 	col.File.Buf[id] = 1
-	binary.PutUvarint(col.File.Buf[id+1:dataBegin], room)
-	copy(col.File.Buf[dataBegin:dataEnd], data)
-	copy(col.File.Buf[dataEnd:paddingEnd], make([]byte, len(data)))
-	col.File.Append = paddingEnd
+	binary.PutUvarint(col.File.Buf[id+1:id+DOC_HEADER], room)
+	copy(col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+len64], data)
+	copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], make([]byte, len64))
+	col.File.Append = id + DOC_HEADER + room
 	return id, nil
 }
 
 // Update a document, return its new ID.
 func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
-	if id < 0 || id > col.File.Append {
-		return id, errors.New(fmt.Sprintf("No such document %d in %s\n", id, col.File.Name))
+	if id < 0 || id > col.File.Append || col.File.Buf[id] != DOC_VALID {
+		return id, errors.New(fmt.Sprintf("No such document %d in %s", id, col.File.Name))
 	}
-	switch col.File.Buf[id] {
-	case DOC_INVALID:
-		return id, nil
-	case DOC_VALID:
-		if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+4]); room < 0 || room > DOC_MAX_ROOM {
-			return id, errors.New(fmt.Sprintf("No such document %d in %s\n", id, col.File.Name))
-		} else {
-			len64 := uint64(len(data))
-			if len64 <= room { // Overwrite
-				var (
-					dataBegin = id + DOC_HEADER
-					dataEnd   = dataBegin + len64
-				)
-				copy(col.File.Buf[dataBegin:dataEnd], data)
-				copy(col.File.Buf[dataEnd:dataBegin+room], make([]byte, room-len64))
-				return id, nil
-			}
-			// Re-insert
-			col.Delete(id)
-			return col.Insert(data)
+	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+9]); room > DOC_MAX_ROOM {
+		return id, errors.New(fmt.Sprintf("No such document %d in %s", id, col.File.Name))
+	} else {
+		len64 := uint64(len(data))
+		if len64 <= room { // Overwrite
+			copy(col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+len64], data)
+			copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], make([]byte, room-len64))
+			return id, nil
 		}
-	default:
-		return id, errors.New(fmt.Sprintf("No such document %d in %s\n", id, col.File.Name))
+		// Re-insert
+		col.Delete(id)
+		return col.Insert(data)
 	}
 }
 

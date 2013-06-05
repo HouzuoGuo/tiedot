@@ -30,11 +30,11 @@ func TestInsertRead(t *testing.T) {
 	if ids[1], err = col.Insert(docs[1]); err != nil {
 		t.Errorf("Failed to insert: %v", err)
 	}
-	if doc0, err := col.Read(ids[0]); err != nil || strings.Trim(string(doc0), "\000") != string(docs[0]) {
-		t.Errorf("Failed to read: %v", err)
+	if doc0 := col.Read(ids[0]); doc0 == nil || strings.Trim(string(doc0), "\000") != string(docs[0]) {
+		t.Errorf("Failed to read")
 	}
-	if doc1, err := col.Read(ids[1]); err != nil || strings.Trim(string(doc1), "\000") != string(docs[1]) {
-		t.Errorf("Failed to read: %v", err)
+	if doc1 := col.Read(ids[1]); doc1 == nil || strings.Trim(string(doc1), "\000") != string(docs[1]) {
+		t.Errorf("Failed to read")
 	}
 	col.File.Close()
 }
@@ -58,17 +58,17 @@ func TestInsertUpdateRead(t *testing.T) {
 		t.Errorf("Failed to insert: %v", err)
 	}
 	updated := [2]uint64{}
-	if updated[0], err = col.Update(ids[0], []byte("bcd")); err != nil || updated[0] != ids[0] {
+	if updated[0], err = col.Update(ids[0], []byte("abcdef")); err != nil || updated[0] != ids[0] {
 		t.Errorf("Failed to update: %v", err)
 	}
-	if updated[1], err = col.Update(ids[1], []byte("longlonglong")); err != nil || updated[1] == ids[1] {
+	if updated[1], err = col.Update(ids[1], []byte("longlonglonglonglong")); err != nil || updated[1] == ids[1] {
 		t.Errorf("Failed to update: %v", err)
 	}
-	if doc0, err := col.Read(updated[0]); err != nil || strings.Trim(string(doc0), "\000") != "bcd" {
-		t.Errorf("Failed to read: %v", err)
+	if doc0 := col.Read(updated[0]); doc0 == nil || strings.Trim(string(doc0), "\000") != "abcdef" {
+		t.Errorf("Failed to read")
 	}
-	if doc1, err := col.Read(updated[1]); err != nil || strings.Trim(string(doc1), "\000") != "longlonglong" {
-		t.Errorf("Failed to read: %v", err)
+	if doc1 := col.Read(updated[1]); doc1 == nil || strings.Trim(string(doc1), "\000") != "longlonglonglonglong" {
+		t.Errorf("Failed to read")
 	}
 	col.File.Close()
 }
@@ -95,15 +95,15 @@ func TestInsertDeleteRead(t *testing.T) {
 	if ids[2], err = col.Insert(docs[2]); err != nil {
 		t.Errorf("Failed to insert: %v", err)
 	}
-	if doc0, err := col.Read(ids[0]); err != nil || strings.Trim(string(doc0), "\000") != string(docs[0]) {
-		t.Errorf("Failed to read: %v", err)
+	if doc0 := col.Read(ids[0]); doc0 == nil || strings.Trim(string(doc0), "\000") != string(docs[0]) {
+		t.Errorf("Failed to read")
 	}
 	col.Delete(ids[1])
-	if doc1, err := col.Read(ids[1]); err != nil || doc1 != nil {
+	if doc1 := col.Read(ids[1]); doc1 != nil {
 		t.Errorf("Did not delete")
 	}
-	if doc2, err := col.Read(ids[2]); err != nil || strings.Trim(string(doc2), "\000") != string(docs[2]) {
-		t.Errorf("Failed to read: %v", err)
+	if doc2 := col.Read(ids[2]); doc2 == nil || strings.Trim(string(doc2), "\000") != string(docs[2]) {
+		t.Errorf("Failed to read")
 	}
 	col.File.Close()
 }
@@ -146,8 +146,8 @@ func BenchmarkRead(b *testing.B) {
 	rand.Seed(time.Now().UTC().UnixNano())
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = col.Read(ids[rand.Int63n(BENCH_SIZE)]); err != nil {
-			b.Errorf("Failed to read: %v", err)
+		if doc := col.Read(ids[rand.Int63n(BENCH_SIZE)]); doc == nil {
+			b.Errorf("Failed to read")
 		}
 	}
 }
