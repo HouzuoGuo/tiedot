@@ -18,7 +18,7 @@ type File struct {
 // Open (create if non-exist) the file
 func Open(name string, growth uint64) (file *File, err error) {
 	if growth < 1 {
-		err = errors.New(fmt.Sprintf("Opening %s, file growth (%d) is too small\n", name, growth))
+		err = errors.New(fmt.Sprintf("Opening %s, file growth (%d) is too small", name, growth))
 	}
 	file = &File{Name: name, Growth: growth}
 	if file.Fh, err = os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0600); err != nil {
@@ -29,7 +29,7 @@ func Open(name string, growth uint64) (file *File, err error) {
 		return
 	}
 	if int(fsize) < 0 {
-		panic(fmt.Sprintf("File %s is too large to mmap\n", name))
+		panic(fmt.Sprintf("File %s is too large to mmap", name))
 	}
 	file.Size = uint64(fsize)
 	if file.Size == 0 {
@@ -78,7 +78,7 @@ func (file *File) Ensure(more uint64) (err error) {
 		return
 	}
 	if newSize := int(file.Size + file.Growth); newSize < 0 {
-		panic(fmt.Sprintf("File %s is getting too large\n", file.Name))
+		panic(fmt.Sprintf("File %s is getting too large", file.Name))
 	} else if file.Buf, err = syscall.Mmap(int(file.Fh.Fd()), 0, newSize, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED); err != nil {
 		return
 	}
