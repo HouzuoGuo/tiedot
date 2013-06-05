@@ -34,7 +34,7 @@ func (col *ColFile) Read(id uint64) ([]byte, error) {
 	case DOC_INVALID:
 		return nil, nil
 	case DOC_VALID:
-		if room, err := binary.Uvarint(col.File.Buf[id+1 : id+4]); err <= 0 || room < 0 || room > DOC_MAX_ROOM {
+		if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+4]); room < 0 || room > DOC_MAX_ROOM {
 			return nil, errors.New(fmt.Sprintf("No such document %d in %s\n", id, col.File.Name))
 		} else {
 			return col.File.Buf[id+DOC_HEADER : id+DOC_HEADER+room], nil
@@ -75,7 +75,7 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 	case DOC_INVALID:
 		return id, nil
 	case DOC_VALID:
-		if room, err := binary.Uvarint(col.File.Buf[id+1 : id+4]); err <= 0 || room < 0 || room > DOC_MAX_ROOM {
+		if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+4]); room < 0 || room > DOC_MAX_ROOM {
 			return id, errors.New(fmt.Sprintf("No such document %d in %s\n", id, col.File.Name))
 		} else {
 			len64 := uint64(len(data))
