@@ -148,21 +148,61 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		if entry++; entry == ht.PerBucket {
 			entry = 0
 			if bucket = ht.NextBucket(bucket); bucket == 0 {
-				break
+				return
 			}
 		}
 	}
-	return
 }
 
 // Remove specific key-value pair.
 func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool) {
-	return
+	var count, entry, bucket uint64 = 0, 0, ht.HashKey(key)
+	for {
+		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
+		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+9])
+		entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+9 : entryAddr+17])
+		if ht.File.Buf[entryAddr] == ENTRY_VALID {
+			if entryKey == key && filter(entryKey, entryVal) {
+				ht.File.Buf[entryAddr] = ENTRY_INVALID
+				if count++; count == limit {
+					return
+				}
+			}
+		} else if entryKey == 0 && entryVal == 0 {
+			return
+		}
+		if entry++; entry == ht.PerBucket {
+			entry = 0
+			if bucket = ht.NextBucket(bucket); bucket == 0 {
+				return
+			}
+		}
+	}
 }
 
 // Return all entries in the hash table
 func (ht *HashTable) GetAll() (keys, vals []uint64) {
-	keys = make([]uint64, 1, ht.NumberBuckets()*ht.PerBucket/2)
-	vals = make([]uint64, 1, ht.NumberBuckets()*ht.PerBucket/2)
+	keys = make([]uint64, 0, ht.NumberBuckets()*ht.PerBucket/2)
+	vals = make([]uint64, 0, ht.NumberBuckets()*ht.PerBucket/2)
+	for head := uint64(0); head < uint64(math.Pow(2, float64(ht.HashBits))); head++ {
+		var entry, bucket uint64 = 0, head
+		for {
+			entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
+			entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+9])
+			entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+9 : entryAddr+17])
+			if ht.File.Buf[entryAddr] == ENTRY_VALID {
+				keys = append(keys, entryKey)
+				vals = append(vals, entryVal)
+			} else if entryKey == 0 && entryVal == 0 {
+				break
+			}
+			if entry++; entry == ht.PerBucket {
+				entry = 0
+				if bucket = ht.NextBucket(bucket); bucket == 0 {
+					return
+				}
+			}
+		}
+	}
 	return
 }
