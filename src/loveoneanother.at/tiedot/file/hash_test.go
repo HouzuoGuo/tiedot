@@ -1,8 +1,14 @@
 package file
 
 import (
+	"math/rand"
 	"os"
 	"testing"
+	"time"
+)
+
+const (
+	HT_BENCH_SIZE = 1000000
 )
 
 func TestPutGet(t *testing.T) {
@@ -116,4 +122,77 @@ func TestGetAll(t *testing.T) {
 		t.Errorf("Did not have all, got only %v, %v", keys, vals)
 	}
 	ht.File.Close()
+}
+
+func BenchmarkPut(b *testing.B) {
+	tmp := "/tmp/tiedot_hash_benchmark"
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	ht, err := OpenHash(tmp, 14, 100)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+	}
+	rand.Seed(time.Now().UTC().UnixNano())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ht.Put(uint64(rand.Int63n(HT_BENCH_SIZE)), uint64(rand.Int63n(HT_BENCH_SIZE)))
+	}
+}
+
+func BenchmarkGet(b *testing.B) {
+	tmp := "/tmp/tiedot_hash_benchmark"
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	ht, err := OpenHash(tmp, 14, 100)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+	}
+	rand.Seed(time.Now().UTC().UnixNano())
+	for i := 0; i < HT_BENCH_SIZE; i++ {
+		ht.Put(uint64(rand.Int63n(HT_BENCH_SIZE)), uint64(rand.Int63n(HT_BENCH_SIZE)))
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ht.Get(uint64(rand.Int63n(HT_BENCH_SIZE)), 1, func(a, b uint64) bool {
+			return true
+		})
+	}
+}
+
+func BenchmarkRemove(b *testing.B) {
+	tmp := "/tmp/tiedot_hash_benchmark"
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	ht, err := OpenHash(tmp, 14, 100)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+	}
+	rand.Seed(time.Now().UTC().UnixNano())
+	for i := 0; i < HT_BENCH_SIZE; i++ {
+		ht.Put(uint64(rand.Int63n(HT_BENCH_SIZE)), uint64(rand.Int63n(HT_BENCH_SIZE)))
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ht.Remove(uint64(rand.Int63n(HT_BENCH_SIZE)), 1, func(a, b uint64) bool {
+			return true
+		})
+	}
+}
+
+func BenchmarkGetAll(b *testing.B) {
+	tmp := "/tmp/tiedot_hash_benchmark"
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	ht, err := OpenHash(tmp, 14, 100)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+	}
+	rand.Seed(time.Now().UTC().UnixNano())
+	for i := 0; i < HT_BENCH_SIZE; i++ {
+		ht.Put(uint64(rand.Int63n(HT_BENCH_SIZE)), uint64(rand.Int63n(HT_BENCH_SIZE)))
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ht.GetAll()
+	}
 }

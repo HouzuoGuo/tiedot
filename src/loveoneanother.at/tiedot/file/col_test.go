@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	BENCH_SIZE = 1000000
+	COL_BENCH_SIZE = 1000000
 )
 
 func TestInsertRead(t *testing.T) {
@@ -136,7 +136,7 @@ func BenchmarkRead(b *testing.B) {
 	}
 	// Insert 1 million documents
 	load := []byte("abcdefghijklmnopqrstuvwxyz")
-	ids := make([]uint64, BENCH_SIZE)
+	ids := make([]uint64, COL_BENCH_SIZE)
 	for id := range ids {
 		if ids[id], err = col.Insert(load); err != nil {
 			b.Errorf("Failed to insert: %v", err)
@@ -146,7 +146,7 @@ func BenchmarkRead(b *testing.B) {
 	rand.Seed(time.Now().UTC().UnixNano())
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if doc := col.Read(ids[rand.Int63n(BENCH_SIZE)]); doc == nil {
+		if doc := col.Read(ids[rand.Int63n(COL_BENCH_SIZE)]); doc == nil {
 			b.Errorf("Failed to read")
 		}
 	}
@@ -163,7 +163,7 @@ func BenchmarkUpdate(b *testing.B) {
 	}
 	// Insert 10 million documents
 	load := []byte("abcdefghijklmnopqrstuvwxyz")
-	ids := make([]uint64, BENCH_SIZE)
+	ids := make([]uint64, COL_BENCH_SIZE)
 	for id := range ids {
 		if ids[id], err = col.Insert(load); err != nil {
 			b.Errorf("Failed to insert: %v", err)
@@ -174,7 +174,7 @@ func BenchmarkUpdate(b *testing.B) {
 	newDoc := []byte("0123456789")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = col.Update(ids[rand.Int63n(BENCH_SIZE)], newDoc); err != nil {
+		if _, err = col.Update(ids[rand.Int63n(COL_BENCH_SIZE)], newDoc); err != nil {
 			b.Errorf("Failed to update: %v", err)
 		}
 	}
@@ -191,7 +191,7 @@ func BenchmarkDelete(b *testing.B) {
 	}
 	// Insert 1 million documents
 	load := []byte("abcdefghijklmnopqrstuvwxyz")
-	ids := make([]uint64, BENCH_SIZE)
+	ids := make([]uint64, COL_BENCH_SIZE)
 	for id := range ids {
 		if ids[id], err = col.Insert(load); err != nil {
 			b.Errorf("Failed to insert: %v", err)
@@ -201,6 +201,6 @@ func BenchmarkDelete(b *testing.B) {
 	rand.Seed(time.Now().UTC().UnixNano())
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		col.Delete(ids[rand.Int63n(BENCH_SIZE)])
+		col.Delete(ids[rand.Int63n(COL_BENCH_SIZE)])
 	}
 }

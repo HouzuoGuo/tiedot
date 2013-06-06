@@ -1,3 +1,4 @@
+/* A hash table of uint64 key-value pairs. */
 package file
 
 import (
@@ -88,7 +89,6 @@ func (ht *HashTable) LastBucket(bucket uint64) uint64 {
 func (ht *HashTable) grow(bucket uint64) {
 	lastBucketAddr := ht.LastBucket(bucket) * ht.BucketSize
 	binary.PutUvarint(ht.File.Buf[lastBucketAddr:lastBucketAddr+8], ht.NumberBuckets())
-	fmt.Fprintf(os.Stderr, "Hash table %s grows a bucket from %d, new bucket is %d\n", ht.File.Name, bucket, ht.NumberBuckets())
 	ht.File.Ensure(ht.BucketSize)
 	ht.File.Append += ht.BucketSize
 }
