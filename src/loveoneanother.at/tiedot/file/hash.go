@@ -64,7 +64,7 @@ func (ht *HashTable) NextBucket(bucket uint64) uint64 {
 		return 0
 	} else {
 		if next, _ := binary.Uvarint(ht.File.Buf[bucketAddr : bucketAddr+BUCKET_HEADER_SIZE]); next != 0 && next <= bucket {
-			fmt.Fprintf(os.Stderr, "Hash table %s has a corrupted bucket %d which forms a loop at address %d\n", ht.File.Name, bucketAddr, bucket)
+			fmt.Fprintf(os.Stderr, "Loop detected in hash table %s at bucket %d, address %d\n", ht.File.Name, bucket, bucketAddr)
 			return 0
 		} else {
 			return next
@@ -75,18 +75,22 @@ func (ht *HashTable) NextBucket(bucket uint64) uint64 {
 // Return the last bucket number in chain.
 func (ht *HashTable) LastBucket(bucket uint64) uint64 {
 	curr := bucket
-	for ; ht.NextBucket(curr) != 0; curr = ht.NextBucket(curr) {
+	for {
+		next := ht.NextBucket(curr)
+		if next == 0 {
+			return curr
+		}
+		curr = next
 	}
-	return curr
 }
 
 // Grow a new bucket on the chain of buckets.
 func (ht *HashTable) grow(bucket uint64) {
 	lastBucketAddr := ht.LastBucket(bucket) * ht.BucketSize
 	binary.PutUvarint(ht.File.Buf[lastBucketAddr:lastBucketAddr+8], ht.NumberBuckets())
+	fmt.Fprintf(os.Stderr, "Hash table %s grows a bucket from %d, new bucket is %d\n", ht.File.Name, bucket, ht.NumberBuckets())
 	ht.File.Ensure(ht.BucketSize)
 	ht.File.Append += ht.BucketSize
-	fmt.Fprintf(os.Stderr, "Hash table %s has a grown a bucket from bucket %d\n", ht.File.Name, bucket)
 }
 
 // Return a hash key to be used by hash table by masking non-key bits.
@@ -96,26 +100,29 @@ func (ht *HashTable) HashKey(key uint64) uint64 {
 
 // Put a new key-value pair.
 func (ht *HashTable) Put(key, val uint64) {
-	for bucket := ht.HashKey(key); ; {
-		for entry, entryAddr := uint64(0), bucket*ht.BucketSize+BUCKET_HEADER_SIZE; entry < ht.PerBucket; entry, entryAddr = entry+1, BUCKET_HEADER_SIZE+bucket*ht.BucketSize+entry*ENTRY_SIZE {
-			if ht.File.Buf[entryAddr] != ENTRY_VALID {
-				ht.File.Buf[entryAddr] = ENTRY_VALID
-				binary.PutUvarint(ht.File.Buf[entryAddr+1:entryAddr+9], key)
-				binary.PutUvarint(ht.File.Buf[entryAddr+9:entryAddr+17], val)
+	var bucket, entry uint64 = ht.HashKey(key), 0
+	for {
+		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
+		if ht.File.Buf[entryAddr] != ENTRY_VALID {
+			ht.File.Buf[entryAddr] = ENTRY_VALID
+			binary.PutUvarint(ht.File.Buf[entryAddr+1:entryAddr+9], key)
+			binary.PutUvarint(ht.File.Buf[entryAddr+9:entryAddr+17], val)
+			return
+		}
+		if entry++; entry == ht.PerBucket {
+			entry = 0
+			if bucket = ht.NextBucket(bucket); bucket == 0 {
+				ht.grow(ht.HashKey(key))
+				ht.Put(key, val)
 				return
 			}
 		}
-		if bucket = ht.NextBucket(bucket); bucket == 0 {
-			break
-		}
 	}
-	ht.grow(ht.HashKey(key))
-	ht.Put(key, val)
 }
 
 // Get key-value pairs.
 func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (keys, vals []uint64) {
-	var count uint64 = 0
+	var count, entry, bucket uint64 = 0, 0, ht.HashKey(key)
 	if limit == 0 {
 		keys = make([]uint64, 0, 10)
 		vals = make([]uint64, 0, 10)
@@ -123,24 +130,26 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		keys = make([]uint64, 0, limit)
 		vals = make([]uint64, 0, limit)
 	}
-	for bucket := ht.HashKey(key); ; {
-		for entry, entryAddr := uint64(0), bucket*ht.BucketSize+BUCKET_HEADER_SIZE; entry < ht.PerBucket; entry, entryAddr = entry+1, BUCKET_HEADER_SIZE+bucket*ht.BucketSize+entry*ENTRY_SIZE {
-			entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+9])
-			entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+9 : entryAddr+17])
-			if ht.File.Buf[entryAddr] == ENTRY_VALID {
-				if entryKey == key && filter(entryKey, entryVal) {
-					keys = append(keys, entryKey)
-					vals = append(vals, entryVal)
-					if count++; count == limit {
-						return
-					}
+	for {
+		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
+		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+9])
+		entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+9 : entryAddr+17])
+		if ht.File.Buf[entryAddr] == ENTRY_VALID {
+			if entryKey == key && filter(entryKey, entryVal) {
+				keys = append(keys, entryKey)
+				vals = append(vals, entryVal)
+				if count++; count == limit {
+					return
 				}
-			} else if entryKey == 0 && entryVal == 0 {
-				return
 			}
+		} else if entryKey == 0 && entryVal == 0 {
+			return
 		}
-		if bucket = ht.NextBucket(bucket); bucket == 0 {
-			break
+		if entry++; entry == ht.PerBucket {
+			entry = 0
+			if bucket = ht.NextBucket(bucket); bucket == 0 {
+				break
+			}
 		}
 	}
 	return
@@ -148,42 +157,12 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 
 // Remove specific key-value pair.
 func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool) {
-	var count uint64 = 0
-
-	for bucket := ht.HashKey(key); bucket != 0; bucket = ht.NextBucket(bucket) {
-		for entry, entryAddr := uint64(0), uint64(0); entry < ht.PerBucket; entry, entryAddr = entry+1, bucket*ht.BucketSize+entry*ENTRY_SIZE {
-			entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+9])
-			entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+9 : entryAddr+17])
-			if ht.File.Buf[entryAddr] == ENTRY_VALID && entryKey == key && filter(entryKey, entryVal) {
-				ht.File.Buf[entryAddr] = ENTRY_INVALID
-				if count++; count == limit {
-					return
-				}
-			} else if entryKey == 0 && entryVal == 0 {
-				return
-			}
-		}
-	}
+	return
 }
 
 // Return all entries in the hash table
 func (ht *HashTable) GetAll() (keys, vals []uint64) {
 	keys = make([]uint64, 1, ht.NumberBuckets()*ht.PerBucket/2)
 	vals = make([]uint64, 1, ht.NumberBuckets()*ht.PerBucket/2)
-	for curr := uint64(0); curr < uint64(math.Pow(2, float64(ht.HashBits))); curr++ {
-	head:
-		for chain := curr; ht.NextBucket(chain) != 0; chain = ht.NextBucket(curr) {
-			for entry, entryAddr := uint64(0), uint64(0); entry < ht.PerBucket; entry, entryAddr = entry+1, chain*ht.BucketSize+entry*ENTRY_SIZE {
-				entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+9])
-				entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+9 : entryAddr+17])
-				if ht.File.Buf[entryAddr] == ENTRY_VALID {
-					keys = append(keys, entryKey)
-					vals = append(vals, entryVal)
-				} else if entryKey == 0 && entryVal == 0 {
-					break head
-				}
-			}
-		}
-	}
 	return
 }
