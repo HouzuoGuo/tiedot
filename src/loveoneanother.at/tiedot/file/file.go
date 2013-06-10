@@ -13,7 +13,7 @@ type File struct {
 	Fh                   *os.File
 	Append, Size, Growth uint64
 	Buf                  []byte
-	sem                  chan bool
+	Sem                  chan bool
 }
 
 // Open (create if non-exist) the file
@@ -21,8 +21,8 @@ func Open(name string, growth uint64) (file *File, err error) {
 	if growth < 1 {
 		err = errors.New(fmt.Sprintf("Opening %s, file growth (%d) is too small", name, growth))
 	}
-	file = &File{Name: name, Growth: growth, sem: make(chan bool, 1)}
-	file.sem <- true
+	file = &File{Name: name, Growth: growth, Sem: make(chan bool, 1)}
+	file.Sem <- true
 	if file.Fh, err = os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0600); err != nil {
 		return
 	}

@@ -101,21 +101,21 @@ func (ht *HashTable) hashKey(key uint64) uint64 {
 // Put a new key-value pair.
 func (ht *HashTable) Put(key, val uint64) {
 	var bucket, entry uint64 = ht.hashKey(key), 0
-	<-ht.File.sem
+	<-ht.File.Sem
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		if ht.File.Buf[entryAddr] != ENTRY_VALID {
 			ht.File.Buf[entryAddr] = ENTRY_VALID
 			binary.PutUvarint(ht.File.Buf[entryAddr+1:entryAddr+9], key)
 			binary.PutUvarint(ht.File.Buf[entryAddr+9:entryAddr+17], val)
-			ht.File.sem <- true
+			ht.File.Sem <- true
 			return
 		}
 		if entry++; entry == ht.PerBucket {
 			entry = 0
 			if bucket = ht.nextBucket(bucket); bucket == 0 {
 				ht.grow(ht.hashKey(key))
-				ht.File.sem <- true
+				ht.File.Sem <- true
 				ht.Put(key, val)
 				return
 			}
@@ -133,7 +133,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		keys = make([]uint64, 0, limit)
 		vals = make([]uint64, 0, limit)
 	}
-	<-ht.File.sem
+	<-ht.File.Sem
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+9])
@@ -143,18 +143,18 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 				keys = append(keys, entryKey)
 				vals = append(vals, entryVal)
 				if count++; count == limit {
-					ht.File.sem <- true
+					ht.File.Sem <- true
 					return
 				}
 			}
 		} else if entryKey == 0 && entryVal == 0 {
-			ht.File.sem <- true
+			ht.File.Sem <- true
 			return
 		}
 		if entry++; entry == ht.PerBucket {
 			entry = 0
 			if bucket = ht.nextBucket(bucket); bucket == 0 {
-				ht.File.sem <- true
+				ht.File.Sem <- true
 				return
 			}
 		}
@@ -164,7 +164,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 // Remove specific key-value pair.
 func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool) {
 	var count, entry, bucket uint64 = 0, 0, ht.hashKey(key)
-	<-ht.File.sem
+	<-ht.File.Sem
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+9])
@@ -173,18 +173,18 @@ func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool)
 			if entryKey == key && filter(entryKey, entryVal) {
 				ht.File.Buf[entryAddr] = ENTRY_INVALID
 				if count++; count == limit {
-					ht.File.sem <- true
+					ht.File.Sem <- true
 					return
 				}
 			}
 		} else if entryKey == 0 && entryVal == 0 {
-			ht.File.sem <- true
+			ht.File.Sem <- true
 			return
 		}
 		if entry++; entry == ht.PerBucket {
 			entry = 0
 			if bucket = ht.nextBucket(bucket); bucket == 0 {
-				ht.File.sem <- true
+				ht.File.Sem <- true
 				return
 			}
 		}
@@ -195,7 +195,7 @@ func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool)
 func (ht *HashTable) GetAll() (keys, vals []uint64) {
 	keys = make([]uint64, 0, ht.numberBuckets()*ht.PerBucket/2)
 	vals = make([]uint64, 0, ht.numberBuckets()*ht.PerBucket/2)
-	<-ht.File.sem
+	<-ht.File.Sem
 	for head := uint64(0); head < uint64(math.Pow(2, float64(ht.HashBits))); head++ {
 		var entry, bucket uint64 = 0, head
 		for {
@@ -211,12 +211,12 @@ func (ht *HashTable) GetAll() (keys, vals []uint64) {
 			if entry++; entry == ht.PerBucket {
 				entry = 0
 				if bucket = ht.nextBucket(bucket); bucket == 0 {
-					ht.File.sem <- true
+					ht.File.Sem <- true
 					return
 				}
 			}
 		}
 	}
-	ht.File.sem <- true
+	ht.File.Sem <- true
 	return
 }
