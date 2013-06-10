@@ -75,14 +75,14 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 		return id, errors.New(fmt.Sprintf("No such document %d in %s", id, col.File.Name))
 	} else {
 		len64 := uint64(len(data))
-		if len64 <= room { // Overwrite
+		if len64 <= room { // overwrite
 			copy(col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+len64], data)
 			copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], make([]byte, room-len64))
 			col.File.Sem <- true
 			return id, nil
 		}
 		col.File.Sem <- true
-		// Re-insert
+		// re-insert
 		col.Delete(id)
 		return col.Insert(data)
 	}

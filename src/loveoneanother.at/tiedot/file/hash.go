@@ -22,15 +22,6 @@ type HashTable struct {
 	BucketSize, HashBits, PerBucket uint64
 }
 
-func StrHash(str string) int {
-	length := len(str)
-	hash := int(0)
-	for i, c := range str {
-		hash += int(c)*31 ^ (length - i)
-	}
-	return hash
-}
-
 // Open a hash table file.
 func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error) {
 	if hashBits < 1 || perBucket < 1 {
@@ -42,12 +33,12 @@ func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error
 	}
 	ht = &HashTable{File: file, HashBits: hashBits, PerBucket: perBucket}
 	ht.BucketSize = BUCKET_HEADER_SIZE + ENTRY_SIZE*perBucket
-	// File has to be big enough to contain all initial buckets
+	// file has to be big enough to contain all initial buckets
 	if minAppend := uint64(math.Pow(2, float64(hashBits))) * ht.BucketSize; ht.File.Append < minAppend {
 		ht.File.Ensure(minAppend - ht.File.Append)
 		ht.File.Append = minAppend
 	}
-	// Move append position to end of final bucket
+	// move append position to end of final bucket
 	if extra := ht.File.Append % ht.BucketSize; extra != 0 {
 		ht.File.Append += ht.BucketSize - extra
 	}
@@ -191,7 +182,7 @@ func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool)
 	}
 }
 
-// Return all entries in the hash table
+// Return all entries in the hash table.
 func (ht *HashTable) GetAll() (keys, vals []uint64) {
 	keys = make([]uint64, 0, ht.numberBuckets()*ht.PerBucket/2)
 	vals = make([]uint64, 0, ht.numberBuckets()*ht.PerBucket/2)

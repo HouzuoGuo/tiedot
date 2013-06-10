@@ -16,7 +16,7 @@ type File struct {
 	Sem                  chan bool
 }
 
-// Open (create if non-exist) the file
+// Open (create if non-exist) the file.
 func Open(name string, growth uint64) (file *File, err error) {
 	if growth < 1 {
 		err = errors.New(fmt.Sprintf("Opening %s, file growth (%d) is too small", name, growth))
