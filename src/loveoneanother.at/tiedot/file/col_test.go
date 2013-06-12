@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	COL_BENCH_SIZE = 1000000
+	COL_BENCH_SIZE = 1000000 // Number of documents made available for collection benchmark
 )
 
 func TestInsertRead(t *testing.T) {

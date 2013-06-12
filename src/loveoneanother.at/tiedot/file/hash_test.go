@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	HT_BENCH_SIZE = 1000000
+	HT_BENCH_SIZE = 1000000 // Number of entries made available for hash table benchmark
 )
 
 func TestPutGet(t *testing.T) {

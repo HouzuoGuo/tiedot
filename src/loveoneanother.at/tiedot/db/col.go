@@ -22,11 +22,11 @@ type Config struct {
 }
 
 type Col struct {
-	Data           *file.ColFile
-	Config         *Config
-	ConfigFileName string
-	Indexes        map[IndexConf]*file.HashTable
-	PathIndex      map[string]*file.HashTable
+	Data                *file.ColFile
+	Config              *Config
+	Dir, ConfigFileName string
+	Indexes             map[IndexConf]*file.HashTable
+	PathIndex           map[string]*file.HashTable
 }
 
 // Return string hash code.
@@ -41,8 +41,11 @@ func StrHash(thing interface{}) uint64 {
 }
 
 // Open a collection.
-func OpenCol(name string) (col *Col, err error) {
-	col = &Col{ConfigFileName: path.Join(name, "config")}
+func OpenCol(dir string) (col *Col, err error) {
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		return
+	}
+	col = &Col{ConfigFileName: path.Join(dir, "config"), Dir: dir}
 	// make sure the config file exists
 	tryOpen, err := os.OpenFile(col.ConfigFileName, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
@@ -55,7 +58,9 @@ func OpenCol(name string) (col *Col, err error) {
 	if err != nil {
 		return
 	}
-	if err = json.Unmarshal(config, &col.Config); err != nil {
+	if string(config) == "" {
+		col.Config = &Config{}
+	} else if err = json.Unmarshal(config, &col.Config); err != nil {
 		return
 	}
 	// open each index file
@@ -68,7 +73,7 @@ func OpenCol(name string) (col *Col, err error) {
 		col.Indexes[index] = ht
 	}
 	// open data file
-	if col.Data, err = file.OpenCol(path.Join(name, "data")); err != nil {
+	if col.Data, err = file.OpenCol(path.Join(dir, "data")); err != nil {
 		return
 	}
 	return
@@ -98,9 +103,9 @@ func GetIn(doc interface{}, path []string) (thing interface{}) {
 
 // Retrieve document data given its ID.
 func (col *Col) Read(id uint64) (doc interface{}) {
-	data := col.Data.Read(id)
+	data := []byte(strings.Trim(string(col.Data.Read(id)), "\000"))
 	if err := json.Unmarshal(data, &doc); err != nil {
-		fmt.Fprintf(os.Stderr, "JSOn cannot parse document %d '%v'\n", id, data)
+		fmt.Fprintf(os.Stderr, "Cannot parse document ID %d in %s to JSON\n", id, col.Dir)
 	}
 	return
 }
@@ -160,7 +165,7 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	}
 	completed := make(chan bool, 3)
 	go func() {
-		newID, err = col.Update(id, data)
+		newID, err = col.Data.Update(id, data)
 		completed <- true
 	}()
 	go func() {
@@ -185,7 +190,7 @@ func (col *Col) Delete(id uint64) {
 	}
 	completed := make(chan bool, 2)
 	go func() {
-		col.Delete(id)
+		col.Data.Delete(id)
 		completed <- true
 	}()
 	go func() {
