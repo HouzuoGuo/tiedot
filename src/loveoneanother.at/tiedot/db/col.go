@@ -3,6 +3,7 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"loveoneanother.at/tiedot/file"
@@ -202,6 +203,36 @@ func (col *Col) Delete(id uint64) {
 	}()
 	<-completed
 	<-completed
+}
+
+// Add an index.
+func (col *Col) Index(path []string) error {
+	joinedPath := strings.Join(path, ",")
+	if _, found := col.PathIndex[joinedPath]; found {
+		return errors.New(fmt.Sprintf("Path %v is already indexed in collection %s", path, col.Dir))
+	}
+	return nil
+}
+
+// Remove an index.
+func (col *Col) Unindex(path []string) error {
+	joinedPath := strings.Join(path, ",")
+	if _, found := col.PathIndex[joinedPath]; !found {
+		return errors.New(fmt.Sprintf("Path %v was never indexed in collection %s", path, col.Dir))
+	}
+	return nil
+}
+
+// Do fun for all documents.
+func (col *Col) ForAll(fun func(doc interface{})) {
+	col.Data.ForAll(func(data []byte) {
+		var parsed interface{}
+		if err := json.Unmarshal(data, &parsed); err != nil {
+			fmt.Fprintf(os.Stderr, "Cannot parse document '%v' in %s to JSON\n", data, col.Dir)
+		} else {
+			fun(parsed)
+		}
+	})
 }
 
 // Close a collection.
