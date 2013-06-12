@@ -1,6 +1,7 @@
 package file
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"strings"
@@ -30,11 +31,58 @@ func TestInsertRead(t *testing.T) {
 	if ids[1], err = col.Insert(docs[1]); err != nil {
 		t.Errorf("Failed to insert: %v", err)
 	}
-	if doc0 := col.Read(ids[0]); doc0 == nil || strings.Trim(string(doc0), "\000") != string(docs[0]) {
+	if doc0 := col.Read(ids[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != string(docs[0]) {
 		t.Errorf("Failed to read")
 	}
-	if doc1 := col.Read(ids[1]); doc1 == nil || strings.Trim(string(doc1), "\000") != string(docs[1]) {
+	if doc1 := col.Read(ids[1]); doc1 == nil || strings.TrimSpace(string(doc1)) != string(docs[1]) {
 		t.Errorf("Failed to read")
+	}
+	col.File.Close()
+}
+
+func TestInsertReadAll(t *testing.T) {
+	tmp := "/tmp/tiedot_col_test"
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		t.Errorf("Failed to open: %v", err)
+	}
+	var ids [5]uint64
+	ids[0], err = col.Insert([]byte("abc"))
+	if err != nil {
+		t.Errorf("Insert failed: %v", err)
+	}
+	ids[1], err = col.Insert([]byte("abc"))
+	if err != nil {
+		t.Errorf("Insert failed: %v", err)
+	}
+	ids[2], err = col.Insert([]byte("abc"))
+	if err != nil {
+		t.Errorf("Insert failed: %v", err)
+	}
+	ids[3], err = col.Insert([]byte("abc"))
+	if err != nil {
+		t.Errorf("Insert failed: %v", err)
+	}
+	ids[4], err = col.Insert([]byte("abc"))
+	if err != nil {
+		t.Errorf("Insert failed: %v", err)
+	}
+	fmt.Println("Please ignore the following Corrupted Document error messages, they are intentional.")
+	// intentionally corrupt two docuemnts
+	col.File.Buf[ids[4]] = 3     // corrupted validity
+	col.File.Buf[ids[1]+1] = 255 // corrupted room
+	col.File.Buf[ids[1]+2] = 255
+	col.File.Buf[ids[1]+3] = 255
+	col.File.Buf[ids[1]+4] = 255
+	successfullyRead := 0
+	col.ForAll(func(data []byte) {
+		successfullyRead++
+	})
+	// the reason is that corrupted documents are "empty" documents
+	if successfullyRead != 5 {
+		t.Errorf("Should have recovered 5 documents, but %d are recovered", successfullyRead)
 	}
 	col.File.Close()
 }
@@ -64,10 +112,10 @@ func TestInsertUpdateRead(t *testing.T) {
 	if updated[1], err = col.Update(ids[1], []byte("longlonglonglonglong")); err != nil || updated[1] == ids[1] {
 		t.Errorf("Failed to update: %v", err)
 	}
-	if doc0 := col.Read(updated[0]); doc0 == nil || strings.Trim(string(doc0), "\000") != "abcdef" {
+	if doc0 := col.Read(updated[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != "abcdef" {
 		t.Errorf("Failed to read")
 	}
-	if doc1 := col.Read(updated[1]); doc1 == nil || strings.Trim(string(doc1), "\000") != "longlonglonglonglong" {
+	if doc1 := col.Read(updated[1]); doc1 == nil || strings.TrimSpace(string(doc1)) != "longlonglonglonglong" {
 		t.Errorf("Failed to read")
 	}
 	col.File.Close()
@@ -95,14 +143,14 @@ func TestInsertDeleteRead(t *testing.T) {
 	if ids[2], err = col.Insert(docs[2]); err != nil {
 		t.Errorf("Failed to insert: %v", err)
 	}
-	if doc0 := col.Read(ids[0]); doc0 == nil || strings.Trim(string(doc0), "\000") != string(docs[0]) {
+	if doc0 := col.Read(ids[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != string(docs[0]) {
 		t.Errorf("Failed to read")
 	}
 	col.Delete(ids[1])
 	if doc1 := col.Read(ids[1]); doc1 != nil {
 		t.Errorf("Did not delete")
 	}
-	if doc2 := col.Read(ids[2]); doc2 == nil || strings.Trim(string(doc2), "\000") != string(docs[2]) {
+	if doc2 := col.Read(ids[2]); doc2 == nil || strings.TrimSpace(string(doc2)) != string(docs[2]) {
 		t.Errorf("Failed to read")
 	}
 	col.File.Close()
@@ -119,9 +167,7 @@ func BenchmarkInsert(b *testing.B) {
 	load := []byte("abcdefghijklmnopqrstuvwxyz")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = col.Insert(load); err != nil {
-			b.Errorf("Failed to insert: %v", err)
-		}
+		col.Insert(load)
 	}
 }
 
@@ -146,9 +192,7 @@ func BenchmarkRead(b *testing.B) {
 	rand.Seed(time.Now().UTC().UnixNano())
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if doc := col.Read(ids[rand.Int63n(COL_BENCH_SIZE)]); doc == nil {
-			b.Errorf("Failed to read")
-		}
+		col.Read(ids[rand.Int63n(COL_BENCH_SIZE)])
 	}
 }
 
@@ -174,9 +218,7 @@ func BenchmarkUpdate(b *testing.B) {
 	newDoc := []byte("0123456789")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = col.Update(ids[rand.Int63n(COL_BENCH_SIZE)], newDoc); err != nil {
-			b.Errorf("Failed to update: %v", err)
-		}
+		col.Update(ids[rand.Int63n(COL_BENCH_SIZE)], newDoc)
 	}
 }
 
@@ -192,10 +234,8 @@ func BenchmarkDelete(b *testing.B) {
 	// Insert 1 million documents
 	load := []byte("abcdefghijklmnopqrstuvwxyz")
 	ids := make([]uint64, COL_BENCH_SIZE)
-	for id := range ids {
-		if ids[id], err = col.Insert(load); err != nil {
-			b.Errorf("Failed to insert: %v", err)
-		}
+	for _ = range ids {
+		col.Insert(load)
 	}
 	// Update documents using random ID
 	rand.Seed(time.Now().UTC().UnixNano())

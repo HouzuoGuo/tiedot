@@ -103,9 +103,12 @@ func GetIn(doc interface{}, path []string) (thing interface{}) {
 
 // Retrieve document data given its ID.
 func (col *Col) Read(id uint64) (doc interface{}) {
-	data := []byte(strings.Trim(string(col.Data.Read(id)), "\000"))
-	if err := json.Unmarshal(data, &doc); err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot parse document ID %d in %s to JSON\n", id, col.Dir)
+	data := col.Data.Read(id)
+	if data == nil {
+		return
+	}
+	if err := json.Unmarshal(col.Data.Read(id), &doc); err != nil {
+		fmt.Fprintf(os.Stderr, "Cannot parse document %d in %s to JSON\n", id, col.Dir)
 	}
 	return
 }

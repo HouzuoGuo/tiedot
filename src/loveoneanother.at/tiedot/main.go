@@ -4,44 +4,37 @@ import (
 	"encoding/json"
 	"fmt"
 	"loveoneanother.at/tiedot/db"
+	"os"
+	"time"
+)
+
+const (
+	COL_BENCH_SIZE    = 5000000 // Number of documents made available for collection benchmark
+	COL_BENCH_THREADS = 8       // Number of threads for collection benchmark
 )
 
 func main() {
+	os.RemoveAll("/tmp/col")
 	col, err := db.OpenCol("/tmp/col")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-
-	docs := []string{`{"a": 1}`, `{"b": 2}`}
-	var jsonDoc [2]interface{}
-	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
-	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
-
-	updatedDocs := []string{`{"a": 2}`, `{"b": "abcdefghijklmnopqrstuvwxyz"}`}
-	var updatedJsonDoc [2]interface{}
-	json.Unmarshal([]byte(updatedDocs[0]), &updatedJsonDoc[0])
-	json.Unmarshal([]byte(updatedDocs[1]), &updatedJsonDoc[1])
-
-	ids := [2]uint64{}
-	if ids[0], err = col.Insert(jsonDoc[0]); err != nil {
-		fmt.Printf("Failed to insert: %v", err)
+	var jsonDoc interface{}
+	json.Unmarshal([]byte(`{"a": 1}`), jsonDoc)
+	completed := make(chan bool, COL_BENCH_THREADS)
+	start := time.Now().UnixNano()
+	for t := 0; t < COL_BENCH_THREADS; t++ {
+		go func() {
+			for d := 0; d < COL_BENCH_SIZE/COL_BENCH_THREADS; d++ {
+				col.Insert(jsonDoc)
+			}
+			completed <- true
+		}()
 	}
-	if ids[1], err = col.Insert(jsonDoc[1]); err != nil {
-		fmt.Printf("Failed to insert: %v", err)
+	for c := 0; c < COL_BENCH_THREADS; c++ {
+		<-completed
 	}
-
-	if ids[0], err = col.Update(ids[0], updatedJsonDoc[0]); err != nil {
-		fmt.Printf("Failed to update: %v", err)
-	}
-	if ids[1], err = col.Update(ids[1], updatedJsonDoc[1]); err != nil {
-		fmt.Printf("Failed to update: %v", err)
-	}
-
-	if col.Read(ids[0]).(map[string]interface{})[string('a')].(float64) != 2.0 {
-		fmt.Printf("Failed to read back doc 0, %v", col.Read(ids[0]))
-	}
-	if col.Read(ids[1]).(map[string]interface{})[string('b')].(string) != string("abcdefghijklmnopqrstuvwxyz") {
-		fmt.Printf("Failed to read back doc 1, %v", col.Read(ids[1]))
-	}
+	end := time.Now().UnixNano()
+	fmt.Println(float64(COL_BENCH_SIZE) / (float64(end-start) / float64(1000000000.0)))
 }

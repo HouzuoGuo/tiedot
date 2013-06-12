@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
 )
 
 const (
@@ -16,13 +17,19 @@ const (
 )
 
 type ColFile struct {
-	File *File
+	File    *File
+	Padding []byte
 }
 
 // Open a collection file.
 func OpenCol(name string) (*ColFile, error) {
 	file, err := Open(name, COL_FILE_GROWTH)
-	return &ColFile{File: file}, err
+	// make an array of padding spaces
+	padding := make([]byte, DOC_MAX_ROOM)
+	for i := range padding {
+		padding[i] = 32
+	}
+	return &ColFile{File: file, Padding: padding}, err
 }
 
 // Retrieve document data given its ID.
@@ -43,21 +50,19 @@ func (col *ColFile) Read(id uint64) []byte {
 
 // Insert a document, return its ID.
 func (col *ColFile) Insert(data []byte) (uint64, error) {
-	<-col.File.Sem
-	var (
-		len64 = uint64(len(data))
-		room  = len64 + len64
-		id    = col.File.Append
-	)
+	len64 := uint64(len(data))
+	room := len64 + len64
 	if room > DOC_MAX_ROOM {
 		col.File.Sem <- true
 		return 0, errors.New(fmt.Sprintf("Document is too large"))
 	}
+	<-col.File.Sem
+	id := col.File.Append
 	col.File.Ensure(DOC_HEADER + room)
 	col.File.Buf[id] = 1
 	binary.PutUvarint(col.File.Buf[id+1:id+DOC_HEADER], room)
 	copy(col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+len64], data)
-	copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], make([]byte, len64))
+	copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], col.Padding[0:len64])
 	col.File.Append = id + DOC_HEADER + room
 	col.File.Sem <- true
 	return id, nil
@@ -77,7 +82,7 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 		len64 := uint64(len(data))
 		if len64 <= room { // overwrite
 			copy(col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+len64], data)
-			copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], make([]byte, room-len64))
+			copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], col.Padding[0:room-len64])
 			col.File.Sem <- true
 			return id, nil
 		}
@@ -93,6 +98,31 @@ func (col *ColFile) Delete(id uint64) {
 	<-col.File.Sem
 	if col.File.Buf[id] == DOC_VALID {
 		col.File.Buf[id] = DOC_INVALID
+	}
+	col.File.Sem <- true
+}
+
+// Do fun for all documents in the collection.
+func (col *ColFile) ForAll(fun func(doc []byte)) {
+	<-col.File.Sem
+	addr := uint64(0)
+	for {
+		if addr >= col.File.Append {
+			break
+		}
+		validity := col.File.Buf[addr]
+		room, _ := binary.Uvarint(col.File.Buf[addr+1 : addr+9])
+		if validity != DOC_VALID && validity != DOC_INVALID || room > DOC_MAX_ROOM {
+			fmt.Fprintf(os.Stderr, "In %s at %d, the document is corrupted\n", col.File.Name, addr)
+			// skip corrupted document
+			addr++
+			for ; col.File.Buf[addr] != DOC_VALID && col.File.Buf[addr] != DOC_INVALID; addr++ {
+			}
+			fmt.Fprintf(os.Stderr, "Corrupted document is skipped, now at %d\n", addr)
+			continue
+		}
+		fun(col.File.Buf[addr+DOC_HEADER : addr+DOC_HEADER+room])
+		addr += DOC_HEADER + room
 	}
 	col.File.Sem <- true
 }

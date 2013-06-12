@@ -2,14 +2,14 @@ package db
 
 import (
 	"encoding/json"
-	"fmt"
+	"math/rand"
 	"os"
 	"testing"
+	"time"
 )
 
 const (
-	COL_BENCH_SIZE    = 1000000 // Number of documents made available for collection benchmark
-	COL_BENCH_THREADS = 16      // Number of threads for collection benchmark
+	COL_BENCH_SIZE = 1000000 // Number of documents made available for collection benchmark
 )
 
 func TestInsertRead(t *testing.T) {
@@ -105,7 +105,6 @@ func TestInsertDeleteRead(t *testing.T) {
 		t.Errorf("Failed to insert: %v", err)
 	}
 	col.Delete(ids[0])
-	fmt.Println("Please ignore the next error message, it is intended to happen.")
 	if col.Read(ids[0]) != nil {
 		t.Errorf("Did not delete document, still read %v", col.Read(ids[0]))
 	}
@@ -120,8 +119,75 @@ func BenchmarkInsert(b *testing.B) {
 	defer os.RemoveAll(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		b.Errorf("Failed to open: %v", err)
 	}
 	var jsonDoc interface{}
-	json.Unmarshal([]byte(`{"a"`), &jsonDoc)
+	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		col.Insert(jsonDoc)
+	}
+}
+
+func BenchmarkRead(b *testing.B) {
+	tmp := "/tmp/tiedot_col_bench"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+	}
+	var jsonDoc interface{}
+	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
+	var ids [COL_BENCH_SIZE]uint64
+	for i := 0; i < COL_BENCH_SIZE; i++ {
+		ids[i], _ = col.Insert(jsonDoc)
+	}
+	rand.Seed(time.Now().UTC().UnixNano())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		col.Read(ids[rand.Int63n(COL_BENCH_SIZE)])
+	}
+}
+
+func BenchmarkUpdate(b *testing.B) {
+	tmp := "/tmp/tiedot_col_bench"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+	}
+	var jsonDoc interface{}
+	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
+	var ids [COL_BENCH_SIZE]uint64
+	for i := 0; i < COL_BENCH_SIZE; i++ {
+		ids[i], _ = col.Insert(jsonDoc)
+	}
+	rand.Seed(time.Now().UTC().UnixNano())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		col.Update(ids[rand.Int63n(COL_BENCH_SIZE)], jsonDoc)
+	}
+}
+
+func BenchmarkDelete(b *testing.B) {
+	tmp := "/tmp/tiedot_col_bench"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+	}
+	var jsonDoc interface{}
+	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
+	var ids [COL_BENCH_SIZE]uint64
+	for i := 0; i < COL_BENCH_SIZE; i++ {
+		ids[i], _ = col.Insert(jsonDoc)
+	}
+	rand.Seed(time.Now().UTC().UnixNano())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		col.Delete(ids[rand.Int63n(COL_BENCH_SIZE)])
+	}
 }
