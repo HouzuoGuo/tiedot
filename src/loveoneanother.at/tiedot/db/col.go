@@ -36,7 +36,7 @@ type Col struct {
 // Return string hash code.
 func StrHash(thing interface{}) uint64 {
 	// very similar to Java String.hashCode()
-	// valid changes to this implementation *may* cause test case hash table placements to change, and thus failing test cases
+	// you must review (even rewrite) most collection test cases, if you change the hash algorithm
 	str := fmt.Sprint(thing)
 	length := len(str)
 	hash := 0
@@ -96,8 +96,6 @@ func (col *Col) BackupAndSaveConf() error {
 
 // (Re)load configuration to collection.
 func (col *Col) LoadConf() error {
-	col.StrHT = make(map[string]*file.HashTable)
-	col.StrIC = make(map[string]*IndexConf)
 	// read index config
 	config, err := ioutil.ReadFile(col.ConfigFileName)
 	if err != nil {
@@ -109,20 +107,22 @@ func (col *Col) LoadConf() error {
 		return err
 	}
 	// open each index file
-	for _, index := range col.Config.Indexes {
+	col.StrHT = make(map[string]*file.HashTable)
+	col.StrIC = make(map[string]*IndexConf)
+	for i, index := range col.Config.Indexes {
 		ht, err := file.OpenHash(path.Join(col.Dir, index.FileName), index.HashBits, index.PerBucket)
 		if err != nil {
 			return err
 		}
 		col.StrHT[strings.Join(index.IndexedPath, ",")] = ht
-		col.StrIC[strings.Join(index.IndexedPath, ",")] = &index
+		col.StrIC[strings.Join(index.IndexedPath, ",")] = &col.Config.Indexes[i]
 	}
 	return nil
 }
 
 // Get inside the data structure, along the given path.
-func GetIn(doc interface{}, path []string) (thing interface{}) {
-	thing = doc
+func GetIn(doc interface{}, path []string) (ret []interface{}) {
+	thing := doc
 	for _, seg := range path {
 		switch t := thing.(type) {
 		case bool:
@@ -139,7 +139,12 @@ func GetIn(doc interface{}, path []string) (thing interface{}) {
 			return nil
 		}
 	}
-	return thing
+	switch thing.(type) {
+	case []interface{}:
+		return thing.([]interface{})
+	default:
+		return append(ret, thing)
+	}
 }
 
 // Retrieve document data given its ID.
@@ -157,16 +162,18 @@ func (col *Col) Read(id uint64) (doc interface{}) {
 // Index the document on all indexes
 func (col *Col) IndexDoc(id uint64, doc interface{}) {
 	completed := make(chan bool, len(col.StrHT)+1)
-	for k, v := range col.StrIC {
-		go func() {
-			col.StrHT[k].Put(StrHash(GetIn(doc, v.IndexedPath)), id)
-			completed <- true
-		}()
-	}
 	go func() {
 		col.IdIndex.Put(id, id)
 		completed <- true
 	}()
+	for k, v := range col.StrIC {
+		go func(k string, v *IndexConf) {
+			for _, thing := range GetIn(doc, v.IndexedPath) {
+				col.StrHT[k].Put(StrHash(thing), id)
+			}
+			completed <- true
+		}(k, v)
+	}
 	for i := -1; i < len(col.StrHT); i++ {
 		<-completed
 	}
@@ -175,20 +182,22 @@ func (col *Col) IndexDoc(id uint64, doc interface{}) {
 // Remove the document from all indexes
 func (col *Col) UnindexDoc(id uint64, doc interface{}) {
 	completed := make(chan bool, len(col.StrHT)+1)
-	for k, v := range col.StrIC {
-		go func() {
-			col.StrHT[k].Remove(StrHash(GetIn(doc, v.IndexedPath)), 1, func(k, v uint64) bool {
-				return v == id
-			})
-			completed <- true
-		}()
-	}
 	go func() {
 		col.IdIndex.Remove(id, 1, func(k, v uint64) bool {
 			return true
 		})
 		completed <- true
 	}()
+	for k, v := range col.StrIC {
+		go func(k string, v *IndexConf) {
+			for _, thing := range GetIn(doc, v.IndexedPath) {
+				col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
+					return v == id
+				})
+			}
+			completed <- true
+		}(k, v)
+	}
 	for i := -1; i < len(col.StrHT); i++ {
 		<-completed
 	}
@@ -261,17 +270,27 @@ func (col *Col) Index(path []string) error {
 	if len(newFileName) > 100 {
 		newFileName = newFileName[0:100]
 	}
+	// close all indexes
+	for _, v := range col.StrHT {
+		v.File.Close()
+	}
 	// save and reload config
 	col.Config.Indexes = append(col.Config.Indexes, IndexConf{FileName: newFileName + strconv.Itoa(int(time.Now().UnixNano())), PerBucket: 100, HashBits: 14, IndexedPath: path})
-	col.BackupAndSaveConf()
-	col.LoadConf()
+	if err := col.BackupAndSaveConf(); err != nil {
+		return err
+	}
+	if err := col.LoadConf(); err != nil {
+		return err
+	}
 	// put all documents in the new index
 	newIndex, ok := col.StrHT[strings.Join(path, ",")]
 	if !ok {
 		return errors.New(fmt.Sprintf("The new index %v in %s is gone??", path, col.Dir))
 	}
 	col.ForAll(func(id uint64, doc interface{}) {
-		newIndex.Put(StrHash(GetIn(doc, path)), id)
+		for _, thing := range GetIn(doc, path) {
+			newIndex.Put(StrHash(thing), id)
+		}
 	})
 	return nil
 }

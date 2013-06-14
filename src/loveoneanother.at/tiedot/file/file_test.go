@@ -11,6 +11,7 @@ func TestOpenClose(t *testing.T) {
 	tmpFile, err := Open(tmp, 1000)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	if tmpFile.Name != tmp {
 		t.Error("Name not set")
@@ -36,6 +37,7 @@ func TestFindingAppend(t *testing.T) {
 	tmpFile, err := Open(tmp, 1000)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	if tmpFile.Append != 0 {
 		t.Error("Incorrect Append")

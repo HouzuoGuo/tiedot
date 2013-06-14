@@ -19,6 +19,7 @@ func TestInsertRead(t *testing.T) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	docs := []string{`{"a": 1}`, `{"b": 2}`}
 	var jsonDoc [2]interface{}
@@ -51,6 +52,7 @@ func TestInsertUpdateRead(t *testing.T) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 
 	docs := []string{`{"a": 1}`, `{"b": 2}`}
@@ -97,6 +99,7 @@ func TestInsertDeleteRead(t *testing.T) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	docs := []string{`{"a": 1}`, `{"b": 2}`}
 	var jsonDoc [2]interface{}
@@ -129,8 +132,9 @@ func TestIndex(t *testing.T) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
-	docs := []string{`{"a": {"b": {"c": 1}, "d": 0}}`, `{"a": {"b": {"c": 2}, "d": 0}}`, `{"a": {"b": {"c": 3}, "d": 0}}`, `{"a": {"b": {"c": 4}, "d": 0}}`}
+	docs := []string{`{"a": {"b": {"c": 1}}, "d": 0}`, `{"a": {"b": {"c": 2}}, "d": 0}`, `{"a": {"b": {"c": 3}}, "d": 0}`, `{"a": {"b": {"c": 4}}, "d": 0}`}
 	var jsonDoc [4]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
@@ -140,25 +144,65 @@ func TestIndex(t *testing.T) {
 	ids[0], _ = col.Insert(jsonDoc[0])
 	if err = col.Index([]string{"a", "b", "c"}); err != nil {
 		t.Error(err)
+		return
 	}
 	if err = col.Index([]string{"d"}); err != nil {
 		t.Error(err)
+		return
 	}
 	for _, first := range col.StrHT {
 		keys, vals := first.GetAll()
-		if !(len(keys) == 1 && len(vals) == 1 && keys[0] == StrHash(1) && vals[0] == ids[0]) {
-			t.Errorf("Did not index existing document")
+		if !(len(keys) == 1 && len(vals) == 1 && vals[0] == ids[0]) {
+			t.Errorf("Did not index existing document, got %v, %v", keys, vals)
 		}
 		break
 	}
 	ids[1], _ = col.Insert(jsonDoc[1])
 	ids[2], _ = col.Insert(jsonDoc[2])
-	//	ids[2], _ = col.Update(ids[2], jsonDoc[3])
-	//	col.Delete(ids[1])
+	ids[2], _ = col.Update(ids[2], jsonDoc[3])
+	col.Delete(ids[1])
+	// jsonDoc[0,3], ids[0, 2] are the ones left
 	index1 := col.StrHT["a,b,c"]
 	index2 := col.StrHT["d"]
-	t.Error(index1.GetAll())
-	t.Error(index2.GetAll())
+	k0, v0 := index2.Get(StrHash(0), 0, func(k, v uint64) bool {
+		return true
+	})
+	k1, v1 := index1.Get(StrHash(1), 0, func(k, v uint64) bool {
+		return true
+	})
+	k4, v4 := index1.Get(StrHash(4), 0, func(k, v uint64) bool {
+		return true
+	})
+	if !(len(k0) == 2 && len(v0) == 2 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[1] == ids[2]) {
+		t.Errorf("Index fault, %v, %v", k0, v0)
+	}
+	if !(len(k1) == 1 && len(v1) == 1 && k1[0] == StrHash(1) && v1[0] == ids[0]) {
+		t.Errorf("Index fault, %v, %v", k1, v1)
+	}
+	if !(len(k4) == 1 && len(v4) == 1 && k4[0] == StrHash(4) && v4[0] == ids[2]) {
+		t.Errorf("Index fault, %v, %v", k4, v4)
+	}
+	// now remove a,b,c index
+	if err = col.Unindex([]string{"a", "b", "c"}); err != nil {
+		t.Error(err)
+		return
+	}
+	if _, ok := col.StrHT["a,b,c"]; ok {
+		t.Error("did not delete index")
+	}
+	if _, ok := col.StrIC["a,b,c"]; ok {
+		t.Error("did not delete index")
+	}
+	newID, err := col.Insert(jsonDoc[0])
+	if err != nil {
+		t.Error(err)
+	}
+	k0, v0 = col.StrHT["d"].Get(StrHash(0), 0, func(k, v uint64) bool {
+		return true
+	})
+	if !(len(k0) == 3 && len(v0) == 3 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[2] == ids[2] && k0[2] == StrHash(0) && v0[1] == newID) {
+		t.Errorf("Index fault, %d, %v, %v", newID, k0, v0)
+	}
 }
 
 func BenchmarkInsert(b *testing.B) {
@@ -168,6 +212,7 @@ func BenchmarkInsert(b *testing.B) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	var jsonDoc interface{}
 	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
@@ -184,6 +229,7 @@ func BenchmarkRead(b *testing.B) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	var jsonDoc interface{}
 	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
@@ -205,6 +251,7 @@ func BenchmarkUpdate(b *testing.B) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	var jsonDoc interface{}
 	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
@@ -226,6 +273,7 @@ func BenchmarkDelete(b *testing.B) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	var jsonDoc interface{}
 	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)

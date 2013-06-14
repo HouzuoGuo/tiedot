@@ -20,6 +20,7 @@ func TestInsertRead(t *testing.T) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	docs := [][]byte{
 		[]byte("abc"),
@@ -47,6 +48,7 @@ func TestInsertReadAll(t *testing.T) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	var ids [5]uint64
 	ids[0], err = col.Insert([]byte("abc"))
@@ -94,6 +96,7 @@ func TestInsertUpdateRead(t *testing.T) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	docs := [][]byte{
 		[]byte("abc"),
@@ -128,6 +131,7 @@ func TestInsertDeleteRead(t *testing.T) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	docs := [][]byte{
 		[]byte("abc"),
@@ -163,6 +167,7 @@ func BenchmarkInsert(b *testing.B) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	load := []byte("abcdefghijklmnopqrstuvwxyz")
 	b.ResetTimer()
@@ -179,6 +184,7 @@ func BenchmarkRead(b *testing.B) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	// Insert 1 million documents
 	load := []byte("abcdefghijklmnopqrstuvwxyz")
@@ -204,6 +210,7 @@ func BenchmarkUpdate(b *testing.B) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	// Insert 10 million documents
 	load := []byte("abcdefghijklmnopqrstuvwxyz")
@@ -230,6 +237,7 @@ func BenchmarkDelete(b *testing.B) {
 	col, err := OpenCol(tmp)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	// Insert 1 million documents
 	load := []byte("abcdefghijklmnopqrstuvwxyz")

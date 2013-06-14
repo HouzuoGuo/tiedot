@@ -18,6 +18,7 @@ func TestPutGet(t *testing.T) {
 	ht, err := OpenHash(tmp, 2, 2)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	for i := uint64(0); i < 30; i++ {
 		ht.Put(i, i)
@@ -40,6 +41,7 @@ func TestPutGet2(t *testing.T) {
 	ht, err := OpenHash(tmp, 2, 2)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	ht.Put(1, 1)
 	ht.Put(1, 2)
@@ -75,6 +77,7 @@ func TestPutRemove(t *testing.T) {
 	ht, err := OpenHash(tmp, 2, 2)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	ht.Put(1, 1)
 	ht.Put(1, 2)
@@ -110,6 +113,7 @@ func TestGetAll(t *testing.T) {
 	ht, err := OpenHash(tmp, 2, 2)
 	if err != nil {
 		t.Errorf("Failed to open: %v", err)
+		return
 	}
 	ht.Put(1, 1)
 	ht.Put(1, 2)
@@ -131,6 +135,7 @@ func BenchmarkPut(b *testing.B) {
 	ht, err := OpenHash(tmp, 14, 100)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	rand.Seed(time.Now().UTC().UnixNano())
 	b.ResetTimer()
@@ -146,6 +151,7 @@ func BenchmarkGet(b *testing.B) {
 	ht, err := OpenHash(tmp, 14, 100)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	rand.Seed(time.Now().UTC().UnixNano())
 	for i := 0; i < HT_BENCH_SIZE; i++ {
@@ -166,6 +172,7 @@ func BenchmarkRemove(b *testing.B) {
 	ht, err := OpenHash(tmp, 14, 100)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	rand.Seed(time.Now().UTC().UnixNano())
 	for i := 0; i < HT_BENCH_SIZE; i++ {
@@ -186,6 +193,7 @@ func BenchmarkGetAll(b *testing.B) {
 	ht, err := OpenHash(tmp, 14, 100)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
+		return
 	}
 	rand.Seed(time.Now().UTC().UnixNano())
 	for i := 0; i < HT_BENCH_SIZE; i++ {
