@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math/rand"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -206,6 +207,7 @@ func TestIndex(t *testing.T) {
 }
 
 func BenchmarkInsert(b *testing.B) {
+	rand.Seed(time.Now().UTC().UnixNano())
 	tmp := "/tmp/tiedot_col_bench"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
@@ -214,15 +216,17 @@ func BenchmarkInsert(b *testing.B) {
 		b.Errorf("Failed to open: %v", err)
 		return
 	}
+	col.Index([]string{"a", "b", "c"})
 	var jsonDoc interface{}
-	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz}`), &jsonDoc)
 		col.Insert(jsonDoc)
 	}
 }
 
 func BenchmarkRead(b *testing.B) {
+	rand.Seed(time.Now().UTC().UnixNano())
 	tmp := "/tmp/tiedot_col_bench"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
@@ -231,10 +235,11 @@ func BenchmarkRead(b *testing.B) {
 		b.Errorf("Failed to open: %v", err)
 		return
 	}
+	col.Index([]string{"a", "b", "c"})
 	var jsonDoc interface{}
-	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
 	var ids [COL_BENCH_SIZE]uint64
 	for i := 0; i < COL_BENCH_SIZE; i++ {
+		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz}`), &jsonDoc)
 		ids[i], _ = col.Insert(jsonDoc)
 	}
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -245,6 +250,7 @@ func BenchmarkRead(b *testing.B) {
 }
 
 func BenchmarkUpdate(b *testing.B) {
+	rand.Seed(time.Now().UTC().UnixNano())
 	tmp := "/tmp/tiedot_col_bench"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
@@ -253,20 +259,23 @@ func BenchmarkUpdate(b *testing.B) {
 		b.Errorf("Failed to open: %v", err)
 		return
 	}
+	col.Index([]string{"a", "b", "c"})
 	var jsonDoc interface{}
 	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
 	var ids [COL_BENCH_SIZE]uint64
 	for i := 0; i < COL_BENCH_SIZE; i++ {
+		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz}`), &jsonDoc)
 		ids[i], _ = col.Insert(jsonDoc)
 	}
-	rand.Seed(time.Now().UTC().UnixNano())
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz}`), &jsonDoc)
 		col.Update(ids[rand.Int63n(COL_BENCH_SIZE)], jsonDoc)
 	}
 }
 
 func BenchmarkDelete(b *testing.B) {
+	rand.Seed(time.Now().UTC().UnixNano())
 	tmp := "/tmp/tiedot_col_bench"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
@@ -275,10 +284,12 @@ func BenchmarkDelete(b *testing.B) {
 		b.Errorf("Failed to open: %v", err)
 		return
 	}
+	col.Index([]string{"a", "b", "c"})
 	var jsonDoc interface{}
 	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
 	var ids [COL_BENCH_SIZE]uint64
 	for i := 0; i < COL_BENCH_SIZE; i++ {
+		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz}`), &jsonDoc)
 		ids[i], _ = col.Insert(jsonDoc)
 	}
 	rand.Seed(time.Now().UTC().UnixNano())

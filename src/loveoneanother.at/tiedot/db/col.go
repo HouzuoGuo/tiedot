@@ -161,45 +161,27 @@ func (col *Col) Read(id uint64) (doc interface{}) {
 
 // Index the document on all indexes
 func (col *Col) IndexDoc(id uint64, doc interface{}) {
-	completed := make(chan bool, len(col.StrHT)+1)
-	go func() {
-		col.IdIndex.Put(id, id)
-		completed <- true
-	}()
+	col.IdIndex.Put(id, id)
 	for k, v := range col.StrIC {
-		go func(k string, v *IndexConf) {
-			for _, thing := range GetIn(doc, v.IndexedPath) {
+		for _, thing := range GetIn(doc, v.IndexedPath) {
+			if thing != nil {
 				col.StrHT[k].Put(StrHash(thing), id)
 			}
-			completed <- true
-		}(k, v)
-	}
-	for i := -1; i < len(col.StrHT); i++ {
-		<-completed
+		}
 	}
 }
 
 // Remove the document from all indexes
 func (col *Col) UnindexDoc(id uint64, doc interface{}) {
-	completed := make(chan bool, len(col.StrHT)+1)
-	go func() {
-		col.IdIndex.Remove(id, 1, func(k, v uint64) bool {
-			return true
-		})
-		completed <- true
-	}()
+	col.IdIndex.Remove(id, 1, func(k, v uint64) bool {
+		return true
+	})
 	for k, v := range col.StrIC {
-		go func(k string, v *IndexConf) {
-			for _, thing := range GetIn(doc, v.IndexedPath) {
-				col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
-					return v == id
-				})
-			}
-			completed <- true
-		}(k, v)
-	}
-	for i := -1; i < len(col.StrHT); i++ {
-		<-completed
+		for _, thing := range GetIn(doc, v.IndexedPath) {
+			col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
+				return v == id
+			})
+		}
 	}
 }
 
@@ -226,18 +208,9 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	if oldDoc == nil {
 		return id, nil
 	}
-	completed := make(chan bool, 2)
-	go func() {
-		newID, err = col.Data.Update(id, data)
-		completed <- true
-	}()
-	go func() {
-		col.UnindexDoc(id, oldDoc)
-		col.IndexDoc(newID, doc)
-		completed <- true
-	}()
-	<-completed
-	<-completed
+	newID, err = col.Data.Update(id, data)
+	col.UnindexDoc(id, oldDoc)
+	col.IndexDoc(newID, doc)
 	return
 }
 
@@ -247,17 +220,8 @@ func (col *Col) Delete(id uint64) {
 	if oldDoc == nil {
 		return
 	}
-	completed := make(chan bool, 2)
-	go func() {
-		col.Data.Delete(id)
-		completed <- true
-	}()
-	go func() {
-		col.UnindexDoc(id, oldDoc)
-		completed <- true
-	}()
-	<-completed
-	<-completed
+	col.Data.Delete(id)
+	col.UnindexDoc(id, oldDoc)
 }
 
 // Add an index.
@@ -289,7 +253,9 @@ func (col *Col) Index(path []string) error {
 	}
 	col.ForAll(func(id uint64, doc interface{}) {
 		for _, thing := range GetIn(doc, path) {
-			newIndex.Put(StrHash(thing), id)
+			if thing != nil {
+				newIndex.Put(StrHash(thing), id)
+			}
 		}
 	})
 	return nil
