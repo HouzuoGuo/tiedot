@@ -267,6 +267,10 @@ func (col *Col) Unindex(path []string) error {
 	if _, found := col.StrHT[joinedPath]; !found {
 		return errors.New(fmt.Sprintf("Path %v was never indexed in collection %s", path, col.Dir))
 	}
+	// close all indexes
+	for _, v := range col.StrHT {
+		v.File.Close()
+	}
 	found := 0
 	for i, index := range col.Config.Indexes {
 		match := true
@@ -290,8 +294,12 @@ func (col *Col) Unindex(path []string) error {
 	}
 	// remove it from config
 	col.Config.Indexes = append(col.Config.Indexes[0:found], col.Config.Indexes[found+1:len(col.Config.Indexes)]...)
-	col.BackupAndSaveConf()
-	col.LoadConf()
+	if err := col.BackupAndSaveConf(); err != nil {
+		return err
+	}
+	if err := col.LoadConf(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -308,17 +316,16 @@ func (col *Col) ForAll(fun func(id uint64, doc interface{})) {
 }
 
 // Close a collection.
-func (col *Col) Close() (err error) {
-	if err = col.Data.File.Close(); err != nil {
-		return
+func (col *Col) Close() {
+	if err := col.Data.File.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to close %s, reason: %v\n", col.Data.File.Name, err)
 	}
-	if err = col.IdIndex.File.Close(); err != nil {
-		return
+	if err := col.IdIndex.File.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to close %s, reason: %v\n", col.IdIndex.File.Name, err)
 	}
 	for _, ht := range col.StrHT {
-		if err = ht.File.Close(); err != nil {
-			return
+		if err := ht.File.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to close %s, reason: %v\n", ht.File.Name, err)
 		}
 	}
-	return
 }

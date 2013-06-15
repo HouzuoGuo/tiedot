@@ -44,6 +44,7 @@ func TestInsertRead(t *testing.T) {
 	if !(keys[0] == ids[0] && ids[0] == vals[0] && keys[1] == ids[1] && ids[1] == vals[1] && len(keys) == 2 && len(vals) == 2) {
 		t.Errorf("ID Index was not set correctly")
 	}
+	col.Close()
 }
 
 func TestInsertUpdateRead(t *testing.T) {
@@ -91,6 +92,7 @@ func TestInsertUpdateRead(t *testing.T) {
 	if !(keys[0] == ids[0] && ids[0] == vals[0] && keys[1] == ids[1] && ids[1] == vals[1] && len(keys) == 2 && len(vals) == 2) {
 		t.Errorf("ID Index was not set correctly")
 	}
+	col.Close()
 }
 
 func TestInsertDeleteRead(t *testing.T) {
@@ -124,6 +126,7 @@ func TestInsertDeleteRead(t *testing.T) {
 	if !(keys[0] == ids[1] && ids[1] == vals[0] && len(keys) == 1 && len(vals) == 1) {
 		t.Errorf("ID Index was not set correctly")
 	}
+	col.Close()
 }
 
 func TestIndex(t *testing.T) {
@@ -204,6 +207,7 @@ func TestIndex(t *testing.T) {
 	if !(len(k0) == 3 && len(v0) == 3 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[2] == ids[2] && k0[2] == StrHash(0) && v0[1] == newID) {
 		t.Errorf("Index fault, %d, %v, %v", newID, k0, v0)
 	}
+	col.Close()
 }
 
 func BenchmarkInsert(b *testing.B) {
