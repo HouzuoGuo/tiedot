@@ -1,3 +1,4 @@
+/* Collection management (Database is a collection of collections). */
 package db
 
 import (
