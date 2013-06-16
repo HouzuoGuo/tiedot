@@ -1,3 +1,4 @@
+/* Query processor. */
 package db
 
 import (
@@ -6,6 +7,10 @@ import (
 
 const ()
 
+/*
+ */
+
+// Evaluate a query and return query result.
 func Eval(expr interface{}, src *Col) (result []uint64) {
 	fmt.Println("Eval", expr)
 	switch v := expr.(type) {
