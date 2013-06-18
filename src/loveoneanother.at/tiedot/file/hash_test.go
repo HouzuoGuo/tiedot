@@ -190,7 +190,7 @@ func BenchmarkGetAll(b *testing.B) {
 	tmp := "/tmp/tiedot_hash_benchmark"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	ht, err := OpenHash(tmp, 14, 100)
+	ht, err := OpenHash(tmp, 12, 400)
 	if err != nil {
 		b.Errorf("Failed to open: %v", err)
 		return

@@ -53,7 +53,7 @@ func OpenCol(dir string) (col *Col, err error) {
 	}
 	col = &Col{ConfigFileName: path.Join(dir, "config"), ConfBackupFileName: path.Join(dir, "config.bak"), Dir: dir}
 	// open ID index
-	idIndex, err := file.OpenHash(path.Join(dir, "id"), 14, 100)
+	idIndex, err := file.OpenHash(path.Join(dir, "id"), 12, 400)
 	if err != nil {
 		return
 	}

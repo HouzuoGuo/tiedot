@@ -7,34 +7,12 @@ import (
 	"strings"
 )
 
-const ()
-
-/*
-
-Lookup:
-["=", {"eq": "the_value", "limit": 3, "in": ["path1", "path2"]}]
-
-Return all:
-["all"]
-
-intersect:
-["n", [], [], []]
-
-complement:
-["\", [], [], []]
-
-union:
-["u", [], [], []]
-
-*/
-
-// Evaluate a query and return query result. Use result map keys!
-func Eval(q interface{}, src *Col, result *map[uint64]bool) (err error) {
-	fmt.Println("Eval", q)
+// EvalQueryuate a query and return query result. Use result map keys!
+func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 	switch expr := q.(type) {
 	// 1, 2.0, etc
 	case float64:
-
+		(*result)[uint64(expr)] = false
 	// ["op", "param1", "param2"...]
 	case []interface{}:
 		switch op := expr[0].(type) {
@@ -71,6 +49,8 @@ func Eval(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 							return errors.New(fmt.Sprintf("expecting `limit` number, but you gave me: %v", floatLimit))
 						}
 					}
+					// figure out lookup value
+					lookupStrValue := fmt.Sprint(lookupValue)
 					// now do lookup!
 					if ht, indexScan := src.StrHT[strings.Join(vecPath, ",")]; indexScan {
 						// index scan is much prefered
@@ -78,7 +58,7 @@ func Eval(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 						_, vals := ht.Get(hashValue, intLimit, func(k, v uint64) bool {
 							// to avoid hash collision
 							for _, v := range GetIn(src.Read(v), vecPath) {
-								if v == lookupValue {
+								if fmt.Sprint(v) == lookupStrValue {
 									return true
 								}
 							}
@@ -89,16 +69,16 @@ func Eval(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 						}
 					} else {
 						// fallback to collection scan
-						counter := 0
+						counter := uint64(0)
 						src.ForAll(func(id uint64, doc interface{}) bool {
 							for _, v := range GetIn(doc, vecPath) {
-								if v == lookupValue {
+								if fmt.Sprint(v) == lookupStrValue {
 									counter += 1
 									(*result)[id] = false
-									return counter == limit
+									return counter != intLimit
 								}
 							}
-							return counter == limit
+							return true
 						})
 					}
 				default:
@@ -106,52 +86,69 @@ func Eval(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 				}
 			// intersect
 			case "n":
-				for _, subExpr := range expr[1 : len(expr)-1] {
+				if len(expr) < 3 {
+					return errors.New(fmt.Sprintf("expecting more than two results to intersect, but I only have: %v", expr))
+				}
+				first := true
+				for _, subExpr := range expr[1:len(expr)] {
 					subExprResult := make(map[uint64]bool)
 					intersection := make(map[uint64]bool)
-					err = Eval(subExpr, src, &subExprResult)
+					err = EvalQuery(subExpr, src, &subExprResult)
 					if err != nil {
 						return
 					}
 					// calculate intersection
-					for k, _ := range subExprResult {
-						if _, inBoth := (*result)[k]; inBoth {
-							intersection[k] = false
+					if first {
+						*result = subExprResult
+					} else {
+						for k, _ := range subExprResult {
+							if _, inBoth := (*result)[k]; inBoth {
+								intersection[k] = false
+							}
 						}
+						*result = intersection
 					}
-					result = &intersection
+					first = false
 				}
 			// complement
 			case "\\":
-				for _, subExpr := range expr[1 : len(expr)-1] {
+				if len(expr) < 3 {
+					return errors.New(fmt.Sprintf("expecting more than two results to complement, but I only have: %v", expr))
+				}
+				for _, subExpr := range expr[1:len(expr)] {
 					subExprResult := make(map[uint64]bool)
 					complement := make(map[uint64]bool)
-					err = Eval(subExpr, src, &subExprResult)
+					err = EvalQuery(subExpr, src, &subExprResult)
 					if err != nil {
 						return
 					}
-					// calculate intersection
+					// calculate complement
 					for k, _ := range subExprResult {
 						if _, inBoth := (*result)[k]; !inBoth {
 							complement[k] = false
 						}
 					}
-					result = &complement
+					for k, _ := range *result {
+						if _, inBoth := subExprResult[k]; !inBoth {
+							complement[k] = false
+						}
+					}
+					*result = complement
 				}
 			// union
 			case "u":
-				for _, subExpr := range expr[1 : len(expr)-1] {
-					err = Eval(subExpr, src, result)
+				for _, subExpr := range expr[1:len(expr)] {
+					err = EvalQuery(subExpr, src, result)
 					if err != nil {
 						return
 					}
 				}
 			// all documents
 			case "all":
-				_, ids := src.IdIndex.GetAll()
-				for _, id := range ids {
+				src.Data.ForAll(func(id uint64, _ []byte) bool {
 					(*result)[id] = false
-				}
+					return true
+				})
 			}
 		}
 	}

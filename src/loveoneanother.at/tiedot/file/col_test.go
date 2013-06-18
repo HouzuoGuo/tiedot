@@ -253,3 +253,28 @@ func BenchmarkDelete(b *testing.B) {
 		col.Delete(ids[rand.Int63n(COL_BENCH_SIZE)])
 	}
 }
+
+func BenchmarkColGetAll(b *testing.B) {
+	tmp := "/tmp/tiedot_benchmark_getall"
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+		return
+	}
+	load := []byte("abcdefghijklmnopqrstuvwxyz")
+	ids := make([]uint64, COL_BENCH_SIZE)
+	for _ = range ids {
+		if _, err = col.Insert(load); err != nil {
+			b.Error(err)
+		}
+	}
+	rand.Seed(time.Now().UTC().UnixNano())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		col.ForAll(func(id uint64, doc []byte) bool {
+			return true
+		})
+	}
+}

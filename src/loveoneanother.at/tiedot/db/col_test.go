@@ -323,3 +323,32 @@ func BenchmarkDelete(b *testing.B) {
 		col.Delete(ids[rand.Int63n(COL_BENCH_SIZE)])
 	}
 }
+
+func BenchmarkColGetAll(b *testing.B) {
+	rand.Seed(time.Now().UTC().UnixNano())
+	tmp := "/tmp/tiedot_col_bench"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		b.Errorf("Failed to open: %v", err)
+		return
+	}
+	col.Index([]string{"a", "b", "c"})
+	var jsonDoc interface{}
+	json.Unmarshal([]byte(`{"a": 1}`), &jsonDoc)
+	var ids [COL_BENCH_SIZE]uint64
+	for i := 0; i < COL_BENCH_SIZE; i++ {
+		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz}`), &jsonDoc)
+		ids[i], err = col.Insert(jsonDoc)
+		if err != nil {
+			b.Error(err)
+		}
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		col.ForAll(func(id uint64, doc interface{}) bool {
+			return true
+		})
+	}
+}
