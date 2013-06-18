@@ -122,4 +122,5 @@ func TestQuery(t *testing.T) {
 	if !ensureMapHasKeys(q, ids[0]) {
 		t.Error(q)
 	}
+	col.Close()
 }

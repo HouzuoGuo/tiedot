@@ -40,10 +40,6 @@ func TestInsertRead(t *testing.T) {
 	if col.Read(ids[1]).(map[string]interface{})[string('b')].(float64) != 2.0 {
 		t.Errorf("Failed to read back document, got %v", col.Read(ids[1]))
 	}
-	keys, vals := col.IdIndex.GetAll()
-	if !(keys[0] == ids[0] && ids[0] == vals[0] && keys[1] == ids[1] && ids[1] == vals[1] && len(keys) == 2 && len(vals) == 2) {
-		t.Errorf("ID Index was not set correctly")
-	}
 	col.Close()
 }
 
@@ -88,10 +84,6 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	if col.Read(ids[1]).(map[string]interface{})[string('b')].(string) != string("abcdefghijklmnopqrstuvwxyz") {
 		t.Errorf("Failed to read back document, got %v", col.Read(ids[1]))
 	}
-	keys, vals := col.IdIndex.GetAll()
-	if !(keys[0] == ids[0] && ids[0] == vals[0] && keys[1] == ids[1] && ids[1] == vals[1] && len(keys) == 2 && len(vals) == 2) {
-		t.Errorf("ID Index was not set correctly")
-	}
 	counter := 0
 	col.ForAll(func(id uint64, doc interface{}) bool {
 		counter++
@@ -129,10 +121,6 @@ func TestInsertDeleteRead(t *testing.T) {
 	}
 	if col.Read(ids[1]).(map[string]interface{})[string('b')].(float64) != 2 {
 		t.Errorf("Failed to read back document, got %v", col.Read(ids[1]))
-	}
-	keys, vals := col.IdIndex.GetAll()
-	if !(keys[0] == ids[1] && ids[1] == vals[0] && len(keys) == 1 && len(vals) == 1) {
-		t.Errorf("ID Index was not set correctly")
 	}
 	col.Close()
 }
@@ -248,6 +236,7 @@ func BenchmarkInsert(b *testing.B) {
 		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz}`), &jsonDoc)
 		col.Insert(jsonDoc)
 	}
+	col.Close()
 }
 
 func BenchmarkRead(b *testing.B) {
@@ -272,6 +261,7 @@ func BenchmarkRead(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		col.Read(ids[rand.Int63n(COL_BENCH_SIZE)])
 	}
+	col.Close()
 }
 
 func BenchmarkUpdate(b *testing.B) {
@@ -297,6 +287,7 @@ func BenchmarkUpdate(b *testing.B) {
 		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz}`), &jsonDoc)
 		col.Update(ids[rand.Int63n(COL_BENCH_SIZE)], jsonDoc)
 	}
+	col.Close()
 }
 
 func BenchmarkDelete(b *testing.B) {
@@ -322,6 +313,7 @@ func BenchmarkDelete(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		col.Delete(ids[rand.Int63n(COL_BENCH_SIZE)])
 	}
+	col.Close()
 }
 
 func BenchmarkColGetAll(b *testing.B) {
@@ -351,4 +343,5 @@ func BenchmarkColGetAll(b *testing.B) {
 			return true
 		})
 	}
+	col.Close()
 }

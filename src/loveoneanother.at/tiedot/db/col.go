@@ -30,7 +30,6 @@ type Col struct {
 	Dir, ConfigFileName, ConfBackupFileName string
 	StrHT                                   map[string]*file.HashTable
 	StrIC                                   map[string]*IndexConf
-	IdIndex                                 *file.HashTable
 }
 
 // Return string hash code.
@@ -52,16 +51,10 @@ func OpenCol(dir string) (col *Col, err error) {
 		return
 	}
 	col = &Col{ConfigFileName: path.Join(dir, "config"), ConfBackupFileName: path.Join(dir, "config.bak"), Dir: dir}
-	// open ID index
-	idIndex, err := file.OpenHash(path.Join(dir, "id"), 12, 400)
-	if err != nil {
-		return
-	}
 	// open data file
 	if col.Data, err = file.OpenCol(path.Join(dir, "data")); err != nil {
 		return
 	}
-	col.IdIndex = idIndex
 	// make sure the config file exists
 	tryOpen, err := os.OpenFile(col.ConfigFileName, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
@@ -161,7 +154,6 @@ func (col *Col) Read(id uint64) (doc interface{}) {
 
 // Index the document on all indexes
 func (col *Col) IndexDoc(id uint64, doc interface{}) {
-	col.IdIndex.Put(id, id)
 	for k, v := range col.StrIC {
 		for _, thing := range GetIn(doc, v.IndexedPath) {
 			if thing != nil {
@@ -173,9 +165,6 @@ func (col *Col) IndexDoc(id uint64, doc interface{}) {
 
 // Remove the document from all indexes
 func (col *Col) UnindexDoc(id uint64, doc interface{}) {
-	col.IdIndex.Remove(id, 1, func(k, v uint64) bool {
-		return true
-	})
 	for k, v := range col.StrIC {
 		for _, thing := range GetIn(doc, v.IndexedPath) {
 			col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
@@ -321,9 +310,6 @@ func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
 func (col *Col) Close() {
 	if err := col.Data.File.Close(); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to close %s, reason: %v\n", col.Data.File.Name, err)
-	}
-	if err := col.IdIndex.File.Close(); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to close %s, reason: %v\n", col.IdIndex.File.Name, err)
 	}
 	for _, ht := range col.StrHT {
 		if err := ht.File.Close(); err != nil {
