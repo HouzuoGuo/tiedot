@@ -12,7 +12,7 @@ const ()
 /*
 
 Lookup:
-["=", {"eq": "the_value", "limit": 1, "in": ["path1", "path2"]}]
+["=", {"eq": "the_value", "limit": 3, "in": ["path1", "path2"]}]
 
 Return all:
 ["all"]
@@ -89,13 +89,16 @@ func Eval(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 						}
 					} else {
 						// fallback to collection scan
-						src.ForAll(func(id uint64, doc interface{}) {
+						counter := 0
+						src.ForAll(func(id uint64, doc interface{}) bool {
 							for _, v := range GetIn(doc, vecPath) {
 								if v == lookupValue {
+									counter += 1
 									(*result)[id] = false
-									return
+									return counter == limit
 								}
 							}
+							return counter == limit
 						})
 					}
 				default:

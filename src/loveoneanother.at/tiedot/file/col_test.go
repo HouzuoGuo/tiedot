@@ -79,12 +79,13 @@ func TestInsertReadAll(t *testing.T) {
 	col.File.Buf[ids[1]+3] = 255
 	col.File.Buf[ids[1]+4] = 255
 	successfullyRead := 0
-	col.ForAll(func(id uint64, data []byte) {
+	col.ForAll(func(id uint64, data []byte) bool {
 		successfullyRead++
+		return true
 	})
 	// the reason is that corrupted documents are "empty" documents
-	if successfullyRead != 5 {
-		t.Errorf("Should have recovered 5 documents, but %d are recovered", successfullyRead)
+	if successfullyRead != 3 {
+		t.Errorf("Should have recovered 3 documents, but %d are recovered", successfullyRead)
 	}
 	col.File.Close()
 }

@@ -47,7 +47,7 @@ func TestInsertRead(t *testing.T) {
 	col.Close()
 }
 
-func TestInsertUpdateRead(t *testing.T) {
+func TestInsertUpdateReadAll(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
@@ -91,6 +91,14 @@ func TestInsertUpdateRead(t *testing.T) {
 	keys, vals := col.IdIndex.GetAll()
 	if !(keys[0] == ids[0] && ids[0] == vals[0] && keys[1] == ids[1] && ids[1] == vals[1] && len(keys) == 2 && len(vals) == 2) {
 		t.Errorf("ID Index was not set correctly")
+	}
+	counter := 0
+	col.ForAll(func(id uint64, doc interface{}) bool {
+		counter++
+		return true
+	})
+	if counter != 2 {
+		t.Errorf("Expected to read 2 documents, but %d read", counter)
 	}
 	col.Close()
 }

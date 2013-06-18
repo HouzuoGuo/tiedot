@@ -251,12 +251,13 @@ func (col *Col) Index(path []string) error {
 	if !ok {
 		return errors.New(fmt.Sprintf("The new index %v in %s is gone??", path, col.Dir))
 	}
-	col.ForAll(func(id uint64, doc interface{}) {
+	col.ForAll(func(id uint64, doc interface{}) bool {
 		for _, thing := range GetIn(doc, path) {
 			if thing != nil {
 				newIndex.Put(StrHash(thing), id)
 			}
 		}
+		return true
 	})
 	return nil
 }
@@ -304,13 +305,14 @@ func (col *Col) Unindex(path []string) error {
 }
 
 // Do fun for all documents.
-func (col *Col) ForAll(fun func(id uint64, doc interface{})) {
-	col.Data.ForAll(func(id uint64, data []byte) {
+func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
+	col.Data.ForAll(func(id uint64, data []byte) bool {
 		var parsed interface{}
 		if err := json.Unmarshal(data, &parsed); err != nil {
 			fmt.Fprintf(os.Stderr, "Cannot parse document '%v' in %s to JSON\n", data, col.Dir)
+			return true
 		} else {
-			fun(id, parsed)
+			return fun(id, parsed)
 		}
 	})
 }

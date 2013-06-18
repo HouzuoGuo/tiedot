@@ -103,7 +103,7 @@ func (col *ColFile) Delete(id uint64) {
 }
 
 // Do fun for all documents in the collection.
-func (col *ColFile) ForAll(fun func(id uint64, doc []byte)) {
+func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 	<-col.File.Sem
 	addr := uint64(0)
 	for {
@@ -121,7 +121,9 @@ func (col *ColFile) ForAll(fun func(id uint64, doc []byte)) {
 			fmt.Fprintf(os.Stderr, "Corrupted document is skipped, now at %d\n", addr)
 			continue
 		}
-		fun(addr, col.File.Buf[addr+DOC_HEADER:addr+DOC_HEADER+room])
+		if validity == DOC_VALID && !fun(addr, col.File.Buf[addr+DOC_HEADER:addr+DOC_HEADER+room]) {
+			break
+		}
 		addr += DOC_HEADER + room
 	}
 	col.File.Sem <- true
