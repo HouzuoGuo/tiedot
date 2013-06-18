@@ -138,7 +138,12 @@ func TestIndex(t *testing.T) {
 		t.Errorf("Failed to open: %v", err)
 		return
 	}
-	docs := []string{`{"a": {"b": {"c": 1}}, "d": 0}`, `{"a": {"b": {"c": 2}}, "d": 0}`, `{"a": {"b": {"c": 3}}, "d": 0}`, `{"a": {"b": {"c": 4}}, "d": 0}`}
+	docs := []string{
+		`{"a": {"b": {"c": 1}}, "d": 0}`,
+		`{"a": {"b": {"c": 2}}, "d": 0}`,
+		`{"a": {"b": {"c": 3}}, "d": 0}`,
+		`{"a": {"b": {"c": 4}}, "d": [0, 9]}`,
+		`{"a": {"b": {"c": null}}, "d": null}`}
 	var jsonDoc [4]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
@@ -168,18 +173,26 @@ func TestIndex(t *testing.T) {
 	// jsonDoc[0,3], ids[0, 2] are the ones left
 	index1 := col.StrHT["a,b,c"]
 	index2 := col.StrHT["d"]
+	// d index
 	k0, v0 := index2.Get(StrHash(0), 0, func(k, v uint64) bool {
 		return true
 	})
+	k9, v9 := index2.Get(StrHash(9), 0, func(k, v uint64) bool {
+		return true
+	})
+	if !(len(k0) == 2 && len(v0) == 2 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[1] == ids[2]) {
+		t.Errorf("Index fault on key 0, %v, %v", k0, v0)
+	}
+	if !(len(k9) == 1 && len(v9) == 1 && k9[0] == StrHash(9) && v9[0] == ids[2]) {
+		t.Errorf("Index fault on key 9, %v, %v", k9, v9)
+	}
+	// abc index
 	k1, v1 := index1.Get(StrHash(1), 0, func(k, v uint64) bool {
 		return true
 	})
 	k4, v4 := index1.Get(StrHash(4), 0, func(k, v uint64) bool {
 		return true
 	})
-	if !(len(k0) == 2 && len(v0) == 2 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[1] == ids[2]) {
-		t.Errorf("Index fault, %v, %v", k0, v0)
-	}
 	if !(len(k1) == 1 && len(v1) == 1 && k1[0] == StrHash(1) && v1[0] == ids[0]) {
 		t.Errorf("Index fault, %v, %v", k1, v1)
 	}
