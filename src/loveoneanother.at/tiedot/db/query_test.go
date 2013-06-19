@@ -152,13 +152,9 @@ func BenchmarkQuery(b *testing.B) {
 			b.Error(err)
 		}
 	}
-	for i := 0; i < 1000; i++ {
-		q, err := runQuery(fmt.Sprintf("[\"u\", [\"=\", {\"eq\": %d, \"limit\": 1, \"in\": [\"a\", \"b\", \"c\"]}], [\"=\", {\"eq\": %d, \"limit\": 1, \"in\": [\"a\", \"b\", \"c\"]}]]", rand.Intn(QUERY_BENCH_SIZE), rand.Intn(QUERY_BENCH_SIZE)), col)
-		fmt.Println(q, err)
-	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := runQuery(fmt.Sprintf("[\"u\", [\"=\", {\"eq\": %d,  \"in\": [\"a\", \"b\", \"c\"]}], [\"=\", {\"eq\": %d,  \"in\": [\"a\", \"b\", \"c\"]}]]", rand.Intn(QUERY_BENCH_SIZE), rand.Intn(QUERY_BENCH_SIZE)), col)
+		_, err := runQuery(fmt.Sprintf("[\"u\", [\"=\", {\"eq\": %d, \"limit\": 1, \"in\": [\"a\", \"b\", \"c\"]}], [\"=\", {\"eq\": %d, \"limit\": 1, \"in\": [\"a\", \"b\", \"c\"]}]]", rand.Intn(QUERY_BENCH_SIZE), rand.Intn(QUERY_BENCH_SIZE)), col)
 		if err != nil {
 			b.Error(err)
 		}
