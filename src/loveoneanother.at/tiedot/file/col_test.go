@@ -9,9 +9,7 @@ import (
 	"time"
 )
 
-const (
-	COL_BENCH_SIZE = 1000000 // Number of documents made available for collection benchmark
-)
+const COL_BENCH_SIZE = 1000000 // Number of documents made available for collection benchmark
 
 func TestInsertRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"

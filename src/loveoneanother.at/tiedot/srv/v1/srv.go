@@ -3,6 +3,7 @@ package v1
 
 import (
 	"fmt"
+	"log"
 	"loveoneanother.at/tiedot/db"
 	"net/http"
 )
@@ -25,5 +26,6 @@ func Start(db *db.DB, port int) {
 	http.HandleFunc("/FIND", Find)
 	http.HandleFunc("/COUNT", Count)
 
+	log.Printf("Listening on all interfaces, port %d", port)
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
