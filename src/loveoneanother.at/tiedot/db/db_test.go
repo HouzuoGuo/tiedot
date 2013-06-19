@@ -53,27 +53,3 @@ func TestCRUD(t *testing.T) {
 	}
 	db.Close()
 }
-
-func BenchmarkUse(b *testing.B) {
-	tmp := "/tmp/tiedot_db_test"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	db, err := OpenDB(tmp)
-	if err != nil {
-		b.Errorf("Failed to open: %v", err)
-		return
-	}
-	if err := db.Create("a"); err != nil {
-		b.Error(err)
-	}
-	if err := db.Create("b"); err != nil {
-		b.Error(err)
-	}
-	if err := db.Create("c"); err != nil {
-		b.Error(err)
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		db.Use("a")
-	}
-}

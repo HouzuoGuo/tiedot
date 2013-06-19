@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"os"
+	"log"
 )
 
 const (
@@ -113,12 +113,12 @@ func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 		validity := col.File.Buf[addr]
 		room, _ := binary.Uvarint(col.File.Buf[addr+1 : addr+9])
 		if validity != DOC_VALID && validity != DOC_INVALID || room > DOC_MAX_ROOM {
-			fmt.Fprintf(os.Stderr, "In %s at %d, the document is corrupted\n", col.File.Name, addr)
+			log.Printf("In %s at %d, the document is corrupted\n", col.File.Name, addr)
 			// skip corrupted document
 			addr++
 			for ; col.File.Buf[addr] != DOC_VALID && col.File.Buf[addr] != DOC_INVALID; addr++ {
 			}
-			fmt.Fprintf(os.Stderr, "Corrupted document is skipped, now at %d\n", addr)
+			log.Printf("Corrupted document is skipped, now at %d\n", addr)
 			continue
 		}
 		if validity == DOC_VALID && !fun(addr, col.File.Buf[addr+DOC_HEADER:addr+DOC_HEADER+room]) {

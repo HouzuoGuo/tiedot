@@ -1,3 +1,5 @@
 package v1
 
-import ()
+import "loveoneanother.at/tiedot/db"
+
+var DB *db.DB

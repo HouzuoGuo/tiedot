@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 	"math"
-	"os"
 )
 
 const (
@@ -56,7 +56,7 @@ func (ht *HashTable) nextBucket(bucket uint64) uint64 {
 		return 0
 	} else {
 		if next, _ := binary.Uvarint(ht.File.Buf[bucketAddr : bucketAddr+BUCKET_HEADER_SIZE]); next != 0 && next <= bucket {
-			fmt.Fprintf(os.Stderr, "Loop detected in hash table %s at bucket %d, address %d\n", ht.File.Name, bucket, bucketAddr)
+			log.Printf("Loop detected in hash table %s at bucket %d, address %d\n", ht.File.Name, bucket, bucketAddr)
 			return 0
 		} else {
 			return next

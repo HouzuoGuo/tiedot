@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 )
@@ -26,9 +27,9 @@ func OpenDB(dir string) (db *DB, err error) {
 	for _, f := range files {
 		if f.IsDir() {
 			if db.StrCol[f.Name()], err = OpenCol(path.Join(dir, f.Name())); err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to open collection %s, reason: %v\n", f.Name(), err)
+				log.Printf("Failed to open collection %s, reason: %v\n", f.Name(), err)
 			} else {
-				fmt.Fprintf(os.Stderr, "Successfully opened collection %s\n", f.Name(), err)
+				log.Printf("Successfully opened collection %s\n", f.Name(), err)
 			}
 		}
 	}

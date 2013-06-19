@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"loveoneanother.at/tiedot/file"
 	"os"
 	"path"
@@ -147,7 +148,7 @@ func (col *Col) Read(id uint64) (doc interface{}) {
 		return
 	}
 	if err := json.Unmarshal(col.Data.Read(id), &doc); err != nil {
-		fmt.Fprintf(os.Stderr, "Cannot parse document %d in %s to JSON\n", id, col.Dir)
+		log.Printf("Cannot parse document %d in %s to JSON\n", id, col.Dir)
 	}
 	return
 }
@@ -298,7 +299,7 @@ func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
 	col.Data.ForAll(func(id uint64, data []byte) bool {
 		var parsed interface{}
 		if err := json.Unmarshal(data, &parsed); err != nil {
-			fmt.Fprintf(os.Stderr, "Cannot parse document '%v' in %s to JSON\n", data, col.Dir)
+			log.Printf("Cannot parse document '%v' in %s to JSON\n", data, col.Dir)
 			return true
 		} else {
 			return fun(id, parsed)
@@ -309,11 +310,11 @@ func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
 // Close a collection.
 func (col *Col) Close() {
 	if err := col.Data.File.Close(); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to close %s, reason: %v\n", col.Data.File.Name, err)
+		log.Printf("Failed to close %s, reason: %v\n", col.Data.File.Name, err)
 	}
 	for _, ht := range col.StrHT {
 		if err := ht.File.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to close %s, reason: %v\n", ht.File.Name, err)
+			log.Printf("Failed to close %s, reason: %v\n", ht.File.Name, err)
 		}
 	}
 }

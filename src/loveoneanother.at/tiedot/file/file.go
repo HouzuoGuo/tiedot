@@ -4,6 +4,7 @@ package file
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"syscall"
 )
@@ -31,7 +32,7 @@ func Open(name string, growth uint64) (file *File, err error) {
 		return
 	}
 	if int(fsize) < 0 {
-		panic(fmt.Sprintf("File %s is too large to mmap", name))
+		log.Panicf("File %s is too large to mmap", name)
 	}
 	file.Size = uint64(fsize)
 	if file.Size == 0 {
@@ -80,12 +81,12 @@ func (file *File) Ensure(more uint64) (err error) {
 		return
 	}
 	if newSize := int(file.Size + file.Growth); newSize < 0 {
-		panic(fmt.Sprintf("File %s is getting too large", file.Name))
+		log.Panicf("File %s is getting too large", file.Name)
 	} else if file.Buf, err = syscall.Mmap(int(file.Fh.Fd()), 0, newSize, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED); err != nil {
 		return
 	}
 	file.Size += file.Growth
-	fmt.Fprintf(os.Stderr, "File %s has grown %d bytes\n", file.Name, file.Growth)
+	log.Printf("File %s has grown %d bytes\n", file.Name, file.Growth)
 	return file.Ensure(more)
 }
 

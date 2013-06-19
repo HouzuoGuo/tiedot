@@ -90,7 +90,7 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 					return errors.New(fmt.Sprintf("expecting more than two results to intersect, but I only have: %v", expr))
 				}
 				first := true
-				for _, subExpr := range expr[1:len(expr)] {
+				for _, subExpr := range expr[1:] {
 					subExprResult := make(map[uint64]bool)
 					intersection := make(map[uint64]bool)
 					err = EvalQuery(subExpr, src, &subExprResult)
@@ -115,7 +115,7 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 				if len(expr) < 3 {
 					return errors.New(fmt.Sprintf("expecting more than two results to complement, but I only have: %v", expr))
 				}
-				for _, subExpr := range expr[1:len(expr)] {
+				for _, subExpr := range expr[1:] {
 					subExprResult := make(map[uint64]bool)
 					complement := make(map[uint64]bool)
 					err = EvalQuery(subExpr, src, &subExprResult)
@@ -137,7 +137,7 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 				}
 			// union
 			case "u":
-				for _, subExpr := range expr[1:len(expr)] {
+				for _, subExpr := range expr[1:] {
 					err = EvalQuery(subExpr, src, result)
 					if err != nil {
 						return
