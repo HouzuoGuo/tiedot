@@ -159,4 +159,5 @@ func BenchmarkQuery(b *testing.B) {
 			b.Error(err)
 		}
 	}
+	col.Close()
 }
