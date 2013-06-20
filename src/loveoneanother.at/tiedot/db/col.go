@@ -158,16 +158,16 @@ func (col *Col) Read(id uint64) (doc interface{}, size int) {
 // Index the document on all indexes
 func (col *Col) IndexDoc(id uint64, doc interface{}) {
 	wg := new(sync.WaitGroup)
+	wg.Add(len(col.StrIC))
 	for k, v := range col.StrIC {
-		wg.Add(1)
-		go func() {
+		go func(k string, v *IndexConf) {
 			defer wg.Done()
 			for _, thing := range GetIn(doc, v.IndexedPath) {
 				if thing != nil {
 					col.StrHT[k].Put(StrHash(thing), id)
 				}
 			}
-		}()
+		}(k, v)
 	}
 	wg.Wait()
 }
@@ -175,16 +175,16 @@ func (col *Col) IndexDoc(id uint64, doc interface{}) {
 // Remove the document from all indexes
 func (col *Col) UnindexDoc(id uint64, doc interface{}) {
 	wg := new(sync.WaitGroup)
+	wg.Add(len(col.StrIC))
 	for k, v := range col.StrIC {
-		wg.Add(1)
-		go func() {
+		go func(k string, v *IndexConf) {
 			defer wg.Done()
 			for _, thing := range GetIn(doc, v.IndexedPath) {
 				col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
 					return v == id
 				})
 			}
-		}()
+		}(k, v)
 	}
 	wg.Wait()
 }
