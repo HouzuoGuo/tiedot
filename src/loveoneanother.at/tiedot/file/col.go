@@ -34,16 +34,16 @@ func OpenCol(name string) (*ColFile, error) {
 
 // Retrieve document data given its ID.
 func (col *ColFile) Read(id uint64) []byte {
-	<-col.File.Sem
+	col.File.Sync.Lock()
 	if id < 0 || id > col.File.Append || col.File.Buf[id] != DOC_VALID {
-		col.File.Sem <- true
+		col.File.Sync.Unlock()
 		return nil
 	}
 	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+9]); room > DOC_MAX_ROOM {
-		col.File.Sem <- true
+		col.File.Sync.Unlock()
 		return nil
 	} else {
-		col.File.Sem <- true
+		col.File.Sync.Unlock()
 		return col.File.Buf[id+DOC_HEADER : id+DOC_HEADER+room]
 	}
 }
@@ -53,10 +53,10 @@ func (col *ColFile) Insert(data []byte) (uint64, error) {
 	len64 := uint64(len(data))
 	room := len64 + len64
 	if room > DOC_MAX_ROOM {
-		col.File.Sem <- true
+		col.File.Sync.Unlock()
 		return 0, errors.New(fmt.Sprintf("Document is too large"))
 	}
-	<-col.File.Sem
+	col.File.Sync.Lock()
 	id := col.File.Append
 	col.File.Ensure(DOC_HEADER + room)
 	col.File.Buf[id] = 1
@@ -64,29 +64,29 @@ func (col *ColFile) Insert(data []byte) (uint64, error) {
 	copy(col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+len64], data)
 	copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], col.Padding[0:len64])
 	col.File.Append = id + DOC_HEADER + room
-	col.File.Sem <- true
+	col.File.Sync.Unlock()
 	return id, nil
 }
 
 // Update a document, return its new ID.
 func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
-	<-col.File.Sem
+	col.File.Sync.Lock()
 	if id < 0 || id > col.File.Append || col.File.Buf[id] != DOC_VALID {
-		col.File.Sem <- true
+		col.File.Sync.Unlock()
 		return id, errors.New(fmt.Sprintf("No such document %d in %s", id, col.File.Name))
 	}
 	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+9]); room > DOC_MAX_ROOM {
-		col.File.Sem <- true
+		col.File.Sync.Unlock()
 		return id, errors.New(fmt.Sprintf("No such document %d in %s", id, col.File.Name))
 	} else {
 		len64 := uint64(len(data))
 		if len64 <= room { // overwrite
 			copy(col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+len64], data)
 			copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], col.Padding[0:room-len64])
-			col.File.Sem <- true
+			col.File.Sync.Unlock()
 			return id, nil
 		}
-		col.File.Sem <- true
+		col.File.Sync.Unlock()
 		// re-insert
 		col.Delete(id)
 		return col.Insert(data)
@@ -95,17 +95,17 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 
 // Delete a document.
 func (col *ColFile) Delete(id uint64) {
-	<-col.File.Sem
+	col.File.Sync.Lock()
 	if col.File.Buf[id] == DOC_VALID {
 		col.File.Buf[id] = DOC_INVALID
 	}
-	col.File.Sem <- true
+	col.File.Sync.Unlock()
 }
 
 // Do fun for all documents in the collection.
 func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
-	<-col.File.Sem
 	addr := uint64(0)
+	col.File.Sync.Lock()
 	for {
 		if addr >= col.File.Append {
 			break
@@ -126,5 +126,5 @@ func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 		}
 		addr += DOC_HEADER + room
 	}
-	col.File.Sem <- true
+	col.File.Sync.Unlock()
 }

@@ -32,11 +32,11 @@ func TestInsertRead(t *testing.T) {
 	if ids[1], err = col.Insert(jsonDoc[1]); err != nil {
 		t.Errorf("Failed to insert: %v", err)
 	}
-	if col.Read(ids[0]).(map[string]interface{})[string('a')].(float64) != 1.0 {
-		t.Errorf("Failed to read back document, got %v", col.Read(ids[0]))
+	if doc, _ := col.Read(ids[0]); doc.(map[string]interface{})[string('a')].(float64) != 1.0 {
+		t.Errorf("Failed to read back document, got %v", doc)
 	}
-	if col.Read(ids[1]).(map[string]interface{})[string('b')].(float64) != 2.0 {
-		t.Errorf("Failed to read back document, got %v", col.Read(ids[1]))
+	if doc, _ := col.Read(ids[1]); doc.(map[string]interface{})[string('b')].(float64) != 2.0 {
+		t.Errorf("Failed to read back document, got %v", doc)
 	}
 	col.Close()
 }
@@ -76,11 +76,11 @@ func TestInsertUpdateReadAll(t *testing.T) {
 		t.Errorf("Failed to update: %v", err)
 	}
 
-	if col.Read(ids[0]).(map[string]interface{})[string('a')].(float64) != 2.0 {
-		t.Errorf("Failed to read back document, got %v", col.Read(ids[0]))
+	if doc, _ := col.Read(ids[0]); doc.(map[string]interface{})[string('a')].(float64) != 2.0 {
+		t.Errorf("Failed to read back document, got %v", doc)
 	}
-	if col.Read(ids[1]).(map[string]interface{})[string('b')].(string) != string("abcdefghijklmnopqrstuvwxyz") {
-		t.Errorf("Failed to read back document, got %v", col.Read(ids[1]))
+	if doc, _ := col.Read(ids[1]); doc.(map[string]interface{})[string('b')].(string) != string("abcdefghijklmnopqrstuvwxyz") {
+		t.Errorf("Failed to read back document, got %v", doc)
 	}
 	counter := 0
 	col.ForAll(func(id uint64, doc interface{}) bool {
@@ -114,11 +114,11 @@ func TestInsertDeleteRead(t *testing.T) {
 		t.Errorf("Failed to insert: %v", err)
 	}
 	col.Delete(ids[0])
-	if col.Read(ids[0]) != nil {
-		t.Errorf("Did not delete document, still read %v", col.Read(ids[0]))
+	if doc, _ := col.Read(ids[0]); doc != nil {
+		t.Errorf("Did not delete document")
 	}
-	if col.Read(ids[1]).(map[string]interface{})[string('b')].(float64) != 2 {
-		t.Errorf("Failed to read back document, got %v", col.Read(ids[1]))
+	if doc, _ := col.Read(ids[1]); doc.(map[string]interface{})[string('b')].(float64) != 2 {
+		t.Errorf("Failed to read back document, got %v", doc)
 	}
 	col.Close()
 }
@@ -231,7 +231,9 @@ func BenchmarkInsert(b *testing.B) {
 	var jsonDoc interface{}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc)
+		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
+			b.Error("json error")
+		}
 		col.Insert(jsonDoc)
 	}
 	col.Close()
@@ -251,7 +253,9 @@ func BenchmarkRead(b *testing.B) {
 	var jsonDoc interface{}
 	var ids [COL_BENCH_SIZE]uint64
 	for i := 0; i < COL_BENCH_SIZE; i++ {
-		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc)
+		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
+			b.Error("json error")
+		}
 		ids[i], _ = col.Insert(jsonDoc)
 	}
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -276,12 +280,16 @@ func BenchmarkUpdate(b *testing.B) {
 	var jsonDoc interface{}
 	var ids [COL_BENCH_SIZE]uint64
 	for i := 0; i < COL_BENCH_SIZE; i++ {
-		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc)
+		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
+			b.Error("json error")
+		}
 		ids[i], _ = col.Insert(jsonDoc)
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc)
+		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
+			b.Error("json error")
+		}
 		col.Update(ids[rand.Int63n(COL_BENCH_SIZE)], jsonDoc)
 	}
 	col.Close()
@@ -301,7 +309,9 @@ func BenchmarkDelete(b *testing.B) {
 	var jsonDoc interface{}
 	var ids [COL_BENCH_SIZE]uint64
 	for i := 0; i < COL_BENCH_SIZE; i++ {
-		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc)
+		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
+			b.Error("json error")
+		}
 		ids[i], _ = col.Insert(jsonDoc)
 	}
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -326,7 +336,9 @@ func BenchmarkColGetAll(b *testing.B) {
 	var jsonDoc interface{}
 	var ids [COL_BENCH_SIZE]uint64
 	for i := 0; i < COL_BENCH_SIZE; i++ {
-		json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc)
+		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
+			b.Error("json error")
+		}
 		ids[i], err = col.Insert(jsonDoc)
 		if err != nil {
 			b.Error(err)

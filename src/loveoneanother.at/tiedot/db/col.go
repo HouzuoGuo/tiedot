@@ -12,6 +12,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -142,8 +143,9 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 }
 
 // Retrieve document data given its ID.
-func (col *Col) Read(id uint64) (doc interface{}) {
+func (col *Col) Read(id uint64) (doc interface{}, size int) {
 	data := col.Data.Read(id)
+	size = len(data)
 	if data == nil {
 		return
 	}
@@ -155,24 +157,36 @@ func (col *Col) Read(id uint64) (doc interface{}) {
 
 // Index the document on all indexes
 func (col *Col) IndexDoc(id uint64, doc interface{}) {
+	wg := new(sync.WaitGroup)
 	for k, v := range col.StrIC {
-		for _, thing := range GetIn(doc, v.IndexedPath) {
-			if thing != nil {
-				col.StrHT[k].Put(StrHash(thing), id)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, thing := range GetIn(doc, v.IndexedPath) {
+				if thing != nil {
+					col.StrHT[k].Put(StrHash(thing), id)
+				}
 			}
-		}
+		}()
 	}
+	wg.Wait()
 }
 
 // Remove the document from all indexes
 func (col *Col) UnindexDoc(id uint64, doc interface{}) {
+	wg := new(sync.WaitGroup)
 	for k, v := range col.StrIC {
-		for _, thing := range GetIn(doc, v.IndexedPath) {
-			col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
-				return v == id
-			})
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, thing := range GetIn(doc, v.IndexedPath) {
+				col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
+					return v == id
+				})
+			}
+		}()
 	}
+	wg.Wait()
 }
 
 // Insert a new document.
@@ -194,24 +208,47 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	if err != nil {
 		return
 	}
-	oldDoc := col.Read(id)
+	oldDoc, oldSize := col.Read(id)
 	if oldDoc == nil {
 		return id, nil
 	}
-	newID, err = col.Data.Update(id, data)
-	col.UnindexDoc(id, oldDoc)
-	col.IndexDoc(newID, doc)
+	wg := new(sync.WaitGroup)
+	if oldSize >= len(data) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err = col.Data.Update(id, data)
+		}()
+	} else {
+		newID, err = col.Data.Update(id, data)
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		col.UnindexDoc(id, oldDoc)
+		col.IndexDoc(newID, doc)
+	}()
+	wg.Wait()
 	return
 }
 
 // Delete a document.
 func (col *Col) Delete(id uint64) {
-	oldDoc := col.Read(id)
+	oldDoc, _ := col.Read(id)
 	if oldDoc == nil {
 		return
 	}
-	col.Data.Delete(id)
-	col.UnindexDoc(id, oldDoc)
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		col.Data.Delete(id)
+	}()
+	go func() {
+		defer wg.Done()
+		col.UnindexDoc(id, oldDoc)
+	}()
+	wg.Wait()
 }
 
 // Add an index.

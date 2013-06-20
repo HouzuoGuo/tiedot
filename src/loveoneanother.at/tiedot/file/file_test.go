@@ -7,6 +7,7 @@ import (
 
 func TestOpenClose(t *testing.T) {
 	tmp := "/tmp/tiedot_file_test"
+	os.Remove(tmp)
 	defer os.Remove(tmp)
 	tmpFile, err := Open(tmp, 1000)
 	if err != nil {
@@ -32,6 +33,7 @@ func TestOpenClose(t *testing.T) {
 
 func TestFindingAppend(t *testing.T) {
 	tmp := "/tmp/tiedot_file_test"
+	os.Remove(tmp)
 	defer os.Remove(tmp)
 	// Open
 	tmpFile, err := Open(tmp, 1000)
