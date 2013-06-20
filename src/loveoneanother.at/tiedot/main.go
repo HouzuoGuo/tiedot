@@ -8,15 +8,27 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 )
 
-func average(iterations int, do func()) {
-	iter := float64(iterations)
+func average(name string, total int, numThreads int, init func(), do func()) {
+	wp := new(sync.WaitGroup)
+	init()
+	iter := float64(total)
 	start := float64(time.Now().UTC().UnixNano())
-	do()
+	for i := 0; i < total; i += total / numThreads {
+		wp.Add(1)
+		go func() {
+			defer wp.Done()
+			for j := 0; j < total/numThreads; j++ {
+				do()
+			}
+		}()
+	}
+	wp.Wait()
 	end := float64(time.Now().UTC().UnixNano())
-	fmt.Printf("%d: %d ns/iter, %d iter/sec\n", int(iterations), int((end-start)/iter), int(1000000000/((end-start)/iter)))
+	fmt.Printf("%s %d: %d ns/iter, %d iter/sec\n", name, int(total), int((end-start)/iter), int(1000000000/((end-start)/iter)))
 }
 
 func benchmark() {
@@ -36,62 +48,46 @@ func benchmark() {
 	col.Index([]string{"a", "b", "c"})
 	col.Index([]string{"a", "c", "d"})
 	// benchmark insert
-	average(BENCH_SIZE, func() {
-		completed := make(chan bool, BENCH_SIZE/THREADS)
-		for i := 0; i < BENCH_SIZE; i += BENCH_SIZE / THREADS {
-			go func() {
-				for j := 0; j < BENCH_SIZE/THREADS; j++ {
-					var jsonDoc interface{}
-					if err := json.Unmarshal([]byte(
-						`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}},`+
-							`"c": {"d": `+strconv.Itoa(rand.Int())+`},`+
-							`"more": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
-						return
-						panic("json error")
-					}
-					if _, err := col.Insert(jsonDoc); err != nil {
-						return
-						panic("insert error")
-					}
-				}
-				completed <- true
-			}()
+	average("insert", BENCH_SIZE, THREADS, func() {}, func() {
+		var jsonDoc interface{}
+		if err := json.Unmarshal([]byte(
+			`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}},`+
+				`"c": {"d": `+strconv.Itoa(rand.Int())+`},`+
+				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
+			panic("json error")
 		}
-		for i := 0; i < BENCH_SIZE; i += BENCH_SIZE / THREADS {
-			<-completed
+		if _, err := col.Insert(jsonDoc); err != nil {
+			panic("insert error")
+		}
+	})
+	// benchmark read
+	ids := make([]uint64, 0)
+	average("read", BENCH_SIZE, THREADS, func() {
+		col.ForAll(func(id uint64, doc interface{}) bool {
+			ids = append(ids, id)
+			return true
+		})
+	}, func() {
+		doc, _ := col.Read(ids[uint64(rand.Intn(BENCH_SIZE))])
+		if doc == nil {
+			panic("read error")
 		}
 	})
 	// benchmark update
-	ids := make([]uint64, 0)
-	col.ForAll(func(id uint64, doc interface{}) bool {
-		ids = append(ids, id)
-		return true
-	})
-	average(BENCH_SIZE, func() {
-		completed := make(chan bool, BENCH_SIZE/THREADS)
-		for i := 0; i < BENCH_SIZE; i += BENCH_SIZE / THREADS {
-			go func() {
-				for j := 0; j < BENCH_SIZE/THREADS; j++ {
-					var jsonDoc interface{}
-					if err := json.Unmarshal([]byte(
-						`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}},`+
-							`"c": {"d": `+strconv.Itoa(rand.Int())+`},`+
-							`"more": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
-						return
-						panic("json error")
-					}
-					if _, err := col.Update(ids[rand.Intn(BENCH_SIZE)], jsonDoc); err != nil {
-						return
-						panic("insert error")
-					}
-				}
-				completed <- true
-			}()
+	average("update", BENCH_SIZE, THREADS, func() {
+	}, func() {
+		var jsonDoc interface{}
+		if err := json.Unmarshal([]byte(
+			`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}},`+
+				`"c": {"d": `+strconv.Itoa(rand.Int())+`},`+
+				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
+			panic("json error")
 		}
-		for i := 0; i < BENCH_SIZE; i += BENCH_SIZE / THREADS {
-			<-completed
+		if _, err := col.Update(ids[rand.Intn(BENCH_SIZE)], jsonDoc); err != nil {
+			panic("update error")
 		}
 	})
+
 	col.Close()
 }
 
