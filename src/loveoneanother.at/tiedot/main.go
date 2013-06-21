@@ -34,7 +34,7 @@ func average(name string, total int, numThreads int, init func(), do func()) {
 func benchmark() {
 	// config
 	BENCH_SIZE := 1000000
-	THREADS := 4
+	THREADS := 16
 	runtime.GOMAXPROCS(THREADS)
 	rand.Seed(time.Now().UTC().UnixNano())
 	// prepare collection
@@ -47,12 +47,11 @@ func benchmark() {
 	}
 	col.Index([]string{"a", "b", "c"})
 	col.Index([]string{"a", "c", "d"})
-	// benchmark insert
 	average("insert", BENCH_SIZE, THREADS, func() {}, func() {
 		var jsonDoc interface{}
 		if err := json.Unmarshal([]byte(
-			`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}},`+
-				`"c": {"d": `+strconv.Itoa(rand.Int())+`},`+
+			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`}},`+
+				`"c": {"d": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`},`+
 				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
 			panic("json error")
 		}
@@ -60,7 +59,6 @@ func benchmark() {
 			panic("insert error")
 		}
 	})
-	// benchmark read
 	ids := make([]uint64, 0)
 	average("read", BENCH_SIZE, THREADS, func() {
 		col.ForAll(func(id uint64, doc interface{}) bool {
@@ -73,9 +71,17 @@ func benchmark() {
 			panic("read error")
 		}
 	})
-	// benchmark update
-	average("update", BENCH_SIZE, THREADS, func() {
-	}, func() {
+//	average("double lookup", BENCH_SIZE, THREADS, func() {}, func() {
+//		var query interface{}
+//		if err := json.Unmarshal([]byte(`["n", ["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "b", "c"]}], ["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "c", "d"]}]]`), &query); err != nil {
+//			panic("json error")
+//		}
+//		result := make(map[uint64]bool)
+//		if err := db.EvalQuery(query, col, &result); err != nil {
+//			panic("query")
+//		}
+//	})
+	average("update", BENCH_SIZE, THREADS, func() {}, func() {
 		var jsonDoc interface{}
 		if err := json.Unmarshal([]byte(
 			`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}},`+
@@ -86,6 +92,9 @@ func benchmark() {
 		if _, err := col.Update(ids[rand.Intn(BENCH_SIZE)], jsonDoc); err != nil {
 			panic("update error")
 		}
+	})
+	average("delete", BENCH_SIZE, THREADS, func() {}, func() {
+		col.Delete(ids[rand.Intn(BENCH_SIZE)])
 	})
 
 	col.Close()
