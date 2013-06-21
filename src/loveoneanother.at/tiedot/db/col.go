@@ -161,12 +161,12 @@ func (col *Col) IndexDoc(id uint64, doc interface{}) {
 	wg.Add(len(col.StrIC))
 	for k, v := range col.StrIC {
 		go func(k string, v *IndexConf) {
-			defer wg.Done()
 			for _, thing := range GetIn(doc, v.IndexedPath) {
 				if thing != nil {
-					col.StrHT[k].Put(StrHash(thing), id)
+						col.StrHT[k].Put(StrHash(thing), id)
 				}
 			}
+			wg.Done()
 		}(k, v)
 	}
 	wg.Wait()
@@ -178,12 +178,12 @@ func (col *Col) UnindexDoc(id uint64, doc interface{}) {
 	wg.Add(len(col.StrIC))
 	for k, v := range col.StrIC {
 		go func(k string, v *IndexConf) {
-			defer wg.Done()
 			for _, thing := range GetIn(doc, v.IndexedPath) {
-				col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
-					return v == id
-				})
+					col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
+						return v == id
+					})
 			}
+			wg.Done()
 		}(k, v)
 	}
 	wg.Wait()
@@ -216,17 +216,17 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	if oldSize >= len(data) {
 		wg.Add(1)
 		go func() {
-			defer wg.Done()
 			_, err = col.Data.Update(id, data)
+			wg.Done()
 		}()
 	} else {
 		newID, err = col.Data.Update(id, data)
 	}
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		col.UnindexDoc(id, oldDoc)
 		col.IndexDoc(newID, doc)
+		wg.Done()
 	}()
 	wg.Wait()
 	return
@@ -241,12 +241,12 @@ func (col *Col) Delete(id uint64) {
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 	go func() {
-		defer wg.Done()
 		col.Data.Delete(id)
+		wg.Done()
 	}()
 	go func() {
-		defer wg.Done()
 		col.UnindexDoc(id, oldDoc)
+		wg.Done()
 	}()
 	wg.Wait()
 }

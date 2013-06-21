@@ -33,8 +33,8 @@ func average(name string, total int, numThreads int, init func(), do func()) {
 
 func benchmark() {
 	// config
-	BENCH_SIZE := 1000000
-	THREADS := 16
+	BENCH_SIZE := 500000
+	THREADS := 8
 	runtime.GOMAXPROCS(THREADS)
 	rand.Seed(time.Now().UTC().UnixNano())
 	// prepare collection
@@ -71,16 +71,16 @@ func benchmark() {
 			panic("read error")
 		}
 	})
-//	average("double lookup", BENCH_SIZE, THREADS, func() {}, func() {
-//		var query interface{}
-//		if err := json.Unmarshal([]byte(`["n", ["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "b", "c"]}], ["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "c", "d"]}]]`), &query); err != nil {
-//			panic("json error")
-//		}
-//		result := make(map[uint64]bool)
-//		if err := db.EvalQuery(query, col, &result); err != nil {
-//			panic("query")
-//		}
-//	})
+	average("lookup", BENCH_SIZE, THREADS, func() {}, func() {
+		var query interface{}
+		if err := json.Unmarshal([]byte(`["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "c", "d"]}]`), &query); err != nil {
+			panic("json error")
+		}
+		result := make(map[uint64]bool)
+		if err := db.EvalQuery(query, col, &result); err != nil {
+			panic("query")
+		}
+	})
 	average("update", BENCH_SIZE, THREADS, func() {}, func() {
 		var jsonDoc interface{}
 		if err := json.Unmarshal([]byte(
