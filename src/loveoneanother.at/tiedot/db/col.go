@@ -145,10 +145,10 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 // Retrieve document data given its ID.
 func (col *Col) Read(id uint64) (doc interface{}, size int) {
 	data := col.Data.Read(id)
-	size = len(data)
 	if data == nil {
 		return
 	}
+	size = len(data)
 	if err := json.Unmarshal(col.Data.Read(id), &doc); err != nil {
 		log.Printf("Cannot parse document %d in %s to JSON\n", id, col.Dir)
 	}
@@ -266,7 +266,7 @@ func (col *Col) Index(path []string) error {
 		v.File.Close()
 	}
 	// save and reload config
-	col.Config.Indexes = append(col.Config.Indexes, IndexConf{FileName: newFileName + strconv.Itoa(int(time.Now().UnixNano())), PerBucket: 100, HashBits: 14, IndexedPath: path})
+	col.Config.Indexes = append(col.Config.Indexes, IndexConf{FileName: newFileName + strconv.Itoa(int(time.Now().UnixNano())), PerBucket: 200, HashBits: 14, IndexedPath: path})
 	if err := col.BackupAndSaveConf(); err != nil {
 		return err
 	}
