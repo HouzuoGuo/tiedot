@@ -163,7 +163,7 @@ func (col *Col) IndexDoc(id uint64, doc interface{}) {
 		go func(k string, v *IndexConf) {
 			for _, thing := range GetIn(doc, v.IndexedPath) {
 				if thing != nil {
-						col.StrHT[k].Put(StrHash(thing), id)
+					col.StrHT[k].Put(StrHash(thing), id)
 				}
 			}
 			wg.Done()
@@ -179,9 +179,9 @@ func (col *Col) UnindexDoc(id uint64, doc interface{}) {
 	for k, v := range col.StrIC {
 		go func(k string, v *IndexConf) {
 			for _, thing := range GetIn(doc, v.IndexedPath) {
-					col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
-						return v == id
-					})
+				col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
+					return v == id
+				})
 			}
 			wg.Done()
 		}(k, v)
