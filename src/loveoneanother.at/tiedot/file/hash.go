@@ -20,7 +20,6 @@ const (
 type HashTable struct {
 	File                            *File
 	BucketSize, HashBits, PerBucket uint64
-	C1, C2, C3                      int
 }
 
 // Open a hash table file.
@@ -94,7 +93,6 @@ func (ht *HashTable) hashKey(key uint64) uint64 {
 func (ht *HashTable) Put(key, val uint64) {
 	var bucket, entry uint64 = ht.hashKey(key), 0
 	ht.File.Sync.Lock()
-	ht.C1++
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		if ht.File.Buf[entryAddr] != ENTRY_VALID {
@@ -127,7 +125,6 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		vals = make([]uint64, 0, limit)
 	}
 	ht.File.Sync.Lock()
-	ht.C2++
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+9])
@@ -159,7 +156,6 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool) {
 	var count, entry, bucket uint64 = 0, 0, ht.hashKey(key)
 	ht.File.Sync.Lock()
-	ht.C3++
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+9])

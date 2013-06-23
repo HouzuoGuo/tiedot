@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	BENCH_SIZE = 200000
-	THREADS    = 16
+	BENCH_SIZE = 2000
+	THREADS    = 1
 )
 
 func average(name string, total int, numThreads int, init func(), do func()) {
@@ -59,17 +59,12 @@ func benchmark() {
 		panic(err)
 	}
 	col.Index([]string{"a", "b", "c"})
-	col.Index([]string{"a", "c", "d"})
+	col.Index([]string{"c", "d"})
 	average("insert", BENCH_SIZE, THREADS, func() {}, func() {
 		if _, err := col.Insert(docs[rand.Intn(BENCH_SIZE)]); err != nil {
 			panic("insert error")
 		}
 	})
-
-	for name, ht := range col.StrHT {
-		fmt.Println(name, ht.C1, ht.C2, ht.C3)
-	}
-
 	ids := make([]uint64, 0)
 	average("read", BENCH_SIZE, THREADS, func() {
 		col.ForAll(func(id uint64, doc interface{}) bool {
@@ -82,14 +77,9 @@ func benchmark() {
 			panic("read error")
 		}
 	})
-
-	for name, ht := range col.StrHT {
-		fmt.Println(name, ht.C1, ht.C2, ht.C3)
-	}
-
 	average("lookup", BENCH_SIZE, THREADS, func() {}, func() {
 		var query interface{}
-		if err := json.Unmarshal([]byte(`["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "c", "d"]}]`), &query); err != nil {
+		if err := json.Unmarshal([]byte(`["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["c", "d"]}]`), &query); err != nil {
 			panic("json error")
 		}
 		result := make(map[uint64]bool)
@@ -97,28 +87,14 @@ func benchmark() {
 			panic("query")
 		}
 	})
-
-	for name, ht := range col.StrHT {
-		fmt.Println(name, ht.C1, ht.C2, ht.C3)
-	}
-
 	average("update", BENCH_SIZE, THREADS, func() {}, func() {
 		if _, err := col.Update(ids[rand.Intn(BENCH_SIZE)], docs[rand.Intn(BENCH_SIZE)]); err != nil {
 			panic("update error")
 		}
 	})
-
-	for name, ht := range col.StrHT {
-		fmt.Println(name, ht.C1, ht.C2, ht.C3)
-	}
-
 	average("delete", BENCH_SIZE, THREADS, func() {}, func() {
 		col.Delete(ids[rand.Intn(BENCH_SIZE)])
 	})
-
-	for name, ht := range col.StrHT {
-		fmt.Println(name, ht.C1, ht.C2, ht.C3)
-	}
 	col.Close()
 }
 

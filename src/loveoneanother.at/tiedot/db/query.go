@@ -4,6 +4,7 @@ package db
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -70,6 +71,7 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 						}
 					} else {
 						// fallback to collection scan
+						log.Printf("Query %v is inefficient\n", q)
 						counter := uint64(0)
 						src.ForAll(func(id uint64, doc interface{}) bool {
 							for _, v := range GetIn(doc, vecPath) {
