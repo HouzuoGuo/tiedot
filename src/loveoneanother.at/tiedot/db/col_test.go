@@ -2,14 +2,11 @@ package db
 
 import (
 	"encoding/json"
-	"math/rand"
 	"os"
-	"strconv"
 	"testing"
-	"time"
 )
 
-const COL_BENCH_SIZE = 1000000 // Number of documents made available for collection benchmark
+const COL_BENCH_SIZE = 200000 // Number of documents made available for collection benchmark
 
 func TestInsertRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
@@ -213,142 +210,6 @@ func TestIndex(t *testing.T) {
 	})
 	if !(len(k0) == 3 && len(v0) == 3 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[2] == ids[2] && k0[2] == StrHash(0) && v0[1] == newID) {
 		t.Errorf("Index fault, %d, %v, %v", newID, k0, v0)
-	}
-	col.Close()
-}
-
-func BenchmarkInsert(b *testing.B) {
-	rand.Seed(time.Now().UTC().UnixNano())
-	tmp := "/tmp/tiedot_col_bench"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
-	if err != nil {
-		b.Errorf("Failed to open: %v", err)
-		return
-	}
-	col.Index([]string{"a", "b", "c"})
-	var jsonDoc interface{}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
-			b.Error("json error")
-		}
-		col.Insert(jsonDoc)
-	}
-	col.Close()
-}
-
-func BenchmarkRead(b *testing.B) {
-	rand.Seed(time.Now().UTC().UnixNano())
-	tmp := "/tmp/tiedot_col_bench"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
-	if err != nil {
-		b.Errorf("Failed to open: %v", err)
-		return
-	}
-	col.Index([]string{"a", "b", "c"})
-	var jsonDoc interface{}
-	var ids [COL_BENCH_SIZE]uint64
-	for i := 0; i < COL_BENCH_SIZE; i++ {
-		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
-			b.Error("json error")
-		}
-		ids[i], _ = col.Insert(jsonDoc)
-	}
-	rand.Seed(time.Now().UTC().UnixNano())
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		col.Read(ids[rand.Int63n(COL_BENCH_SIZE)])
-	}
-	col.Close()
-}
-
-func BenchmarkUpdate(b *testing.B) {
-	rand.Seed(time.Now().UTC().UnixNano())
-	tmp := "/tmp/tiedot_col_bench"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
-	if err != nil {
-		b.Errorf("Failed to open: %v", err)
-		return
-	}
-	col.Index([]string{"a", "b", "c"})
-	var jsonDoc interface{}
-	var ids [COL_BENCH_SIZE]uint64
-	for i := 0; i < COL_BENCH_SIZE; i++ {
-		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
-			b.Error("json error")
-		}
-		ids[i], _ = col.Insert(jsonDoc)
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
-			b.Error("json error")
-		}
-		col.Update(ids[rand.Int63n(COL_BENCH_SIZE)], jsonDoc)
-	}
-	col.Close()
-}
-
-func BenchmarkDelete(b *testing.B) {
-	rand.Seed(time.Now().UTC().UnixNano())
-	tmp := "/tmp/tiedot_col_bench"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
-	if err != nil {
-		b.Errorf("Failed to open: %v", err)
-		return
-	}
-	col.Index([]string{"a", "b", "c"})
-	var jsonDoc interface{}
-	var ids [COL_BENCH_SIZE]uint64
-	for i := 0; i < COL_BENCH_SIZE; i++ {
-		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
-			b.Error("json error")
-		}
-		ids[i], _ = col.Insert(jsonDoc)
-	}
-	rand.Seed(time.Now().UTC().UnixNano())
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		col.Delete(ids[rand.Int63n(COL_BENCH_SIZE)])
-	}
-	col.Close()
-}
-
-func BenchmarkColGetAll(b *testing.B) {
-	rand.Seed(time.Now().UTC().UnixNano())
-	tmp := "/tmp/tiedot_col_bench"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
-	if err != nil {
-		b.Errorf("Failed to open: %v", err)
-		return
-	}
-	col.Index([]string{"a", "b", "c"})
-	var jsonDoc interface{}
-	var ids [COL_BENCH_SIZE]uint64
-	for i := 0; i < COL_BENCH_SIZE; i++ {
-		if err = json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
-			b.Error("json error")
-		}
-		ids[i], err = col.Insert(jsonDoc)
-		if err != nil {
-			b.Error(err)
-		}
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		col.ForAll(func(id uint64, doc interface{}) bool {
-			return true
-		})
 	}
 	col.Close()
 }

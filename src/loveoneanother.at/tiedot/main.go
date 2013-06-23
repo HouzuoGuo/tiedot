@@ -12,6 +12,11 @@ import (
 	"time"
 )
 
+const (
+	BENCH_SIZE = 200000
+	THREADS    = 16
+)
+
 func average(name string, total int, numThreads int, init func(), do func()) {
 	wp := new(sync.WaitGroup)
 	init()
@@ -33,10 +38,18 @@ func average(name string, total int, numThreads int, init func(), do func()) {
 
 func benchmark() {
 	// config
-	BENCH_SIZE := 500000
-	THREADS := 8
 	runtime.GOMAXPROCS(THREADS)
 	rand.Seed(time.Now().UTC().UnixNano())
+	// prepare benchmark data
+	docs := [BENCH_SIZE]interface{}{}
+	for i := range docs {
+		if err := json.Unmarshal([]byte(
+			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`}},`+
+				`"c": {"d": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`},`+
+				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &docs[i]); err != nil {
+			panic("json error")
+		}
+	}
 	// prepare collection
 	tmp := "/tmp/tiedot_col_bench"
 	os.RemoveAll(tmp)
@@ -48,17 +61,15 @@ func benchmark() {
 	col.Index([]string{"a", "b", "c"})
 	col.Index([]string{"a", "c", "d"})
 	average("insert", BENCH_SIZE, THREADS, func() {}, func() {
-		var jsonDoc interface{}
-		if err := json.Unmarshal([]byte(
-			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`}},`+
-				`"c": {"d": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`},`+
-				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
-			panic("json error")
-		}
-		if _, err := col.Insert(jsonDoc); err != nil {
+		if _, err := col.Insert(docs[rand.Intn(BENCH_SIZE)]); err != nil {
 			panic("insert error")
 		}
 	})
+
+	for name, ht := range col.StrHT {
+		fmt.Println(name, ht.C1, ht.C2, ht.C3)
+	}
+
 	ids := make([]uint64, 0)
 	average("read", BENCH_SIZE, THREADS, func() {
 		col.ForAll(func(id uint64, doc interface{}) bool {
@@ -71,6 +82,11 @@ func benchmark() {
 			panic("read error")
 		}
 	})
+
+	for name, ht := range col.StrHT {
+		fmt.Println(name, ht.C1, ht.C2, ht.C3)
+	}
+
 	average("lookup", BENCH_SIZE, THREADS, func() {}, func() {
 		var query interface{}
 		if err := json.Unmarshal([]byte(`["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "c", "d"]}]`), &query); err != nil {
@@ -81,22 +97,28 @@ func benchmark() {
 			panic("query")
 		}
 	})
+
+	for name, ht := range col.StrHT {
+		fmt.Println(name, ht.C1, ht.C2, ht.C3)
+	}
+
 	average("update", BENCH_SIZE, THREADS, func() {}, func() {
-		var jsonDoc interface{}
-		if err := json.Unmarshal([]byte(
-			`{"a": {"b": {"c": `+strconv.Itoa(rand.Int())+`}},`+
-				`"c": {"d": `+strconv.Itoa(rand.Int())+`},`+
-				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc); err != nil {
-			panic("json error")
-		}
-		if _, err := col.Update(ids[rand.Intn(BENCH_SIZE)], jsonDoc); err != nil {
+		if _, err := col.Update(ids[rand.Intn(BENCH_SIZE)], docs[rand.Intn(BENCH_SIZE)]); err != nil {
 			panic("update error")
 		}
 	})
+
+	for name, ht := range col.StrHT {
+		fmt.Println(name, ht.C1, ht.C2, ht.C3)
+	}
+
 	average("delete", BENCH_SIZE, THREADS, func() {}, func() {
 		col.Delete(ids[rand.Intn(BENCH_SIZE)])
 	})
 
+	for name, ht := range col.StrHT {
+		fmt.Println(name, ht.C1, ht.C2, ht.C3)
+	}
 	col.Close()
 }
 
