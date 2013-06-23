@@ -149,7 +149,7 @@ func (col *Col) Read(id uint64) (doc interface{}, size int) {
 		return
 	}
 	size = len(data)
-	if err := json.Unmarshal(col.Data.Read(id), &doc); err != nil {
+	if err := json.Unmarshal(data, &doc); err != nil {
 		log.Printf("Cannot parse document %d in %s to JSON\n", id, col.Dir)
 	}
 	return

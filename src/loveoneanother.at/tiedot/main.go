@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	BENCH_SIZE = 2000
-	THREADS    = 1
+	BENCH_SIZE = 1000
+	THREADS    = 8
 )
 
 func average(name string, total int, numThreads int, init func(), do func()) {
@@ -51,7 +51,7 @@ func benchmark() {
 		}
 	}
 	// prepare collection
-	tmp := "/tmp/tiedot_col_bench"
+	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
 	col, err := db.OpenCol(tmp)
@@ -60,6 +60,7 @@ func benchmark() {
 	}
 	col.Index([]string{"a", "b", "c"})
 	col.Index([]string{"c", "d"})
+	// start benchmarks
 	average("insert", BENCH_SIZE, THREADS, func() {}, func() {
 		if _, err := col.Insert(docs[rand.Intn(BENCH_SIZE)]); err != nil {
 			panic("insert error")
@@ -84,7 +85,7 @@ func benchmark() {
 		}
 		result := make(map[uint64]bool)
 		if err := db.EvalQuery(query, col, &result); err != nil {
-			panic("query")
+			panic("query error")
 		}
 	})
 	average("update", BENCH_SIZE, THREADS, func() {}, func() {
