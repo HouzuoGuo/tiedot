@@ -16,7 +16,20 @@ func Create(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func All(w http.ResponseWriter, r *http.Request) {
+}
+
 func Rename(w http.ResponseWriter, r *http.Request) {
+	var oldName, newName string
+	if !Require(w, r, "old", &oldName) {
+		return
+	}
+	if !Require(w, r, "new", &newName) {
+		return
+	}
+	if err := V1DB.Rename(oldName, newName); err != nil {
+		http.Error(w, fmt.Sprint(err), 400)
+	}
 }
 
 func Drop(w http.ResponseWriter, r *http.Request) {

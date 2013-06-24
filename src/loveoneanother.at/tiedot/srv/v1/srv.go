@@ -2,6 +2,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"loveoneanother.at/tiedot/db"
@@ -20,12 +21,26 @@ func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bo
 	return true
 }
 
+// Common server response.
+func Respond(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Cache-Control", "must-revalidate")
+	w.WriteHeader(status)
+	if data != nil {
+		if response, err := json.Marshal(data); err != nil {
+			log.Printf("Cannot serialize server response '%v' to JSON", data)
+		} else {
+			w.Write(response)
+		}
+	}
+}
+
 func Start(db *db.DB, port int) {
 	V1DB = db
 	// collection management
 	http.HandleFunc("/create", Create)
 	http.HandleFunc("/rename", Rename)
 	http.HandleFunc("/drop", Drop)
+	http.HandleFunc("/all", All)
 	// document management
 	http.HandleFunc("/insert", Insert)
 	http.HandleFunc("/get", Get)
