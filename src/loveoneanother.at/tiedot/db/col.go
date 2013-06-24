@@ -214,6 +214,7 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	}
 	wg := new(sync.WaitGroup)
 	if oldSize >= len(data) {
+		newID = id
 		wg.Add(1)
 		go func() {
 			_, err = col.Data.Update(id, data)

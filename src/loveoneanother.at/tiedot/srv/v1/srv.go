@@ -15,23 +15,30 @@ var V1DB *db.DB
 func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bool {
 	*val = r.FormValue(key)
 	if *val == "" {
-		http.Error(w, fmt.Sprintf("Please pass POST/PUT/GET parameter value of '%s'", key), 400)
+		http.Error(w, fmt.Sprintf("Please pass POST/PUT/GET parameter value of '%s'.", key), 400)
 		return false
 	}
 	return true
 }
 
-// Common server response.
-func Respond(w http.ResponseWriter, status int, data interface{}) {
+// Write JSON response.
+func JsonResponse(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.WriteHeader(status)
 	if data != nil {
 		if response, err := json.Marshal(data); err != nil {
-			log.Printf("Cannot serialize server response '%v' to JSON", data)
+			log.Printf("Cannot serialize server response '%v' to JSON.", data)
 		} else {
 			w.Write(response)
 		}
 	}
+}
+
+// Write ordinary text response.
+func TextResponse(w http.ResponseWriter, status int, data string) {
+	w.Header().Set("Cache-Control", "must-revalidate")
+	w.WriteHeader(status)
+	w.Write([]byte(data))
 }
 
 func Start(db *db.DB, port int) {
@@ -46,10 +53,16 @@ func Start(db *db.DB, port int) {
 	http.HandleFunc("/get", Get)
 	http.HandleFunc("/update", Update)
 	http.HandleFunc("/delete", Delete)
+	// index management
+	http.HandleFunc("/index", Index)
+	http.HandleFunc("/indexes", Indexes)
+	http.HandleFunc("/unindex", Unindex)
 	// query
 	http.HandleFunc("/select", Select)
 	http.HandleFunc("/find", Find)
 	http.HandleFunc("/count", Count)
+	// misc
+	http.HandleFunc("/shutdown", Shutdown)
 
 	log.Printf("Listening on all interfaces, port %d", port)
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
