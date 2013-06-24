@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// EvalQueryuate a query and return query result. Use result map keys!
+// Evaluate a query and return query result (as map keys).
 func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 	switch expr := q.(type) {
 	// 1, 2.0, etc
