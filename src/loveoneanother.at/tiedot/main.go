@@ -5,19 +5,26 @@ import (
 	"log"
 	"loveoneanother.at/tiedot/db"
 	"loveoneanother.at/tiedot/srv/v1"
+	"runtime"
 )
 
 func main() {
 	var mode, dir string
-	var port int
+	var port, maxprocs int
 	flag.StringVar(&mode, "mode", "", "[v1|bench]")
 	flag.StringVar(&dir, "dir", "", "database directory")
 	flag.IntVar(&port, "port", 0, "listening port number")
+	flag.IntVar(&maxprocs, "gomaxprocs", runtime.NumCPU()*2, "GOMAXPROCS")
 	flag.Parse()
 
+	if mode == "" {
+		log.Fatal("tiedot -mode=[v1|bench] -gomaxprocs=MAX_NUMBER_OF_GOPROCS")
+	}
+
+	runtime.GOMAXPROCS(maxprocs)
+	log.Printf("GOMAXPROCS is set to %d", maxprocs)
+
 	switch mode {
-	case "":
-		log.Fatal("tiedot -mode=[v1|bench]")
 	case "v1":
 		if dir == "" {
 			log.Fatal("Please specify database directory, for example -dir=/tmp/db")
@@ -32,5 +39,7 @@ func main() {
 		v1.Start(db, port)
 	case "bench":
 		benchmark()
+	default:
+		log.Fatal("tiedot -mode=[v1|bench] -gomaxprocs=MAX_NUMBER_OF_GOPROCS")
 	}
 }

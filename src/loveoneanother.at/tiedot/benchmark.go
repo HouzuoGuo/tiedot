@@ -13,12 +13,13 @@ import (
 )
 
 const (
-	BENCH_SIZE = 200000
+	BENCH_SIZE = 200000 // don't make it too large... unmarshaled JSON takes lots of memory!
 	THREADS    = 16
 )
 
 // Run function a number of times and calculate average time consumption per iteration.
-func average(name string, total int, numThreads int, init func(), do func()) {
+func average(name string, total int, init func(), do func()) {
+	numThreads := runtime.GOMAXPROCS(-1)
 	wp := new(sync.WaitGroup)
 	init()
 	iter := float64(total)
@@ -39,8 +40,7 @@ func average(name string, total int, numThreads int, init func(), do func()) {
 
 // Feature benchmarks.
 func benchmark() {
-	// config
-	runtime.GOMAXPROCS(THREADS)
+	// initialization
 	rand.Seed(time.Now().UTC().UnixNano())
 	// prepare benchmark data
 	docs := [BENCH_SIZE]interface{}{}
@@ -63,13 +63,13 @@ func benchmark() {
 	col.Index([]string{"a", "b", "c"})
 	col.Index([]string{"c", "d"})
 	// start benchmarks
-	average("insert", BENCH_SIZE, THREADS, func() {}, func() {
+	average("insert", BENCH_SIZE, func() {}, func() {
 		if _, err := col.Insert(docs[rand.Intn(BENCH_SIZE)]); err != nil {
 			panic("insert error")
 		}
 	})
 	ids := make([]uint64, 0)
-	average("read", BENCH_SIZE, THREADS, func() {
+	average("read", BENCH_SIZE, func() {
 		col.ForAll(func(id uint64, doc interface{}) bool {
 			ids = append(ids, id)
 			return true
@@ -80,22 +80,22 @@ func benchmark() {
 			panic("read error")
 		}
 	})
-	//	average("lookup", BENCH_SIZE, THREADS, func() {}, func() {
-	//		var query interface{}
-	//		if err := json.Unmarshal([]byte(`["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["c", "d"], "limit": 1}]`), &query); err != nil {
-	//			panic("json error")
-	//		}
-	//		result := make(map[uint64]bool)
-	//		if err := db.EvalQuery(query, col, &result); err != nil {
-	//			panic("query error")
-	//		}
-	//	})
-	average("update", BENCH_SIZE, THREADS, func() {}, func() {
+	average("lookup", BENCH_SIZE, func() {}, func() {
+		var query interface{}
+		if err := json.Unmarshal([]byte(`["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["c", "d"], "limit": 1}]`), &query); err != nil {
+			panic("json error")
+		}
+		result := make(map[uint64]bool)
+		if err := db.EvalQuery(query, col, &result); err != nil {
+			panic("query error")
+		}
+	})
+	average("update", BENCH_SIZE, func() {}, func() {
 		if _, err := col.Update(ids[rand.Intn(BENCH_SIZE)], docs[rand.Intn(BENCH_SIZE)]); err != nil {
 			panic("update error")
 		}
 	})
-	average("delete", BENCH_SIZE, THREADS, func() {}, func() {
+	average("delete", BENCH_SIZE, func() {}, func() {
 		col.Delete(ids[rand.Intn(BENCH_SIZE)])
 	})
 	col.Close()
