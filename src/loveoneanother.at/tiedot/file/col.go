@@ -34,16 +34,14 @@ func OpenCol(name string) (*ColFile, error) {
 
 // Retrieve document data given its ID.
 func (col *ColFile) Read(id uint64) []byte {
-	col.File.Sync.Lock()
+	col.File.Sync.RLock()
+	defer col.File.Sync.RUnlock()
 	if id < 0 || id > col.File.Append || col.File.Buf[id] != DOC_VALID {
-		col.File.Sync.Unlock()
 		return nil
 	}
 	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
-		col.File.Sync.Unlock()
 		return nil
 	} else {
-		col.File.Sync.Unlock()
 		return col.File.Buf[id+DOC_HEADER : id+DOC_HEADER+room]
 	}
 }
@@ -53,10 +51,10 @@ func (col *ColFile) Insert(data []byte) (uint64, error) {
 	len64 := uint64(len(data))
 	room := len64 + len64
 	if room > DOC_MAX_ROOM {
-		col.File.Sync.Unlock()
 		return 0, errors.New(fmt.Sprintf("Document is too large"))
 	}
 	col.File.Sync.Lock()
+	defer col.File.Sync.Unlock()
 	id := col.File.Append
 	col.File.Ensure(DOC_HEADER + room)
 	col.File.Buf[id] = 1
@@ -64,7 +62,6 @@ func (col *ColFile) Insert(data []byte) (uint64, error) {
 	copy(col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+len64], data)
 	copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], col.Padding[0:len64])
 	col.File.Append = id + DOC_HEADER + room
-	col.File.Sync.Unlock()
 	return id, nil
 }
 
@@ -96,16 +93,17 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 // Delete a document.
 func (col *ColFile) Delete(id uint64) {
 	col.File.Sync.Lock()
+	defer col.File.Sync.Unlock()
 	if col.File.Buf[id] == DOC_VALID {
 		col.File.Buf[id] = DOC_INVALID
 	}
-	col.File.Sync.Unlock()
 }
 
 // Do fun for all documents in the collection.
 func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 	addr := uint64(0)
-	col.File.Sync.Lock()
+	col.File.Sync.RLock()
+	defer col.File.Sync.RUnlock()
 	for {
 		if addr >= col.File.Append {
 			break
@@ -126,5 +124,4 @@ func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 		}
 		addr += DOC_HEADER + room
 	}
-	col.File.Sync.Unlock()
 }

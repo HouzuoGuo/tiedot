@@ -124,7 +124,8 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		keys = make([]uint64, 0, limit)
 		vals = make([]uint64, 0, limit)
 	}
-	ht.File.Sync.Lock()
+	ht.File.Sync.RLock()
+	defer ht.File.Sync.RUnlock()
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
@@ -134,18 +135,15 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 				keys = append(keys, entryKey)
 				vals = append(vals, entryVal)
 				if count++; count == limit {
-					ht.File.Sync.Unlock()
 					return
 				}
 			}
 		} else if entryKey == 0 && entryVal == 0 {
-			ht.File.Sync.Unlock()
 			return
 		}
 		if entry++; entry == ht.PerBucket {
 			entry = 0
 			if bucket = ht.nextBucket(bucket); bucket == 0 {
-				ht.File.Sync.Unlock()
 				return
 			}
 		}
@@ -156,6 +154,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool) {
 	var count, entry, bucket uint64 = 0, 0, ht.hashKey(key)
 	ht.File.Sync.Lock()
+	defer ht.File.Sync.Unlock()
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
@@ -164,18 +163,15 @@ func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool)
 			if entryKey == key && filter(entryKey, entryVal) {
 				ht.File.Buf[entryAddr] = ENTRY_INVALID
 				if count++; count == limit {
-					ht.File.Sync.Unlock()
 					return
 				}
 			}
 		} else if entryKey == 0 && entryVal == 0 {
-			ht.File.Sync.Unlock()
 			return
 		}
 		if entry++; entry == ht.PerBucket {
 			entry = 0
 			if bucket = ht.nextBucket(bucket); bucket == 0 {
-				ht.File.Sync.Unlock()
 				return
 			}
 		}
@@ -186,7 +182,8 @@ func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool)
 func (ht *HashTable) GetAll() (keys, vals []uint64) {
 	keys = make([]uint64, 0, ht.numberBuckets()*ht.PerBucket/2)
 	vals = make([]uint64, 0, ht.numberBuckets()*ht.PerBucket/2)
-	ht.File.Sync.Lock()
+	ht.File.Sync.RLock()
+	defer ht.File.Sync.RUnlock()
 	for head := uint64(0); head < uint64(math.Pow(2, float64(ht.HashBits))); head++ {
 		var entry, bucket uint64 = 0, head
 		for {
@@ -202,12 +199,10 @@ func (ht *HashTable) GetAll() (keys, vals []uint64) {
 			if entry++; entry == ht.PerBucket {
 				entry = 0
 				if bucket = ht.nextBucket(bucket); bucket == 0 {
-					ht.File.Sync.Unlock()
 					return
 				}
 			}
 		}
 	}
-	ht.File.Sync.Unlock()
 	return
 }
