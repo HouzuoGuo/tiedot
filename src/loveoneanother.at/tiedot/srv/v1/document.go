@@ -17,6 +17,8 @@ func Insert(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "doc", &doc) {
 		return
 	}
+	V1Sync.RLock()
+	defer V1Sync.RUnlock()
 	dbcol := V1DB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -45,6 +47,8 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "id", &id) {
 		return
 	}
+	V1Sync.RLock()
+	defer V1Sync.RUnlock()
 	dbcol := V1DB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -80,6 +84,8 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "doc", &doc) {
 		return
 	}
+	V1Sync.RLock()
+	defer V1Sync.RUnlock()
 	dbcol := V1DB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -112,6 +118,8 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "id", &id) {
 		return
 	}
+	V1Sync.RLock()
+	defer V1Sync.RUnlock()
 	dbcol := V1DB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)

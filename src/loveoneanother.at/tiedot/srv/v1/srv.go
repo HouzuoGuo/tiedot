@@ -24,26 +24,30 @@ func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bo
 
 func Start(db *db.DB, port int) {
 	V1DB = db
-	// collection management
+
+	/* Certain handlers are synchronized via mutex to guarantee safety, such as scrubbing a collection or dropping a collection.
+	Other handlers are asynchronized for maximum concurrency. */
+
+	// collection management (synchronized)
 	http.HandleFunc("/create", Create)
 	http.HandleFunc("/rename", Rename)
 	http.HandleFunc("/drop", Drop)
 	http.HandleFunc("/all", All)
 	http.HandleFunc("/scrub", Scrub)
-	// document management
+	// query (asynchronized)
+	http.HandleFunc("/select", Select)
+	http.HandleFunc("/find", Find)
+	http.HandleFunc("/count", Count)
+	// document management (asynchronized)
 	http.HandleFunc("/insert", Insert)
 	http.HandleFunc("/get", Get)
 	http.HandleFunc("/update", Update)
 	http.HandleFunc("/delete", Delete)
-	// index management
+	// index management (synchronized)
 	http.HandleFunc("/index", Index)
 	http.HandleFunc("/indexes", Indexes)
 	http.HandleFunc("/unindex", Unindex)
-	// query
-	http.HandleFunc("/select", Select)
-	http.HandleFunc("/find", Find)
-	http.HandleFunc("/count", Count)
-	// misc
+	// misc (synchronized)
 	http.HandleFunc("/shutdown", Shutdown)
 
 	log.Printf("Listening on all interfaces, port %d", port)
