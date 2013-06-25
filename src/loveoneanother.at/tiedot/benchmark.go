@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	BENCH_SIZE = 200000 // don't make it too large... unmarshaled JSON takes lots of memory!
+	BENCH_SIZE = 400000 // don't make it too large... unmarshaled JSON takes lots of memory!
 	THREADS    = 16
 )
 
@@ -82,7 +82,8 @@ func benchmark() {
 	})
 	average("lookup", BENCH_SIZE, func() {}, func() {
 		var query interface{}
-		if err := json.Unmarshal([]byte(`["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["c", "d"], "limit": 1}]`), &query); err != nil {
+		if err := json.Unmarshal([]byte(`["c", ["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "b", "c"], "limit": 1}],`+
+			`["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["c", "d"], "limit": 1}]]`), &query); err != nil {
 			panic("json error")
 		}
 		result := make(map[uint64]bool)

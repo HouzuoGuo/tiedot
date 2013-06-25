@@ -11,7 +11,7 @@ import (
 const (
 	COL_FILE_GROWTH = uint64(134217728) // Grows every 128MB
 	DOC_MAX_ROOM    = 33554432          // Maximum single document size
-	DOC_HEADER      = 1 + 8             // byte(validity), uint64(document room)
+	DOC_HEADER      = 1 + 10            // byte(validity), uint64(document room)
 	DOC_VALID       = byte(1)
 	DOC_INVALID     = byte(0)
 )
@@ -39,7 +39,7 @@ func (col *ColFile) Read(id uint64) []byte {
 		col.File.Sync.Unlock()
 		return nil
 	}
-	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+9]); room > DOC_MAX_ROOM {
+	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
 		col.File.Sync.Unlock()
 		return nil
 	} else {
@@ -75,7 +75,7 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 		col.File.Sync.Unlock()
 		return id, errors.New(fmt.Sprintf("No such document %d in %s", id, col.File.Name))
 	}
-	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+9]); room > DOC_MAX_ROOM {
+	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
 		col.File.Sync.Unlock()
 		return id, errors.New(fmt.Sprintf("No such document %d in %s", id, col.File.Name))
 	} else {
@@ -111,7 +111,7 @@ func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 			break
 		}
 		validity := col.File.Buf[addr]
-		room, _ := binary.Uvarint(col.File.Buf[addr+1 : addr+9])
+		room, _ := binary.Uvarint(col.File.Buf[addr+1 : addr+11])
 		if validity != DOC_VALID && validity != DOC_INVALID || room > DOC_MAX_ROOM {
 			log.Printf("In %s at %d, the document is corrupted\n", col.File.Name, addr)
 			// skip corrupted document

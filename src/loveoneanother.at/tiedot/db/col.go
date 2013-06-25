@@ -39,10 +39,9 @@ func StrHash(thing interface{}) uint64 {
 	// very similar to Java String.hashCode()
 	// you must review (even rewrite) most collection test cases, if you change the hash algorithm
 	str := fmt.Sprint(thing)
-	length := len(str)
 	hash := 0
-	for i, c := range str {
-		hash += int(c)*31 ^ (length - i)
+	for _, c := range str {
+		hash = int(c) + (hash << 6) + (hash << 16) - hash
 	}
 	return uint64(hash)
 }

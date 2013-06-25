@@ -3,11 +3,8 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"os"
-	"strconv"
 	"testing"
-	"time"
 )
 
 const QUERY_BENCH_SIZE = 1000000 // Number of documents made available for query benchmark
@@ -114,7 +111,7 @@ func TestQuery(t *testing.T) {
 		t.Error(q)
 	}
 	// complement
-	q, err = runQuery(`["\\", ["=", {"eq": 4,  "in": ["c"]}], ["=", {"eq": 2, "in": ["d"]}], ["all"]]`, col)
+	q, err = runQuery(`["c", ["=", {"eq": 4,  "in": ["c"]}], ["=", {"eq": 2, "in": ["d"]}], ["all"]]`, col)
 	if err != nil {
 		t.Error(err)
 	}
@@ -128,36 +125,6 @@ func TestQuery(t *testing.T) {
 	}
 	if !ensureMapHasKeys(q, ids[0]) {
 		t.Error(q)
-	}
-	col.Close()
-}
-
-func BenchmarkQuery(b *testing.B) {
-	rand.Seed(time.Now().UTC().UnixNano())
-	tmp := "/tmp/tiedot_query_bench"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
-	if err != nil {
-		b.Errorf("Failed to open: %v", err)
-		return
-	}
-	col.Index([]string{"a", "b", "c"})
-	var jsonDoc interface{}
-	var ids [QUERY_BENCH_SIZE]uint64
-	for i := 0; i < QUERY_BENCH_SIZE; i++ {
-		err := json.Unmarshal([]byte(`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(QUERY_BENCH_SIZE))+`}}, "d": "abcdefghijklmnopqrstuvwxyz"}`), &jsonDoc)
-		ids[i], err = col.Insert(jsonDoc)
-		if err != nil {
-			b.Error(err)
-		}
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := runQuery(fmt.Sprintf("[\"u\", [\"=\", {\"eq\": %d, \"limit\": 1, \"in\": [\"a\", \"b\", \"c\"]}], [\"=\", {\"eq\": %d, \"limit\": 1, \"in\": [\"a\", \"b\", \"c\"]}]]", rand.Intn(QUERY_BENCH_SIZE), rand.Intn(QUERY_BENCH_SIZE)), col)
-		if err != nil {
-			b.Error(err)
-		}
 	}
 	col.Close()
 }

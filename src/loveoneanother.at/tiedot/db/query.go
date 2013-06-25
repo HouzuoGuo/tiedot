@@ -114,7 +114,7 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 					first = false
 				}
 			// complement
-			case "\\":
+			case "c":
 				if len(expr) < 3 {
 					return errors.New(fmt.Sprintf("expecting more than two results to complement, but I only have: %v", expr))
 				}
