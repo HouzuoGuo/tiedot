@@ -17,9 +17,10 @@ func TestPutGet(t *testing.T) {
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, 2, 2)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer ht.File.Close()
 	for i := uint64(0); i < 30; i++ {
 		ht.Put(i, i)
 	}
@@ -28,10 +29,9 @@ func TestPutGet(t *testing.T) {
 			return true
 		})
 		if !(len(keys) == 1 && keys[0] == i && len(vals) == 1 && vals[0] == i) {
-			t.Errorf("Get failed on key %d, got %v and %v", i, keys, vals)
+			t.Fatalf("Get failed on key %d, got %v and %v", i, keys, vals)
 		}
 	}
-	ht.File.Close()
 }
 
 func TestPutGet2(t *testing.T) {
@@ -40,9 +40,10 @@ func TestPutGet2(t *testing.T) {
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, 2, 2)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer ht.File.Close()
 	ht.Put(1, 1)
 	ht.Put(1, 2)
 	ht.Put(1, 3)
@@ -53,21 +54,20 @@ func TestPutGet2(t *testing.T) {
 		return true
 	})
 	if !(len(keys) == 3 && len(vals) == 3) {
-		t.Errorf("Get failed, got %v, %v", keys, vals)
+		t.Fatalf("Get failed, got %v, %v", keys, vals)
 	}
 	keys, vals = ht.Get(2, 2, func(a, b uint64) bool {
 		return true
 	})
 	if !(len(keys) == 2 && len(vals) == 2) {
-		t.Errorf("Get failed, got %v, %v", keys, vals)
+		t.Fatalf("Get failed, got %v, %v", keys, vals)
 	}
 	keys, vals = ht.Get(1, 0, func(a, b uint64) bool {
 		return b >= 2
 	})
 	if !(len(keys) == 2 && len(vals) == 2) {
-		t.Errorf("Get failed, got %v, %v", keys, vals)
+		t.Fatalf("Get failed, got %v, %v", keys, vals)
 	}
-	ht.File.Close()
 }
 
 func TestPutRemove(t *testing.T) {
@@ -76,9 +76,10 @@ func TestPutRemove(t *testing.T) {
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, 2, 2)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer ht.File.Close()
 	ht.Put(1, 1)
 	ht.Put(1, 2)
 	ht.Put(1, 3)
@@ -95,15 +96,14 @@ func TestPutRemove(t *testing.T) {
 		return true
 	})
 	if !(len(keys) == 2 && len(vals) == 2) {
-		t.Errorf("Did not delete, still have %v, %v", keys, vals)
+		t.Fatalf("Did not delete, still have %v, %v", keys, vals)
 	}
 	keys, vals = ht.Get(2, 0, func(a, b uint64) bool {
 		return true
 	})
 	if !(len(keys) == 1 && len(vals) == 1) {
-		t.Errorf("Did not delete, still have %v, %v", keys, vals)
+		t.Fatalf("Did not delete, still have %v, %v", keys, vals)
 	}
-	ht.File.Close()
 }
 
 func TestGetAll(t *testing.T) {
@@ -112,20 +112,20 @@ func TestGetAll(t *testing.T) {
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, 2, 2)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer ht.File.Close()
 	ht.Put(1, 1)
 	ht.Put(1, 2)
 	ht.Put(1, 3)
 	ht.Put(2, 1)
 	ht.Put(2, 2)
 	ht.Put(2, 3)
-	keys, vals := ht.GetAll()
+	keys, vals := ht.GetAll(0)
 	if !(len(keys) == 6 && len(vals) == 6) {
-		t.Errorf("Did not have all, got only %v, %v", keys, vals)
+		t.Fatalf("Did not have all, got only %v, %v", keys, vals)
 	}
-	ht.File.Close()
 }
 
 func BenchmarkPut(b *testing.B) {
@@ -134,9 +134,10 @@ func BenchmarkPut(b *testing.B) {
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, 14, 100)
 	if err != nil {
-		b.Errorf("Failed to open: %v", err)
+		b.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer ht.File.Close()
 	rand.Seed(time.Now().UTC().UnixNano())
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -150,9 +151,10 @@ func BenchmarkGet(b *testing.B) {
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, 14, 100)
 	if err != nil {
-		b.Errorf("Failed to open: %v", err)
+		b.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer ht.File.Close()
 	rand.Seed(time.Now().UTC().UnixNano())
 	for i := 0; i < HT_BENCH_SIZE; i++ {
 		ht.Put(uint64(rand.Int63n(HT_BENCH_SIZE)), uint64(rand.Int63n(HT_BENCH_SIZE)))
@@ -171,9 +173,10 @@ func BenchmarkRemove(b *testing.B) {
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, 14, 100)
 	if err != nil {
-		b.Errorf("Failed to open: %v", err)
+		b.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer ht.File.Close()
 	rand.Seed(time.Now().UTC().UnixNano())
 	for i := 0; i < HT_BENCH_SIZE; i++ {
 		ht.Put(uint64(rand.Int63n(HT_BENCH_SIZE)), uint64(rand.Int63n(HT_BENCH_SIZE)))
@@ -192,15 +195,16 @@ func BenchmarkGetAll(b *testing.B) {
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, 12, 400)
 	if err != nil {
-		b.Errorf("Failed to open: %v", err)
+		b.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer ht.File.Close()
 	rand.Seed(time.Now().UTC().UnixNano())
 	for i := 0; i < HT_BENCH_SIZE; i++ {
 		ht.Put(uint64(rand.Int63n(HT_BENCH_SIZE)), uint64(rand.Int63n(HT_BENCH_SIZE)))
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ht.GetAll()
+		ht.GetAll(0)
 	}
 }

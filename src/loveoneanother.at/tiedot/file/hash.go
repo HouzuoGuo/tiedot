@@ -179,9 +179,10 @@ func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool)
 }
 
 // Return all entries in the hash table.
-func (ht *HashTable) GetAll() (keys, vals []uint64) {
-	keys = make([]uint64, 0, ht.numberBuckets()*ht.PerBucket/2)
-	vals = make([]uint64, 0, ht.numberBuckets()*ht.PerBucket/2)
+func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
+	keys = make([]uint64, 0, 100)
+	vals = make([]uint64, 0, 100)
+	counter := uint64(0)
 	ht.File.Sync.RLock()
 	defer ht.File.Sync.RUnlock()
 	for head := uint64(0); head < uint64(math.Pow(2, float64(ht.HashBits))); head++ {
@@ -191,8 +192,12 @@ func (ht *HashTable) GetAll() (keys, vals []uint64) {
 			entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
 			entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+11 : entryAddr+21])
 			if ht.File.Buf[entryAddr] == ENTRY_VALID {
+				counter++
 				keys = append(keys, entryKey)
 				vals = append(vals, entryVal)
+				if counter == limit {
+					return
+				}
 			} else if entryKey == 0 && entryVal == 0 {
 				break
 			}

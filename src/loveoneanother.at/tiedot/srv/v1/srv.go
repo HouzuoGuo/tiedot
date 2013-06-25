@@ -2,14 +2,15 @@
 package v1
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"loveoneanother.at/tiedot/db"
 	"net/http"
+	"sync"
 )
 
 var V1DB *db.DB
+var V1Sync = new(sync.RWMutex)
 
 // Put form parameter value of specified key to *val, return false and set HTTP error status if the parameter is not set.
 func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bool {
@@ -21,26 +22,6 @@ func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bo
 	return true
 }
 
-// Write JSON response.
-func JsonResponse(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Cache-Control", "must-revalidate")
-	w.WriteHeader(status)
-	if data != nil {
-		if response, err := json.Marshal(data); err != nil {
-			log.Printf("Cannot serialize server response '%v' to JSON.", data)
-		} else {
-			w.Write(response)
-		}
-	}
-}
-
-// Write ordinary text response.
-func TextResponse(w http.ResponseWriter, status int, data string) {
-	w.Header().Set("Cache-Control", "must-revalidate")
-	w.WriteHeader(status)
-	w.Write([]byte(data))
-}
-
 func Start(db *db.DB, port int) {
 	V1DB = db
 	// collection management
@@ -48,6 +29,7 @@ func Start(db *db.DB, port int) {
 	http.HandleFunc("/rename", Rename)
 	http.HandleFunc("/drop", Drop)
 	http.HandleFunc("/all", All)
+	http.HandleFunc("/scrub", Scrub)
 	// document management
 	http.HandleFunc("/insert", Insert)
 	http.HandleFunc("/get", Get)

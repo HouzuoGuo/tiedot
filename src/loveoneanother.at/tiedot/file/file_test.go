@@ -11,23 +11,24 @@ func TestOpenClose(t *testing.T) {
 	defer os.Remove(tmp)
 	tmpFile, err := Open(tmp, 1000)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer tmpFile.Close()
 	if tmpFile.Name != tmp {
-		t.Error("Name not set")
+		t.Fatal("Name not set")
 	}
 	if tmpFile.Append != 0 {
-		t.Error("Incorrect Append")
+		t.Fatal("Incorrect Append")
 	}
 	if tmpFile.Growth != 1000 {
-		t.Error("Growth not set")
+		t.Fatal("Growth not set")
 	}
 	if tmpFile.Fh == nil || tmpFile.Buf == nil {
-		t.Error("Not mmapped")
+		t.Fatal("Not mmapped")
 	}
 	if err := tmpFile.Close(); err != nil {
-		t.Errorf("Failed to close: %v", err)
+		t.Fatalf("Failed to close: %v", err)
 	}
 }
 
@@ -38,11 +39,11 @@ func TestFindingAppend(t *testing.T) {
 	// Open
 	tmpFile, err := Open(tmp, 1000)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 		return
 	}
 	if tmpFile.Append != 0 {
-		t.Error("Incorrect Append")
+		t.Fatal("Incorrect Append")
 	}
 	// Write something
 	tmpFile.Buf[0] = 0
@@ -53,10 +54,10 @@ func TestFindingAppend(t *testing.T) {
 	// Re-open
 	tmpFile, err = Open(tmp, 1000)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 	}
 	if tmpFile.Append != 3 {
-		t.Error("Incorrect Append")
+		t.Fatal("Incorrect Append")
 	}
 
 	// Write something again
@@ -66,10 +67,10 @@ func TestFindingAppend(t *testing.T) {
 	// Re-open again
 	tmpFile, err = Open(tmp, 1000)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 	}
 	if tmpFile.Append != 4 {
-		t.Error("Incorrect Append")
+		t.Fatalf("Incorrect Append")
 	}
 	tmpFile.Close()
 }

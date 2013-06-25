@@ -14,9 +14,10 @@ func TestInsertRead(t *testing.T) {
 	defer os.RemoveAll(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer col.Close()
 	docs := []string{`{"a": 1}`, `{"b": 2}`}
 	var jsonDoc [2]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
@@ -24,18 +25,17 @@ func TestInsertRead(t *testing.T) {
 
 	ids := [2]uint64{}
 	if ids[0], err = col.Insert(jsonDoc[0]); err != nil {
-		t.Errorf("Failed to insert: %v", err)
+		t.Fatalf("Failed to insert: %v", err)
 	}
 	if ids[1], err = col.Insert(jsonDoc[1]); err != nil {
-		t.Errorf("Failed to insert: %v", err)
+		t.Fatalf("Failed to insert: %v", err)
 	}
 	if doc, _ := col.Read(ids[0]); doc.(map[string]interface{})[string('a')].(float64) != 1.0 {
-		t.Errorf("Failed to read back document, got %v", doc)
+		t.Fatalf("Failed to read back document, got %v", doc)
 	}
 	if doc, _ := col.Read(ids[1]); doc.(map[string]interface{})[string('b')].(float64) != 2.0 {
-		t.Errorf("Failed to read back document, got %v", doc)
+		t.Fatalf("Failed to read back document, got %v", doc)
 	}
-	col.Close()
 }
 
 func TestInsertUpdateReadAll(t *testing.T) {
@@ -44,9 +44,10 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	defer os.RemoveAll(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer col.Close()
 
 	docs := []string{`{"a": 1}`, `{"b": 2}`}
 	var jsonDoc [2]interface{}
@@ -60,24 +61,24 @@ func TestInsertUpdateReadAll(t *testing.T) {
 
 	ids := [2]uint64{}
 	if ids[0], err = col.Insert(jsonDoc[0]); err != nil {
-		t.Errorf("Failed to insert: %v", err)
+		t.Fatalf("Failed to insert: %v", err)
 	}
 	if ids[1], err = col.Insert(jsonDoc[1]); err != nil {
-		t.Errorf("Failed to insert: %v", err)
+		t.Fatalf("Failed to insert: %v", err)
 	}
 
 	if ids[0], err = col.Update(ids[0], updatedJsonDoc[0]); err != nil {
-		t.Errorf("Failed to update: %v", err)
+		t.Fatalf("Failed to update: %v", err)
 	}
 	if ids[1], err = col.Update(ids[1], updatedJsonDoc[1]); err != nil {
-		t.Errorf("Failed to update: %v", err)
+		t.Fatalf("Failed to update: %v", err)
 	}
 
 	if doc, _ := col.Read(ids[0]); doc.(map[string]interface{})[string('a')].(float64) != 2.0 {
-		t.Errorf("Failed to read back document, got %v", doc)
+		t.Fatalf("Failed to read back document, got %v", doc)
 	}
 	if doc, _ := col.Read(ids[1]); doc.(map[string]interface{})[string('b')].(string) != string("abcdefghijklmnopqrstuvwxyz") {
-		t.Errorf("Failed to read back document, got %v", doc)
+		t.Fatalf("Failed to read back document, got %v", doc)
 	}
 	counter := 0
 	col.ForAll(func(id uint64, doc interface{}) bool {
@@ -85,9 +86,8 @@ func TestInsertUpdateReadAll(t *testing.T) {
 		return true
 	})
 	if counter != 2 {
-		t.Errorf("Expected to read 2 documents, but %d read", counter)
+		t.Fatalf("Expected to read 2 documents, but %d read", counter)
 	}
-	col.Close()
 }
 
 func TestInsertDeleteRead(t *testing.T) {
@@ -96,28 +96,28 @@ func TestInsertDeleteRead(t *testing.T) {
 	defer os.RemoveAll(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer col.Close()
 	docs := []string{`{"a": 1}`, `{"b": 2}`}
 	var jsonDoc [2]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
 	ids := [2]uint64{}
 	if ids[0], err = col.Insert(jsonDoc[0]); err != nil {
-		t.Errorf("Failed to insert: %v", err)
+		t.Fatalf("Failed to insert: %v", err)
 	}
 	if ids[1], err = col.Insert(jsonDoc[1]); err != nil {
-		t.Errorf("Failed to insert: %v", err)
+		t.Fatalf("Failed to insert: %v", err)
 	}
 	col.Delete(ids[0])
 	if doc, _ := col.Read(ids[0]); doc != nil {
-		t.Errorf("Did not delete document")
+		t.Fatalf("Did not delete document")
 	}
 	if doc, _ := col.Read(ids[1]); doc.(map[string]interface{})[string('b')].(float64) != 2 {
-		t.Errorf("Failed to read back document, got %v", doc)
+		t.Fatalf("Failed to read back document, got %v", doc)
 	}
-	col.Close()
 }
 
 func TestIndex(t *testing.T) {
@@ -126,9 +126,10 @@ func TestIndex(t *testing.T) {
 	defer os.RemoveAll(tmp)
 	col, err := OpenCol(tmp)
 	if err != nil {
-		t.Errorf("Failed to open: %v", err)
+		t.Fatalf("Failed to open: %v", err)
 		return
 	}
+	defer col.Close()
 	docs := []string{
 		`{"a": {"b": {"c": 1}}, "d": 0}`,
 		`{"a": {"b": {"c": 2}}, "d": 0}`,
@@ -143,17 +144,17 @@ func TestIndex(t *testing.T) {
 	ids := [3]uint64{}
 	ids[0], _ = col.Insert(jsonDoc[0])
 	if err = col.Index([]string{"a", "b", "c"}); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 		return
 	}
 	if err = col.Index([]string{"d"}); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 		return
 	}
 	for _, first := range col.StrHT {
-		keys, vals := first.GetAll()
+		keys, vals := first.GetAll(0)
 		if !(len(keys) == 1 && len(vals) == 1 && vals[0] == ids[0]) {
-			t.Errorf("Did not index existing document, got %v, %v", keys, vals)
+			t.Fatalf("Did not index existing document, got %v, %v", keys, vals)
 		}
 		break
 	}
@@ -172,10 +173,10 @@ func TestIndex(t *testing.T) {
 		return true
 	})
 	if !(len(k0) == 2 && len(v0) == 2 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[1] == ids[2]) {
-		t.Errorf("Index fault on key 0, %v, %v", k0, v0)
+		t.Fatalf("Index fault on key 0, %v, %v", k0, v0)
 	}
 	if !(len(k9) == 1 && len(v9) == 1 && k9[0] == StrHash(9) && v9[0] == ids[2]) {
-		t.Errorf("Index fault on key 9, %v, %v", k9, v9)
+		t.Fatalf("Index fault on key 9, %v, %v", k9, v9)
 	}
 	// abc index
 	k1, v1 := index1.Get(StrHash(1), 0, func(k, v uint64) bool {
@@ -185,31 +186,30 @@ func TestIndex(t *testing.T) {
 		return true
 	})
 	if !(len(k1) == 1 && len(v1) == 1 && k1[0] == StrHash(1) && v1[0] == ids[0]) {
-		t.Errorf("Index fault, %v, %v", k1, v1)
+		t.Fatalf("Index fault, %v, %v", k1, v1)
 	}
 	if !(len(k4) == 1 && len(v4) == 1 && k4[0] == StrHash(4) && v4[0] == ids[2]) {
-		t.Errorf("Index fault, %v, %v", k4, v4)
+		t.Fatalf("Index fault, %v, %v", k4, v4)
 	}
 	// now remove a,b,c index
 	if err = col.Unindex([]string{"a", "b", "c"}); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 		return
 	}
 	if _, ok := col.StrHT["a,b,c"]; ok {
-		t.Error("did not delete index")
+		t.Fatal("did not delete index")
 	}
 	if _, ok := col.StrIC["a,b,c"]; ok {
-		t.Error("did not delete index")
+		t.Fatal("did not delete index")
 	}
 	newID, err := col.Insert(jsonDoc[0])
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	k0, v0 = col.StrHT["d"].Get(StrHash(0), 0, func(k, v uint64) bool {
 		return true
 	})
 	if !(len(k0) == 3 && len(v0) == 3 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[2] == ids[2] && k0[2] == StrHash(0) && v0[1] == newID) {
-		t.Errorf("Index fault, %d, %v, %v", newID, k0, v0)
+		t.Fatalf("Index fault, %d, %v, %v", newID, k0, v0)
 	}
-	col.Close()
 }

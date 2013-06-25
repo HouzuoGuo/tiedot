@@ -58,3 +58,14 @@ func Drop(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprint(err), 400)
 	}
 }
+
+func Scrub(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "must-revalidate")
+	var name string
+	if !Require(w, r, "name", &name) {
+		return
+	}
+	if err := V1DB.Scrub(name); err != nil {
+		http.Error(w, fmt.Sprint(err), 400)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strings"
 )
 
 type DB struct {
@@ -80,6 +81,41 @@ func (db *DB) Drop(name string) (err error) {
 	} else {
 		return errors.New(fmt.Sprintf("Collection %s does not exists in %s", name, db.Dir))
 	}
+}
+
+// Repair (remove) damaged/deleted documents.
+func (db *DB) Scrub(name string) (err error) {
+	if col, ok := db.StrCol[name]; ok {
+		db.Drop("scrub-" + name)
+		if err = db.Create("scrub-" + name); err != nil {
+			return
+		}
+		scrub := db.Use("scrub-" + name)
+		if scrub == nil {
+			return errors.New(fmt.Sprint("Scrub temporary collection has disappeared, please try again."))
+		}
+		// recreate indexes
+		for path := range col.StrIC {
+			if err = scrub.Index(strings.Split(path, ",")); err != nil {
+				return
+			}
+		}
+		// recreate documents
+		col.ForAll(func(id uint64, doc interface{}) bool {
+			if _, err = scrub.Insert(doc); err != nil {
+				log.Printf("Scrub %s: could not insert '%v' back", name, doc)
+			}
+			return true
+		})
+		// replace original collection
+		if err = db.Drop(name); err != nil {
+			return
+		}
+		return db.Rename("scrub-"+name, name)
+	} else {
+		return errors.New(fmt.Sprintf("Collection %s does not exists in %s", name, db.Dir))
+	}
+	return nil
 }
 
 // Close all collections.
