@@ -1,5 +1,4 @@
-<div style="background: url('http://golang.org/doc/gopher/frontpage.png') 50% 0% no-repeat transparent;">
-</div>
+<img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
 tiedot - Your NoSQL database powered by Golang
 =
