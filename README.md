@@ -1,9 +1,10 @@
-<img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right" />
+<div style="background: url('http://golang.org/doc/gopher/frontpage.png') 50% 0% no-repeat transparent;">
+</div>
 
 tiedot - Your NoSQL database powered by Golang
 =
 
-tiedot is a document database that uses __ JSON __ for documents and queries; it can be __ embedded __ into your program, or run a stand-alone server using __ HTTP __ for an API.
+tiedot is a document database that uses __JSON__ for documents and queries; it can be __embedded__ into your program, or run a stand-alone server using __HTTP__ for an API.
 
 Feature Highlights
 -
@@ -16,7 +17,7 @@ High Performance!
 -
 tiedot scales reasonably well on SMP machines. Under maximum load, it usually either uses all CPUs to 100%, or uses up all IO bandwidth. The following performance results are collected on three different types of machines, using tiedot built-in benchmark:
 
-(_Operations per second_)
+(Operations per second)
 <table>
 <tr>
   <th>Processor</th>
@@ -102,17 +103,17 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 Project Background
 -
-__ Is tiedot "yet another NoSQL database"? __
+__Is tiedot "yet another NoSQL database"?__
 
 There are probably as many NoSQL database as there are Linux distributions.
 
 tiedot is not as powerful (yet) - and does not intend to compete with mainstream NoSQL database engines such as CouchDB or Cassandra. However, tiedot performs reasonably well given its small size (< 3k LOC); and for certain loads, it may perform as well as those large brand NoSQL solutions.
 
-__ What is the motive behind this project? __
+__What is the motive behind this project?__
 
 Golang (Go) is a fascinating language - very easy to use, scalable and reasonably stable. I am very passionate about document database technologies (check out my other GitHub projects!) and enjoy the moments when my program scales well on SMP machines. So this is my Golang practice.
 
-__ Why the name "tiedot"? __
+__Why the name "tiedot"?__
 
 "tiedot" is a Finnish word standing for "data". I enjoy learning (natural and computer) languages, also enjoy listening to music in many languages. "Tiedot" sounds cute, doesn't it?
 
