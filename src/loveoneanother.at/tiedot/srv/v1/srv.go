@@ -12,7 +12,7 @@ import (
 var V1DB *db.DB
 var V1Sync = new(sync.RWMutex)
 
-// Put form parameter value of specified key to *val, return false and set HTTP error status if the parameter is not set.
+// Store form parameter value of specified key to *val and return true; if key does not exist, set HTTP status 400 and return false.
 func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bool {
 	*val = r.FormValue(key)
 	if *val == "" {
@@ -35,8 +35,8 @@ func Start(db *db.DB, port int) {
 	http.HandleFunc("/all", All)
 	http.HandleFunc("/scrub", Scrub)
 	// query (asynchronized)
-	http.HandleFunc("/select", Select)
-	http.HandleFunc("/find", Find)
+	http.HandleFunc("/query", Query)
+	http.HandleFunc("/queryID", QueryID)
 	http.HandleFunc("/count", Count)
 	// document management (asynchronized)
 	http.HandleFunc("/insert", Insert)

@@ -9,13 +9,13 @@ import (
 
 func Create(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
-	var name string
-	if !Require(w, r, "name", &name) {
+	var col string
+	if !Require(w, r, "col", &col) {
 		return
 	}
 	V1Sync.Lock()
 	defer V1Sync.Unlock()
-	if err := V1DB.Create(name); err != nil {
+	if err := V1DB.Create(col); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 	} else {
 		w.WriteHeader(201)
@@ -56,26 +56,26 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 
 func Drop(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
-	var name string
-	if !Require(w, r, "name", &name) {
+	var col string
+	if !Require(w, r, "col", &col) {
 		return
 	}
 	V1Sync.Lock()
 	defer V1Sync.Unlock()
-	if err := V1DB.Drop(name); err != nil {
+	if err := V1DB.Drop(col); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 	}
 }
 
 func Scrub(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
-	var name string
-	if !Require(w, r, "name", &name) {
+	var col string
+	if !Require(w, r, "col", &col) {
 		return
 	}
 	V1Sync.Lock()
 	defer V1Sync.Unlock()
-	if err := V1DB.Scrub(name); err != nil {
+	if err := V1DB.Scrub(col); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 	}
 }
