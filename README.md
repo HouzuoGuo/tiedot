@@ -68,6 +68,7 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
 References
 -
 - [Quick Start Guide: tiedot in 10 minutes][tutorial]
+- [HTTP API reference]
 - [Embedded usage]
 - [Data structures]
 - [Query processor and index]
@@ -126,6 +127,7 @@ __Why the name "tiedot"?__
 "tiedot" is a Finnish word standing for "data". I enjoy learning (natural and computer) languages, also enjoy listening to music in many languages. "Tiedot" sounds cute, doesn't it?
 
 [tutorial]: https://github.com/HouzuoGuo/tiedot/wiki/Tutorial
+[HTTP API reference]: https://github.com/HouzuoGuo/tiedot/wiki/HTTP-API-Refernece
 [Embedded usage]: https://github.com/HouzuoGuo/tiedot/wiki/Embedded-Usage
 [Data structures]: https://github.com/HouzuoGuo/tiedot/wiki/Data-structures
 [Query processor and index]: https://github.com/HouzuoGuo/tiedot/wiki/Query-processor-and-index
