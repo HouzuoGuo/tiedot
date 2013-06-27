@@ -28,15 +28,6 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
   <th></th>
 </tr>
 <tr>
-  <td>Desktop Intel Core i3</td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td>A 5 years old workstation</td>
-</tr>
-<tr>
   <td>Mobile Intel Core i7 (2nd Gen)</td>
   <td>140k</td>
   <td>310k</td>
@@ -44,6 +35,23 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
   <td>60k</td>
   <td>140k</td>
   <td>A 3 years old laptop</td>
+</tr>
+<tr>
+  <td>Desktop Intel Core i2</td>
+  <td>107k</td>
+  <td>231k</td>
+  <td>44k</td>
+  <td>48k</td>
+  <td>90k</td>
+  <td>A 5 years old workstation</td>
+</tr>
+<tr>
+  <td>Amazon EC2 m1.xlarge</td>
+  <td>90k</td>
+  <td>188k</td>
+  <td>39k</td>
+  <td>42k</td>
+  <td>116k</td>
 </tr>
 <tr>
   <td>Amazon EC2 t1.micro</td>
