@@ -26,6 +26,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprint(err), 400)
 		return
 	}
+	w.WriteHeader(201)
 }
 
 func Indexes(w http.ResponseWriter, r *http.Request) {
