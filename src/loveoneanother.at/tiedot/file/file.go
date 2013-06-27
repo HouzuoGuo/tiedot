@@ -46,7 +46,11 @@ func Open(name string, growth uint64) (file *File, err error) {
 		switch {
 		case high-mid == 1:
 			if file.Buf[mid] == 0 {
-				file.Append = mid
+				if file.Buf[mid-1] == 0 {
+					file.Append = mid - 1
+				} else {
+					file.Append = mid
+				}
 				return
 			}
 			file.Append = high
@@ -59,6 +63,7 @@ func Open(name string, growth uint64) (file *File, err error) {
 			mid = mid + (high-mid)/2
 		}
 	}
+	return
 }
 
 // Ensure the file ahs room for more data.
