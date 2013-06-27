@@ -125,7 +125,12 @@ __Why the name "tiedot"?__
 
 "tiedot" is a Finnish word standing for "data". I enjoy learning (natural and computer) languages, also enjoy listening to music in many languages. "Tiedot" sounds cute, doesn't it?
 
-[tutorial]:
+[tutorial]: https://github.com/HouzuoGuo/tiedot/wiki/Tutorial
+[Embedded usage]: https://github.com/HouzuoGuo/tiedot/wiki/Embedded-Usage
+[Data structures]: https://github.com/HouzuoGuo/tiedot/wiki/Data-structures
+[Query processor and index]: https://github.com/HouzuoGuo/tiedot/wiki/Query-processor-and-index
+[Concurrency and networking]: https://github.com/HouzuoGuo/tiedot/wiki/Concurrency-and-networking
+[Limitations]: https://github.com/HouzuoGuo/tiedot/wiki/Limitations
 [Howard]: mailto:guohouzuo@gmail.com
 [Twitter]: https://twitter.com/hzguo
 [blog]: http://allstarnix.blogspot.com.au
