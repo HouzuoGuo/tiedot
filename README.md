@@ -52,6 +52,7 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
   <td>39k</td>
   <td>42k</td>
   <td>116k</td>
+  <td>Medium range instance type</td>
 </tr>
 <tr>
   <td>Amazon EC2 t1.micro</td>
@@ -60,7 +61,7 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
   <td>15k</td>
   <td>19k</td>
   <td>54k</td>
-  <td>The slowest EC2 instance type</td>
+  <td>The slowest instance type</td>
 </tr>
 </table>
 
