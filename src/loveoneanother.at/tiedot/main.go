@@ -5,16 +5,23 @@ import (
 	"log"
 	"loveoneanother.at/tiedot/db"
 	"loveoneanother.at/tiedot/srv/v1"
+	"os"
 	"runtime"
+	"strconv"
 )
 
 func main() {
+	var defaultMaxprocs int
+	var err error
+	if defaultMaxprocs, err = strconv.Atoi(os.Getenv("GOMAXPROCS")); err != nil {
+		defaultMaxprocs = runtime.NumCPU() * 2
+	}
 	var mode, dir string
 	var port, maxprocs int
 	flag.StringVar(&mode, "mode", "", "[v1|bench|example]")
 	flag.StringVar(&dir, "dir", "", "database directory")
 	flag.IntVar(&port, "port", 0, "listening port number")
-	flag.IntVar(&maxprocs, "gomaxprocs", runtime.NumCPU()*2, "GOMAXPROCS")
+	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
 	flag.Parse()
 
 	if mode == "" {
