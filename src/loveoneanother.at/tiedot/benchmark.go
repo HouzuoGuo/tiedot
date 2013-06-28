@@ -12,9 +12,7 @@ import (
 	"time"
 )
 
-const (
-	BENCH_SIZE = 500000 // don't make it too large... unmarshaled JSON takes lots of memory!
-)
+const BENCH_SIZE = 400000 // don't make it too large... unmarshaled JSON takes lots of memory!
 
 // Run function a number of times and calculate average time consumption per iteration.
 func average(name string, total int, init func(), do func()) {
