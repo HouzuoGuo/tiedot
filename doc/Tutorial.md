@@ -159,7 +159,7 @@ Query is a JSON structure of __nested__ array and objects. tiedot supports some 
   </tr>
   <tr>
     <td>Value lookup</td>
-    <td>["=", {"eq": VAL, "limit": 2, "in": ["path1", "path2"]]<br/><br/><i>["=", {"eq": "A", "limit": 1, "in": ["exam", "result", "CS"]]</i></td>
+    <td>["=", {"eq": VALUE, "limit": N, "in": ["path1", "path2"...]]<br/><br/><i>["=", {"eq": "A", "limit": 1, "in": ["exam", "result", "CS"]]</i></td>
   </tr>
   <tr>
     <td>Get all documents</td>
@@ -167,15 +167,15 @@ Query is a JSON structure of __nested__ array and objects. tiedot supports some 
   </tr>
   <tr>
     <td>Union</td>
-    <td>["u", result1, result2...]<br/><br/><i>["u", {"eq": "David", in: ["name"]}, {"eq": "Joe", in: ["name"]}]</i></td>
+    <td>["u", result1, result2...]<br/><br/><i>["u", ["=", {"eq": "David", "in": ["name"]}], ["=", {"eq": "Joe", "in": ["name"]}]]</i></td>
   </tr>
   <tr>
     <td>Intersect</td>
-    <td>["n", result1, result2...]<br/><br/><i>["n", {"eq": "A", in: ["math"]}, {"eq": "A", in: ["piano"]}]</i></td>
+    <td>["n", result1, result2...]<br/><br/><i>["n", ["=", {"eq": "A", "in": ["math"]}], ["=", {"eq": "A", "in": ["piano"]}]]</i></td>
   </tr>
   <tr>
     <td>Complement</td>
-    <td>["c", result1, result2...]<br/><br/><i>["c", ["all"], {"eq": "F", in: ["math"]}]</i></td>
+    <td>["c", result1, result2...]<br/><br/><i>["c", ["all"], ["=", {"eq": "F", "in": ["math"]}]]</i></td>
   </tr>
 </table>
 

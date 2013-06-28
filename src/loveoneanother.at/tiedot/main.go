@@ -30,7 +30,7 @@ func main() {
 			log.Fatal("Please specify database directory, for example -dir=/tmp/db")
 		}
 		if port == 0 {
-			log.Fatal("Plese specify port number, for example -port=8080")
+			log.Fatal("Please specify port number, for example -port=8080")
 		}
 		db, err := db.OpenDB(dir)
 		if err != nil {
