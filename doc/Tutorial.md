@@ -159,7 +159,7 @@ Query is a JSON structure of __nested__ array and objects. tiedot supports some 
   </tr>
   <tr>
     <td>Value lookup</td>
-    <td>["=", {"eq": VALUE, "limit": N, "in": ["path1", "path2"...]]<br/><br/><i>["=", {"eq": "A", "limit": 1, "in": ["exam", "result", "CS"]]</i></td>
+    <td>["=", {"eq": VALUE, "limit": N, "in": ["path1", "path2"...]}]<br/><br/><i>["=", {"eq": "A", "limit": 1, "in": ["exam", "result", "CS"]}]</i></td>
   </tr>
   <tr>
     <td>Get all documents</td>
