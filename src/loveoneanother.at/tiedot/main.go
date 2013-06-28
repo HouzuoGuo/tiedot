@@ -11,14 +11,14 @@ import (
 func main() {
 	var mode, dir string
 	var port, maxprocs int
-	flag.StringVar(&mode, "mode", "", "[v1|bench]")
+	flag.StringVar(&mode, "mode", "", "[v1|bench|example]")
 	flag.StringVar(&dir, "dir", "", "database directory")
 	flag.IntVar(&port, "port", 0, "listening port number")
 	flag.IntVar(&maxprocs, "gomaxprocs", runtime.NumCPU()*2, "GOMAXPROCS")
 	flag.Parse()
 
 	if mode == "" {
-		log.Fatal("tiedot -mode=[v1|bench] -gomaxprocs=MAX_NUMBER_OF_GOPROCS")
+		log.Fatal("tiedot -mode=[v1|bench|example] -gomaxprocs=MAX_NUMBER_OF_GOPROCS")
 	}
 
 	runtime.GOMAXPROCS(maxprocs)
@@ -39,6 +39,8 @@ func main() {
 		v1.Start(db, port)
 	case "bench":
 		benchmark()
+	case "example":
+		embeddedExample()
 	default:
 		log.Fatal("tiedot -mode=[v1|bench] -gomaxprocs=MAX_NUMBER_OF_GOPROCS")
 	}
