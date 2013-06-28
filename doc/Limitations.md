@@ -12,8 +12,6 @@ The above size limits apply to all hash table (indexes) and collection data (doc
 
 Golang runtime uses `GOMAXPROCS` to determine number of OS threads available for a Go program, thus affecting scalability of tiedot.
 
-tiedot does __not__ read `GOMAXPROCS` environmental variable (which is how you usually set it), there is an optional CLI parameter to set it - by default tiedot will use number of CPUs * 2 as `GOMAXPROCS`.
-
 ## Documents specific
 
 Any document may not exceed 32MBytes, which means:

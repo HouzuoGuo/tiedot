@@ -37,7 +37,7 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
   <td>A 3 years old laptop</td>
 </tr>
 <tr>
-  <td>Desktop Intel Core i2</td>
+  <td>Desktop Intel Core 2 Duo</td>
   <td>107k</td>
   <td>231k</td>
   <td>44k</td>

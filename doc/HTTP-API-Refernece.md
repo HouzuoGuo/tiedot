@@ -20,7 +20,7 @@ Server responds HTTP status 400 in any of these situations:
 
 HTTP status 500 indicates a severe server error (usually comes with log messages).
 
-To help with diagnostics, any HTTP 4xx/5xx response will include error message text (__not__ JSON formatted).
+To help with diagnostics, any HTTP 4xx/5xx response will include error message text (message text __not__ formatted in JSON).
 
 ## Collection management endpoints
 
@@ -59,7 +59,7 @@ All the endpoints below are __synchronized__.
   </tr>
   <tr>
     <td>Scrub collection</td>
-    <td>/drop</td>
+    <td>/scrub</td>
     <td>col=(collection name)</td>
     <td>HTTP 200</td>
   </tr>
@@ -84,13 +84,13 @@ All the endpoints below are __Asynchronized__.
   </tr>
   <tr>
     <td>Query document IDs</td>
-    <td>/query</td>
+    <td>/queryID</td>
     <td>col=(collection name)<br/>q=(query in JSON)</td>
     <td>HTTP 200<br/>(document ID integers, one on each line)</td>
   </tr>
   <tr>
     <td>Count query result</td>
-    <td>/query</td>
+    <td>/count</td>
     <td>col=(collection name)<br/>q=(query in JSON)</td>
     <td>HTTP 200<br/>(one integer, number of documents in query result)</td>
   </tr>
