@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	BENCH_SIZE = 400000 // don't make it too large... unmarshaled JSON takes lots of memory!
-	THREADS    = 16
+	BENCH_SIZE = 500000 // don't make it too large... unmarshaled JSON takes lots of memory!
 )
 
 // Run function a number of times and calculate average time consumption per iteration.
