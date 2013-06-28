@@ -31,6 +31,10 @@ func main() {
 	runtime.GOMAXPROCS(maxprocs)
 	log.Printf("GOMAXPROCS is set to %d", maxprocs)
 
+	if maxprocs < runtime.NumCPU() {
+		log.Printf("GOMAXPROCS (%d) is less than number of CPUs (%d), this may affect performance. You can change it via environment variable GOMAXPROCS or by passing CLI parameter -gomaxprocs", maxprocs, runtime.NumCPU())
+	}
+
 	switch mode {
 	case "v1":
 		if dir == "" {
