@@ -6,20 +6,14 @@ You will need:
 - Go (>= 1.1)
 - HTTP client (web browser, curl, etc)
 
-##Get tiedot running
-
-    # get tiedot
-    git clone git://github.com/HouzuoGuo/tiedot.git
-    cd tiedot
-    git checkout master
-
-    # build tiedot
+## Get tiedot running
+    
+    mkdir tiedot && cd tiedot
     export GOPATH=`pwd`
-    cd src/loveoneanother.at/tiedot/
-    go build
+    go get loveoneanother.at/tiedot
 
     # run server
-    ./tiedot -mode=v1 -dir=/tmp/MyDatabase -port=8080
+    ./bin/tiedot -mode=v1 -dir=/tmp/MyDatabase -port=8080
 
     # tiedot is now running in Foreground, listening on port 8080
 
