@@ -110,7 +110,8 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 						hashValue := StrHash(lookupValue)
 						_, vals := ht.Get(hashValue, intLimit, func(k, v uint64) bool {
 							// to avoid hash collision
-							doc, _ := src.Read(v)
+							var doc interface{}
+							src.Read(v, &doc) //FIXME: (SR) Check for error
 							for _, v := range GetIn(doc, vecPath) {
 								if fmt.Sprint(v) == lookupStrValue {
 									return true
