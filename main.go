@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"log"
-	"loveoneanother.at/tiedot/db"
-	"loveoneanother.at/tiedot/srv/v1"
+	"db"
+	"srv/v1"
 	"os"
 	"runtime"
 	"strconv"

@@ -1,3 +1,5 @@
+> `go get` does not work on this project yet, I am working on fixing it, stay turned :) 
+
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
 ### tiedot - Your NoSQL database powered by Golang

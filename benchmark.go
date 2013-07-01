@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"loveoneanother.at/tiedot/db"
+	"db"
 	"math/rand"
 	"os"
 	"runtime"
