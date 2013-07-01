@@ -213,21 +213,24 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	}
 	wg := new(sync.WaitGroup)
 	if oldSize >= len(data) {
-		newID = id
-		wg.Add(1)
+		// update indexes and collection data in parallel
+		wg.Add(2)
 		go func() {
 			_, err = col.Data.Update(id, data)
 			wg.Done()
 		}()
+		go func() {
+			col.UnindexDoc(id, oldDoc)
+			col.IndexDoc(newID, doc)
+			wg.Done()
+		}()
+		newID = id
 	} else {
+		// update data before updating indexes
 		newID, err = col.Data.Update(id, data)
-	}
-	wg.Add(1)
-	go func() {
 		col.UnindexDoc(id, oldDoc)
 		col.IndexDoc(newID, doc)
-		wg.Done()
-	}()
+	}
 	wg.Wait()
 	return
 }
