@@ -44,22 +44,42 @@ func embeddedExample() {
 	// Start using collection
 	A := myDB.Use("A")
 
-	// Insert document
-	var doc interface{}
-	json.Unmarshal([]byte(`{"a": 1, "b": 2}`), &doc)
-	docID, err := A.Insert(doc)
+	/*
+		  * Insert document.
+		  * You may insert/update any interface{} to collection, for example:
+		  *
+			* var doc interface{}
+			* json.Unmarshal([]byte(`{"a": 1, "b": 2}`), &doc)
+		  * A.Insert(doc)
+		  *
+		  * And here is an example using struct:
+	*/
+
+	type Document struct {
+		Url, Owner string
+	}
+
+	docID, err := A.Insert(Document{"http://google.com", "Google Inc."})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Inserted document %v at %d (document ID)\n", doc, docID)
+	fmt.Printf("Inserted document at %d (document ID)\n", docID)
 
-	// Update document
-	json.Unmarshal([]byte(`{"a": 2, "b": 3}`), &doc)
-	newID, err := A.Update(docID, doc) // newID may or may not be the same
+	// Update document (you can still use struct, but this example uses generic interface{})
+	var doc interface{}
+	json.Unmarshal([]byte(`{"Url": "http://www.google.com.au", "Owner": "Google Inc."}`), &doc)
+	newID, err := A.Update(docID, doc) // newID may or may not be the same!
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("Updated document %d to %v, new ID is %d\n", docID, doc, newID)
+
+	// Read document
+	var readback Document
+	if err := A.Read(newID, &readback); err != nil {
+		panic(err)
+	}
+	fmt.Printf("Read document ID %d: %v\n", newID, readback)
 
 	// Delete document
 	A.Delete(123) // passing invalid ID to it will not harm your data

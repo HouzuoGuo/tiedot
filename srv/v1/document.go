@@ -59,7 +59,8 @@ func Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
 	}
-	doc, _ := dbcol.Read(uint64(docID))
+	var doc interface{}
+	err = dbcol.Read(uint64(docID), &doc)
 	if doc == nil {
 		http.Error(w, fmt.Sprintf("No such document ID %d.", docID), 404)
 		return

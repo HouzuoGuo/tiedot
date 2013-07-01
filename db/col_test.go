@@ -30,11 +30,13 @@ func TestInsertRead(t *testing.T) {
 	if ids[1], err = col.Insert(jsonDoc[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if doc, _ := col.Read(ids[0]); doc.(map[string]interface{})[string('a')].(float64) != 1.0 {
-		t.Fatalf("Failed to read back document, got %v", doc)
+	var doc1 interface{}
+	if err = col.Read(ids[0], &doc1); doc1.(map[string]interface{})[string('a')].(float64) != 1.0 {
+		t.Fatalf("Failed to read back document, got %v", doc1)
 	}
-	if doc, _ := col.Read(ids[1]); doc.(map[string]interface{})[string('b')].(float64) != 2.0 {
-		t.Fatalf("Failed to read back document, got %v", doc)
+	var doc2 interface{}
+	if err = col.Read(ids[1], &doc2); doc2.(map[string]interface{})[string('b')].(float64) != 2.0 {
+		t.Fatalf("Failed to read back document, got %v", doc2)
 	}
 }
 
@@ -74,11 +76,13 @@ func TestInsertUpdateReadAll(t *testing.T) {
 		t.Fatalf("Failed to update: %v", err)
 	}
 
-	if doc, _ := col.Read(ids[0]); doc.(map[string]interface{})[string('a')].(float64) != 2.0 {
-		t.Fatalf("Failed to read back document, got %v", doc)
+	var doc1 interface{}
+	if err = col.Read(ids[0], &doc1); doc1.(map[string]interface{})[string('a')].(float64) != 2.0 {
+		t.Fatalf("Failed to read back document, got %v", doc1)
 	}
-	if doc, _ := col.Read(ids[1]); doc.(map[string]interface{})[string('b')].(string) != string("abcdefghijklmnopqrstuvwxyz") {
-		t.Fatalf("Failed to read back document, got %v", doc)
+	var doc2 interface{}
+	if err = col.Read(ids[1], &doc2); doc2.(map[string]interface{})[string('b')].(string) != string("abcdefghijklmnopqrstuvwxyz") {
+		t.Fatalf("Failed to read back document, got %v", doc2)
 	}
 	counter := 0
 	col.ForAll(func(id uint64, doc interface{}) bool {
@@ -112,11 +116,13 @@ func TestInsertDeleteRead(t *testing.T) {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	col.Delete(ids[0])
-	if doc, _ := col.Read(ids[0]); doc != nil {
+	var doc1 interface{}
+	if err = col.Read(ids[0], &doc1); doc1 != nil {
 		t.Fatalf("Did not delete document")
 	}
-	if doc, _ := col.Read(ids[1]); doc.(map[string]interface{})[string('b')].(float64) != 2 {
-		t.Fatalf("Failed to read back document, got %v", doc)
+	var doc2 interface{}
+	if err = col.Read(ids[1], &doc2); doc2.(map[string]interface{})[string('b')].(float64) != 2 {
+		t.Fatalf("Failed to read back document, got %v", doc2)
 	}
 }
 

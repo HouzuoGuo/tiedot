@@ -142,16 +142,17 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 }
 
 // Retrieve document data given its ID.
-func (col *Col) Read(id uint64) (doc interface{}, size int) {
+func (col *Col) Read(id uint64, doc interface{}) error {
 	data := col.Data.Read(id)
 	if data == nil {
-		return
+		return errors.New(fmt.Sprintf("Document does not exist"))
 	}
-	size = len(data)
 	if err := json.Unmarshal(data, &doc); err != nil {
-		log.Printf("Cannot parse document %d in %s to JSON\n", id, col.Dir)
+		msg := fmt.Sprintf("Cannot parse document %d in %s to JSON\n", id, col.Dir)
+		log.Println(msg)       // for the srv
+		return errors.New(msg) // for embedded usage
 	}
-	return
+	return nil
 }
 
 // Index the document on all indexes
@@ -207,7 +208,13 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	if err != nil {
 		return
 	}
-	oldDoc, oldSize := col.Read(id)
+	oldData := col.Data.Read(id)
+	if oldData == nil {
+		return id, errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.Dir))
+	}
+	oldSize := len(oldData)
+	var oldDoc interface{}
+	err = json.Unmarshal(oldData, &oldDoc)
 	if oldDoc == nil {
 		return id, nil
 	}
@@ -237,8 +244,9 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 
 // Delete a document.
 func (col *Col) Delete(id uint64) {
-	oldDoc, _ := col.Read(id)
-	if oldDoc == nil {
+	var oldDoc interface{}
+	err := col.Read(id, &oldDoc)
+	if err != nil {
 		return
 	}
 	wg := new(sync.WaitGroup)
