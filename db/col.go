@@ -4,10 +4,10 @@ package db
 import (
 	"encoding/json"
 	"errors"
-	"file"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"loveoneanother.at/tiedot/file"
 	"os"
 	"path"
 	"strconv"

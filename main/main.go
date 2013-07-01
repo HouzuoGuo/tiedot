@@ -1,12 +1,12 @@
 package main
 
 import (
-	"db"
 	"flag"
 	"log"
+	"loveoneanother.at/tiedot/db"
+	"loveoneanother.at/tiedot/srv/v1"
 	"os"
 	"runtime"
-	"srv/v1"
 	"strconv"
 )
 

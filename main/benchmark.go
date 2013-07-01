@@ -1,9 +1,9 @@
 package main
 
 import (
-	"db"
 	"encoding/json"
 	"fmt"
+	"loveoneanother.at/tiedot/db"
 	"math/rand"
 	"os"
 	"runtime"
