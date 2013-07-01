@@ -72,7 +72,8 @@ func benchmark() {
 			return true
 		})
 	}, func() {
-		doc, _ := col.Read(ids[uint64(rand.Intn(BENCH_SIZE))])
+		var doc interface{}
+		err = col.Read(ids[uint64(rand.Intn(BENCH_SIZE))], &doc)
 		if doc == nil {
 			panic("read error")
 		}

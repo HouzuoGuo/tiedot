@@ -39,7 +39,8 @@ func Query(w http.ResponseWriter, r *http.Request) {
 	}
 	// write each document on a new line
 	for k := range queryResult {
-		doc, _ := dbcol.Read(k)
+		var doc interface{}
+		dbcol.Read(k, &doc) //FIXME (SR): err handling
 		if doc == nil {
 			continue
 		}
