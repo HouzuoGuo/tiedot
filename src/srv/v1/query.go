@@ -2,10 +2,10 @@
 package v1
 
 import (
+	"db"
 	"encoding/json"
 	"fmt"
 	"log"
-	"loveoneanother.at/tiedot/db"
 	"net/http"
 	"strconv"
 )

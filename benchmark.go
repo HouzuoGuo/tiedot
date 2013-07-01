@@ -1,9 +1,9 @@
 package main
 
 import (
+	"db"
 	"encoding/json"
 	"fmt"
-	"db"
 	"math/rand"
 	"os"
 	"runtime"

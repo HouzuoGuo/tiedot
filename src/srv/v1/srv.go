@@ -2,9 +2,9 @@
 package v1
 
 import (
+	"db"
 	"fmt"
 	"log"
-	"loveoneanother.at/tiedot/db"
 	"net/http"
 	"sync"
 )

@@ -1,12 +1,12 @@
 package main
 
 import (
+	"db"
 	"flag"
 	"log"
-	"db"
-	"srv/v1"
 	"os"
 	"runtime"
+	"srv/v1"
 	"strconv"
 )
 
