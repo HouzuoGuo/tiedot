@@ -1,19 +1,18 @@
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
-tiedot - Your NoSQL database powered by Golang
-=
+### tiedot - Your NoSQL database powered by Golang
 
 tiedot is a document database that uses __JSON__ for documents and queries; it can be __embedded__ into your program, or run a stand-alone server using __HTTP__ for an API.
 
-Feature Highlights
--
+### Feature Highlights
+
 - Designed for both embedded usage and standalone service.
 - Fault-tolerant data structures that put safety of your data *first*.
 - Built with performance and scalability always in mind.
 - Use JSON syntax to build powerful queries.
 
-High Performance!
--
+### High Performance!
+
 tiedot scales reasonably well on SMP machines. Under maximum load, it usually either uses all CPUs to 100%, or uses up all IO bandwidth. The following performance results are collected on three different types of machines, using tiedot built-in benchmark:
 
 (Operations per second)
@@ -65,8 +64,8 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
 </tr>
 </table>
 
-References
--
+### References
+
 - [Quick Start Guide: tiedot in 10 minutes][tutorial]
 - [HTTP API reference]
 - [Embedded usage]
@@ -75,8 +74,8 @@ References
 - [Concurrency and networking]
 - [Limitations]
 
-Version History
--
+### Version History
+
 <table>
 <tr>
   <th>Version</th>
@@ -92,8 +91,7 @@ Version History
 </tr>
 </table>
 
-Contact and License
--
+### Contact and License
 
 You may want to check out [Issues] section for future plans, and please feel very free to contact [Howard] if you have any feedback / questions. I also have [Twitter] and [blog], please check them out as well.
 
@@ -110,8 +108,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 </pre>
 
 
-Project Background
--
+### Project Background
+
 __Is tiedot "yet another NoSQL database"?__
 
 There are probably as many NoSQL database as there are Linux distributions.
