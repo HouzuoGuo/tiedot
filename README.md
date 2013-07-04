@@ -74,6 +74,7 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
 - [Data structures]
 - [Query processor and index]
 - [Concurrency and networking]
+- [Performance and benchmarks]
 - [Limitations]
 
 ### Version History
@@ -132,6 +133,7 @@ __Why the name "tiedot"?__
 [Data structures]: https://github.com/HouzuoGuo/tiedot/wiki/Data-structures
 [Query processor and index]: https://github.com/HouzuoGuo/tiedot/wiki/Query-processor-and-index
 [Concurrency and networking]: https://github.com/HouzuoGuo/tiedot/wiki/Concurrency-and-networking
+[Performance and benchmarks]: https://github.com/HouzuoGuo/tiedot/wiki/Performance-and-benchmarks
 [Limitations]: https://github.com/HouzuoGuo/tiedot/wiki/Limitations
 [Howard]: mailto:guohouzuo@gmail.com
 [Twitter]: https://twitter.com/hzguo

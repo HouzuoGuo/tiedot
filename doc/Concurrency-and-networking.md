@@ -1,5 +1,11 @@
 # Concurrency and networking
 
+## High level picture: ACID?
+
+Similar to some other popular NoSQL solutions, tiedot does not provide ACID transactions. However, atomic operations are possible within the scope of a single document.
+
+tiedot currently does not support durable write (blocking write until synchronized), but this feature is planned in the next release.
+
 ## IO operation synchronization
 
 For maximum performance and scalability, tiedot only synchronizes IO operations at very low level - each data file (documents or index) has a `RWMutex` (read-write lock).
