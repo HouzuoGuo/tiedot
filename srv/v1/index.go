@@ -10,6 +10,7 @@ import (
 
 func Index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	var col, path string
 	if !Require(w, r, "col", &col) {
 		return
@@ -31,6 +32,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
 
 func Indexes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	var col string
 	if !Require(w, r, "col", &col) {
 		return
@@ -54,6 +56,7 @@ func Indexes(w http.ResponseWriter, r *http.Request) {
 
 func Unindex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	var col, path string
 	if !Require(w, r, "col", &col) {
 		return

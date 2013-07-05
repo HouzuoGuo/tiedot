@@ -9,6 +9,7 @@ import (
 
 func Create(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	var col string
 	if !Require(w, r, "col", &col) {
 		return
@@ -24,6 +25,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 
 func All(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	cols := make([]string, 0)
 	V1Sync.Lock()
 	defer V1Sync.Unlock()
@@ -40,6 +42,7 @@ func All(w http.ResponseWriter, r *http.Request) {
 
 func Rename(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	var oldName, newName string
 	if !Require(w, r, "old", &oldName) {
 		return
@@ -56,6 +59,7 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 
 func Drop(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	var col string
 	if !Require(w, r, "col", &col) {
 		return
@@ -69,6 +73,7 @@ func Drop(w http.ResponseWriter, r *http.Request) {
 
 func Scrub(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	var col string
 	if !Require(w, r, "col", &col) {
 		return

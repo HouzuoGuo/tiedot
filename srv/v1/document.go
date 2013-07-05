@@ -10,6 +10,7 @@ import (
 
 func Insert(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	var col, doc string
 	if !Require(w, r, "col", &col) {
 		return
@@ -40,6 +41,7 @@ func Insert(w http.ResponseWriter, r *http.Request) {
 
 func Get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	var col, id string
 	if !Require(w, r, "col", &col) {
 		return
@@ -75,6 +77,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 
 func Update(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	var col, id, doc string
 	if !Require(w, r, "col", &col) {
 		return
@@ -112,6 +115,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 
 func Delete(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
 	var col, id string
 	if !Require(w, r, "col", &col) {
 		return
