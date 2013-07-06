@@ -12,7 +12,7 @@ import (
 
 func Query(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "text/plain")
 	var col, q string
 	if !Require(w, r, "col", &col) {
 		return
@@ -56,7 +56,7 @@ func Query(w http.ResponseWriter, r *http.Request) {
 
 func QueryID(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "text/plain")
 	var col, q string
 	if !Require(w, r, "col", &col) {
 		return
@@ -88,7 +88,7 @@ func QueryID(w http.ResponseWriter, r *http.Request) {
 
 func Count(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "text/plain")
 	var col, q string
 	if !Require(w, r, "col", &col) {
 		return
