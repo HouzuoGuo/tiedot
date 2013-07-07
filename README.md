@@ -1,4 +1,4 @@
-> my apologize for earlier inconvenience, `go get` now works with this project :)
+> Check out [tiedot-webcp][] (in-development), a web application control panel for your tiedot databases.
 
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
@@ -58,8 +58,7 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
 <tr>
   <td>Amazon EC2 t1.micro</td>
   <td>18k</td>
-  <td>70k</td>
-  <td>15k</td>
+  <td>70k</td> <td>15k</td>
   <td>19k</td>
   <td>54k</td>
   <td>The slowest instance type</td>
@@ -139,3 +138,4 @@ __Why the name "tiedot"?__
 [Twitter]: https://twitter.com/hzguo
 [blog]: http://allstarnix.blogspot.com.au
 [Issues]: https://github.com/HouzuoGuo/tiedot/issues
+[tiedot-webcp]: https://github.com/HouzuoGuo/tiedot-webcp
