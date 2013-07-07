@@ -49,6 +49,8 @@ func Start(db *db.DB, port int) {
 	http.HandleFunc("/unindex", Unindex)
 	// misc (synchronized)
 	http.HandleFunc("/shutdown", Shutdown)
+	// misc (asynchronized)
+	http.HandleFunc("/version", Version)
 
 	log.Printf("Listening on all interfaces, port %d", port)
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)

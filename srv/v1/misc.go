@@ -15,3 +15,10 @@ func Shutdown(w http.ResponseWriter, r *http.Request) {
 	V1DB.Close()
 	os.Exit(0)
 }
+
+// Return server protocol version number.
+func Version(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("1"))
+}
