@@ -1,4 +1,4 @@
-> Check out [tiedot-webcp][] (in-development), a web control panel application for your tiedot databases.
+> Check out [tiedot-webcp][] - tiedot control panel, brings tiedot database management to the Web!
 
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
