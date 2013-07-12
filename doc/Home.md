@@ -1,5 +1,3 @@
-> my apologize for earlier inconvenience, `go get` now works with this project :)
-
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
 ### tiedot - Your NoSQL database powered by Golang
@@ -12,6 +10,8 @@ tiedot is a document database that uses __JSON__ for documents and queries; it c
 - Fault-tolerant data structures that put safety of your data *first*.
 - Built with performance and scalability always in mind.
 - Use JSON syntax to build powerful queries.
+- Support both *nix and Windows operating systems.
+- Web control panel [tiedot-webcp][] brings database management to the web and makes it easier!
 
 ### High Performance!
 
@@ -58,8 +58,7 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
 <tr>
   <td>Amazon EC2 t1.micro</td>
   <td>18k</td>
-  <td>70k</td>
-  <td>15k</td>
+  <td>70k</td> <td>15k</td>
   <td>19k</td>
   <td>54k</td>
   <td>The slowest instance type</td>
@@ -91,6 +90,12 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
   <td>alpha</td>
   <td>2013-06-28</td>
   <td>First release</td>
+</tr>
+<tr>
+  <td>Beta</td>
+  <td>beta</td>
+  <td>2013-07-12</td>
+  <td>Platform support and data durability improvements.</td>
 </tr>
 </table>
 
@@ -139,3 +144,4 @@ __Why the name "tiedot"?__
 [Twitter]: https://twitter.com/hzguo
 [blog]: http://allstarnix.blogspot.com.au
 [Issues]: https://github.com/HouzuoGuo/tiedot/issues
+[tiedot-webcp]: https://github.com/HouzuoGuo/tiedot-webcp

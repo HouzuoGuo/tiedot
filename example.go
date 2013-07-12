@@ -45,14 +45,14 @@ func embeddedExample() {
 	A := myDB.Use("A")
 
 	/*
-		  * Insert document.
-		  * You may insert/update any interface{} to collection, for example:
-		  *
-			* var doc interface{}
-			* json.Unmarshal([]byte(`{"a": 1, "b": 2}`), &doc)
-		  * A.Insert(doc)
-		  *
-		  * And here is an example using struct:
+		Insert document.
+
+		You may insert/update any interface{} to collection, for example:
+		var doc interface{}
+		json.Unmarshal([]byte(`{"a": 1, "b": 2}`), &doc)
+		A.Insert(doc)
+
+		And here is an example using struct:
 	*/
 
 	type Document struct {
@@ -83,6 +83,15 @@ func embeddedExample() {
 
 	// Delete document
 	A.Delete(123) // passing invalid ID to it will not harm your data
+
+	/*
+	   Collection insert/update/delete have their dedicated "durable" calls:
+	   - durableInsert
+	   - durableUpdate
+	  - durableDelete
+	  Those operations ensure a disk flush after each call to guarantee data durability on disk.
+	  However - those operations are 10000x more expensive than ordinary insert/update/delete!
+	*/
 
 	// Create index
 	if err := A.Index([]string{"a", "b", "c"}); err != nil {

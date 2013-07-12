@@ -84,6 +84,14 @@ And here are the results collected from multiple benchmark runs:
 </tr>
 </table>
 
+## Performance of durable operations
+
+tiedot supports guaranteed data durability on disk by calling `msync` (synchronizing disk file with its memory map) after collection insert/update/delete: check out `durableInsert/durableUpdate/durableDelete` in `db/col.go`.
+
+The durable operations come with a very high cost due to that they await disk flush before carrying on.
+
+Compare to normal insert/update/delete operations, the durable operations are 10000x more costly to use (disk flush is very expensive). You may not want to use them too often!
+
 ## Performance comparison with other NoSQL solutions
 
 Every NoSQL solution has its own advantages and disadvantages; tiedot is unique in its own way:
