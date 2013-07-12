@@ -39,7 +39,7 @@ func Open(name string, growth uint64) (file *File, err error) {
 		return file, file.Ensure(file.Growth)
 	}
 
-	if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
+	if file.Buf, err = gommap.Map(file.Fh.Fd(), gommap.PROT_READ|gommap.PROT_WRITE, gommap.MAP_SHARED); err != nil {
 		return
 	}
 	// find append position
@@ -73,7 +73,7 @@ func (file *File) Ensure(more uint64) (err error) {
 		return
 	}
 	if file.Buf != nil {
-		if err = file.Buf.Unmap(); err != nil {
+		if err = file.Buf.UnsafeUnmap(); err != nil {
 			return
 		}
 	}
@@ -88,7 +88,7 @@ func (file *File) Ensure(more uint64) (err error) {
 	}
 	if newSize := int(file.Size + file.Growth); newSize < 0 {
 		log.Panicf("File %s is getting too large", file.Name)
-	} else if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
+	} else if file.Buf, err = gommap.Map(file.Fh.Fd(), gommap.PROT_READ|gommap.PROT_WRITE, gommap.MAP_SHARED); err != nil {
 		return
 	}
 	file.Size += file.Growth
@@ -98,12 +98,12 @@ func (file *File) Ensure(more uint64) (err error) {
 
 // Synchronize mapped region with underlying storage device.
 func (file *File) Flush() error {
-	return file.Buf.Flush()
+	return file.Buf.Sync(gommap.MS_SYNC)
 }
 
 // Close the file.
 func (file *File) Close() (err error) {
-	if err = file.Buf.Unmap(); err != nil {
+	if err = file.Buf.UnsafeUnmap(); err != nil {
 		return
 	}
 	return file.Fh.Close()
