@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"loveoneanother.at/gommap"
+	"loveoneanother.at/tiedot/gommap"
 	"os"
 	"sync"
 )
