@@ -33,7 +33,7 @@ func Query(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// evaluate the query
-	queryResult := make(map[uint64]bool)
+	queryResult := make(map[uint64]struct{})
 	if err := db.EvalQuery(qJson, dbcol, &queryResult); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 		return
@@ -76,7 +76,7 @@ func QueryID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	queryResult := make(map[uint64]bool)
+	queryResult := make(map[uint64]struct{})
 	if err := db.EvalQuery(qJson, dbcol, &queryResult); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 		return
@@ -108,7 +108,7 @@ func Count(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	queryResult := make(map[uint64]bool)
+	queryResult := make(map[uint64]struct{})
 	if err := db.EvalQuery(qJson, dbcol, &queryResult); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 		return

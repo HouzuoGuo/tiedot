@@ -9,11 +9,11 @@ import (
 )
 
 // Evaluate a query and return query result (as map keys).
-func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
+func EvalQuery(q interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	switch expr := q.(type) {
 	// 1, 2.0, etc
 	case float64:
-		(*result)[uint64(expr)] = false
+		(*result)[uint64(expr)] = struct{}{}
 	// ["op", "param1", "param2"...]
 	case []interface{}:
 		switch op := expr[0].(type) {
@@ -54,7 +54,7 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 						// hash scan
 						_, vals := ht.GetAll(intLimit)
 						for _, docID := range vals {
-							(*result)[docID] = false
+							(*result)[docID] = struct{}{}
 						}
 					} else {
 						// collection scan
@@ -63,7 +63,7 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 							vals := GetIn(doc, vecPath)
 							if !(vals == nil || len(vals) == 1 && vals[0] == nil) {
 								counter += 1
-								(*result)[id] = false
+								(*result)[id] = struct{}{}
 								return counter != intLimit
 							}
 							return true
@@ -123,7 +123,7 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 							return false
 						})
 						for _, docID := range vals {
-							(*result)[docID] = false
+							(*result)[docID] = struct{}{}
 						}
 					} else {
 						// fallback to collection scan
@@ -133,7 +133,7 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 							for _, v := range GetIn(doc, vecPath) {
 								if fmt.Sprint(v) == lookupStrValue {
 									counter += 1
-									(*result)[id] = false
+									(*result)[id] = struct{}{}
 									return counter != intLimit
 								}
 							}
@@ -150,8 +150,8 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 				}
 				first := true
 				for _, subExpr := range expr[1:] {
-					subExprResult := make(map[uint64]bool)
-					intersection := make(map[uint64]bool)
+					subExprResult := make(map[uint64]struct{})
+					intersection := make(map[uint64]struct{})
 					err = EvalQuery(subExpr, src, &subExprResult)
 					if err != nil {
 						return
@@ -162,7 +162,7 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 					} else {
 						for k, _ := range subExprResult {
 							if _, inBoth := (*result)[k]; inBoth {
-								intersection[k] = false
+								intersection[k] = struct{}{}
 							}
 						}
 						*result = intersection
@@ -175,8 +175,8 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 					return errors.New(fmt.Sprintf("Expecting more than two results to complement, but I only have: %v", expr))
 				}
 				for _, subExpr := range expr[1:] {
-					subExprResult := make(map[uint64]bool)
-					complement := make(map[uint64]bool)
+					subExprResult := make(map[uint64]struct{})
+					complement := make(map[uint64]struct{})
 					err = EvalQuery(subExpr, src, &subExprResult)
 					if err != nil {
 						return
@@ -184,12 +184,12 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 					// calculate complement
 					for k, _ := range subExprResult {
 						if _, inBoth := (*result)[k]; !inBoth {
-							complement[k] = false
+							complement[k] = struct{}{}
 						}
 					}
 					for k, _ := range *result {
 						if _, inBoth := subExprResult[k]; !inBoth {
-							complement[k] = false
+							complement[k] = struct{}{}
 						}
 					}
 					*result = complement
@@ -205,7 +205,7 @@ func EvalQuery(q interface{}, src *Col, result *map[uint64]bool) (err error) {
 			// all documents
 			case "all":
 				src.Data.ForAll(func(id uint64, _ []byte) bool {
-					(*result)[id] = false
+					(*result)[id] = struct{}{}
 					return true
 				})
 			default:

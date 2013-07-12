@@ -100,7 +100,7 @@ func embeddedExample() {
 	}
 
 	// Execute query
-	result := make(map[uint64]bool)
+	result := make(map[uint64]struct{})
 	var query interface{}
 	json.Unmarshal([]byte(`["all"]`), &query)
 	if err := db.EvalQuery(query, A, &result); err != nil {

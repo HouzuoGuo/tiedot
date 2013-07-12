@@ -9,7 +9,7 @@ import (
 
 const QUERY_BENCH_SIZE = 1000000 // Number of documents made available for query benchmark
 
-func ensureMapHasKeys(m map[uint64]bool, keys ...uint64) bool {
+func ensureMapHasKeys(m map[uint64]struct{}, keys ...uint64) bool {
 	if len(m) != len(keys) {
 		return false
 	}
@@ -21,8 +21,8 @@ func ensureMapHasKeys(m map[uint64]bool, keys ...uint64) bool {
 	return true
 }
 
-func runQuery(query string, col *Col) (map[uint64]bool, error) {
-	result := make(map[uint64]bool)
+func runQuery(query string, col *Col) (map[uint64]struct{}, error) {
+	result := make(map[uint64]struct{})
 	var jq interface{}
 	if err := json.Unmarshal([]byte(query), &jq); err != nil {
 		fmt.Println(err)

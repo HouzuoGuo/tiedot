@@ -84,7 +84,7 @@ func benchmark() {
 			`["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["c", "d"], "limit": 1}]]`), &query); err != nil {
 			panic("json error")
 		}
-		result := make(map[uint64]bool)
+		result := make(map[uint64]struct{})
 		if err := db.EvalQuery(query, col, &result); err != nil {
 			panic("query error")
 		}
