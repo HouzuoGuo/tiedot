@@ -55,7 +55,7 @@ func TestCRUD(t *testing.T) {
 	}
 }
 
-func TestScrub(t *testing.T) {
+func TestFlushScrub(t *testing.T) {
 	tmp := "/tmp/tiedot_db_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
@@ -78,6 +78,9 @@ func TestScrub(t *testing.T) {
 	id1, _ := db.Use("a").Insert(jsonDoc)
 	db.Use("a").Insert(jsonDoc)
 	db.Use("a").Delete(id1)
+	// flush everything
+	db.Flush()
+	// now do scrub
 	if err := db.Scrub("a"); err != nil {
 		t.Fatal(err)
 	}

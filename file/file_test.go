@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestOpenClose(t *testing.T) {
+func TestOpenFlushClose(t *testing.T) {
 	tmp := "/tmp/tiedot_file_test"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
@@ -26,6 +26,9 @@ func TestOpenClose(t *testing.T) {
 	}
 	if tmpFile.Fh == nil || tmpFile.Buf == nil {
 		t.Fatal("Not mmapped")
+	}
+	if err := tmpFile.Flush(); err != nil {
+		t.Fatalf("Failed to flush: %v", err)
 	}
 	if err := tmpFile.Close(); err != nil {
 		t.Fatalf("Failed to close: %v", err)

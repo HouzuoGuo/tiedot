@@ -118,6 +118,13 @@ func (db *DB) Scrub(name string) (err error) {
 	return nil
 }
 
+// Flush all collection data files.
+func (db *DB) Flush() {
+	for _, col := range db.StrCol {
+		col.Flush()
+	}
+}
+
 // Close all collections.
 func (db *DB) Close() {
 	for _, col := range db.StrCol {

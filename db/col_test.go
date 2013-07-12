@@ -94,6 +94,63 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	}
 }
 
+func TestDurableInsertUpdateDelete(t *testing.T) {
+	tmp := "/tmp/tiedot_col_test"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		t.Fatalf("Failed to open: %v", err)
+		return
+	}
+	defer col.Close()
+
+	docs := []string{`{"a": 1}`, `{"b": 2}`}
+	var jsonDoc [2]interface{}
+	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
+	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
+
+	updatedDocs := []string{`{"a": 2}`, `{"b": "abcdefghijklmnopqrstuvwxyz"}`}
+	var updatedJsonDoc [2]interface{}
+	json.Unmarshal([]byte(updatedDocs[0]), &updatedJsonDoc[0])
+	json.Unmarshal([]byte(updatedDocs[1]), &updatedJsonDoc[1])
+
+	ids := [2]uint64{}
+	if ids[0], err = col.DurableInsert(jsonDoc[0]); err != nil {
+		t.Fatalf("Failed to insert: %v", err)
+	}
+	if ids[1], err = col.DurableInsert(jsonDoc[1]); err != nil {
+		t.Fatalf("Failed to insert: %v", err)
+	}
+
+	if ids[0], err = col.DurableUpdate(ids[0], updatedJsonDoc[0]); err != nil {
+		t.Fatalf("Failed to update: %v", err)
+	}
+	if ids[1], err = col.DurableUpdate(ids[1], updatedJsonDoc[1]); err != nil {
+		t.Fatalf("Failed to update: %v", err)
+	}
+	if err = col.DurableDelete(12345); err != nil {
+		t.Fatalf("Failed to delete: %v", err)
+	}
+
+	var doc1 interface{}
+	if err = col.Read(ids[0], &doc1); doc1.(map[string]interface{})[string('a')].(float64) != 2.0 {
+		t.Fatalf("Failed to read back document, got %v", doc1)
+	}
+	var doc2 interface{}
+	if err = col.Read(ids[1], &doc2); doc2.(map[string]interface{})[string('b')].(string) != string("abcdefghijklmnopqrstuvwxyz") {
+		t.Fatalf("Failed to read back document, got %v", doc2)
+	}
+	counter := 0
+	col.ForAll(func(id uint64, doc interface{}) bool {
+		counter++
+		return true
+	})
+	if counter != 2 {
+		t.Fatalf("Expected to read 2 documents, but %d read", counter)
+	}
+}
+
 func TestInsertDeleteRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)

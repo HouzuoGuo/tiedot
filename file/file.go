@@ -5,16 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"loveoneanother.at/gommap"
 	"os"
 	"sync"
-	"syscall"
 )
 
 type File struct {
 	Name                 string
 	Fh                   *os.File
 	Append, Size, Growth uint64
-	Buf                  []byte
+	Buf                  gommap.MMap
 	Sync                 *sync.RWMutex
 }
 
@@ -38,7 +38,8 @@ func Open(name string, growth uint64) (file *File, err error) {
 	if file.Size == 0 {
 		return file, file.Ensure(file.Growth)
 	}
-	if file.Buf, err = syscall.Mmap(int(file.Fh.Fd()), 0, int(file.Size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED); err != nil {
+
+	if file.Buf, err = gommap.Map(file.Fh.Fd(), gommap.PROT_READ|gommap.PROT_WRITE, gommap.MAP_SHARED); err != nil {
 		return
 	}
 	// find append position
@@ -72,7 +73,7 @@ func (file *File) Ensure(more uint64) (err error) {
 		return
 	}
 	if file.Buf != nil {
-		if err = syscall.Munmap(file.Buf); err != nil {
+		if err = file.Buf.UnsafeUnmap(); err != nil {
 			return
 		}
 	}
@@ -87,7 +88,7 @@ func (file *File) Ensure(more uint64) (err error) {
 	}
 	if newSize := int(file.Size + file.Growth); newSize < 0 {
 		log.Panicf("File %s is getting too large", file.Name)
-	} else if file.Buf, err = syscall.Mmap(int(file.Fh.Fd()), 0, newSize, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED); err != nil {
+	} else if file.Buf, err = gommap.Map(file.Fh.Fd(), gommap.PROT_READ|gommap.PROT_WRITE, gommap.MAP_SHARED); err != nil {
 		return
 	}
 	file.Size += file.Growth
@@ -95,9 +96,14 @@ func (file *File) Ensure(more uint64) (err error) {
 	return file.Ensure(more)
 }
 
+// Synchronize mapped region with underlying storage device.
+func (file *File) Flush() error {
+	return file.Buf.Sync(gommap.MS_SYNC)
+}
+
 // Close the file.
 func (file *File) Close() (err error) {
-	if err = syscall.Munmap(file.Buf); err != nil {
+	if err = file.Buf.UnsafeUnmap(); err != nil {
 		return
 	}
 	return file.Fh.Close()

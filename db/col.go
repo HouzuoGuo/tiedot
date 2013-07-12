@@ -202,6 +202,16 @@ func (col *Col) Insert(doc interface{}) (id uint64, err error) {
 	return
 }
 
+// Insert a new document and immediately flush all buffers.
+func (col *Col) DurableInsert(doc interface{}) (id uint64, err error) {
+	id, err = col.Insert(doc)
+	if err != nil {
+		return
+	}
+	err = col.Flush()
+	return
+}
+
 // Update a document, return its new ID.
 func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	data, err := json.Marshal(doc)
@@ -242,6 +252,16 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	return
 }
 
+// Update a document and immediately flush all buffers.
+func (col *Col) DurableUpdate(id uint64, doc interface{}) (newID uint64, err error) {
+	newID, err = col.Update(id, doc)
+	if err != nil {
+		return
+	}
+	err = col.Flush()
+	return
+}
+
 // Delete a document.
 func (col *Col) Delete(id uint64) {
 	var oldDoc interface{}
@@ -260,6 +280,12 @@ func (col *Col) Delete(id uint64) {
 		wg.Done()
 	}()
 	wg.Wait()
+}
+
+// Delete a document and immediately flush all buffers.
+func (col *Col) DurableDelete(id uint64) error {
+	col.Delete(id)
+	return col.Flush()
 }
 
 // Add an index.
@@ -353,6 +379,21 @@ func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
 			return fun(id, parsed)
 		}
 	})
+}
+
+// Flush collection data files.
+func (col *Col) Flush() error {
+	if err := col.Data.File.Flush(); err != nil {
+		log.Printf("Failed to flush %s, reason: %v\n", col.Data.File.Name, err)
+		return err
+	}
+	for _, ht := range col.StrHT {
+		if err := ht.File.Flush(); err != nil {
+			log.Printf("Failed to flush %s, reason: %v\n", ht.File.Name, err)
+			return err
+		}
+	}
+	return nil
 }
 
 // Close a collection.
