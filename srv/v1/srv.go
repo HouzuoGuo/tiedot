@@ -7,6 +7,7 @@ import (
 	"loveoneanother.at/tiedot/db"
 	"net/http"
 	"sync"
+	"time"
 )
 
 var V1DB *db.DB
@@ -51,7 +52,14 @@ func Start(db *db.DB, port int) {
 	http.HandleFunc("/shutdown", Shutdown)
 	// misc (asynchronized)
 	http.HandleFunc("/version", Version)
-
+	// flush all buffers every minute
+	go func() {
+		ticker := time.Tick(time.Minute)
+		for _ = range ticker {
+			V1DB.Flush()
+			log.Printf("Buffers flushed at %s", time.Now())
+		}
+	}()
 	log.Printf("Listening on all interfaces, port %d", port)
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
