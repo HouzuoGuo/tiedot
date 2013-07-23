@@ -368,7 +368,7 @@ func (col *Col) Unindex(path []string) error {
 	return nil
 }
 
-// Do fun for all documents.
+// Do fun for all documents (deserialized into generic interface).
 func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
 	col.Data.ForAll(func(id uint64, data []byte) bool {
 		var parsed interface{}
@@ -377,6 +377,17 @@ func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
 			return true
 		} else {
 			return fun(id, parsed)
+		}
+	})
+}
+
+// Do fun for all documents (deserialized into target interface). template must be a pointer to an initialized structure.
+func (col *Col) DeserializeAll(template interface{}, fun func(id uint64) bool) {
+	col.Data.ForAll(func(id uint64, data []byte) bool {
+		if err := json.Unmarshal(data, template); err != nil {
+			return true
+		} else {
+			return fun(id)
 		}
 	})
 }

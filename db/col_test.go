@@ -94,6 +94,50 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	}
 }
 
+func TestInsertDeserialize(t *testing.T) {
+	tmp := "/tmp/tiedot_col_test"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		t.Fatalf("Failed to open: %v", err)
+		return
+	}
+	defer col.Close()
+
+	type Struct struct {
+		I int
+		S string
+		B bool
+	}
+
+	doc0 := &Struct{0, "a", false}
+	doc1 := &Struct{1, "b", true}
+
+	ids := [2]uint64{}
+	if ids[0], err = col.Insert(doc0); err != nil {
+		t.Fatalf("Failed to insert: %v", err)
+	}
+	if ids[1], err = col.Insert(doc1); err != nil {
+		t.Fatalf("Failed to insert: %v", err)
+	}
+
+	template := new(Struct)
+	col.DeserializeAll(template, func(id uint64) bool {
+		switch id {
+		case ids[0]:
+			if !(template.I == 0 && template.S == "a" && template.B == false) {
+				t.Fatalf("Deserialized document is not expected: %v", template)
+			}
+		case ids[1]:
+			if !(template.I == 1 && template.S == "b" && template.B == true) {
+				t.Fatalf("Deserialized document is not expected: %v", template)
+			}
+		}
+		return true
+	})
+}
+
 func TestDurableInsertUpdateDelete(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
