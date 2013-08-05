@@ -1,3 +1,5 @@
+> Important note: Please `go get loveoneanother.at/tiedot`. Go get this repository may not work.
+
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
 ### tiedot - Your NoSQL database powered by Golang
@@ -10,7 +12,7 @@ tiedot is a document database that uses __JSON__ for documents and queries; it c
 - Fault-tolerant data structures that put safety of your data *first*.
 - Built with performance and scalability always in mind.
 - Use JSON syntax to build powerful queries.
-- Support both *nix and Windows operating systems.
+- Support both \*nix and Windows operating systems.
 - Web control panel [tiedot-webcp][] brings database management to the web and makes it easier!
 
 ### High Performance!
