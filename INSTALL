@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+if [ ! -e "../../../loveoneanother.at" ]; then
+	ln -s `pwd`/.. ../../../loveoneanother.at
+fi
+export GOPATH=$(cd ../../../..;pwd)
+go build
