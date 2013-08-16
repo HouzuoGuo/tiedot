@@ -34,14 +34,14 @@ func Query(w http.ResponseWriter, r *http.Request) {
 	}
 	// evaluate the query
 	queryResult := make(map[uint64]struct{})
-	if err := db.EvalQuery(qJson, dbcol, &queryResult); err != nil {
+	if err := db.EvalQueryV2(qJson, dbcol, &queryResult); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 		return
 	}
 	// write each document on a new line
 	for k := range queryResult {
 		var doc interface{}
-		dbcol.Read(k, &doc) //FIXME (SR): err handling
+		dbcol.Read(k, &doc)
 		if doc == nil {
 			continue
 		}

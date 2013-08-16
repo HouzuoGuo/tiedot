@@ -80,12 +80,12 @@ func benchmark() {
 	})
 	average("lookup", BENCH_SIZE, func() {}, func() {
 		var query interface{}
-		if err := json.Unmarshal([]byte(`["c", ["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "b", "c"], "limit": 1}],`+
-			`["=", {"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["c", "d"], "limit": 1}]]`), &query); err != nil {
+		if err := json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "b", "c"], "limit": 1}, `+
+			`{"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
 			panic("json error")
 		}
 		result := make(map[uint64]struct{})
-		if err := db.EvalQuery(query, col, &result); err != nil {
+		if err := db.EvalQueryV2(query, col, &result); err != nil {
 			panic("query error")
 		}
 	})
