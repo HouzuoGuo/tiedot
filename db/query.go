@@ -1,4 +1,4 @@
-/* Query processor. */
+/* Query processor for embedded and HTTP API V1. */
 package db
 
 import (
