@@ -83,7 +83,7 @@ func TestQueryV2(t *testing.T) {
 		t.Fatal(q)
 	}
 	// all documents
-	q, err = runQueryV2(`{"all": "123"}`, col)
+	q, err = runQueryV2(`"all"`, col)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestQueryV2(t *testing.T) {
 		t.Fatal(q)
 	}
 	// intersection
-	q, err = runQueryV2(`{"n": [{"eq": 2, "in": ["d"]}, {"all":1 }]}`, col)
+	q, err = runQueryV2(`{"n": [{"eq": 2, "in": ["d"]}, "all"]}`, col)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestQueryV2(t *testing.T) {
 		t.Fatal(q)
 	}
 	// complement
-	q, err = runQueryV2(`{"c": [{"eq": 4,  "in": ["c"]}, {"eq": 2, "in": ["d"]}, {"all": 0}]}`, col)
+	q, err = runQueryV2(`{"c": [{"eq": 4,  "in": ["c"]}, {"eq": 2, "in": ["d"]}, "all"]}`, col)
 	if err != nil {
 		t.Fatal(err)
 	}

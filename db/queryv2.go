@@ -21,6 +21,16 @@ func EvalQueryV2(q interface{}, src *Col, result *map[uint64]struct{}) (err erro
 				return
 			}
 		}
+	case string:
+		if expr == "all" {
+			// put all IDs into result
+			src.Data.ForAll(func(id uint64, _ []byte) bool {
+				(*result)[id] = struct{}{}
+				return true
+			})
+		} else {
+			return errors.New(fmt.Sprintf("Do not know what %v means", expr))
+		}
 	case map[string]interface{}:
 		// single query
 		if lookupValue, lookup := expr["eq"]; lookup {
@@ -121,12 +131,6 @@ func EvalQueryV2(q interface{}, src *Col, result *map[uint64]struct{}) (err erro
 					return true
 				})
 			}
-		} else if _, all := expr["all"]; all {
-			// put all IDs into result
-			src.Data.ForAll(func(id uint64, _ []byte) bool {
-				(*result)[id] = struct{}{}
-				return true
-			})
 		} else if subExprs, intersect := expr["n"]; intersect {
 			// calculate intersection of sub-query results
 			if subExprVecs, ok := subExprs.([]interface{}); ok {
