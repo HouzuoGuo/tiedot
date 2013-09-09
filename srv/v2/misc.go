@@ -20,5 +20,5 @@ func Shutdown(w http.ResponseWriter, r *http.Request) {
 func Version(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("1"))
+	w.Write([]byte("2"))
 }
