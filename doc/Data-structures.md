@@ -84,7 +84,7 @@ There is no padding before or after a bucket. Each bucket is stored in the follo
   </tr>
   <tr>
     <td>Bucket Entry</td>
-    <td>22 * number of entries per bucket</td>
+    <td>21 * number of entries per bucket</td>
     <td>Bucket entries</td>
     <td>See "Bucket entry format"</td>
   </tr>
