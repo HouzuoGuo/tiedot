@@ -52,6 +52,7 @@ func Start(db *db.DB, port int) {
 	http.HandleFunc("/shutdown", Shutdown)
 	// misc (asynchronized)
 	http.HandleFunc("/version", Version)
+	http.HandleFunc("/memstats", MemStats)
 	// flush all buffers every minute
 	go func() {
 		ticker := time.Tick(time.Minute)
