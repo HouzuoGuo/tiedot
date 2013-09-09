@@ -148,7 +148,7 @@ func (col *Col) Read(id uint64, doc interface{}) error {
 		return errors.New(fmt.Sprintf("Document does not exist"))
 	}
 	if err := json.Unmarshal(data, &doc); err != nil {
-		msg := fmt.Sprintf("Cannot parse document %d in %s to JSON\n", id, col.Dir)
+		msg := fmt.Sprintf("Cannot parse document %d in %s to JSON", id, col.Dir)
 		log.Println(msg)       // for the srv
 		return errors.New(msg) // for embedded usage
 	}
@@ -218,37 +218,21 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	if err != nil {
 		return
 	}
+	// read original document
 	oldData := col.Data.Read(id)
 	if oldData == nil {
 		return id, errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.Dir))
 	}
-	oldSize := len(oldData)
 	var oldDoc interface{}
-	err = json.Unmarshal(oldData, &oldDoc)
-	if oldDoc == nil {
-		return id, nil
-	}
-	wg := new(sync.WaitGroup)
-	if oldSize >= len(data) {
-		// update indexes and collection data in parallel
-		wg.Add(2)
-		go func() {
-			_, err = col.Data.Update(id, data)
-			wg.Done()
-		}()
-		go func() {
-			col.UnindexDoc(id, oldDoc)
-			col.IndexDoc(newID, doc)
-			wg.Done()
-		}()
-		newID = id
+	if err = json.Unmarshal(oldData, &oldDoc); err != nil {
+		log.Printf("The original document at %d is corrupted, this update will overwrite it", id)
 	} else {
-		// update data before updating indexes
-		newID, err = col.Data.Update(id, data)
 		col.UnindexDoc(id, oldDoc)
-		col.IndexDoc(newID, doc)
 	}
-	wg.Wait()
+	if newID, err = col.Data.Update(id, data); err != nil {
+		return
+	}
+	col.IndexDoc(newID, doc)
 	return
 }
 
@@ -373,7 +357,7 @@ func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
 	col.Data.ForAll(func(id uint64, data []byte) bool {
 		var parsed interface{}
 		if err := json.Unmarshal(data, &parsed); err != nil {
-			log.Printf("Cannot parse document '%v' in %s to JSON\n", data, col.Dir)
+			log.Printf("Cannot parse document '%v' in %s to JSON", data, col.Dir)
 			return true
 		} else {
 			return fun(id, parsed)
@@ -395,12 +379,12 @@ func (col *Col) DeserializeAll(template interface{}, fun func(id uint64) bool) {
 // Flush collection data files.
 func (col *Col) Flush() error {
 	if err := col.Data.File.Flush(); err != nil {
-		log.Printf("Failed to flush %s, reason: %v\n", col.Data.File.Name, err)
+		log.Printf("Failed to flush %s, reason: %v", col.Data.File.Name, err)
 		return err
 	}
 	for _, ht := range col.StrHT {
 		if err := ht.File.Flush(); err != nil {
-			log.Printf("Failed to flush %s, reason: %v\n", ht.File.Name, err)
+			log.Printf("Failed to flush %s, reason: %v", ht.File.Name, err)
 			return err
 		}
 	}
@@ -410,11 +394,11 @@ func (col *Col) Flush() error {
 // Close a collection.
 func (col *Col) Close() {
 	if err := col.Data.File.Close(); err != nil {
-		log.Printf("Failed to close %s, reason: %v\n", col.Data.File.Name, err)
+		log.Printf("Failed to close %s, reason: %v", col.Data.File.Name, err)
 	}
 	for _, ht := range col.StrHT {
 		if err := ht.File.Close(); err != nil {
-			log.Printf("Failed to close %s, reason: %v\n", ht.File.Name, err)
+			log.Printf("Failed to close %s, reason: %v", ht.File.Name, err)
 		}
 	}
 }
