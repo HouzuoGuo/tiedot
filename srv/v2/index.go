@@ -18,6 +18,8 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "path", &path) {
 		return
 	}
+	V2Sync.Lock()
+	defer V2Sync.Unlock()
 	dbcol := V2DB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -37,6 +39,8 @@ func Indexes(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "col", &col) {
 		return
 	}
+	V2Sync.Lock()
+	defer V2Sync.Unlock()
 	dbcol := V2DB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -64,6 +68,8 @@ func Unindex(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "path", &path) {
 		return
 	}
+	V2Sync.Lock()
+	defer V2Sync.Unlock()
 	dbcol := V2DB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
