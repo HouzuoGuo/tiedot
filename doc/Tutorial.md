@@ -1,4 +1,4 @@
-# Quick Start Guide: tiedot in 10 minutes
+# Quick Start: tiedot in 10 minutes
 
 You will need:
 
@@ -7,7 +7,9 @@ You will need:
 - HTTP client (web browser, curl, etc)
 
 ## Get tiedot running
-    
+
+This tutorial uses HTTP API version 1:
+
     mkdir tiedot && cd tiedot
     export GOPATH=`pwd`
     go get loveoneanother.at/tiedot

@@ -1,5 +1,3 @@
-# Data structures
-
 ## Directory and file structure
 
 Database is an ordinary directory in file system, tiedot requires to have RWX permissions on the directory.

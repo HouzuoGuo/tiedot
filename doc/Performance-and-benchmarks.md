@@ -1,5 +1,3 @@
-# Performance and benchmarks
-
 ## When data size < available memory
 
 This is the preferred situation - there is plenty memory available for holding all data files. Operating system does a very good on managing mapped file buffers, swapping rarely happens and there is minimal to no IO on disk. In this situation, tiedot performs like an in-memory database.
@@ -21,7 +19,7 @@ Here are some benchmark results:
   <td>Mobile Intel Core i7 (2nd Gen)</td>
   <td>140k</td>
   <td>310k</td>
-  <td>58k</td>
+  <td>60k</td>
   <td>60k</td>
   <td>140k</td>
   <td>A 3 years old laptop</td>
@@ -86,11 +84,9 @@ And here are the results collected from multiple benchmark runs:
 
 ## Performance of durable operations
 
-tiedot supports guaranteed data durability on disk by calling `msync` (synchronizing disk file with its memory map) after collection insert/update/delete: check out `durableInsert/durableUpdate/durableDelete` in `db/col.go`.
+Normally, tiedot flushes memory buffers onto disk every minute.
 
-The durable operations come with a very high cost due to that they await disk flush before carrying on.
-
-Compare to normal insert/update/delete operations, the durable operations are 10000x more costly to use (disk flush is very expensive). You may not want to use them too often!
+When you require guaranteed data durability, tiedot supports `durableInsert/durableUpdate/durableDelete` (in `db/col.go`) which make syscall `msync` immediately following collection operation. Compare to normal insert/update/delete operations, the durable operations are 10000x more costly to use (they have to wait for disk IO!) you may not want to use them too often!
 
 ## Performance comparison with other NoSQL solutions
 

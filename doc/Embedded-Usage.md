@@ -1,5 +1,3 @@
-# Embedded Usage
-
 ## Introduction
 
 tiedot is designed for both running standalone service and embedded usage.

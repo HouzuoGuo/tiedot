@@ -1,4 +1,4 @@
-> Important note: Please `go get loveoneanother.at/tiedot`. Go get this repository may not work.
+> Important note: Please `go get loveoneanother.at/tiedot`. Go get this repository may not work. See INSTALL for more details.
 
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
@@ -70,7 +70,8 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
 ### References
 
 - [Quick Start Guide: tiedot in 10 minutes][tutorial]
-- [HTTP API reference]
+- [HTTP API V1 reference]
+- [HTTP API V2 reference]
 - [Embedded usage]
 - [Data structures]
 - [Query processor and index]
@@ -79,6 +80,8 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
 - [Limitations]
 
 ### Version History
+
+See [Version History] for detailed change logs, known issues, etc.
 
 <table>
 <tr>
@@ -105,7 +108,7 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
 
 You may want to check out [Issues] section for future plans, and please feel very free to contact [Howard] if you have any feedback / questions. I also have [Twitter] and [blog], please check them out as well.
 
-The following copyright notice and disclaimers apply to all files in the project repository:
+The following license (2 clause BSD license) applies to all files in the project repository:
 <pre>
 Copyright (c) 2013, Howard Guo
 All rights reserved.
@@ -135,7 +138,9 @@ __Why the name "tiedot"?__
 "tiedot" is a Finnish word standing for "data". I enjoy learning (natural and computer) languages, also enjoy listening to music in many languages. "Tiedot" sounds cute, doesn't it?
 
 [tutorial]: https://github.com/HouzuoGuo/tiedot/wiki/Tutorial
-[HTTP API reference]: https://github.com/HouzuoGuo/tiedot/wiki/HTTP-API-Refernece
+[HTTP API V1 reference]: https://github.com/HouzuoGuo/tiedot/wiki/HTTP-API-V1-Reference
+[HTTP API V2 reference]: https://github.com/HouzuoGuo/tiedot/wiki/HTTP-API-V2-Reference
+[Version History]: https://github.com/HouzuoGuo/tiedot/wiki/Version-History
 [Embedded usage]: https://github.com/HouzuoGuo/tiedot/wiki/Embedded-Usage
 [Data structures]: https://github.com/HouzuoGuo/tiedot/wiki/Data-structures
 [Query processor and index]: https://github.com/HouzuoGuo/tiedot/wiki/Query-processor-and-index

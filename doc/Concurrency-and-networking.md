@@ -1,10 +1,8 @@
-# Concurrency and networking
-
 ## High level picture: ACID?
 
 Similar to some other popular NoSQL solutions, tiedot does not provide ACID transactions. However, atomic operations are possible within the scope of a single document.
 
-tiedot currently does not support durable write (blocking write until synchronized), but this feature is planned in the next release.
+Durable write operations have been introduced in beta release - these operations block and wait for all memory buffers to synchronize with disk, therefore they are slow but guarantee data durability.
 
 ## IO operation synchronization
 
@@ -39,6 +37,7 @@ tiedot HTTP service is powered by HTTP server in standard Golang library `net/ht
 
 The HTTP service:
 
+- Serves only one database instance
 - Listens on all network interfaces
 - Listens on the port specified by user via CLI parameter
 - Unconditionally processes all incoming requests

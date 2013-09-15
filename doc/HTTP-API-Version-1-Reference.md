@@ -1,14 +1,12 @@
-#HTTP API Reference
-
 ## General info
-
-tiedot server serves one database instance and listens on all network interfaces for incoming HTTP requests.
 
 All server endpoints support GET/PUT/POST methods. Request parameters may also be passed via any of those methods.
 
 There are two types of endpoints - synchronized (stop-the-world) and asynchronized. Certain endpoints have to be synchronized in order to ensure safe operation, such as renaming a collection or removing an index.
 
 Server response always contains `Cache-Control: must-revalidate` header.
+
+Version 1 API is supported by alpha (and later) releases. [Version 2 API][] is now available - it is easier and more efficient, please use version 2 API if possible.
 
 ## Generic error response
 
@@ -182,3 +180,5 @@ All the endpoints below are __synchronized__.
     <td>No response<br/>Connection closed</td>
   </tr>
 </table>
+
+[Version 2 API]: https://github.com/HouzuoGuo/tiedot/wiki/HTTP-API-V2-Reference
