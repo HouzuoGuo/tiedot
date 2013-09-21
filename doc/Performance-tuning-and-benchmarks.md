@@ -82,11 +82,11 @@ And here are the results collected from multiple benchmark runs:
 </tr>
 </table>
 
-## Performance of durable operations
+## Performance of "immediate durability" operations
 
-Normally, tiedot flushes memory buffers onto disk every minute.
+Normally, tiedot synchronizes memory buffers with disk files every minute.
 
-When you require guaranteed data durability, tiedot supports `durableInsert/durableUpdate/durableDelete` (in `db/col.go`) which make syscall `msync` immediately following collection operation. Compare to normal insert/update/delete operations, the durable operations are 10000x more costly to use (they have to wait for disk IO!) you may not want to use them too often!
+When you require immediately guaranteed data durability, tiedot supports `durableInsert/durableUpdate/durableDelete` (in `db/col.go`) which make syscall `msync` immediately following collection operation - they are 10000x more costly to use ompare to normal insert/update/delete operations, therefore you may not want to use them too often!
 
 ## Performance comparison with other NoSQL solutions
 
