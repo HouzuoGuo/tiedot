@@ -4,214 +4,124 @@ You will need:
 
 - git
 - Go (>= 1.1)
-- HTTP client (web browser, curl, etc)
+- A regular web browser OR curl/wget
 
-## Get tiedot running
-
-This tutorial uses HTTP API version 1:
+## Run tiedot
 
     mkdir tiedot && cd tiedot
     export GOPATH=`pwd`
     go get loveoneanother.at/tiedot
 
-    # run server
-    ./bin/tiedot -mode=v1 -dir=/tmp/MyDatabase -port=8080
-
-    # tiedot is now running in Foreground, listening on port 8080
+    ./bin/tiedot -mode=v2 -dir=/tmp/MyDatabase -port=8080
 
 ## Basics
 
-tiedot server connects to a database; database is made of collections; collection is made of documents and indexes.
+tiedot server serves one database; database is made of collections; collection is made of documents and indexes.
 
-You may send HTTP requests (along with parameter values) using any of GET, POST or PUT methods. For an example:
-
-    curl "http://localhost:8080/create?col=A"
+API requests (along with parameter values) may be sent using of GET, POST or PUT methods.
 
 ## Manage collections
 
-<table style="font-family: monospace;">
-  <tr>
-    <th></th>
-    <th>Parameters</th>
-    <th>Endpoint</th>
-    <th>Response</th>
-  </tr>
-  <tr>
-    <td>Create a collection</td>
-    <td>col=Feeds</td>
-    <td>/create</td>
-    <td>(nil)</td>
-  </tr>
-  <tr>
-    <td>Create another collection</td>
-    <td>col=Votes</td>
-    <td>/create</td>
-    <td>(nil)</td>
-  </tr>
-  <tr>
-    <td>Which collections do I have?</td>
-    <td>(nil)</td>
-    <td>/all</td>
-    <td>["Feeds", "Votes"]</td>
-  </tr>
-  <tr>
-    <td>Rename collection "Votes" to "Points"</td>
-    <td>old=Votes<br/>new=Points</td>
-    <td>/rename</td>
-    <td>(nil)</td>
-  </tr>
-  <tr>
-    <td>Drop collection "Points"</td>
-    <td>col=Points<br/></td>
-    <td>/drop</td>
-    <td>(nil)</td>
-  </tr>
-  <tr>
-    <td>Scrub(*) collection "Feeds"</td>
-    <td>col=Feeds<br/></td>
-    <td>/scrub</td>
-    <td>(nil)</td>
-  </tr>
-</table>
+Create two collections:
 
-\* Scrub is a maintenance command, it automatically gets rid of corrupted/deleted documents.
+    > curl "http://localhost:8080/create?col=Feeds"
+    > curl "http://localhost:8080/create?col=Votes"
+
+What collections do I have now?
+
+    > curl "http://localhost:8080/all"
+    ["Feeds","Votes"]
+
+Rename collection "Votes" to "Points":
+
+    > curl "http://localhost:8080/rename?old=Votes&new=Points"
+
+Drop (delete) collection "Points":
+
+    > curl "http://localhost:8080/drop?col=Points"
+
+Scrub (repair and compact) "Votes":
+
+    > curl "http://localhost:8080/scrub?col=Feeds"
 
 ## Manage documents
 
-<table style="font-family: monospace;">
-  <tr>
-    <th></th>
-    <th>Parameters (BEFORE encoding)</th>
-    <th>Endpoint</th>
-    <th>Response</th>
-  </tr>
-  <tr>
-    <td>Insert a document</td>
-    <td>col=Feeds<br />doc={"a": 1, "b": 2}</td>
-    <td>/insert</td>
-    <td>0 (new document ID)</td>
-  </tr>
-  <tr>
-    <td>Read a document</td>
-    <td>col=Feeds<br />id=0</td>
-    <td>/get</td>
-    <td>{"a": 1, "b": 2}</td>
-  </tr>
-  <tr>
-    <td>Update a document</td>
-    <td>col=Feeds<br />id=0<br />doc={"a": 2, "b": 2}</td>
-    <td>/update</td>
-    <td>0 (updated document ID)</td>
-  </tr>
-  <tr>
-    <td>Delete a document</td>
-    <td>col=Feeds<br />id=0</td>
-    <td>/delete</td>
-    <td>(nil)</td>
-  </tr>
-</table>
+Insert document:
+
+    > curl --data-ascii doc='{"a": 1, "b": 2}' "http://localhost:8080/insert?col=Feeds"
+    0 # new document ID
+
+Read document:
+
+    > curl "http://localhost:8080/get?col=Feeds&id=0"
+    {"a":1,"b":2}
+
+Update document:
+
+    > curl --data-ascii doc='{"a": 3, "b": 4}' "http://localhost:8080/update?col=Feeds&id=0"
+    0 # updated document's new ID
+
+Delete document:
+
+    > curl "http://localhost:8080/delete?col=Feeds&id=0"
 
 ## Manage indexes
 
-Index helps speeding up lookup queries, but adds a small cost to insert/update/delete operations.
+Index helps with query execution, but adds a small cost to insert/update/delete operations.
 
-For example, if you index path "a,b,c", it will help queries finding documents like `{"a": {"b": {"c": 1}}}`.
+For example: Put an index on `a,b,c` will help queries finding documents such as `{"a": {"b": {"c": 1}}}`.
 
-<table style="font-family: monospace;">
-  <tr>
-    <th></th>
-    <th>Parameters</th>
-    <th>Endpoint</th>
-    <th>Response</th>
-  </tr>
-  <tr>
-    <td>Create an index</td>
-    <td>col=Feeds<br />path=a,b,c</td>
-    <td>/index</td>
-    <td>(nil)</td>
-  </tr>
-  <tr>
-    <td>What indexes do I have?</td>
-    <td>col=Feeds</td>
-    <td>/indexes</td>
-    <td>["a,b,c"]</td>
-  </tr>
-  <tr>
-    <td>Remove an index</td>
-    <td>col=Feeds<br />path=a,b,c</td>
-    <td>/unindex</td>
-    <td>(nil)</td>
-  </tr>
-</table>
+Create an index:
+
+    > curl "http://localhost:8080/index?col=Feeds&path=a,b,c"
+
+What indexes do I have now?
+
+    > curl "http://localhost:8080/indexes?col=Feeds"
+    ["a,b,c"]
+
+Remove an index:
+
+    > curl "http://localhost:8080/unindex?col=Feeds&path=a,b,c"
 
 ## Queries
 
-Query is a JSON structure of __nested__ array and objects. tiedot supports some very basic query operations, however powerful queries can be built by combining different operations:
+Prepare some documents:
 
-<table style="font-family: monospace;">
-  <tr>
-    <th>Operation</th>
-    <th>Usage &amp; Example</th>
-  </tr>
-  <tr>
-    <td>Value lookup</td>
-    <td>["=", {"eq": VALUE, "limit": N, "in": ["path1", "path2"...]}]<br/><br/><i>["=", {"eq": "A", "limit": 1, "in": ["exam", "result", "CS"]}]</i></td>
-  </tr>
-  <tr>
-    <td>Get all documents</td>
-    <td>["all"]<br/><br/><i>["all"]</i></td>
-  </tr>
-  <tr>
-    <td>Union</td>
-    <td>["u", result1, result2...]<br/><br/><i>["u", ["=", {"eq": "David", "in": ["name"]}], ["=", {"eq": "Joe", "in": ["name"]}]]</i></td>
-  </tr>
-  <tr>
-    <td>Intersect</td>
-    <td>["n", result1, result2...]<br/><br/><i>["n", ["=", {"eq": "A", "in": ["math"]}], ["=", {"eq": "A", "in": ["piano"]}]]</i></td>
-  </tr>
-  <tr>
-    <td>Complement</td>
-    <td>["c", result1, result2...]<br/><br/><i>["c", ["all"], ["=", {"eq": "F", "in": ["math"]}]]</i></td>
-  </tr>
-</table>
+    > curl --data-ascii doc='{"Title": "New Go release", "Source": "golang.org", "Age": 3}' "http://localhost:8080/insert?col=Feeds"
+    > curl --data-ascii doc='{"Title": "Kitkat is here", "Source": "android.com", "Age": 2}' "http://localhost:8080/insert?col=Feeds"
+    > curl --data-ascii doc='{"Title": "Slackware Beta", "Source": "slackware.com", "Age": 1}' "http://localhost:8080/insert?col=Feeds"
 
-Those set operations (union, intersect and complement) operate on a number of sub-query results, they are very helpful in building complicated queries.
+Looking for the article "New Go Release":
 
-The following endpoints support query operations:
+    > curl --data-ascii q='{"eq": "New Go release", "in": ["Title"]}' "http://localhost:8080/query?col=Feeds"
+    {"Age":3,"Source":"golang.org","Title":"New Go release"}
 
-<table style="font-family: monospace;">
-  <tr>
-    <th></th>
-    <th>Parameters</th>
-    <th>Endpoint</th>
-    <th>Response</th>
-  </tr>
-  <tr>
-    <td>Return document contents</td>
-    <td>col=Feeds<br />q=YOUR_QUERY</td>
-    <td>/query</td>
-    <td>(documents, one on each line)</td>
-  </tr>
-  <tr>
-    <td>Return document IDs</td>
-    <td>col=Feeds<br />q=YOUR_QUERY</td>
-    <td>/queryID</td>
-    <td>(document IDs, one on each line)</td>
-  </tr>
-  <tr>
-    <td>Return number of results</td>
-    <td>col=Feeds<br />q=YOUR_QUERY</td>
-    <td>/count</td>
-    <td>(a positive integer)</td>
-  </tr>
-</table>
+Looking for article "New Go release" and "android.com" feeds:
 
-## Other stuff
+    > curl --data-ascii q='[{"eq": "New Go release", "in": ["Title"]}, {"eq": "android.com", "in": ["Source"]}]' "http://localhost:8080/query?col=Feeds"
+    {"Age":3,"Source":"golang.org","Title":"New Go release"}
+    {"Age":2,"Source":"android.com","Title":"Kitkat is here"}
 
-Although tiedot data structures are very robust, but please gracefully shutdown server by making an HTTP request to endpoint `/shutdown`.
+Looking for all but not feeds from "golang.org":
 
-You can run a benchmark to see how well tiedot performs on your machine:
+    > curl --data-ascii q='{"c": [{"eq": "golang.org", "in": ["Source"]}, "all"]}' "http://localhost:8080/query?col=Feeds"
+    {"Age":2,"Source":"android.com","Title":"Kitkat is here"}
+    {"Age":1,"Source":"slackware.com","Title":"Slackware Beta"}
 
-    ./tiedot -mode=bench
+Note that: `"all"` means "all documents"; `{"c": [ .. ]}` means "complement". 
 
-The benchmark suit is large and may take a minute or two to complete.
+Looking for young feeds (age between 1 and 3) from "slackware.com":
+
+    > curl --data-ascii q='{"n": [{"eq": "slackware.com", "in": ["Source"]}, {"int-from": 1, "int-to": 3, "in": ["Age"]}]}' "http://localhost:8080/query?col=Feeds"
+    {"Age":1,"Source":"slackware.com","Title":"Slackware Beta"}
+
+Note that: `{"n": [ .. ]}` means "intersect"; `{"int-from": x, "int-to": y, "in": [ .. ] }` is an integer range lookup.
+
+There is also `count` API to return number of results, and `queryID` to return document ID instead of content. Their usage is identical to regular `query` API.
+
+## Wrap up
+
+Let's gracefully shutdown server:
+
+    > curl "http://localhost:8080/shutdown"

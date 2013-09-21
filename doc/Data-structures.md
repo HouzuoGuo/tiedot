@@ -1,4 +1,4 @@
-## Directory and file structure
+### Directory and file structure
 
 Database is an ordinary directory in file system, tiedot requires to have RWX permissions on the directory.
 
@@ -12,7 +12,7 @@ Collection has the following files:
 
 It may also have several index files - one for each index.
 
-## Data file structure
+### Data file structure
 
 All documents are stored in data file. New documents are inserted to end-of-data* position, and they are left room for future updates (growth).
 
@@ -22,7 +22,7 @@ Deleted documents are marked as deleted.
 
 Data file is initially 128MB. It grows automatically by 128MB when there is no place left to append more documents.
 
-### Document format
+#### Document format
 
 There is no padding before or after a document. Every document has:
 <table>
@@ -58,13 +58,13 @@ There is no padding before or after a document. Every document has:
   </tr>
 </table>
 
-## Index hash table file structure
+### Index hash table file structure
 
 This is a static hash table made of buckets. All buckets have same number of entries, new buckets will be chained together should a bucket becomes full.
 
 Index file automatically grows by 64MB when there is no place left for more buckets.
 
-### Bucket format
+#### Bucket format
 
 There is no padding before or after a bucket. Each bucket is stored in the following format:
 <table style="width: 100%;">
@@ -88,7 +88,7 @@ There is no padding before or after a bucket. Each bucket is stored in the follo
   </tr>
 </table>
 
-### Bucket entry format
+#### Bucket entry format
 There is no padding before or after an entry. Each entry is stored in the following format:
 <table style="width: 100%;">
   <tr>

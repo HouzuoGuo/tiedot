@@ -1,18 +1,18 @@
-## General info
+## Data size
 
-Similar to other NoSQL solutions, majority of tiedot IO operations is supported by memory mapped files, therefore your operating system's limitation will apply - usually this implies a limited data file size.
+Majority of tiedot operations are supported by memory mapped files - just like many other NoSQL solutions.
 
-Golang's definition of an `int` is "at least 32-bits" and thus it cannot map a file larger than size of `int` - depends on your Golang runtime, this is also a limit on data file size.
+From Go runtime perspective, if the runtime is 32-bit, you may have only up to 2GB data per file; if the runtime is 64-bit, the limit becomes (2 ^ 64) bytes.
 
-The above size limits apply to all hash table (indexes) and collection data (documents) files. When the size limit is to be exceeded, tiedot will panic and log a message.
+Your operating system may have additional limit on the maximum size of memory mapped file.
 
-## Runtime
-
-Golang runtime uses `GOMAXPROCS` to determine number of OS threads available for a Go program, thus affecting scalability of tiedot. For best performance, `GOMAXPROCS` should be set to no less than available number of CPUs (this can be set via tiedot CLI parameter or environment variable).
-
-## Documents specific
+## Document size
 
 Any document may not exceed 32MBytes, which means:
 
 - By inserting a document, its size may not exceed 16MBytes.
 - By updating a document, the updated version may not exceed 32MBytes.
+
+## Runtime and scalability
+
+Golang runtime uses `GOMAXPROCS` to determine number of OS threads available for a Go program, thus it will affect the scalability of tiedot. For best performance, `GOMAXPROCS` should be set to no less than available number of CPUs (this can be set via tiedot CLI parameter or environment variable).

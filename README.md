@@ -1,4 +1,4 @@
-> Important note: Please `go get loveoneanother.at/tiedot`. Go get this repository may not work. See INSTALL for more details.
+> To use `go get`, please use URL `loveoneanother.at/tiedot`. See INSTALL for more details.
 
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
@@ -10,14 +10,13 @@ tiedot is a document database that uses __JSON__ for documents and queries; it c
 
 - Designed for both embedded usage and standalone service.
 - Fault-tolerant data structures that put safety of your data *first*.
-- Built with performance and scalability always in mind.
+- Very scalable on SMP computers.
 - Use JSON syntax to build powerful queries.
 - Support both \*nix and Windows operating systems.
-- Web control panel [tiedot-webcp][] brings database management to the web and makes it easier!
 
 ### High Performance!
 
-tiedot scales reasonably well on SMP machines. Under maximum load, it usually either uses all CPUs to 100%, or uses up all IO bandwidth. The following performance results are collected on three different types of machines, using tiedot built-in benchmark:
+tiedot scales very well on SMP computers. The following performance results are collected from three machines types, using tiedot built-in benchmark:
 
 (Operations per second)
 <table>
@@ -69,14 +68,14 @@ tiedot scales reasonably well on SMP machines. Under maximum load, it usually ei
 
 ### References
 
-- [Quick Start Guide: tiedot in 10 minutes][tutorial]
-- [HTTP API V1 reference]
-- [HTTP API V2 reference]
+- [Quick Start Guide: tiedot in 10 minutes]
+- [API V1 reference]
+- [API V2 reference]
 - [Embedded usage]
 - [Data structures]
 - [Query processor and index]
 - [Concurrency and networking]
-- [Performance and benchmarks]
+- [Performance tuning and benchmarks]
 - [Limitations]
 
 ### Version History
@@ -85,30 +84,42 @@ See [Version History] for detailed change logs, known issues, etc.
 
 <table>
 <tr>
-  <th>Version</th>
   <th>Branch</th>
+  <th>Release Version</th>
+  <th>API Support</th>
   <th>Release Date</th>
-  <th>Comment</th>
+  <th>Highlights</th>
 </tr>
 <tr>
-  <td>Alpha</td>
   <td>alpha</td>
+  <td>Alpha</td>
+  <td>V1 only</td>
   <td>2013-06-28</td>
   <td>First release</td>
 </tr>
 <tr>
-  <td>Beta</td>
   <td>beta</td>
+  <td>Beta</td>
+  <td>V1 only</td>
   <td>2013-07-12</td>
   <td>Platform support and data durability improvements.</td>
+</tr>
+<tr>
+  <td>1.0</td>
+  <td>1.0</td>
+  <td>V1 and V2</td>
+  <td>2013-09-21</td>
+  <td>Query performance/syntax, and documentation improvements.</td>
 </tr>
 </table>
 
 ### Contact and License
 
-You may want to check out [Issues] section for future plans, and please feel very free to contact [Howard] if you have any feedback / questions. I also have [Twitter] and [blog], please check them out as well.
+Future development plans are tracked in [Issues] section.
 
-The following license (2 clause BSD license) applies to all files in the project repository:
+Please contact [Howard] for feedback /questions. I would love to hear from you! Please also check out my [Twitter] and [blog].
+
+tiedot uses 2-clause BSD license:
 <pre>
 Copyright (c) 2013, Howard Guo
 All rights reserved.
@@ -127,28 +138,27 @@ __Is tiedot "yet another NoSQL database"?__
 
 There are probably as many NoSQL database as there are Linux distributions.
 
-tiedot is not as powerful (yet) - and does not intend to compete with mainstream NoSQL database engines such as CouchDB or Cassandra. However, tiedot performs reasonably well given its small size (< 3k LOC); and for certain loads, it may perform as well as those large brand NoSQL solutions.
+tiedot is not as powerful (yet) - and does not intend to compete with mainstream NoSQL database engines such as CouchDB or Cassandra. However, tiedot performs reasonably well given its small size (around 3k LOC); and due to its simplicity, its performance may come close or even exceed those large brand NoSQL solutions (under certain workloads).
 
 __What is the motive behind this project?__
 
-Golang (Go) is a fascinating language - very easy to use, scalable and reasonably stable. I am very passionate about document database technologies (check out my other GitHub projects!) and enjoy the moments when my program scales well on SMP machines. So this is my Golang practice.
+Golang (Go) is a fascinating language - very easy to use, scalable and reasonably stable. I am very passionate about document database technologies (check out my other GitHub projects!) and enjoy seeing my code scaling well on SMP machines. This is my Golang exercise.
 
 __Why the name "tiedot"?__
 
 "tiedot" is a Finnish word standing for "data". I enjoy learning (natural and computer) languages, also enjoy listening to music in many languages. "Tiedot" sounds cute, doesn't it?
 
-[tutorial]: https://github.com/HouzuoGuo/tiedot/wiki/Tutorial
-[HTTP API V1 reference]: https://github.com/HouzuoGuo/tiedot/wiki/HTTP-API-V1-Reference
-[HTTP API V2 reference]: https://github.com/HouzuoGuo/tiedot/wiki/HTTP-API-V2-Reference
+[Quick Start Guide: tiedot in 10 minutes]: https://github.com/HouzuoGuo/tiedot/wiki/Tutorial
+[API V1 reference]: https://github.com/HouzuoGuo/tiedot/wiki/API-V1-Reference
+[API V2 reference]: https://github.com/HouzuoGuo/tiedot/wiki/API-V2-Reference
 [Version History]: https://github.com/HouzuoGuo/tiedot/wiki/Version-History
 [Embedded usage]: https://github.com/HouzuoGuo/tiedot/wiki/Embedded-Usage
 [Data structures]: https://github.com/HouzuoGuo/tiedot/wiki/Data-structures
 [Query processor and index]: https://github.com/HouzuoGuo/tiedot/wiki/Query-processor-and-index
 [Concurrency and networking]: https://github.com/HouzuoGuo/tiedot/wiki/Concurrency-and-networking
-[Performance and benchmarks]: https://github.com/HouzuoGuo/tiedot/wiki/Performance-and-benchmarks
+[Performance tuning and benchmarks]: https://github.com/HouzuoGuo/tiedot/wiki/Performance-tuning-and-benchmarks
 [Limitations]: https://github.com/HouzuoGuo/tiedot/wiki/Limitations
 [Howard]: mailto:guohouzuo@gmail.com
 [Twitter]: https://twitter.com/hzguo
 [blog]: http://allstarnix.blogspot.com.au
 [Issues]: https://github.com/HouzuoGuo/tiedot/issues
-[tiedot-webcp]: https://github.com/HouzuoGuo/tiedot-webcp
