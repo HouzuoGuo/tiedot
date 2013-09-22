@@ -22,7 +22,8 @@ import (
 var handleLock sync.Mutex
 var handleMap = map[uintptr]syscall.Handle{}
 
-func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
+// Windows mmap always mapes the entire file regardless of the specified length.
+func mmap(_ int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 	flProtect := uint32(syscall.PAGE_READONLY)
 	dwDesiredAccess := uint32(syscall.FILE_MAP_READ)
 	switch {
@@ -38,12 +39,12 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 		dwDesiredAccess |= syscall.FILE_MAP_EXECUTE
 	}
 
-	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, flProtect, 0, len, nil)
+	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, flProtect, 0, 0, nil)
 	if h == 0 {
 		return nil, os.NewSyscallError("CreateFileMapping", errno)
 	}
 
-	addr, errno := syscall.MapViewOfFile(h, dwDesiredAccess, uint32(off>>32), uint32(off&0xFFFFFFFF), uintptr(len))
+	addr, errno := syscall.MapViewOfFile(h, dwDesiredAccess, uint32(off>>32), uint32(off&0xFFFFFFFF), 0)
 	if addr == 0 {
 		return nil, os.NewSyscallError("MapViewOfFile", errno)
 	}
