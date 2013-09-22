@@ -55,7 +55,7 @@ func mmap(_ int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 	m := MMap{}
 	dh := m.header()
 	dh.Data = addr
-	dh.Len = len
+	dh.Len = 0
 	dh.Cap = 0
 
 	return m, nil
