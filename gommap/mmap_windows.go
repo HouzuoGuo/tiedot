@@ -38,7 +38,7 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 		dwDesiredAccess |= syscall.FILE_MAP_EXECUTE
 	}
 
-	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, flProtect, 0, uint32(len), nil)
+	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, flProtect, 0, len, nil)
 	if h == 0 {
 		return nil, os.NewSyscallError("CreateFileMapping", errno)
 	}

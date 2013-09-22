@@ -48,12 +48,12 @@ type MMap []byte
 // be completely mapped into memory.
 // If ANON is set in flags, f is ignored.
 func Map(f *os.File, prot, flags int) (MMap, error) {
-	return MapRegion(f, -1, prot, flags, 0)
+	return MapRegion(f, 0, prot, flags, 0)
 }
 
 // MapRegion maps part of a file into memory.
 // The offset parameter must be a multiple of the system's page size.
-// If length < 0, the entire file will be mapped.
+// If length is 0, the entire file will be mapped.
 // Note that because of runtime limitations, no file larger than about 2GB can
 // be completely mapped into memory.
 // If ANON is set in flags, f is ignored.
@@ -61,7 +61,7 @@ func MapRegion(f *os.File, length int, prot, flags int, offset int64) (MMap, err
 	var fd uintptr
 	if flags&ANON == 0 {
 		fd = uintptr(f.Fd())
-		if length < 0 {
+		if length == 0 {
 			fi, err := f.Stat()
 			if err != nil {
 				return nil, err
@@ -70,9 +70,12 @@ func MapRegion(f *os.File, length int, prot, flags int, offset int64) (MMap, err
 		}
 	} else {
 		if length <= 0 {
-			return nil, errors.New("anonymous mapping requires non-zero length")
+			return nil, errors.New("anonymous mapping requires positive length")
 		}
 		fd = ^uintptr(0)
+	}
+	if length < 0 {
+		panic("memory map file length overflow")
 	}
 	return mmap(length, uintptr(prot), uintptr(flags), fd, offset)
 }

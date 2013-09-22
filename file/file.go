@@ -31,9 +31,6 @@ func Open(name string, growth uint64) (file *File, err error) {
 	if err != nil {
 		return
 	}
-	if int(fsize) < 0 {
-		log.Panicf("File %s is too large to mmap", name)
-	}
 	file.Size = uint64(fsize)
 	if file.Size == 0 {
 		return file, file.Ensure(file.Growth)
@@ -86,9 +83,7 @@ func (file *File) Ensure(more uint64) (err error) {
 	if err = file.Fh.Sync(); err != nil {
 		return
 	}
-	if newSize := int(file.Size + file.Growth); newSize < 0 {
-		log.Panicf("File %s is getting too large", file.Name)
-	} else if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
+	if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
 		return
 	}
 	file.Size += file.Growth
