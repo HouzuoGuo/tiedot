@@ -23,9 +23,6 @@ var handleLock sync.Mutex
 var handleMap = map[uintptr]syscall.Handle{}
 
 func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
-	if int(uint32(len)) != len {
-		panic("file is too large to map")
-	}
 	flProtect := uint32(syscall.PAGE_READONLY)
 	dwDesiredAccess := uint32(syscall.FILE_MAP_READ)
 	switch {
@@ -41,7 +38,6 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 		dwDesiredAccess |= syscall.FILE_MAP_EXECUTE
 	}
 
-	// TODO: Do we need to set some security attributes? It might help portability.
 	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, flProtect, 0, uint32(len), nil)
 	if h == 0 {
 		return nil, os.NewSyscallError("CreateFileMapping", errno)
