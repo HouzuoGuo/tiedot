@@ -111,12 +111,12 @@ func embeddedExample() {
 	// Execute query
 	result := make(map[uint64]struct{})
 	var query interface{}
-	json.Unmarshal([]byte(`["all"]`), &query)
-	if err := db.EvalQuery(query, A, &result); err != nil {
+	json.Unmarshal([]byte(`"all"`), &query)
+	if err := db.EvalQueryV2(query, A, &result); err != nil {
 		panic(err)
 	}
 	for id := range result {
-		// query results are in map keys
+		// map keys are query results - result document IDs
 		fmt.Printf("Query returned document ID %d\n", id)
 	}
 
