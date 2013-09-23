@@ -6,7 +6,6 @@ import (
 	"loveoneanother.at/tiedot/db"
 	"loveoneanother.at/tiedot/srv/v1"
 	"loveoneanother.at/tiedot/srv/v2"
-	"loveoneanother.at/tiedot/srv/v3"
 	"os"
 	"runtime"
 	"strconv"
@@ -20,7 +19,7 @@ func main() {
 	}
 	var mode, dir string
 	var port, maxprocs int
-	flag.StringVar(&mode, "mode", "", "[v1|v2|v3|bench|durable-bench|example]")
+	flag.StringVar(&mode, "mode", "", "[v1|v2|bench|durable-bench|example]")
 	flag.StringVar(&dir, "dir", "", "database directory")
 	flag.IntVar(&port, "port", 0, "listening port number")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
@@ -42,8 +41,6 @@ func main() {
 	case "v1":
 		fallthrough
 	case "v2":
-			fallthrough
-	case "v3":
 		if dir == "" {
 			log.Fatal("Please specify database directory, for example -dir=/tmp/db")
 		}
