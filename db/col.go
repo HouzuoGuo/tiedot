@@ -118,18 +118,9 @@ func (col *Col) LoadConf() error {
 func GetIn(doc interface{}, path []string) (ret []interface{}) {
 	thing := doc
 	for _, seg := range path {
-		switch t := thing.(type) {
-		case bool:
-			return nil
-		case float64:
-			return nil
-		case string:
-			return nil
-		case nil:
-			return nil
-		case interface{}:
-			thing = t.(map[string]interface{})[seg]
-		default:
+		if aMap, ok := thing.(map[string]interface{}); ok {
+			thing = aMap[seg]
+		} else {
 			return nil
 		}
 	}
@@ -224,9 +215,7 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 		return id, errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.Dir))
 	}
 	var oldDoc interface{}
-	if err = json.Unmarshal(oldData, &oldDoc); err != nil {
-		log.Printf("The original document at %d is corrupted, this update will overwrite it", id)
-	} else {
+	if err = json.Unmarshal(oldData, &oldDoc); err == nil {
 		col.UnindexDoc(id, oldDoc)
 	}
 	if newID, err = col.Data.Update(id, data); err != nil {
