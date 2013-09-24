@@ -2,7 +2,7 @@
 
 Majority of tiedot operations are supported by memory mapped files - just like many other NoSQL solutions.
 
-From Go runtime perspective, if the runtime is 32-bit, you may have only up to 2GB data per file; if the runtime is 64-bit, the limit becomes (2 ^ 64) bytes.
+Your Go runtime puts a limitation on the maximum size of a single data file: if it is 32-bit, your file may grow up to 2GB; if it is 64-bit, your file may grow up to 2 ^ 63 Bytes (in theory).
 
 Your operating system may have additional limit on the maximum size of memory mapped file.
 

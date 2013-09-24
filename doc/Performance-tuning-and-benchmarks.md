@@ -2,56 +2,7 @@
 
 This is the preferred situation - there is plenty memory available for holding all data files. Operating system does a very good on managing mapped file buffers, swapping rarely happens and there is minimal to no IO on disk. In this situation, tiedot performs like an in-memory database.
 
-Here are some benchmark results:
-
-(Operations per second)
-<table>
-<tr>
-  <th>Processor</th>
-  <th>Insert</th>
-  <th>Read</th>
-  <th>Query</th>
-  <th>Update</th>
-  <th>Delete</th>
-  <th></th>
-</tr>
-<tr>
-  <td>Mobile Intel Core i7 (2nd Gen)</td>
-  <td>140k</td>
-  <td>310k</td>
-  <td>60k</td>
-  <td>60k</td>
-  <td>140k</td>
-  <td>A 3 years old laptop</td>
-</tr>
-<tr>
-  <td>Desktop Intel Core 2 Duo</td>
-  <td>107k</td>
-  <td>231k</td>
-  <td>44k</td>
-  <td>48k</td>
-  <td>90k</td>
-  <td>A 5 years old workstation</td>
-</tr>
-<tr>
-  <td>Amazon EC2 m1.xlarge</td>
-  <td>90k</td>
-  <td>188k</td>
-  <td>39k</td>
-  <td>42k</td>
-  <td>116k</td>
-  <td>Medium range instance type</td>
-</tr>
-<tr>
-  <td>Amazon EC2 t1.micro</td>
-  <td>18k</td>
-  <td>70k</td>
-  <td>15k</td>
-  <td>19k</td>
-  <td>54k</td>
-  <td>The slowest instance type</td>
-</tr>
-</table>
+Some benchmark results are shown on the front-page of this wiki.
 
 ## When data size > available memory
 

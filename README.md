@@ -31,38 +31,30 @@ tiedot scales very well on SMP computers. The following performance results are 
 </tr>
 <tr>
   <td>Mobile Intel Core i7 (2nd Gen)</td>
-  <td>140k</td>
-  <td>310k</td>
+  <td>168k</td>
+  <td>311k</td>
+  <td>61k</td>
   <td>58k</td>
-  <td>60k</td>
   <td>140k</td>
   <td>A 3 years old laptop</td>
 </tr>
 <tr>
   <td>Desktop Intel Core 2 Duo</td>
-  <td>107k</td>
-  <td>231k</td>
-  <td>44k</td>
-  <td>48k</td>
-  <td>90k</td>
+  <td>127k</td>
+  <td>251k</td>
+  <td>50k</td>
+  <td>56k</td>
+  <td>131k</td>
   <td>A 5 years old workstation</td>
 </tr>
 <tr>
-  <td>Amazon EC2 m1.xlarge</td>
-  <td>90k</td>
-  <td>188k</td>
-  <td>39k</td>
-  <td>42k</td>
-  <td>116k</td>
-  <td>Medium range instance type</td>
-</tr>
-<tr>
-  <td>Amazon EC2 t1.micro</td>
-  <td>18k</td>
-  <td>70k</td> <td>15k</td>
-  <td>19k</td>
-  <td>54k</td>
-  <td>The slowest instance type</td>
+  <td>Amazon EC2 c1.medium</td>
+  <td>67k</td>
+  <td>123k</td>
+  <td>29k</td>
+  <td>35k</td>
+  <td>85k</td>
+  <td>A medium range instance</td>
 </tr>
 </table>
 
