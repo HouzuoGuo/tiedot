@@ -2,7 +2,9 @@
 
 Similar to some other popular NoSQL solutions, tiedot does not provide ACID transactions. However, atomic operations are possible within the scope of a single document.
 
-Durable write operations have been introduced in beta release - these operations block and wait for all memory buffers to synchronize with disk, therefore they are slow but guarantee data durability.
+Before Beta release, buffer management was entirely automated and manual "commit" (flush all buffers) was not available.
+
+Since Beta release, buffer management is still automated, but manual "commit" APIs are also supported - check out in `col.go` `durableInsert`, `durableUpdate` `durableDelete` and `Flush` - these operations commit all buffers immediately without waiting for periodic buffer synchronization.
 
 ## IO operation synchronization
 
