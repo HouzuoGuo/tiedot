@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -195,7 +196,12 @@ func benchmark2() {
 						`"more": "abcdefghijklmnopqrstuvwxyz"}`), &updated); err != nil {
 					panic(err)
 				}
-				col.Update(docs[uint64(rand.Intn(len(docs)))], updated)
+				if _, err = col.Update(docs[uint64(rand.Intn(len(docs)))], updated); err != nil {
+					// "does not exist" indicates that a deleted document is being updated, it is safe to ignore
+					if !strings.Contains(fmt.Sprint(err), "does not exist") {
+						fmt.Println(err)
+					}
+				}
 			}
 		}()
 	}

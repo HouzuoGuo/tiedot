@@ -136,10 +136,10 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 func (col *Col) Read(id uint64, doc interface{}) error {
 	data := col.Data.Read(id)
 	if data == nil {
-		return errors.New(fmt.Sprintf("Document does not exist"))
+		return errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.Dir))
 	}
 	if err := json.Unmarshal(data, &doc); err != nil {
-		msg := fmt.Sprintf("Cannot parse document %d in %s to JSON", id, col.Dir)
+		msg := fmt.Sprintf("Cannot parse document %d in %s to JSON, data: %s", id, col.Dir, string(data))
 		log.Println(msg)       // for the srv
 		return errors.New(msg) // for embedded usage
 	}

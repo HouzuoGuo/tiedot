@@ -70,11 +70,11 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 	col.File.Sync.Lock()
 	if id < 0 || id > col.File.Append || col.File.Buf[id] != DOC_VALID {
 		col.File.Sync.Unlock()
-		return id, errors.New(fmt.Sprintf("No such document %d in %s", id, col.File.Name))
+		return id, errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.File.Name))
 	}
 	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
 		col.File.Sync.Unlock()
-		return id, errors.New(fmt.Sprintf("No such document %d in %s", id, col.File.Name))
+		return id, errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.File.Name))
 	} else {
 		len64 := uint64(len(data))
 		if len64 <= room { // overwrite
