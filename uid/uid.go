@@ -1,4 +1,4 @@
-package uuid
+package uid
 
 import (
 	"crypto/rand"
@@ -7,19 +7,19 @@ import (
 
 func poolFiller(pool chan string) {
 	for {
-		uuid := make([]byte, 16)
-		entropy, err := rand.Read(uuid)
+		uid := make([]byte, 16)
+		entropy, err := rand.Read(uid)
 		if err != nil {
 			panic(err)
 		}
 		if entropy != 16 {
 			panic("no enough entropy")
 		}
-		pool <- hex.EncodeToString(uuid)
+		pool <- hex.EncodeToString(uid)
 	}
 }
 
-func UUIDPool() chan string {
+func UIDPool() chan string {
 	pool := make(chan string, 1000000)
 	go poolFiller(pool)
 	return pool
