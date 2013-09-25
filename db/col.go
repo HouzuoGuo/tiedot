@@ -217,6 +217,8 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	var oldDoc interface{}
 	if err = json.Unmarshal(oldData, &oldDoc); err == nil {
 		col.UnindexDoc(id, oldDoc)
+	} else {
+		log.Printf("Original document %d in %s is corrupted, this update will attempt to overwrite it", id, col.Dir)
 	}
 	if newID, err = col.Data.Update(id, data); err != nil {
 		return
