@@ -195,7 +195,7 @@ func benchmark2() {
 						`"more": "abcdefghijklmnopqrstuvwxyz"}`), &updated); err != nil {
 					panic(err)
 				}
-				col.Update(uint64(rand.Intn(len(docs))), updated)
+				col.Update(docs[uint64(rand.Intn(len(docs)))], updated)
 			}
 		}()
 	}
