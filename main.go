@@ -20,7 +20,7 @@ func main() {
 	}
 	var mode, dir string
 	var port, maxprocs int
-	flag.StringVar(&mode, "mode", "", "[v1|v2|v3|bench|durable-bench|example]")
+	flag.StringVar(&mode, "mode", "", "[v1|v2|v3|bench|bench2|durable-bench|example]")
 	flag.StringVar(&dir, "dir", "", "database directory")
 	flag.IntVar(&port, "port", 0, "listening port number")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
@@ -63,6 +63,8 @@ func main() {
 		}
 	case "bench":
 		benchmark()
+	case "bench2":
+		benchmark2()
 	case "durable-bench":
 		durableBenchmark()
 	case "example":
