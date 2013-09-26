@@ -13,7 +13,8 @@ import (
 	"time"
 )
 
-const BENCH_SIZE = 400000 // don't make it too large... unmarshaled JSON takes lots of memory!
+const BENCH_SIZE = 400000  // don't make it too large... unmarshaled JSON takes lots of memory!
+const BENCH2_SIZE = 800000 // feel free to make this one larger!
 
 // Run function a number of times and calculate average time consumption per iteration.
 func average(name string, total int, init func(), do func()) {
@@ -114,13 +115,13 @@ func benchmark2() {
 	}
 	col.Index([]string{"a", "b", "c"})
 	col.Index([]string{"c", "d"})
-	docs := make([]uint64, 0, BENCH_SIZE)
+	docs := make([]uint64, 0, BENCH2_SIZE)
 	// Prepare 1000 docs as a start
 	var docToInsert interface{}
 	for j := 0; j < 1000; j++ {
 		if err = json.Unmarshal([]byte(
-			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`}},`+
-				`"c": {"d": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`},`+
+			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(BENCH2_SIZE))+`}},`+
+				`"c": {"d": `+strconv.Itoa(rand.Intn(BENCH2_SIZE))+`},`+
 				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &docToInsert); err != nil {
 			panic(err)
 		}
@@ -134,16 +135,16 @@ func benchmark2() {
 	wp := new(sync.WaitGroup)
 	wp.Add(5 * numThreads) // (CRUD + query) * number of benchmark threads
 	start := float64(time.Now().UTC().UnixNano())
-	// insert BENCH_SIZE * 2 documents
+	// insert BENCH2_SIZE * 2 documents
 	for i := 0; i < numThreads; i++ {
 		go func() {
 			defer wp.Done()
 			var docToInsert interface{}
 			var err error
-			for j := 0; j < BENCH_SIZE/numThreads*2; j++ {
+			for j := 0; j < BENCH2_SIZE/numThreads*2; j++ {
 				if err = json.Unmarshal([]byte(
-					`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`}},`+
-						`"c": {"d": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`},`+
+					`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(BENCH2_SIZE))+`}},`+
+						`"c": {"d": `+strconv.Itoa(rand.Intn(BENCH2_SIZE))+`},`+
 						`"more": "abcdefghijklmnopqrstuvwxyz"}`), &docToInsert); err != nil {
 					panic(err)
 				}
@@ -155,25 +156,25 @@ func benchmark2() {
 			}
 		}()
 	}
-	// read BENCH_SIZE * 2 documents
+	// read BENCH2_SIZE * 2 documents
 	for i := 0; i < numThreads; i++ {
 		go func() {
 			defer wp.Done()
 			var doc interface{}
-			for j := 0; j < BENCH_SIZE/numThreads*2; j++ {
+			for j := 0; j < BENCH2_SIZE/numThreads*2; j++ {
 				col.Read(docs[uint64(rand.Intn(len(docs)))], &doc)
 			}
 		}()
 	}
-	// query BENCH_SIZE times
+	// query BENCH2_SIZE times
 	for i := 0; i < numThreads; i++ {
 		go func() {
 			defer wp.Done()
 			var query interface{}
 			var err error
-			for j := 0; j < BENCH_SIZE/numThreads; j++ {
-				if err = json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "b", "c"], "limit": 1}, `+
-					`{"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
+			for j := 0; j < BENCH2_SIZE/numThreads; j++ {
+				if err = json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(BENCH2_SIZE))+`, "in": ["a", "b", "c"], "limit": 1}, `+
+					`{"eq": `+strconv.Itoa(rand.Intn(BENCH2_SIZE))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
 					panic("json error")
 				}
 				result := make(map[uint64]struct{})
@@ -183,16 +184,16 @@ func benchmark2() {
 			}
 		}()
 	}
-	// update BENCH_SIZE documents
+	// update BENCH2_SIZE documents
 	for i := 0; i < numThreads; i++ {
 		go func() {
 			defer wp.Done()
 			var updated interface{}
 			var err error
-			for j := 0; j < BENCH_SIZE/numThreads; j++ {
+			for j := 0; j < BENCH2_SIZE/numThreads; j++ {
 				if err = json.Unmarshal([]byte(
-					`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`}},`+
-						`"c": {"d": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`},`+
+					`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(BENCH2_SIZE))+`}},`+
+						`"c": {"d": `+strconv.Itoa(rand.Intn(BENCH2_SIZE))+`},`+
 						`"more": "abcdefghijklmnopqrstuvwxyz"}`), &updated); err != nil {
 					panic(err)
 				}
@@ -205,16 +206,16 @@ func benchmark2() {
 			}
 		}()
 	}
-	// delete BENCH_SIZE documents
+	// delete BENCH2_SIZE documents
 	for i := 0; i < numThreads; i++ {
 		go func() {
 			defer wp.Done()
-			for j := 0; j < BENCH_SIZE/numThreads; j++ {
+			for j := 0; j < BENCH2_SIZE/numThreads; j++ {
 				col.Delete(docs[uint64(rand.Intn(len(docs)))])
 			}
 		}()
 	}
 	wp.Wait()
 	end := float64(time.Now().UTC().UnixNano())
-	fmt.Printf("Total operations %d: %d ns/iter, %d iter/sec\n", BENCH_SIZE*7, int((end-start)/BENCH_SIZE/7), int(1000000000/((end-start)/BENCH_SIZE/7)))
+	fmt.Printf("Total operations %d: %d ns/iter, %d iter/sec\n", BENCH2_SIZE*7, int((end-start)/BENCH2_SIZE/7), int(1000000000/((end-start)/BENCH2_SIZE/7)))
 }
