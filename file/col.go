@@ -42,7 +42,9 @@ func (col *ColFile) Read(id uint64) []byte {
 	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
 		return nil
 	} else {
-		return col.File.Buf[id+DOC_HEADER : id+DOC_HEADER+room]
+		docCopy := make([]byte, room)
+		copy(docCopy, col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+room])
+		return docCopy
 	}
 }
 
