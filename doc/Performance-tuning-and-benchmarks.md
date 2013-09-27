@@ -1,3 +1,35 @@
+## tiedot built-in benchmark
+
+tiedot has two built-in benchmark cases (prior to 1.0, there was only one). To invoke benchmark, compile and run tiedot with CLI parameter:
+
+    ./tiedot -mode=bench  # benchmark 1
+    ./tiedot -mode=bench2  # benchmark 2
+
+### Benchmark 1
+
+Invoked by `tiedot -mode=bench`, the benchmark prepares a collection with two indexes, and then:
+
+- Insert documents (effective on both indexes)
+- Read document at random locations
+- Query - lookup on both indexes
+- Update document at random locations
+- Delete document at random locations
+
+The benchmark makes a large sample (defined as `BENCH_SIZE` in `benchmark.go`) that requires plenty of free memory (minimum of 3GB) to complete. It is designed to test performance of each individual document operation, to assist in finding performance regressions. The result should accurately reflect batch CRUD operation performance.
+
+Try adjustment `BENCH_SIZE` if you wish to conduct the benchmark with a larger or smaller sample size.
+
+### Benchmark 2
+
+Invoked by `tiedot -mode=bench`, the benchmark prepares a collection with two indexes and 1000 documents, then do *all* these operations at the same time:
+
+- Insert/update/delete documents
+- Read documents and do lookup queries
+
+The sample size is controlled by `BENCH2_SIZE` in `benchmark.go`; unlike Benchmark 1, Benchmark 2 does not require large amount of free memory even with very large `BENCH2_SIZE`.
+
+This benchmark focuses on concurrency, to reflect performance under mixed workloads.
+
 ## When data size < available memory
 
 This is the preferred situation - there is plenty memory available for holding all data files. Operating system does a very good on managing mapped file buffers, swapping rarely happens and there is minimal to no IO on disk. In this situation, tiedot performs like an in-memory database.

@@ -27,36 +27,42 @@ tiedot scales very well on SMP computers. The following performance results are 
   <th>Query</th>
   <th>Update</th>
   <th>Delete</th>
-  <th></th>
+  <th>Mix*</th>
+  <th>Machine Type</th>
 </tr>
 <tr>
   <td>Mobile Intel Core i7 (2nd Gen)</td>
   <td>168k</td>
-  <td>311k</td>
-  <td>61k</td>
+  <td>300k</td>
+  <td>66k</td>
   <td>58k</td>
-  <td>140k</td>
+  <td>138k</td>
+  <td>145k</td>
   <td>A 3 years old laptop</td>
 </tr>
 <tr>
   <td>Desktop Intel Core 2 Duo</td>
   <td>127k</td>
-  <td>251k</td>
-  <td>50k</td>
+  <td>248k</td>
+  <td>53k</td>
   <td>56k</td>
-  <td>131k</td>
+  <td>125k</td>
+  <td>121k</td>
   <td>A 5 years old workstation</td>
 </tr>
 <tr>
   <td>Amazon EC2 c1.medium</td>
   <td>67k</td>
-  <td>123k</td>
+  <td>120k</td>
   <td>29k</td>
-  <td>35k</td>
-  <td>85k</td>
+  <td>32k</td>
+  <td>100k</td>
+  <td>63k</td>
   <td>A medium range instance</td>
 </tr>
 </table>
+
+Mix\* runs simultaneous insert/read/update/delete/query operations. See [Performance tuning and benchmarks] for more details
 
 ### References
 
