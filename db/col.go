@@ -244,17 +244,8 @@ func (col *Col) Delete(id uint64) {
 	if err != nil {
 		return
 	}
-	wg := new(sync.WaitGroup)
-	wg.Add(2)
-	go func() {
-		col.Data.Delete(id)
-		wg.Done()
-	}()
-	go func() {
-		col.UnindexDoc(id, oldDoc)
-		wg.Done()
-	}()
-	wg.Wait()
+	col.Data.Delete(id)
+	col.UnindexDoc(id, oldDoc)
 }
 
 // Delete a document and immediately flush all buffers.
