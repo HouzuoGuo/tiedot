@@ -71,20 +71,20 @@ func (file *File) Ensure(more uint64) (err error) {
 	}
 	if file.Buf != nil {
 		if err = file.Buf.Unmap(); err != nil {
-			return
+			panic(err)
 		}
 	}
 	if _, err = file.Fh.Seek(0, os.SEEK_END); err != nil {
-		return
+		panic(err)
 	}
 	if _, err = file.Fh.Write(make([]byte, file.Growth)); err != nil {
-		return
+		panic(err)
 	}
 	if err = file.Fh.Sync(); err != nil {
-		return
+		panic(err)
 	}
 	if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
-		return
+		panic(err)
 	}
 	file.Size += file.Growth
 	log.Printf("File %s has grown %d bytes\n", file.Name, file.Growth)

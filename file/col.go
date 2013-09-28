@@ -36,7 +36,7 @@ func OpenCol(name string) (*ColFile, error) {
 func (col *ColFile) Read(id uint64) []byte {
 	col.File.Sync.RLock()
 	defer col.File.Sync.RUnlock()
-	if id < 0 || id > col.File.Append || col.File.Buf[id] != DOC_VALID {
+	if id < 0 || id >= uint64(len(col.File.Buf)) || col.File.Buf[id] != DOC_VALID {
 		return nil
 	}
 	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
@@ -49,28 +49,28 @@ func (col *ColFile) Read(id uint64) []byte {
 }
 
 // Insert a document, return its ID.
-func (col *ColFile) Insert(data []byte) (uint64, error) {
+func (col *ColFile) Insert(data []byte) (id uint64, err error) {
 	len64 := uint64(len(data))
 	room := len64 + len64
 	if room > DOC_MAX_ROOM {
 		return 0, errors.New(fmt.Sprintf("Document is too large"))
 	}
 	col.File.Sync.Lock()
-	defer col.File.Sync.Unlock()
-	id := col.File.Append
+	id = col.File.Append
 	col.File.Ensure(DOC_HEADER + room)
 	col.File.Buf[id] = 1
 	binary.PutUvarint(col.File.Buf[id+1:id+DOC_HEADER], room)
 	copy(col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+len64], data)
 	copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], col.Padding[0:len64])
 	col.File.Append = id + DOC_HEADER + room
+	col.File.Sync.Unlock()
 	return id, nil
 }
 
 // Update a document, return its new ID.
 func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 	col.File.Sync.Lock()
-	if id < 0 || id > col.File.Append || col.File.Buf[id] != DOC_VALID {
+	if id < 0 || id >= uint64(len(col.File.Buf)) || col.File.Buf[id] != DOC_VALID {
 		col.File.Sync.Unlock()
 		return id, errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.File.Name))
 	}
@@ -94,9 +94,7 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 
 // Delete a document.
 func (col *ColFile) Delete(id uint64) {
-	col.File.Sync.Lock()
-	defer col.File.Sync.Unlock()
-	if col.File.Buf[id] == DOC_VALID {
+	if id >= 0 && id < uint64(len(col.File.Buf)) && col.File.Buf[id] == DOC_VALID {
 		col.File.Buf[id] = DOC_INVALID
 	}
 }
