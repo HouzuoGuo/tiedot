@@ -138,6 +138,7 @@ func benchmark2() {
 	// insert BENCH2_SIZE * 2 documents
 	for i := 0; i < numThreads; i++ {
 		go func(i int) {
+			fmt.Printf("Insert thread %d starting\n", i)
 			defer wp.Done()
 			var docToInsert interface{}
 			var err error
@@ -160,6 +161,7 @@ func benchmark2() {
 	// read BENCH2_SIZE * 2 documents
 	for i := 0; i < numThreads; i++ {
 		go func(i int) {
+			fmt.Printf("Read thread %d starting\n", i)
 			defer wp.Done()
 			var doc interface{}
 			for j := 0; j < BENCH2_SIZE/numThreads*2; j++ {
@@ -171,6 +173,7 @@ func benchmark2() {
 	// query BENCH2_SIZE times
 	for i := 0; i < numThreads; i++ {
 		go func(i int) {
+			fmt.Printf("Query thread %d starting\n", i)
 			defer wp.Done()
 			var query interface{}
 			var err error
@@ -190,6 +193,7 @@ func benchmark2() {
 	// update BENCH2_SIZE documents
 	for i := 0; i < numThreads; i++ {
 		go func(i int) {
+			fmt.Printf("Update thread %d starting\n", i)
 			defer wp.Done()
 			var updated interface{}
 			var err error
@@ -213,6 +217,7 @@ func benchmark2() {
 	// delete BENCH2_SIZE documents
 	for i := 0; i < numThreads; i++ {
 		go func(i int) {
+			fmt.Printf("Delete thread %d starting\n", i)
 			defer wp.Done()
 			for j := 0; j < BENCH2_SIZE/numThreads; j++ {
 				col.Delete(docs[uint64(rand.Intn(len(docs)))])
