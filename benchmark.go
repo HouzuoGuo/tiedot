@@ -75,7 +75,7 @@ func benchmark() {
 		})
 	}, func() {
 		var doc interface{}
-		err = col.Read(ids[uint64(rand.Intn(BENCH_SIZE))], &doc)
+		col.Read(ids[uint64(rand.Intn(BENCH_SIZE))], &doc)
 		if doc == nil {
 			panic("read error")
 		}
@@ -115,7 +115,8 @@ func benchmark2() {
 	}
 	col.Index([]string{"a", "b", "c"})
 	col.Index([]string{"c", "d"})
-	docs := make([]uint64, 0, BENCH2_SIZE)
+	docs := make([]uint64, 0, BENCH2_SIZE*2)
+	docsMutex := new(sync.Mutex)
 	// Prepare 1000 docs as a start
 	var docToInsert interface{}
 	for j := 0; j < 1000; j++ {
@@ -150,7 +151,9 @@ func benchmark2() {
 					panic(err)
 				}
 				if newID, err := col.Insert(docToInsert); err == nil {
+					docsMutex.Lock()
 					docs = append(docs, newID)
+					docsMutex.Unlock()
 				} else {
 					panic(err)
 				}
