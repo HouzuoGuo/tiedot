@@ -137,7 +137,7 @@ func benchmark2() {
 	start := float64(time.Now().UTC().UnixNano())
 	// insert BENCH2_SIZE * 2 documents
 	for i := 0; i < numThreads; i++ {
-		go func() {
+		go func(i int) {
 			defer wp.Done()
 			var docToInsert interface{}
 			var err error
@@ -154,21 +154,23 @@ func benchmark2() {
 					panic(err)
 				}
 			}
-		}()
+			fmt.Printf("Insert thread %d completed\n", i)
+		}(i)
 	}
 	// read BENCH2_SIZE * 2 documents
 	for i := 0; i < numThreads; i++ {
-		go func() {
+		go func(i int) {
 			defer wp.Done()
 			var doc interface{}
 			for j := 0; j < BENCH2_SIZE/numThreads*2; j++ {
 				col.Read(docs[uint64(rand.Intn(len(docs)))], &doc)
 			}
-		}()
+			fmt.Printf("Read thread %d completed\n", i)
+		}(i)
 	}
 	// query BENCH2_SIZE times
 	for i := 0; i < numThreads; i++ {
-		go func() {
+		go func(i int) {
 			defer wp.Done()
 			var query interface{}
 			var err error
@@ -182,11 +184,12 @@ func benchmark2() {
 					panic("query error")
 				}
 			}
-		}()
+			fmt.Printf("Query thread %d completed\n", i)
+		}(i)
 	}
 	// update BENCH2_SIZE documents
 	for i := 0; i < numThreads; i++ {
-		go func() {
+		go func(i int) {
 			defer wp.Done()
 			var updated interface{}
 			var err error
@@ -204,16 +207,18 @@ func benchmark2() {
 					}
 				}
 			}
-		}()
+			fmt.Printf("Update thread %d completed\n", i)
+		}(i)
 	}
 	// delete BENCH2_SIZE documents
 	for i := 0; i < numThreads; i++ {
-		go func() {
+		go func(i int) {
 			defer wp.Done()
 			for j := 0; j < BENCH2_SIZE/numThreads; j++ {
 				col.Delete(docs[uint64(rand.Intn(len(docs)))])
 			}
-		}()
+			fmt.Printf("Delete thread %d completed\n", i)
+		}(i)
 	}
 	wp.Wait()
 	end := float64(time.Now().UTC().UnixNano())
