@@ -14,7 +14,7 @@ import (
 )
 
 const BENCH_SIZE = 400000  // don't make it too large... unmarshaled JSON takes lots of memory!
-const BENCH2_SIZE = 800000 // feel free to make this one larger!
+const BENCH2_SIZE = 400000 // feel free to make this one larger!
 
 // Run function a number of times and calculate average time consumption per iteration.
 func average(name string, total int, init func(), do func()) {
@@ -115,7 +115,7 @@ func benchmark2() {
 	}
 	col.Index([]string{"a", "b", "c"})
 	col.Index([]string{"c", "d"})
-	docs := make([]uint64, 0, BENCH2_SIZE*2)
+	docs := make([]uint64, 0, BENCH2_SIZE*2 + 1000)
 	docsMutex := new(sync.Mutex)
 	// Prepare 1000 docs as a start
 	var docToInsert interface{}
