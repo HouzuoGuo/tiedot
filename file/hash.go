@@ -82,14 +82,15 @@ func (ht *HashTable) lastBucket(bucket uint64) uint64 {
 
 // Grow a new bucket on the chain of buckets.
 func (ht *HashTable) grow(bucket uint64) {
-	ht.getBucketMutex(bucket).Lock()
+	mutex := ht.getBucketMutex(bucket)
+	mutex.Lock()
 	ht.syncBucketCreate.Lock()
 	lastBucketAddr := ht.lastBucket(bucket) * ht.BucketSize
 	binary.PutUvarint(ht.File.Buf[lastBucketAddr:lastBucketAddr+8], ht.numberBuckets())
 	ht.File.Ensure(ht.BucketSize)
 	ht.File.Append += ht.BucketSize
 	ht.syncBucketCreate.Unlock()
-	ht.getBucketMutex(bucket).Unlock()
+	mutex.Unlock()
 }
 
 // Return a hash key to be used by hash table by masking non-key bits.
@@ -121,25 +122,27 @@ func (ht *HashTable) getBucketMutex(bucket uint64) (mutex *sync.RWMutex) {
 // Put a new key-value pair.
 func (ht *HashTable) Put(key, val uint64) {
 	var bucket, entry uint64 = ht.hashKey(key), 0
-	ht.getBucketMutex(bucket).Lock()
+	mutex := ht.getBucketMutex(bucket)
+	mutex.Lock()
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		if ht.File.Buf[entryAddr] != ENTRY_VALID {
 			ht.File.Buf[entryAddr] = ENTRY_VALID
 			binary.PutUvarint(ht.File.Buf[entryAddr+1:entryAddr+11], key)
 			binary.PutUvarint(ht.File.Buf[entryAddr+11:entryAddr+21], val)
-			ht.getBucketMutex(bucket).Unlock()
+			mutex.Unlock()
 			return
 		}
 		if entry++; entry == ht.PerBucket {
-			ht.getBucketMutex(bucket).Unlock()
+			mutex.Unlock()
 			entry = 0
 			if bucket = ht.nextBucket(bucket); bucket == 0 {
 				ht.grow(ht.hashKey(key))
 				ht.Put(key, val)
 				return
 			}
-			ht.getBucketMutex(bucket).Lock()
+			mutex = ht.getBucketMutex(bucket)
+			mutex.Lock()
 		}
 	}
 }
@@ -154,7 +157,8 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		keys = make([]uint64, 0, limit)
 		vals = make([]uint64, 0, limit)
 	}
-	ht.getBucketMutex(bucket).RLock()
+	mutex := ht.getBucketMutex(bucket)
+	mutex.RLock()
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
@@ -164,21 +168,22 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 				keys = append(keys, entryKey)
 				vals = append(vals, entryVal)
 				if count++; count == limit {
-					ht.getBucketMutex(bucket).RUnlock()
+					mutex.RUnlock()
 					return
 				}
 			}
 		} else if entryKey == 0 && entryVal == 0 {
-			ht.getBucketMutex(bucket).RUnlock()
+			mutex.RUnlock()
 			return
 		}
 		if entry++; entry == ht.PerBucket {
-			ht.getBucketMutex(bucket).RUnlock()
+			mutex.RUnlock()
 			entry = 0
 			if bucket = ht.nextBucket(bucket); bucket == 0 {
 				return
 			}
-			ht.getBucketMutex(bucket).RLock()
+			mutex = ht.getBucketMutex(bucket)
+			mutex.RLock()
 		}
 	}
 }
@@ -186,7 +191,8 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 // Remove specific key-value pair.
 func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool) {
 	var count, entry, bucket uint64 = 0, 0, ht.hashKey(key)
-	ht.getBucketMutex(bucket).Lock()
+	mutex := ht.getBucketMutex(bucket)
+	mutex.Lock()
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
@@ -195,21 +201,22 @@ func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool)
 			if entryKey == key && filter(entryKey, entryVal) {
 				ht.File.Buf[entryAddr] = ENTRY_INVALID
 				if count++; count == limit {
-					ht.getBucketMutex(bucket).Unlock()
+					mutex.Unlock()
 					return
 				}
 			}
 		} else if entryKey == 0 && entryVal == 0 {
-			ht.getBucketMutex(bucket).Unlock()
+			mutex.Unlock()
 			return
 		}
 		if entry++; entry == ht.PerBucket {
-			ht.getBucketMutex(bucket).Unlock()
+			mutex.Unlock()
 			entry = 0
 			if bucket = ht.nextBucket(bucket); bucket == 0 {
 				return
 			}
-			ht.getBucketMutex(bucket).Lock()
+			mutex = ht.getBucketMutex(bucket)
+			mutex.Lock()
 		}
 	}
 }
@@ -221,7 +228,8 @@ func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
 	counter := uint64(0)
 	for head := uint64(0); head < uint64(math.Pow(2, float64(ht.HashBits))); head++ {
 		var entry, bucket uint64 = 0, head
-		ht.getBucketMutex(bucket).RLock()
+		mutex := ht.getBucketMutex(bucket)
+		mutex.RLock()
 		for {
 			entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 			entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
@@ -231,20 +239,21 @@ func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
 				keys = append(keys, entryKey)
 				vals = append(vals, entryVal)
 				if counter == limit {
-					ht.getBucketMutex(bucket).RUnlock()
+					mutex.RUnlock()
 					return
 				}
 			} else if entryKey == 0 && entryVal == 0 {
-				ht.getBucketMutex(bucket).RUnlock()
+				mutex.RUnlock()
 				break
 			}
 			if entry++; entry == ht.PerBucket {
-				ht.getBucketMutex(bucket).RUnlock()
+				mutex.RUnlock()
 				entry = 0
 				if bucket = ht.nextBucket(bucket); bucket == 0 {
 					return
 				}
-				ht.getBucketMutex(bucket).RLock()
+				mutex = ht.getBucketMutex(bucket)
+				mutex.RLock()
 			}
 		}
 	}
