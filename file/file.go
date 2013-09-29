@@ -33,7 +33,8 @@ func Open(name string, growth uint64) (file *File, err error) {
 	}
 	file.Size = uint64(fsize)
 	if file.Size == 0 {
-		return file, file.Ensure(file.Growth)
+		file.CheckSizeAndEnsure(file.Growth)
+		return
 	}
 
 	if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
@@ -64,11 +65,17 @@ func Open(name string, growth uint64) (file *File, err error) {
 	return
 }
 
+// Ensure the file has room for more data.
+func (file *File) CheckSize(more uint64) bool {
+	return file.Append+more <= file.Size
+}
+
 // Ensure the file ahs room for more data.
-func (file *File) Ensure(more uint64) (err error) {
+func (file *File) CheckSizeAndEnsure(more uint64) {
 	if file.Append+more <= file.Size {
 		return
 	}
+	var err error
 	if file.Buf != nil {
 		if err = file.Buf.Unmap(); err != nil {
 			panic(err)
@@ -88,7 +95,7 @@ func (file *File) Ensure(more uint64) (err error) {
 	}
 	file.Size += file.Growth
 	log.Printf("File %s has grown %d bytes\n", file.Name, file.Growth)
-	return file.Ensure(more)
+	file.CheckSizeAndEnsure(more)
 }
 
 // Synchronize mapped region with underlying storage device.

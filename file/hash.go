@@ -39,7 +39,7 @@ func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error
 	ht.BucketSize = BUCKET_HEADER_SIZE + ENTRY_SIZE*perBucket
 	// file has to be big enough to contain all initial buckets
 	if minAppend := uint64(math.Pow(2, float64(hashBits))) * ht.BucketSize; ht.File.Append < minAppend {
-		ht.File.Ensure(minAppend - ht.File.Append)
+		ht.File.CheckSizeAndEnsure(minAppend - ht.File.Append)
 		ht.File.Append = minAppend
 	}
 	// move append position to end of final bucket
@@ -82,15 +82,29 @@ func (ht *HashTable) lastBucket(bucket uint64) uint64 {
 
 // Grow a new bucket on the chain of buckets.
 func (ht *HashTable) grow(bucket uint64) {
+	// lock both bucket creation and the bucket affected
+	ht.syncBucketCreate.Lock()
 	mutex := ht.getBucketMutex(bucket)
 	mutex.Lock()
-	ht.syncBucketCreate.Lock()
 	lastBucketAddr := ht.lastBucket(bucket) * ht.BucketSize
 	binary.PutUvarint(ht.File.Buf[lastBucketAddr:lastBucketAddr+8], ht.numberBuckets())
-	ht.File.Ensure(ht.BucketSize)
+	// when file is full, we have lots to do
+	if !ht.File.CheckSize(ht.BucketSize) {
+		// do not allow more locks to be created, because we have to lock them all
+		ht.syncLockCreate.Lock()
+		// lock down everything before growing hash table file (which *deletes* the memory buffer)
+		for _, v := range ht.syncBucketUpdate {
+			v.Lock()
+		}
+		ht.File.CheckSizeAndEnsure(ht.BucketSize)
+		for _, v := range ht.syncBucketUpdate {
+			v.Unlock()
+		}
+		ht.syncLockCreate.Unlock()
+	}
 	ht.File.Append += ht.BucketSize
-	ht.syncBucketCreate.Unlock()
 	mutex.Unlock()
+	ht.syncBucketCreate.Unlock()
 }
 
 // Return a hash key to be used by hash table by masking non-key bits.
