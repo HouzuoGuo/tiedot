@@ -106,14 +106,15 @@ func (col *ColFile) Delete(id uint64) {
 // Do fun for all documents in the collection.
 func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 	addr := uint64(0)
-	col.syncDocUpdate.RLock()
 	for {
 		if addr >= col.File.Append {
 			break
 		}
+		col.syncDocUpdate.RLock()
 		validity := col.File.Buf[addr]
 		room, _ := binary.Uvarint(col.File.Buf[addr+1 : addr+11])
 		if validity != DOC_VALID && validity != DOC_INVALID || room > DOC_MAX_ROOM {
+			col.syncDocUpdate.RUnlock()
 			log.Printf("In %s at %d, the document is corrupted\n", col.File.Name, addr)
 			// skip corrupted document
 			addr++
@@ -123,9 +124,10 @@ func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 			continue
 		}
 		if validity == DOC_VALID && !fun(addr, col.File.Buf[addr+DOC_HEADER:addr+DOC_HEADER+room]) {
+			col.syncDocUpdate.RUnlock()
 			break
 		}
+		col.syncDocUpdate.RUnlock()
 		addr += DOC_HEADER + room
 	}
-	col.syncDocUpdate.RUnlock()
 }
