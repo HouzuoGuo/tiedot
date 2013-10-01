@@ -115,7 +115,7 @@ func benchmark2() {
 	}
 	col.Index([]string{"a", "b", "c"})
 	col.Index([]string{"c", "d"})
-	docs := make([]uint64, 0, BENCH2_SIZE*2 + 1000)
+	docs := make([]uint64, 0, BENCH2_SIZE*2+1000)
 	docsMutex := new(sync.Mutex)
 	// Prepare 1000 docs as a start
 	var docToInsert interface{}
