@@ -25,6 +25,7 @@ func NewMultiRWMutex(levels int) *MultiRWMutex {
 }
 
 func (mutexes *MultiRWMutex) GetRWMutex(key uint64) *sync.RWMutex {
+	// an intermediate step of MurmurHash3 (Austin Appleby, public domain)
 	code := 0xcc9e2d51 * key
 	bucketNumber := (0x1b873593 * (code<<15 | code>>15)) % mutexes.levels
 	bucket := mutexes.buckets[bucketNumber]
