@@ -3,7 +3,6 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"loveoneanother.at/tiedot/uid"
 	"os"
 	"testing"
 )
@@ -14,7 +13,7 @@ func TestInsertRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp, uid.MiniUIDPool())
+	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -46,7 +45,7 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp, uid.MiniUIDPool())
+	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -100,7 +99,7 @@ func TestInsertDeserialize(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp, uid.MiniUIDPool())
+	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -144,7 +143,7 @@ func TestDurableInsertUpdateDelete(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp, uid.MiniUIDPool())
+	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -201,7 +200,7 @@ func TestInsertDeleteRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp, uid.MiniUIDPool())
+	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -233,7 +232,7 @@ func TestIndex(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp, uid.MiniUIDPool())
+	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -324,7 +323,7 @@ func TestUIDDocCRUD(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp, uid.MiniUIDPool())
+	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return

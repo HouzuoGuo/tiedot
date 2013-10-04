@@ -7,7 +7,6 @@ import (
 	"loveoneanother.at/tiedot/srv/v1"
 	"loveoneanother.at/tiedot/srv/v2"
 	"loveoneanother.at/tiedot/srv/v3"
-	"loveoneanother.at/tiedot/uid"
 	"os"
 	"runtime"
 	"strconv"
@@ -51,7 +50,7 @@ func main() {
 		if port == 0 {
 			log.Fatal("Please specify port number, for example -port=8080")
 		}
-		db, err := db.OpenDB(dir, uid.UIDPool())
+		db, err := db.OpenDB(dir)
 		if err != nil {
 			log.Fatal(err)
 		}

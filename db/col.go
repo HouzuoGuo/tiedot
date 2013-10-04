@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"loveoneanother.at/tiedot/file"
+	"loveoneanother.at/tiedot/uid"
 	"os"
 	"path"
 	"strconv"
@@ -27,7 +28,6 @@ type Config struct {
 }
 
 type Col struct {
-	UIDPool                                 chan string
 	Data                                    *file.ColFile
 	Config                                  *Config
 	Dir, ConfigFileName, ConfBackupFileName string
@@ -48,11 +48,11 @@ func StrHash(thing interface{}) uint64 {
 }
 
 // Open a collection.
-func OpenCol(dir string, uidPool chan string) (col *Col, err error) {
+func OpenCol(dir string) (col *Col, err error) {
 	if err = os.MkdirAll(dir, 0700); err != nil {
 		return
 	}
-	col = &Col{UIDPool: uidPool, ConfigFileName: path.Join(dir, "config"), ConfBackupFileName: path.Join(dir, "config.bak"), Dir: dir}
+	col = &Col{ConfigFileName: path.Join(dir, "config"), ConfBackupFileName: path.Join(dir, "config.bak"), Dir: dir}
 	// open data file
 	if col.Data, err = file.OpenCol(path.Join(dir, "data")); err != nil {
 		return
@@ -229,14 +229,14 @@ func (col *Col) Insert(doc interface{}) (id uint64, err error) {
 }
 
 // Insert a new document, and assign a UID to it,
-func (col *Col) InsertWithUID(doc interface{}) (id uint64, uid string, err error) {
-	uid = <-col.UIDPool
+func (col *Col) InsertWithUID(doc interface{}) (newID uint64, newUID string, err error) {
+	newUID = uid.NextUID()
 	if docMap, ok := doc.(map[string]interface{}); !ok {
 		err = errors.New("Only JSON object document may have UID")
 		return
 	} else {
-		docMap["_uid"] = uid
-		id, err = col.Insert(doc)
+		docMap["_uid"] = newUID
+		newID, err = col.Insert(doc)
 		return
 	}
 }
@@ -286,8 +286,8 @@ func (col *Col) UpdateByUID(uid string, doc interface{}) (newID uint64, err erro
 }
 
 // Give a document (identified by ID) a new UID.
-func (col *Col) ReassignUID(id uint64) (newID uint64, uid string, err error) {
-	uid = <-col.UIDPool
+func (col *Col) ReassignUID(id uint64) (newID uint64, newUID string, err error) {
+	newUID = uid.NextUID()
 	var originalDoc interface{}
 	if err = col.Read(id, &originalDoc); err != nil {
 		return
@@ -296,7 +296,7 @@ func (col *Col) ReassignUID(id uint64) (newID uint64, uid string, err error) {
 		err = errors.New("Only JSON object document may have UID")
 		return
 	} else {
-		docWithUID["_uid"] = uid
+		docWithUID["_uid"] = newUID
 		newID, err = col.Update(id, docWithUID)
 		return
 	}

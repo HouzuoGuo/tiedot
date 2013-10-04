@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"loveoneanother.at/tiedot/db"
-	"loveoneanother.at/tiedot/uid"
 	"math/rand"
 	"os"
 	"runtime"
@@ -56,7 +55,7 @@ func benchmark() {
 	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := db.OpenCol(tmp, uid.MiniUIDPool())
+	col, err := db.OpenCol(tmp)
 	if err != nil {
 		panic(err)
 	}
@@ -110,7 +109,7 @@ func benchmark2() {
 	// prepare collection
 	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
-	col, err := db.OpenCol(tmp, uid.MiniUIDPool())
+	col, err := db.OpenCol(tmp)
 	if err != nil {
 		panic(err)
 	}
@@ -252,7 +251,7 @@ func benchmark3() {
 	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := db.OpenCol(tmp, uid.UIDPool())
+	col, err := db.OpenCol(tmp)
 	if err != nil {
 		panic(err)
 	}

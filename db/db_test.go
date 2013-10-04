@@ -2,7 +2,6 @@ package db
 
 import (
 	"encoding/json"
-	"loveoneanother.at/tiedot/uid"
 	"os"
 	"testing"
 )
@@ -11,7 +10,7 @@ func TestCRUD(t *testing.T) {
 	tmp := "/tmp/tiedot_db_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	db, err := OpenDB(tmp, uid.MiniUIDPool())
+	db, err := OpenDB(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -60,7 +59,7 @@ func TestFlushScrub(t *testing.T) {
 	tmp := "/tmp/tiedot_db_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	db, err := OpenDB(tmp, uid.MiniUIDPool())
+	db, err := OpenDB(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return

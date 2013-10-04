@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"loveoneanother.at/tiedot/db"
-	"loveoneanother.at/tiedot/uid"
 	"math/rand"
 	"os"
 	"strconv"
@@ -30,7 +29,7 @@ func durableBenchmark() {
 	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := db.OpenCol(tmp, uid.MiniUIDPool())
+	col, err := db.OpenCol(tmp)
 	if err != nil {
 		panic(err)
 	}

@@ -3,7 +3,6 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"loveoneanother.at/tiedot/uid"
 	"os"
 	"testing"
 )
@@ -34,7 +33,7 @@ func TestQuery(t *testing.T) {
 	tmp := "/tmp/tiedot_query_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp, uid.MiniUIDPool())
+	col, err := OpenCol(tmp)
 	if err != nil {
 		t.Fatal(err)
 		return
