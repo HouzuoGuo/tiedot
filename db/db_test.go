@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"loveoneanother.at/tiedot/uid"
 	"os"
 	"testing"
 )
@@ -10,7 +11,7 @@ func TestCRUD(t *testing.T) {
 	tmp := "/tmp/tiedot_db_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	db, err := OpenDB(tmp)
+	db, err := OpenDB(tmp, uid.MiniUIDPool())
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -59,7 +60,7 @@ func TestFlushScrub(t *testing.T) {
 	tmp := "/tmp/tiedot_db_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	db, err := OpenDB(tmp)
+	db, err := OpenDB(tmp, uid.MiniUIDPool())
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -74,7 +75,10 @@ func TestFlushScrub(t *testing.T) {
 	var jsonDoc interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc)
 	db.Use("a").Index([]string{"a", "b", "c"})
-	db.Use("a").Insert(jsonDoc)
+	_, uid, err := db.Use("a").InsertWithUID(jsonDoc)
+	if err != nil {
+		t.Fatal(err)
+	}
 	id1, _ := db.Use("a").Insert(jsonDoc)
 	db.Use("a").Insert(jsonDoc)
 	db.Use("a").Delete(id1)
@@ -90,12 +94,13 @@ func TestFlushScrub(t *testing.T) {
 		return true
 	})
 	if counter != 2 {
-		t.Fatalf("Scrub failure")
+		t.Fatal("Scrub failure")
 	}
-	for k := range db.Use("a").StrHT {
-		if k != "a,b,c" {
-			t.Fatalf("Scrub did not recreate index")
-		}
-		break
+	if _, ok := db.Use("a").StrHT["a,b,c"]; !ok {
+		t.Fatal("Scrub did not recreate index")
+	}
+	var throwAway interface{}
+	if _, err = db.Use("a").ReadByUID(uid, &throwAway); err != nil {
+		t.Fatal("UID is gone after scrub, this should not happen")
 	}
 }

@@ -19,8 +19,16 @@ func poolFiller(pool chan string) {
 	}
 }
 
+// Return a regular size UID pool (1 million UIDs)
 func UIDPool() chan string {
 	pool := make(chan string, 1000000)
+	go poolFiller(pool)
+	return pool
+}
+
+// Return a small UID pool (100 UIDs)
+func MiniUIDPool() chan string {
+	pool := make(chan string, 100)
 	go poolFiller(pool)
 	return pool
 }

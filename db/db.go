@@ -12,22 +12,23 @@ import (
 )
 
 type DB struct {
-	Dir    string
-	StrCol map[string]*Col
+	Dir     string
+	UIDPool chan string
+	StrCol  map[string]*Col
 }
 
-func OpenDB(dir string) (db *DB, err error) {
+func OpenDB(dir string, uidPool chan string) (db *DB, err error) {
 	if err = os.MkdirAll(dir, 0700); err != nil {
 		return
 	}
-	db = &DB{Dir: dir, StrCol: make(map[string]*Col)}
+	db = &DB{Dir: dir, UIDPool: uidPool, StrCol: make(map[string]*Col)}
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return
 	}
 	for _, f := range files {
 		if f.IsDir() {
-			if db.StrCol[f.Name()], err = OpenCol(path.Join(dir, f.Name())); err != nil {
+			if db.StrCol[f.Name()], err = OpenCol(path.Join(dir, f.Name()), uidPool); err != nil {
 				log.Printf("Failed to open collection %s, reason: %v", f.Name(), err)
 			} else {
 				log.Printf("Successfully opened collection %s", f.Name())
@@ -42,7 +43,7 @@ func (db *DB) Create(name string) (err error) {
 	if _, nope := db.StrCol[name]; nope {
 		return errors.New(fmt.Sprintf("Collection %s already exists in %s", name, db.Dir))
 	}
-	db.StrCol[name], err = OpenCol(path.Join(db.Dir, name))
+	db.StrCol[name], err = OpenCol(path.Join(db.Dir, name), db.UIDPool)
 	return err
 }
 
@@ -68,7 +69,7 @@ func (db *DB) Rename(oldName, newName string) (err error) {
 	if err = os.Rename(path.Join(db.Dir, oldName), path.Join(db.Dir, newName)); err != nil {
 		return
 	}
-	db.StrCol[newName], err = OpenCol(path.Join(db.Dir, newName))
+	db.StrCol[newName], err = OpenCol(path.Join(db.Dir, newName), db.UIDPool)
 	return
 }
 
@@ -96,8 +97,11 @@ func (db *DB) Scrub(name string) (err error) {
 		}
 		// recreate indexes
 		for path := range col.StrIC {
-			if err = scrub.Index(strings.Split(path, ",")); err != nil {
-				return
+			// skip UID index, which has its config created automatically rather than manually
+			if path[0] != '_' {
+				if err = scrub.Index(strings.Split(path, ",")); err != nil {
+					return
+				}
 			}
 		}
 		// recreate documents

@@ -2,6 +2,8 @@ package db
 
 import (
 	"encoding/json"
+	"fmt"
+	"loveoneanother.at/tiedot/uid"
 	"os"
 	"testing"
 )
@@ -12,7 +14,7 @@ func TestInsertRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
+	col, err := OpenCol(tmp, uid.MiniUIDPool())
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -44,7 +46,7 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
+	col, err := OpenCol(tmp, uid.MiniUIDPool())
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -98,7 +100,7 @@ func TestInsertDeserialize(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
+	col, err := OpenCol(tmp, uid.MiniUIDPool())
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -142,7 +144,7 @@ func TestDurableInsertUpdateDelete(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
+	col, err := OpenCol(tmp, uid.MiniUIDPool())
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -199,7 +201,7 @@ func TestInsertDeleteRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
+	col, err := OpenCol(tmp, uid.MiniUIDPool())
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -231,7 +233,7 @@ func TestIndex(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
+	col, err := OpenCol(tmp, uid.MiniUIDPool())
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -258,12 +260,9 @@ func TestIndex(t *testing.T) {
 		t.Fatal(err)
 		return
 	}
-	for _, first := range col.StrHT {
-		keys, vals := first.GetAll(0)
-		if !(len(keys) == 1 && len(vals) == 1 && vals[0] == ids[0]) {
-			t.Fatalf("Did not index existing document, got %v, %v", keys, vals)
-		}
-		break
+	keys, vals := col.StrHT["a,b,c"].GetAll(0)
+	if !(len(keys) == 1 && len(vals) == 1 && vals[0] == ids[0]) {
+		t.Fatalf("Did not index existing document, got %v, %v", keys, vals)
 	}
 	ids[1], _ = col.Insert(jsonDoc[1])
 	ids[2], _ = col.Insert(jsonDoc[2])
@@ -318,5 +317,79 @@ func TestIndex(t *testing.T) {
 	})
 	if !(len(k0) == 3 && len(v0) == 3 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[2] == ids[2] && k0[2] == StrHash(0) && v0[1] == newID) {
 		t.Fatalf("Index fault, %d, %v, %v", newID, k0, v0)
+	}
+}
+
+func TestUIDDocCRUD(t *testing.T) {
+	tmp := "/tmp/tiedot_col_test"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenCol(tmp, uid.MiniUIDPool())
+	if err != nil {
+		t.Fatalf("Failed to open: %v", err)
+		return
+	}
+	defer col.Close()
+	docs := []string{
+		`{"a": {"b": {"c": 1}}, "d": 1}`,
+		`{"a": {"b": {"c": 2}}, "d": 2}`,
+		`{"a": {"b": {"c": 3}}, "d": 3}`}
+	var jsonDocs [3]interface{}
+	var ids [3]uint64
+	var uids [3]string
+	json.Unmarshal([]byte(docs[0]), &jsonDocs[0])
+	json.Unmarshal([]byte(docs[1]), &jsonDocs[1])
+	json.Unmarshal([]byte(docs[2]), &jsonDocs[2])
+	// insert
+	ids[0], uids[0], err = col.InsertWithUID(jsonDocs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids[1], uids[1], err = col.InsertWithUID(jsonDocs[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids[2], uids[2], err = col.InsertWithUID(jsonDocs[2])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(uids[0]) != 32 || len(uids[1]) != 32 || len(uids[2]) != 32 ||
+		uids[0] == uids[1] || uids[1] == uids[2] || uids[2] == uids[0] ||
+		ids[0] == ids[1] || ids[1] == ids[2] || ids[2] == ids[0] {
+		t.Fatalf("Malformed UIDs or IDs: %v %v", uids, ids)
+	}
+	// read
+	var readDoc interface{}
+	readID, readErr := col.ReadByUID(uids[1], &readDoc)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	docMap1 := readDoc.(map[string]interface{})
+	docMap2 := jsonDocs[1].(map[string]interface{})
+	if readID != ids[1] || fmt.Sprint(docMap1["a"]) != fmt.Sprint(docMap2["a"]) {
+		t.Fatalf("Cannot read back original document by UID: %v", readDoc)
+	}
+	// update
+	var docWithoutUID interface{}
+	json.Unmarshal([]byte(docs[1]), &docWithoutUID)
+	if _, err := col.UpdateByUID(uids[0], docWithoutUID); err != nil { // intentionally remove UID
+		t.Fatal(err)
+	}
+	if _, err = col.ReadByUID(uids[0], &readDoc); err == nil { // UID was removed therefore the error shall happen
+		t.Fatalf("UpdateByUID did not work, still read %v", readDoc)
+	}
+	// update (reassign UID)
+	newID, newUID, err := col.ReassignUID(ids[0])
+	if newID != ids[0] || len(newUID) != 32 || err != nil {
+		t.Fatalf("ReassignUID did not work: %v %v %v", newID, newUID, err)
+	}
+	uids[0] = newUID
+	if _, err = col.ReadByUID(uids[0], &readDoc); err != nil { // UID was reassigned, the error shall NOT happen
+		t.Fatalf("ReassignUID did not work")
+	}
+	// delete
+	col.DeleteByUID(uids[0])
+	if _, err = col.ReadByUID(uids[0], &readDoc); err == nil {
+		t.Fatalf("DeleteByUID did not work")
 	}
 }

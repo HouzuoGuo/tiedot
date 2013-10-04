@@ -6,7 +6,24 @@ import (
 	"time"
 )
 
-func TestUID(t *testing.T) {
+func TestMiniUIDPool(t *testing.T) {
+	pool := MiniUIDPool()
+	next := <-pool
+	fmt.Println(next)
+	next = <-pool
+	fmt.Println(next)
+	next = <-pool
+	fmt.Println(next)
+	fmt.Println(len(pool))
+	if len(next) != 32 {
+		t.Fatalf("malformed uid")
+	}
+	if len(pool) < 10 {
+		t.Fatalf("not enough uid in pool")
+	}
+}
+
+func TestRegularUIDPool(t *testing.T) {
 	pool := UIDPool()
 	next := <-pool
 	fmt.Println(next)
@@ -15,7 +32,7 @@ func TestUID(t *testing.T) {
 	next = <-pool
 	fmt.Println(next)
 	fmt.Println(len(pool))
-	if len(next) < 16 {
+	if len(next) != 32 {
 		t.Fatalf("malformed uid")
 	}
 	if len(pool) < 10 {

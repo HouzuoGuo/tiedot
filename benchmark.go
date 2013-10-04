@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"loveoneanother.at/tiedot/db"
+	"loveoneanother.at/tiedot/uid"
 	"math/rand"
 	"os"
 	"runtime"
@@ -37,7 +38,7 @@ func average(name string, total int, init func(), do func()) {
 	fmt.Printf("%s %d: %d ns/iter, %d iter/sec\n", name, int(total), int((end-start)/iter), int(1000000000/((end-start)/iter)))
 }
 
-// Individual feature benchmarks.
+// Benchmark document CRUD operations.
 func benchmark() {
 	// initialization
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -55,7 +56,7 @@ func benchmark() {
 	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := db.OpenCol(tmp)
+	col, err := db.OpenCol(tmp, uid.MiniUIDPool())
 	if err != nil {
 		panic(err)
 	}
@@ -75,7 +76,7 @@ func benchmark() {
 		})
 	}, func() {
 		var doc interface{}
-		col.Read(ids[uint64(rand.Intn(BENCH_SIZE))], &doc)
+		col.Read(ids[rand.Intn(BENCH_SIZE)], &doc)
 		if doc == nil {
 			panic("read error")
 		}
@@ -109,7 +110,7 @@ func benchmark2() {
 	// prepare collection
 	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
-	col, err := db.OpenCol(tmp)
+	col, err := db.OpenCol(tmp, uid.MiniUIDPool())
 	if err != nil {
 		panic(err)
 	}
@@ -231,4 +232,66 @@ func benchmark2() {
 	wp.Wait()
 	end := float64(time.Now().UTC().UnixNano())
 	fmt.Printf("Total operations %d: %d ns/iter, %d iter/sec\n", BENCH2_SIZE*7, int((end-start)/BENCH2_SIZE/7), int(1000000000/((end-start)/BENCH2_SIZE/7)))
+}
+
+// Benchmark document operations involving UID.
+func benchmark3() {
+	// initialization
+	rand.Seed(time.Now().UTC().UnixNano())
+	// prepare benchmark data
+	docs := [BENCH_SIZE]interface{}{}
+	for i := range docs {
+		if err := json.Unmarshal([]byte(
+			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`}},`+
+				`"c": {"d": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`},`+
+				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &docs[i]); err != nil {
+			panic("json error")
+		}
+	}
+	// prepare collection
+	tmp := "/tmp/tiedot_bench"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := db.OpenCol(tmp, uid.UIDPool())
+	if err != nil {
+		panic(err)
+	}
+	col.Index([]string{"a", "b", "c"})
+	col.Index([]string{"c", "d"})
+	uidsMutex := new(sync.Mutex)
+	uids := make([]string, 0, BENCH_SIZE)
+	// start benchmarks
+	average("insert", BENCH_SIZE, func() {}, func() {
+		if _, uid, err := col.InsertWithUID(docs[rand.Intn(BENCH_SIZE)]); err == nil {
+			uidsMutex.Lock()
+			uids = append(uids, uid)
+			uidsMutex.Unlock()
+		} else {
+			panic("insert error")
+		}
+	})
+
+	average("read", BENCH_SIZE, func() {
+	}, func() {
+		var doc interface{}
+		col.ReadByUID(uids[rand.Intn(BENCH_SIZE)], &doc)
+	})
+	average("lookup", BENCH_SIZE, func() {}, func() {
+		var query interface{}
+		if err := json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["a", "b", "c"], "limit": 1}, `+
+			`{"eq": `+strconv.Itoa(rand.Intn(BENCH_SIZE))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
+			panic("json error")
+		}
+		result := make(map[uint64]struct{})
+		if err := db.EvalQueryV2(query, col, &result); err != nil {
+			panic("query error")
+		}
+	})
+	average("update", BENCH_SIZE, func() {}, func() {
+		col.UpdateByUID(uids[rand.Intn(BENCH_SIZE)], docs[rand.Intn(BENCH_SIZE)])
+	})
+	average("delete", BENCH_SIZE, func() {}, func() {
+		col.DeleteByUID(uids[rand.Intn(BENCH_SIZE)])
+	})
+	col.Close()
 }

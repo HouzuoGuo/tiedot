@@ -7,6 +7,7 @@ import (
 	"loveoneanother.at/tiedot/srv/v1"
 	"loveoneanother.at/tiedot/srv/v2"
 	"loveoneanother.at/tiedot/srv/v3"
+	"loveoneanother.at/tiedot/uid"
 	"os"
 	"runtime"
 	"strconv"
@@ -20,7 +21,7 @@ func main() {
 	}
 	var mode, dir string
 	var port, maxprocs int
-	flag.StringVar(&mode, "mode", "", "[v1|v2|v3|bench|bench2|durable-bench|example]")
+	flag.StringVar(&mode, "mode", "", "[v1|v2|v3|bench|bench2|bench3|durable-bench|example]")
 	flag.StringVar(&dir, "dir", "", "database directory")
 	flag.IntVar(&port, "port", 0, "listening port number")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
@@ -50,7 +51,7 @@ func main() {
 		if port == 0 {
 			log.Fatal("Please specify port number, for example -port=8080")
 		}
-		db, err := db.OpenDB(dir)
+		db, err := db.OpenDB(dir, uid.UIDPool())
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -65,6 +66,8 @@ func main() {
 		benchmark()
 	case "bench2":
 		benchmark2()
+	case "bench3":
+		benchmark3()
 	case "durable-bench":
 		durableBenchmark()
 	case "example":

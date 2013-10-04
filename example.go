@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"loveoneanother.at/tiedot/db"
+	"loveoneanother.at/tiedot/uid"
 	"os"
 )
 
@@ -13,7 +14,7 @@ func embeddedExample() {
 	defer os.RemoveAll(dir)
 
 	// Open database
-	myDB, err := db.OpenDB(dir)
+	myDB, err := db.OpenDB(dir, uid.UIDPool())
 	if err != nil {
 		panic(err)
 	}

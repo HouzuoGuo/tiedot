@@ -27,6 +27,7 @@ type Config struct {
 }
 
 type Col struct {
+	UIDPool                                 chan string
 	Data                                    *file.ColFile
 	Config                                  *Config
 	Dir, ConfigFileName, ConfBackupFileName string
@@ -47,11 +48,11 @@ func StrHash(thing interface{}) uint64 {
 }
 
 // Open a collection.
-func OpenCol(dir string) (col *Col, err error) {
+func OpenCol(dir string, uidPool chan string) (col *Col, err error) {
 	if err = os.MkdirAll(dir, 0700); err != nil {
 		return
 	}
-	col = &Col{ConfigFileName: path.Join(dir, "config"), ConfBackupFileName: path.Join(dir, "config.bak"), Dir: dir}
+	col = &Col{UIDPool: uidPool, ConfigFileName: path.Join(dir, "config"), ConfBackupFileName: path.Join(dir, "config.bak"), Dir: dir}
 	// open data file
 	if col.Data, err = file.OpenCol(path.Join(dir, "data")); err != nil {
 		return
@@ -100,6 +101,8 @@ func (col *Col) LoadConf() error {
 	} else if err = json.Unmarshal(config, &col.Config); err != nil {
 		return err
 	}
+	// create UID index config (UID index is not specified in config file)
+	col.Config.Indexes = append(col.Config.Indexes, IndexConf{FileName: "_uid", PerBucket: 200, HashBits: 14, IndexedPath: []string{"_uid"}})
 	// open each index file
 	col.StrHT = make(map[string]*file.HashTable)
 	col.StrIC = make(map[string]*IndexConf)
@@ -111,6 +114,7 @@ func (col *Col) LoadConf() error {
 		col.StrHT[strings.Join(index.IndexedPath, ",")] = ht
 		col.StrIC[strings.Join(index.IndexedPath, ",")] = &col.Config.Indexes[i]
 	}
+	// open UID index
 	return nil
 }
 
@@ -144,6 +148,37 @@ func (col *Col) Read(id uint64, doc interface{}) error {
 		return errors.New(msg) // for embedded usage
 	}
 	return nil
+}
+
+// Retrieve document ID and data given its UID.
+func (col *Col) ReadByUID(uid string, doc interface{}) (uint64, error) {
+	var docID uint64
+	found := false
+	// scan UID hash table
+	col.StrHT["_uid"].Get(StrHash(uid), 1, func(key, value uint64) bool {
+		// potential match is found
+		var candidate interface{}
+		if col.Read(value, &candidate) == nil {
+			if docMap, ok := candidate.(map[string]interface{}); ok {
+				// make sure this is not a case of hash collission
+				if candidateUID, ok := docMap["_uid"]; ok {
+					if stringUID, ok := candidateUID.(string); ok {
+						if stringUID != uid {
+							return false // this IS a hash collission
+						}
+						docID = value
+						found = true
+					}
+				}
+			}
+		}
+		// there was no hash collision, and UID was either found or not found, stop searching
+		return true
+	})
+	if !found {
+		return 0, errors.New(fmt.Sprintf("Document %s does not exist in %s", uid, col.Dir))
+	}
+	return docID, col.Read(docID, doc)
 }
 
 // Index the document on all indexes
@@ -193,6 +228,19 @@ func (col *Col) Insert(doc interface{}) (id uint64, err error) {
 	return
 }
 
+// Insert a new document, and assign a UID to it,
+func (col *Col) InsertWithUID(doc interface{}) (id uint64, uid string, err error) {
+	uid = <-col.UIDPool
+	if docMap, ok := doc.(map[string]interface{}); !ok {
+		err = errors.New("Only JSON object document may have UID")
+		return
+	} else {
+		docMap["_uid"] = uid
+		id, err = col.Insert(doc)
+		return
+	}
+}
+
 // Insert a new document and immediately flush all buffers.
 func (col *Col) DurableInsert(doc interface{}) (id uint64, err error) {
 	id, err = col.Insert(doc)
@@ -227,6 +275,33 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	return
 }
 
+// Identify a document using UID and update it, return its new ID.
+func (col *Col) UpdateByUID(uid string, doc interface{}) (newID uint64, err error) {
+	var throwAway interface{}
+	if newID, err = col.ReadByUID(uid, &throwAway); err != nil {
+		return
+	} else {
+		return col.Update(newID, doc)
+	}
+}
+
+// Give a document (identified by ID) a new UID.
+func (col *Col) ReassignUID(id uint64) (newID uint64, uid string, err error) {
+	uid = <-col.UIDPool
+	var originalDoc interface{}
+	if err = col.Read(id, &originalDoc); err != nil {
+		return
+	}
+	if docWithUID, ok := originalDoc.(map[string]interface{}); !ok {
+		err = errors.New("Only JSON object document may have UID")
+		return
+	} else {
+		docWithUID["_uid"] = uid
+		newID, err = col.Update(id, docWithUID)
+		return
+	}
+}
+
 // Update a document and immediately flush all buffers.
 func (col *Col) DurableUpdate(id uint64, doc interface{}) (newID uint64, err error) {
 	newID, err = col.Update(id, doc)
@@ -237,7 +312,7 @@ func (col *Col) DurableUpdate(id uint64, doc interface{}) (newID uint64, err err
 	return
 }
 
-// Delete a document.
+// Delete a document by ID.
 func (col *Col) Delete(id uint64) {
 	var oldDoc interface{}
 	err := col.Read(id, &oldDoc)
@@ -246,6 +321,14 @@ func (col *Col) Delete(id uint64) {
 	}
 	col.Data.Delete(id)
 	col.UnindexDoc(id, oldDoc)
+}
+
+// Delete a document by UID.
+func (col *Col) DeleteByUID(uid string) {
+	var throwAway interface{}
+	if id, err := col.ReadByUID(uid, &throwAway); err == nil {
+		col.Delete(id)
+	}
 }
 
 // Delete a document and immediately flush all buffers.
