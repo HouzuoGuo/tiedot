@@ -10,6 +10,8 @@ import (
 	"sync"
 )
 
+const FILE_GROWTH_INCREMENTAL = uint64(16777216)
+
 type File struct {
 	Name                 string
 	Fh                   *os.File
@@ -84,8 +86,18 @@ func (file *File) CheckSizeAndEnsure(more uint64) {
 	if _, err = file.Fh.Seek(0, os.SEEK_END); err != nil {
 		panic(err)
 	}
-	if _, err = file.Fh.Write(make([]byte, file.Growth)); err != nil {
-		panic(err)
+	// grow the file incrementally
+	zeroBuf := make([]byte, FILE_GROWTH_INCREMENTAL)
+	for i := uint64(0); i < file.Growth; i += FILE_GROWTH_INCREMENTAL {
+		var slice []byte
+		if i > file.Growth {
+			slice = zeroBuf[0:file.Growth]
+		} else {
+			slice = zeroBuf
+		}
+		if _, err = file.Fh.Write(slice); err != nil {
+			panic(err)
+		}
 	}
 	if err = file.Fh.Sync(); err != nil {
 		panic(err)
