@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	HASH_TABLE_GROWTH  = uint64(67108864) // Grows every 64MB
+	HASH_TABLE_GROWTH  = uint64(134217728) // Grows every 128MB
 	ENTRY_VALID        = byte(1)
 	ENTRY_INVALID      = byte(0)
 	ENTRY_SIZE         = uint64(1 + 10 + 10) // byte(validity), uint64(hash key), uint64(value)

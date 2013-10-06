@@ -15,11 +15,21 @@ const (
 	DOC_HEADER      = 1 + 10            // byte(validity), uint64(document room)
 	DOC_VALID       = byte(1)
 	DOC_INVALID     = byte(0)
+
+	// prepared document padding (2048 bytes of space)
+	PADDING = "                                                                                                                                " +
+		"                                                                                                                                " +
+		"                                                                                                                                " +
+		"                                                                                                                                " +
+		"                                                                                                                                " +
+		"                                                                                                                                " +
+		"                                                                                                                                " +
+		"                                                                                                                                "
+	LEN_PADDING = uint64(len(PADDING))
 )
 
 type ColFile struct {
 	File          *File
-	Padding       []byte
 	syncDocInsert *sync.Mutex
 	syncDocUpdate *MultiRWMutex
 }
@@ -27,13 +37,8 @@ type ColFile struct {
 // Open a collection file.
 func OpenCol(name string) (*ColFile, error) {
 	file, err := Open(name, COL_FILE_GROWTH)
-	// make an array of padding spaces
-	padding := make([]byte, DOC_MAX_ROOM)
-	for i := range padding {
-		padding[i] = 32
-	}
 	return &ColFile{
-		File: file, Padding: padding,
+		File:          file,
 		syncDocInsert: new(sync.Mutex),
 		syncDocUpdate: NewMultiRWMutex(8192)}, err
 }
@@ -71,10 +76,24 @@ func (col *ColFile) Insert(data []byte) (id uint64, err error) {
 		col.File.CheckSizeAndEnsure(DOC_HEADER + room)
 		col.syncDocUpdate.UnlockAll()
 	}
+	// make doc header and copy data
 	col.File.Buf[id] = 1
 	binary.PutUvarint(col.File.Buf[id+1:id+DOC_HEADER], room)
-	copy(col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+len64], data)
-	copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], col.Padding[0:len64])
+	paddingBegin := id + DOC_HEADER + len64
+	paddingEnd := id + DOC_HEADER + room
+	copy(col.File.Buf[id+DOC_HEADER:paddingBegin], data)
+	// make padding
+	for segBegin := paddingBegin; segBegin < paddingEnd; segBegin += LEN_PADDING {
+		segSize := LEN_PADDING
+		segEnd := segBegin + LEN_PADDING
+
+		if segEnd >= paddingEnd {
+			segEnd = paddingEnd
+			segSize = paddingEnd - segBegin
+		}
+		copy(col.File.Buf[segBegin:segEnd], PADDING[0:segSize])
+	}
+	// reposition next append
 	col.File.Append = id + DOC_HEADER + room
 	col.syncDocInsert.Unlock()
 	return id, nil
@@ -92,14 +111,27 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 		mutex.Unlock()
 		return id, errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.File.Name))
 	} else {
-		if len64 <= room { // overwrite
-			copy(col.File.Buf[id+DOC_HEADER:id+DOC_HEADER+len64], data[:])
-			copy(col.File.Buf[id+DOC_HEADER+len64:id+DOC_HEADER+room], col.Padding[0:room-len64])
+		if len64 <= room {
+			// overwrite data
+			paddingBegin := id + DOC_HEADER + len64
+			copy(col.File.Buf[id+DOC_HEADER:paddingBegin], data)
+			paddingEnd := id + DOC_HEADER + room
+			// overwrite padding
+			for segBegin := paddingBegin; segBegin < paddingEnd; segBegin += LEN_PADDING {
+				segSize := LEN_PADDING
+				segEnd := segBegin + LEN_PADDING
+
+				if segEnd >= paddingEnd {
+					segEnd = paddingEnd
+					segSize = paddingEnd - segBegin
+				}
+				copy(col.File.Buf[segBegin:segEnd], PADDING[0:segSize])
+			}
 			mutex.Unlock()
 			return id, nil
 		}
 		mutex.Unlock()
-		// re-insert
+		// re-insert because there is not enough room
 		col.Delete(id)
 		return col.Insert(data)
 	}
