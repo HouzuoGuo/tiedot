@@ -1,13 +1,30 @@
+### 1.1 (2013-10-06)
+
+Bug fix:
+
+- Panic due to out of memory on several 32-bit machines.
+- Fix several incorrect HTTP API content type.
+
+Improvements:
+
+- Remove per-collection padding buffer and replace it by a shared string buffer, to reduce memory consumption.
+- Creation of data file no longer creates a giant empty buffer beforehand, therefore reducing memory consumption.
+- Documents may now have optional persistent IDs (called UID) which will never change during its life time.
+- API version 3 (New!) supports document operations based on UIDs.
+
 ### 1.0 (2013-09-21)
 
 Another maintenance release to address all outstanding issues, with feature improvements and new APIs.
 
 Bug fix:
 
+- Scalability problem on a model of laptop has been resolved.
 - Collection update will no longer panic under a rare data corruption situation.
 
-Improvements - API version 2 (New!):
+Improvements:
 
+- Data file IO now uses more granular locks (RWlock-per-bucket and RWlock-per-document) instead of giant RW file lock.
+- API version 2 (New!)
 - New HTTP endpoints to report server runtime performance.
 - New query syntax - easier and more efficient, together with a new query processor.
 - A specific type of range query (integer lookup in a range) is now supported.

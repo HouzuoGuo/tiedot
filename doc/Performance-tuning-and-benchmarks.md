@@ -2,8 +2,9 @@
 
 tiedot has two built-in benchmark cases (prior to 1.0, there was only one). To invoke benchmark, compile and run tiedot with CLI parameter:
 
-    ./tiedot -mode=bench  # benchmark 1
+    ./tiedot -mode=bench   # benchmark 1
     ./tiedot -mode=bench2  # benchmark 2
+    ./tiedot -mode=bench3  # benchmark 3
 
 ### Benchmark 1
 
@@ -21,7 +22,7 @@ Try adjustment `BENCH_SIZE` if you wish to conduct the benchmark with a larger o
 
 ### Benchmark 2
 
-Invoked by `tiedot -mode=bench`, the benchmark prepares a collection with two indexes and 1000 documents, then do *all* these operations at the same time:
+Invoked by `tiedot -mode=bench2`, the benchmark prepares a collection with two indexes and 1000 documents, then do *all* these operations at the same time:
 
 - Insert/update/delete documents
 - Read documents and do lookup queries
@@ -29,6 +30,10 @@ Invoked by `tiedot -mode=bench`, the benchmark prepares a collection with two in
 The sample size is controlled by `BENCH2_SIZE` in `benchmark.go`; unlike Benchmark 1, Benchmark 2 does not require large amount of free memory even with very large `BENCH2_SIZE`.
 
 This benchmark focuses on concurrency, to reflect performance under mixed workloads.
+
+### Benchmark 3
+
+Invoked by `tiedot -mode=bench3`. Similar to benchmark 1, this benchmark tests individual document operation (CRUD) performance, but addresses documents using UID (persistent ID) instead of ID (physical ID).
 
 ## When data size < available memory
 

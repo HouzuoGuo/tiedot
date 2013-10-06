@@ -32,32 +32,22 @@ tiedot scales very well on SMP computers. The following performance results are 
 </tr>
 <tr>
   <td>Mobile Intel Core i7 (2nd Gen)</td>
-  <td>168k</td>
-  <td>300k</td>
-  <td>66k</td>
-  <td>58k</td>
-  <td>138k</td>
-  <td>145k</td>
+  <td>147k</td>
+  <td>290k</td>
+  <td>65k</td>
+  <td>75k</td>
+  <td>190k</td>
+  <td>155k</td>
   <td>A 3 years old laptop</td>
 </tr>
 <tr>
-  <td>Desktop Intel Core 2 Duo</td>
-  <td>127k</td>
-  <td>248k</td>
-  <td>53k</td>
-  <td>56k</td>
-  <td>125k</td>
-  <td>121k</td>
-  <td>A 5 years old workstation</td>
-</tr>
-<tr>
   <td>Amazon EC2 c1.medium</td>
-  <td>67k</td>
-  <td>120k</td>
+  <td>54k</td>
+  <td>117k</td>
   <td>29k</td>
-  <td>32k</td>
-  <td>100k</td>
-  <td>63k</td>
+  <td>31k</td>
+  <td>85k</td>
+  <td>65k</td>
   <td>A medium range instance</td>
 </tr>
 </table>
@@ -69,6 +59,7 @@ Mix\* runs simultaneous insert/read/update/delete/query operations. See [Perform
 - [Quick Start Guide: tiedot in 10 minutes]
 - [API V1 reference]
 - [API V2 reference]
+- [API V3 reference]
 - [Embedded usage]
 - [Data structures]
 - [Query processor and index]
@@ -108,6 +99,13 @@ See [Version History] for detailed change logs, known issues, etc.
   <td>V1 and V2</td>
   <td>2013-09-21</td>
   <td>Query performance/syntax, and documentation improvements.</td>
+</tr>
+<tr>
+  <td>1.1</td>
+  <td>1.1</td>
+  <td>V1 V2 V3</td>
+  <td>2013-10-06</td>
+  <td>Memory consumption improvements; persistent document ID system.</td>
 </tr>
 </table>
 
@@ -149,6 +147,7 @@ __Why the name "tiedot"?__
 [Quick Start Guide: tiedot in 10 minutes]: https://github.com/HouzuoGuo/tiedot/wiki/Tutorial
 [API V1 reference]: https://github.com/HouzuoGuo/tiedot/wiki/API-V1-Reference
 [API V2 reference]: https://github.com/HouzuoGuo/tiedot/wiki/API-V2-Reference
+[API V3 reference]: https://github.com/HouzuoGuo/tiedot/wiki/API-V3-Reference
 [Version History]: https://github.com/HouzuoGuo/tiedot/wiki/Version-History
 [Embedded usage]: https://github.com/HouzuoGuo/tiedot/wiki/Embedded-Usage
 [Data structures]: https://github.com/HouzuoGuo/tiedot/wiki/Data-structures
