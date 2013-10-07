@@ -54,6 +54,8 @@ tiedot scales very well on SMP computers. The following performance results are 
 
 Mix\* runs simultaneous insert/read/update/delete/query operations. See [Performance tuning and benchmarks] for more details
 
+> Did you know? The largest known tiedot deployment powers a personal offline Wikipedia indexing project, it has 5.9 million documents and over 73GB of data.
+
 ### References
 
 - [Quick Start Guide: tiedot in 10 minutes]
