@@ -85,14 +85,14 @@ func (ht *HashTable) lastBucket(bucket uint64) uint64 {
 func (ht *HashTable) grow(bucket uint64) {
 	// lock both bucket creation and the bucket affected
 	ht.syncBucketCreate.Lock()
-	lastBucketAddr := ht.lastBucket(bucket) * ht.BucketSize
-	binary.PutUvarint(ht.File.Buf[lastBucketAddr:lastBucketAddr+8], ht.numberBuckets())
 	// when file is full, we have to lock down everything before growing the file
 	if !ht.File.CheckSize(ht.BucketSize) {
 		ht.syncBucketUpdate.LockAll()
 		ht.File.CheckSizeAndEnsure(ht.BucketSize)
 		ht.syncBucketUpdate.UnlockAll()
 	}
+	lastBucketAddr := ht.lastBucket(bucket) * ht.BucketSize
+	binary.PutUvarint(ht.File.Buf[lastBucketAddr:lastBucketAddr+8], ht.numberBuckets())
 	ht.File.Append += ht.BucketSize
 	ht.syncBucketCreate.Unlock()
 }

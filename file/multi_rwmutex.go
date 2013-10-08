@@ -61,12 +61,12 @@ func (mutexes *MultiRWMutex) LockAll() {
 }
 
 func (mutexes *MultiRWMutex) UnlockAll() {
-	for _, v := range mutexes.bucketLocks {
-		v.Unlock()
-	}
 	for _, bucket := range mutexes.buckets {
 		for _, mutex := range bucket {
 			mutex.Unlock()
 		}
+	}
+	for _, v := range mutexes.bucketLocks {
+		v.Unlock()
 	}
 }
