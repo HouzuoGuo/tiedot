@@ -76,6 +76,9 @@ func (col *ColFile) Insert(data []byte) (id uint64, err error) {
 		col.File.CheckSizeAndEnsure(DOC_HEADER + room)
 		col.syncDocUpdate.UnlockAll()
 	}
+	// reposition next append
+	col.File.Append = id + DOC_HEADER + room
+	col.syncDocInsert.Unlock()
 	// make doc header and copy data
 	col.File.Buf[id] = 1
 	binary.PutUvarint(col.File.Buf[id+1:id+DOC_HEADER], room)
@@ -93,9 +96,6 @@ func (col *ColFile) Insert(data []byte) (id uint64, err error) {
 		}
 		copy(col.File.Buf[segBegin:segEnd], PADDING[0:segSize])
 	}
-	// reposition next append
-	col.File.Append = id + DOC_HEADER + room
-	col.syncDocInsert.Unlock()
 	return id, nil
 }
 
