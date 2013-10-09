@@ -10,11 +10,12 @@ import (
 )
 
 const (
-	COL_FILE_GROWTH = uint64(134217728) // Grows every 128MB
-	DOC_MAX_ROOM    = 33554432          // Maximum single document size
-	DOC_HEADER      = 1 + 10            // byte(validity), uint64(document room)
-	DOC_VALID       = byte(1)
-	DOC_INVALID     = byte(0)
+	COL_FILE_GROWTH  = uint64(134217728) // Grows every 128MB
+	DOC_MAX_ROOM     = 33554432          // Maximum single document size
+	DOC_HEADER       = 1 + 10            // byte(validity), uint64(document room)
+	DOC_VALID        = byte(1)
+	DOC_INVALID      = byte(0)
+	LOCK_GRANULARITY = 1048576 // Lock region size
 
 	// prepared document padding (2048 bytes of space)
 	PADDING = "                                                                                                                                " +
@@ -40,7 +41,7 @@ func OpenCol(name string) (*ColFile, error) {
 	return &ColFile{
 		File:          file,
 		syncDocInsert: new(sync.Mutex),
-		syncDocUpdate: NewMultiRWMutex(8192)}, err
+		syncDocUpdate: NewMultiRWMutex(2048)}, err
 }
 
 // Retrieve document data given its ID.
@@ -48,7 +49,7 @@ func (col *ColFile) Read(id uint64) []byte {
 	if id < 0 || id >= col.File.Append || col.File.Buf[id] != DOC_VALID {
 		return nil
 	}
-	mutex := col.syncDocUpdate.GetRWMutex(id)
+	mutex := col.syncDocUpdate.GetRWMutex(id - id%LOCK_GRANULARITY)
 	mutex.RLock()
 	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
 		mutex.RUnlock()
@@ -105,7 +106,7 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 		return id, errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.File.Name))
 	}
 	len64 := uint64(len(data))
-	mutex := col.syncDocUpdate.GetRWMutex(id)
+	mutex := col.syncDocUpdate.GetRWMutex(id - id%LOCK_GRANULARITY)
 	mutex.Lock()
 	if room, _ := binary.Uvarint(col.File.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
 		mutex.Unlock()
