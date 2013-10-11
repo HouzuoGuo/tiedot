@@ -13,7 +13,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -183,36 +182,25 @@ func (col *Col) ReadByUID(uid string, doc interface{}) (uint64, error) {
 
 // Index the document on all indexes
 func (col *Col) IndexDoc(id uint64, doc interface{}) {
-	wg := new(sync.WaitGroup)
-	wg.Add(len(col.StrIC))
 	for k, v := range col.StrIC {
-		go func(k string, v *IndexConf) {
-			for _, thing := range GetIn(doc, v.IndexedPath) {
-				if thing != nil {
-					col.StrHT[k].Put(StrHash(thing), id)
-				}
+		for _, thing := range GetIn(doc, v.IndexedPath) {
+			if thing != nil {
+				col.StrHT[k].Put(StrHash(thing), id)
 			}
-			wg.Done()
-		}(k, v)
+		}
 	}
-	wg.Wait()
 }
 
 // Remove the document from all indexes
 func (col *Col) UnindexDoc(id uint64, doc interface{}) {
-	wg := new(sync.WaitGroup)
-	wg.Add(len(col.StrIC))
-	for k, v := range col.StrIC {
-		go func(k string, v *IndexConf) {
-			for _, thing := range GetIn(doc, v.IndexedPath) {
-				col.StrHT[k].Remove(StrHash(thing), 1, func(k, v uint64) bool {
-					return v == id
-				})
-			}
-			wg.Done()
-		}(k, v)
+	verifyFunc := func(k, v uint64) bool {
+		return v == id
 	}
-	wg.Wait()
+	for k, v := range col.StrIC {
+		for _, thing := range GetIn(doc, v.IndexedPath) {
+			col.StrHT[k].Remove(StrHash(thing), 1, verifyFunc)
+		}
+	}
 }
 
 // Insert a new document.
