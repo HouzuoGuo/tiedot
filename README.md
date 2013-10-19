@@ -31,14 +31,24 @@ tiedot scales very well on SMP computers. The following performance results are 
   <th>Machine Type</th>
 </tr>
 <tr>
-  <td>Mobile Intel Core i7 (2nd Gen)</td>
+  <td>Mobile Intel Core i7 2.8GHZ</td>
+  <td>430k</td>
+  <td>697k</td>
+  <td>152k</td>
+  <td>204k</td>
+  <td>495k</td>
+  <td>375k</td>
+  <td>2013 model MacBook</td>
+</tr>
+<tr>
+  <td>Mobile Intel Core i7 1.8GHZ</td>
   <td>147k</td>
   <td>290k</td>
   <td>65k</td>
   <td>75k</td>
   <td>190k</td>
   <td>155k</td>
-  <td>A 3 years old laptop</td>
+  <td>2011 model laptop</td>
 </tr>
 <tr>
   <td>Amazon EC2 c1.medium</td>

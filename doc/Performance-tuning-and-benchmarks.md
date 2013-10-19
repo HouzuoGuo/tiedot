@@ -1,6 +1,6 @@
 ## tiedot built-in benchmark
 
-tiedot has two built-in benchmark cases (prior to 1.0, there was only one). To invoke benchmark, compile and run tiedot with CLI parameter:
+tiedot has three built-in benchmark cases. To invoke benchmark, compile and run tiedot with CLI parameter:
 
     ./tiedot -mode=bench   # benchmark 1
     ./tiedot -mode=bench2  # benchmark 2
@@ -16,7 +16,7 @@ Invoked by `tiedot -mode=bench`, the benchmark prepares a collection with two in
 - Update document at random locations
 - Delete document at random locations
 
-The benchmark makes a large sample (defined as `BENCH_SIZE` in `benchmark.go`) that requires plenty of free memory (minimum of 3GB) to complete. It is designed to test performance of each individual document operation, to assist in finding performance regressions. The result should accurately reflect batch CRUD operation performance.
+The benchmark makes a large sample (defined as `BENCH_SIZE` in `benchmark.go`) that requires plenty of free memory (minimum of 2GB) to complete. It is designed to test performance of each individual document operation, to assist in finding performance regressions. The result should accurately reflect batch CRUD operation performance.
 
 Try adjustment `BENCH_SIZE` if you wish to conduct the benchmark with a larger or smaller sample size.
 
@@ -35,53 +35,31 @@ This benchmark focuses on concurrency, to reflect performance under mixed worklo
 
 Invoked by `tiedot -mode=bench3`. Similar to benchmark 1, this benchmark tests individual document operation (CRUD) performance, but addresses documents using UID (persistent ID) instead of ID (physical ID).
 
-## When data size < available memory
+## Available memory VS performance
 
-This is the preferred situation - there is plenty memory available for holding all data files. Operating system does a very good on managing mapped file buffers, swapping rarely happens and there is minimal to no IO on disk. In this situation, tiedot performs like an in-memory database.
+tiedot runs well with even less than 100 MB of available memory during normal operations. Similar to other NoSQL solutions, having larger free memory usually improves performance.
 
-Some benchmark results are shown on the front-page of this wiki.
+### When data size < available memory
 
-## When data size > available memory
+This is the preferred situation - there is plenty memory available for holding all data files. Operating system does a very good on managing mapped file buffers, swapping rarely happens and there is minimal to no IO on disk. In this situation, tiedot performs as an in-memory database. The benchmark results on the home page of this wiki was collected under this scenario.
 
-This is not ideal - there is not enough memory to hold all collection data; although operating system does its very best on keeping frequently access pages in memory, but swapping becomes an inevitable performance killer - just like what you experience on other NoSQL solutions.
+### When data size > available memory
 
-I carried out this benchmark on my laptop: by increasing benchmark load, memory is filled up with serialized JSON documents to be loaded into benchmark collection, and leaving less than 500MB of available memory for more than 1GB of data files. tiedot benchmark accesses documents at randomly distributed locations, rendering memory buffer ineffecient - this is the worst scenario!
+This is not ideal - there is not enough memory to hold all collection data, memory buffer becomes less efficient due to frequent page faults.
 
-And here are the results collected from multiple benchmark runs:
-(Operations per second)
-<table>
-<tr>
-  <th>Processor</th>
-  <th>Insert</th>
-  <th>Read</th>
-  <th>Query</th>
-  <th>Update</th>
-  <th>Delete</th>
-  <th></th>
-</tr>
-<tr>
-  <td>Mobile Intel Core i7 (2nd Gen)</td>
-  <td>6-20k</td>
-  <td>10-90k</td>
-  <td>11-31k</td>
-  <td>4-7k</td>
-  <td>7-25k</td>
-  <td>My 3 years old laptop</td>
-</tr>
-</table>
+When approximately half of collection data resides in virtual memory, the performance of mixed workloads drops by approximately 400%; depending on your virtual memory media (SSD/HDD), amount of available main memory and usage, actual performance may vary.
 
-## Performance of "immediate durability" operations
+### Performance of "immediate durability" operations
 
-Normally, tiedot synchronizes memory buffers with disk files every minute.
+Normally, when running HTTP service, tiedot synchronizes memory buffers with disk files every minute.
 
-When you require immediately guaranteed data durability, tiedot supports `durableInsert/durableUpdate/durableDelete` (in `db/col.go`) which make syscall `msync` immediately following collection operation - they are 10000x more costly to use ompare to normal insert/update/delete operations, therefore you may not want to use them too often!
+If you are using tiedot as an embedded database, the following APIs are available for controlling durability:
 
-## Performance comparison with other NoSQL solutions
+* DurableInsert/DurableUpdate/DurableDelete (`col.go`)
+* Flush (`col.go`)
 
-Every NoSQL solution has its own advantages and disadvantages; tiedot is unique in its own way:
+All of them make use of syscall `msync` to ensure immediate data durability on storage media. They are very expensive calls.
 
-- Its design scales very well on SMP (symmetric multi-processing) machines.
-- General usage does not comply with ACID.
-- Scalability is affected by Golang scheduler.
+### Performance comparison with other NoSQL solutions
 
-Depending on your usage scenarios: by offering feature simplicity, tiedot performs as well as (and very likely, faster than) mainstream NoSQL solutions, but tiedot does not offer some advanced capabilities such as replication and map-reduce (yet), in which case other solutions may be more capable of handling.
+Every NoSQL solution has its own advantages and disadvantages. By offering feature simplicity, tiedot performs as well as (and very likely, faster than) mainstream NoSQL solutions, but tiedot does not offer some advanced capabilities such as replication and map-reduce (yet), in which case other solutions may be more capable of handling.
