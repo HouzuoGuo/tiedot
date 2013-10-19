@@ -196,8 +196,8 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 }
 
 // Remove specific key-value pair.
-func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool) {
-	var count, entry, bucket uint64 = 0, 0, ht.hashKey(key)
+func (ht *HashTable) Remove(key, val uint64) {
+	var entry, bucket uint64 = 0, ht.hashKey(key)
 	region := bucket / HASH_TABLE_REGION_SIZE
 	mutex := ht.regionRWMutex[region]
 	mutex.Lock()
@@ -206,12 +206,10 @@ func (ht *HashTable) Remove(key, limit uint64, filter func(uint64, uint64) bool)
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+11 : entryAddr+21])
 		if ht.File.Buf[entryAddr] == ENTRY_VALID {
-			if entryKey == key && filter(entryKey, entryVal) {
+			if entryKey == key && entryVal == val {
 				ht.File.Buf[entryAddr] = ENTRY_INVALID
-				if count++; count == limit {
-					mutex.Unlock()
-					return
-				}
+				mutex.Unlock()
+				return
 			}
 		} else if entryKey == 0 && entryVal == 0 {
 			mutex.Unlock()

@@ -1,10 +1,8 @@
 package file
 
 import (
-	"math/rand"
 	"os"
 	"testing"
-	"time"
 )
 
 const (
@@ -86,12 +84,8 @@ func TestPutRemove(t *testing.T) {
 	ht.Put(2, 1)
 	ht.Put(2, 2)
 	ht.Put(2, 3)
-	ht.Remove(1, 1, func(a, b uint64) bool {
-		return true
-	})
-	ht.Remove(2, 2, func(a, b uint64) bool {
-		return b >= 2
-	})
+	ht.Remove(1, 1)
+	ht.Remove(2, 2)
 	keys, vals := ht.Get(1, 0, func(a, b uint64) bool {
 		return true
 	})
@@ -101,7 +95,7 @@ func TestPutRemove(t *testing.T) {
 	keys, vals = ht.Get(2, 0, func(a, b uint64) bool {
 		return true
 	})
-	if !(len(keys) == 1 && len(vals) == 1) {
+	if !(len(keys) == 2 && len(vals) == 2) {
 		t.Fatalf("Did not delete, still have %v, %v", keys, vals)
 	}
 }
@@ -125,86 +119,5 @@ func TestGetAll(t *testing.T) {
 	keys, vals := ht.GetAll(0)
 	if !(len(keys) == 6 && len(vals) == 6) {
 		t.Fatalf("Did not have all, got only %v, %v", keys, vals)
-	}
-}
-
-func BenchmarkPut(b *testing.B) {
-	tmp := "/tmp/tiedot_hash_benchmark"
-	os.Remove(tmp)
-	defer os.Remove(tmp)
-	ht, err := OpenHash(tmp, 14, 100)
-	if err != nil {
-		b.Fatalf("Failed to open: %v", err)
-		return
-	}
-	defer ht.File.Close()
-	rand.Seed(time.Now().UTC().UnixNano())
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		ht.Put(uint64(rand.Int63n(HT_BENCH_SIZE)), uint64(rand.Int63n(HT_BENCH_SIZE)))
-	}
-}
-
-func BenchmarkGet(b *testing.B) {
-	tmp := "/tmp/tiedot_hash_benchmark"
-	os.Remove(tmp)
-	defer os.Remove(tmp)
-	ht, err := OpenHash(tmp, 14, 100)
-	if err != nil {
-		b.Fatalf("Failed to open: %v", err)
-		return
-	}
-	defer ht.File.Close()
-	rand.Seed(time.Now().UTC().UnixNano())
-	for i := 0; i < HT_BENCH_SIZE; i++ {
-		ht.Put(uint64(rand.Int63n(HT_BENCH_SIZE)), uint64(rand.Int63n(HT_BENCH_SIZE)))
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		ht.Get(uint64(rand.Int63n(HT_BENCH_SIZE)), 1, func(a, b uint64) bool {
-			return true
-		})
-	}
-}
-
-func BenchmarkRemove(b *testing.B) {
-	tmp := "/tmp/tiedot_hash_benchmark"
-	os.Remove(tmp)
-	defer os.Remove(tmp)
-	ht, err := OpenHash(tmp, 14, 100)
-	if err != nil {
-		b.Fatalf("Failed to open: %v", err)
-		return
-	}
-	defer ht.File.Close()
-	rand.Seed(time.Now().UTC().UnixNano())
-	for i := 0; i < HT_BENCH_SIZE; i++ {
-		ht.Put(uint64(rand.Int63n(HT_BENCH_SIZE)), uint64(rand.Int63n(HT_BENCH_SIZE)))
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		ht.Remove(uint64(rand.Int63n(HT_BENCH_SIZE)), 1, func(a, b uint64) bool {
-			return true
-		})
-	}
-}
-
-func BenchmarkGetAll(b *testing.B) {
-	tmp := "/tmp/tiedot_hash_benchmark"
-	os.Remove(tmp)
-	defer os.Remove(tmp)
-	ht, err := OpenHash(tmp, 12, 400)
-	if err != nil {
-		b.Fatalf("Failed to open: %v", err)
-		return
-	}
-	defer ht.File.Close()
-	rand.Seed(time.Now().UTC().UnixNano())
-	for i := 0; i < HT_BENCH_SIZE; i++ {
-		ht.Put(uint64(rand.Int63n(HT_BENCH_SIZE)), uint64(rand.Int63n(HT_BENCH_SIZE)))
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		ht.GetAll(0)
 	}
 }

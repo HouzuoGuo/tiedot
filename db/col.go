@@ -193,12 +193,9 @@ func (col *Col) IndexDoc(id uint64, doc interface{}) {
 
 // Remove the document from all indexes
 func (col *Col) UnindexDoc(id uint64, doc interface{}) {
-	verifyFunc := func(k, v uint64) bool {
-		return v == id
-	}
 	for k, v := range col.StrIC {
 		for _, thing := range GetIn(doc, v.IndexedPath) {
-			col.StrHT[k].Remove(StrHash(thing), 1, verifyFunc)
+			col.StrHT[k].Remove(StrHash(thing), id)
 		}
 	}
 }
