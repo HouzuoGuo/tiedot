@@ -15,7 +15,7 @@ const (
 	DOC_HEADER           = 1 + 10            // byte(validity), uint64(document room)
 	DOC_VALID            = byte(1)
 	DOC_INVALID          = byte(0)
-	COL_FILE_REGION_SIZE = 1024 * 512 // 512 KB per locking region
+	COL_FILE_REGION_SIZE = 1024 * 128 // 128 KB per locking region
 
 	// prepared document padding (2048 bytes of space)
 	PADDING = "                                                                                                                                " +
