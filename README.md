@@ -34,32 +34,32 @@ tiedot scales very well on SMP computers. The following performance results are 
 </tr>
 <tr>
   <td>Mobile Intel Core i7 2.8GHZ</td>
-  <td>430k</td>
-  <td>697k</td>
-  <td>152k</td>
-  <td>204k</td>
-  <td>495k</td>
-  <td>375k</td>
+  <td>430,000</td>
+  <td>697,000</td>
+  <td>152,000</td>
+  <td>204,000</td>
+  <td>495,000</td>
+  <td>375,000</td>
   <td>2013 model MacBook</td>
 </tr>
 <tr>
   <td>Mobile Intel Core i7 1.8GHZ</td>
-  <td>147k</td>
-  <td>290k</td>
-  <td>65k</td>
-  <td>75k</td>
-  <td>190k</td>
-  <td>155k</td>
+  <td>147,000</td>
+  <td>290,000</td>
+  <td>65,000</td>
+  <td>75,000</td>
+  <td>190,000</td>
+  <td>155,000</td>
   <td>2011 model laptop</td>
 </tr>
 <tr>
   <td>Amazon EC2 c1.medium</td>
-  <td>54k</td>
-  <td>117k</td>
-  <td>29k</td>
-  <td>31k</td>
-  <td>85k</td>
-  <td>65k</td>
+  <td>54,000</td>
+  <td>117,000</td>
+  <td>29,000</td>
+  <td>31,000</td>
+  <td>85,000</td>
+  <td>65,000</td>
   <td>A medium range instance</td>
 </tr>
 </table>
