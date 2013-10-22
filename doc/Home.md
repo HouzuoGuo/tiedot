@@ -1,5 +1,7 @@
 > To use `go get`, please use URL `loveoneanother.at/tiedot`. See INSTALL for more details.
 
+Your contribution means a lot to tiedot! Please read [ways to contribute][].
+
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
 ### tiedot - Your NoSQL database powered by Golang
@@ -161,3 +163,4 @@ __Why the name "tiedot"?__
 [blog]: http://allstarnix.blogspot.com.au
 [Issues]: https://github.com/HouzuoGuo/tiedot/issues
 [Contributors and License]: https://github.com/HouzuoGuo/tiedot/wiki/Contributors-and-License
+[ways to contribute]: https://github.com/HouzuoGuo/tiedot/wiki/ways-to-contribute
