@@ -89,7 +89,7 @@ HTTP 4xx/5xx response will always include a text message (not JSON) to help with
   <tr>
     <td>Get a document by UID</td>
     <td>/getByUID</td>
-    <td>Collection name `col` and document ID `id`</td>
+    <td>Collection name `col` and document UID `uid`</td>
     <td>HTTP 200 and a JSON object of document content `doc` and ID</td>
   </tr>
   <tr>
