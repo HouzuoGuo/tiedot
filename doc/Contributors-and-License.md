@@ -1,7 +1,8 @@
 ## Contributors
 
-I sincerely appreciate the following individuals and organizations for their contribution to the tiedot project (in alphabetical order):
+I sincerely appreciate the following individuals and organizations for their contribution to the tiedot project (in numeric-alphabetical order):
 
+- 2pi
 - Alexandre Stein
 - Freiheit.com
 - "IFQ"
