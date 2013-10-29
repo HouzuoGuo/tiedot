@@ -37,6 +37,8 @@ func TestInsertRead(t *testing.T) {
 	if doc1 := col.Read(ids[1]); doc1 == nil || strings.TrimSpace(string(doc1)) != string(docs[1]) {
 		t.Fatalf("Failed to read")
 	}
+	// it shall not panic
+	col.Read(col.File.Size)
 }
 
 func TestInsertReadAll(t *testing.T) {
@@ -84,7 +86,7 @@ func TestInsertReadAll(t *testing.T) {
 	})
 	// the reason is that corrupted documents are "empty" documents
 	if successfullyRead != 3 {
-		t.Fatalf("Should have recovered 3 documents, but %d are recovered", successfullyRead)
+		t.Fatalf("Should have read 3 documents, but %d are recovered", successfullyRead)
 	}
 }
 
@@ -121,6 +123,8 @@ func TestInsertUpdateRead(t *testing.T) {
 	if doc1 := col.Read(updated[1]); doc1 == nil || strings.TrimSpace(string(doc1)) != "longlonglonglonglong" {
 		t.Fatalf("Failed to read")
 	}
+	// it shall not panic
+	col.Update(col.File.Size, []byte("abcdef"))
 }
 
 func TestInsertDeleteRead(t *testing.T) {
@@ -157,6 +161,8 @@ func TestInsertDeleteRead(t *testing.T) {
 	if doc2 := col.Read(ids[2]); doc2 == nil || strings.TrimSpace(string(doc2)) != string(docs[2]) {
 		t.Fatalf("Failed to read")
 	}
+	// it shall not panic
+	col.Delete(col.File.Size)
 }
 
 func BenchmarkInsert(b *testing.B) {

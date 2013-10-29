@@ -62,13 +62,13 @@ func (ht *HashTable) numberBuckets() uint64 {
 
 // Return the number of next chained bucket.
 func (ht *HashTable) nextBucket(bucket uint64) uint64 {
-	if bucketAddr := bucket * ht.BucketSize; bucketAddr < 0 || bucketAddr >= uint64(len(ht.File.Buf)) {
+	if bucketAddr := bucket * ht.BucketSize; bucketAddr < 0 || bucketAddr >= uint64(len(ht.File.Buf))-BUCKET_HEADER_SIZE {
 		return 0
 	} else {
 		if next, _ := binary.Uvarint(ht.File.Buf[bucketAddr : bucketAddr+BUCKET_HEADER_SIZE]); next != 0 && next <= bucket {
 			log.Printf("Loop detected in hash table %s at bucket %d, address %d\n", ht.File.Name, bucket, bucketAddr)
 			return 0
-		} else if next >= ht.File.Append {
+		} else if next >= ht.File.Append-BUCKET_HEADER_SIZE {
 			log.Printf("Bucket reference out of bound in hash table %s at bucket %d, address %d\n", ht.File.Name, bucket, bucketAddr)
 			return 0
 		} else {

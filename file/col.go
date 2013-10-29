@@ -50,7 +50,7 @@ func OpenCol(name string) (*ColFile, error) {
 
 // Retrieve document data given its ID.
 func (col *ColFile) Read(id uint64) []byte {
-	if id < 0 || id >= col.File.Append {
+	if id < 0 || id >= col.File.Append-DOC_HEADER {
 		return nil
 	}
 	region := id / COL_FILE_REGION_SIZE
@@ -123,7 +123,7 @@ func (col *ColFile) Insert(data []byte) (id uint64, err error) {
 
 // Update a document, return its new ID.
 func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
-	if id < 0 || id >= col.File.Append {
+	if id < 0 || id >= col.File.Append-DOC_HEADER {
 		return id, errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.File.Name))
 	}
 	len64 := uint64(len(data))
@@ -166,7 +166,7 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 
 // Delete a document.
 func (col *ColFile) Delete(id uint64) {
-	if id < 0 || id >= col.File.Append {
+	if id < 0 || id >= col.File.Append-DOC_HEADER {
 		return
 	}
 	region := id / COL_FILE_REGION_SIZE
@@ -189,6 +189,11 @@ func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 		mutex := col.regionRWMutex[region]
 		mutex.RLock()
 		validity := col.File.Buf[addr]
+		if addr >= col.File.Append-DOC_HEADER {
+			// if by any chance, addr goes out of bounce, we shall stop the search
+			mutex.RUnlock()
+			break
+		}
 		room, _ := binary.Uvarint(col.File.Buf[addr+1 : addr+11])
 		if validity != DOC_VALID && validity != DOC_INVALID || room > DOC_MAX_ROOM {
 			mutex.RUnlock()
