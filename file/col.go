@@ -200,7 +200,7 @@ func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 			log.Printf("In %s at %d, the document is corrupted\n", col.File.Name, addr)
 			// skip corrupted document
 			addr++
-			for ; col.File.Buf[addr] != DOC_VALID && col.File.Buf[addr] != DOC_INVALID; addr++ {
+			for ; col.File.Buf[addr] != DOC_VALID && col.File.Buf[addr] != DOC_INVALID && addr < col.File.Append-DOC_HEADER; addr++ {
 			}
 			log.Printf("Corrupted document is skipped, now at %d\n", addr)
 			continue

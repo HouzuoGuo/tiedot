@@ -63,13 +63,13 @@ func (ht *HashTable) numberBuckets() uint64 {
 
 // Return the number of next chained bucket, 0 if there is not any.
 func (ht *HashTable) nextBucket(bucket uint64) uint64 {
-	if bucketAddr := bucket * ht.BucketSize; bucketAddr < 0 || bucketAddr >= uint64(len(ht.File.Buf))-BUCKET_HEADER_SIZE {
+	if bucketAddr := bucket * ht.BucketSize; bucketAddr < 0 || bucketAddr >= ht.File.Append-BUCKET_HEADER_SIZE {
 		return 0
 	} else {
 		if next, _ := binary.Uvarint(ht.File.Buf[bucketAddr : bucketAddr+BUCKET_HEADER_SIZE]); next != 0 && next != BUCKET_HEADER_NEW && next <= bucket {
 			log.Printf("Loop detected in hash table %s at bucket %d, address %d\n", ht.File.Name, bucket, bucketAddr)
 			return 0
-		} else if next > ht.File.Append-BUCKET_HEADER_SIZE {
+		} else if next >= ht.File.Append-BUCKET_HEADER_SIZE {
 			log.Printf("Bucket reference out of bound in hash table %s at bucket %d, address %d\n", ht.File.Name, bucket, bucketAddr)
 			return 0
 		} else if next == BUCKET_HEADER_NEW {
@@ -150,7 +150,7 @@ func (ht *HashTable) Put(key, val uint64) {
 		if entry++; entry == ht.PerBucket {
 			mutex.Unlock()
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket > ht.File.Append-BUCKET_HEADER_SIZE {
+			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket >= ht.File.Append-BUCKET_HEADER_SIZE {
 				ht.grow(ht.hashKey(key))
 				ht.Put(key, val)
 				return
@@ -199,7 +199,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		if entry++; entry == ht.PerBucket {
 			mutex.RUnlock()
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket > ht.File.Append-BUCKET_HEADER_SIZE {
+			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket >= ht.File.Append-BUCKET_HEADER_SIZE {
 				return
 			}
 			region = bucket / HASH_TABLE_REGION_SIZE
@@ -236,7 +236,7 @@ func (ht *HashTable) Remove(key, val uint64) {
 		if entry++; entry == ht.PerBucket {
 			mutex.Unlock()
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket > ht.File.Append-BUCKET_HEADER_SIZE {
+			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket >= ht.File.Append-BUCKET_HEADER_SIZE {
 				return
 			}
 			region = bucket / HASH_TABLE_REGION_SIZE
@@ -279,7 +279,7 @@ func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
 			if entry++; entry == ht.PerBucket {
 				mutex.RUnlock()
 				entry = 0
-				if bucket = ht.nextBucket(bucket); bucket == 0 || bucket > ht.File.Append-BUCKET_HEADER_SIZE {
+				if bucket = ht.nextBucket(bucket); bucket == 0 || bucket >= ht.File.Append-BUCKET_HEADER_SIZE {
 					return
 				}
 				region = bucket / HASH_TABLE_REGION_SIZE
