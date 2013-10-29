@@ -41,25 +41,10 @@ func Open(name string, growth uint64) (file *File, err error) {
 		return
 	}
 	// find append position
-	for low, mid, high := uint64(0), file.Size/2, file.Size; ; {
-		switch {
-		case high-mid == 1:
-			if file.Buf[mid] == 0 {
-				if file.Buf[mid-1] == 0 {
-					file.Append = mid - 1
-				} else {
-					file.Append = mid
-				}
-				return
-			}
-			file.Append = high
-			return
-		case file.Buf[mid] == 0:
-			high = mid
-			mid = low + (mid-low)/2
-		default:
-			low = mid
-			mid = mid + (high-mid)/2
+	for pos := file.Size - 1; pos > 0; pos-- {
+		if file.Buf[pos] != 0 {
+			file.Append = pos + 1
+			break
 		}
 	}
 	return

@@ -16,6 +16,7 @@ const (
 	ENTRY_INVALID          = byte(0)
 	ENTRY_SIZE             = uint64(1 + 10 + 10) // byte(validity), uint64(hash key), uint64(value)
 	BUCKET_HEADER_SIZE     = uint64(10)          // uint64(next bucket)
+	BUCKET_HEADER_NEW      = uint64(2)           // new bucket will have this header
 	HASH_TABLE_REGION_SIZE = 1024 * 4            // 4KB per locking region, roughly the size of a single bucket
 )
 
@@ -60,16 +61,18 @@ func (ht *HashTable) numberBuckets() uint64 {
 	return ht.File.Append / ht.BucketSize
 }
 
-// Return the number of next chained bucket.
+// Return the number of next chained bucket, 0 if there is not any.
 func (ht *HashTable) nextBucket(bucket uint64) uint64 {
 	if bucketAddr := bucket * ht.BucketSize; bucketAddr < 0 || bucketAddr >= uint64(len(ht.File.Buf))-BUCKET_HEADER_SIZE {
 		return 0
 	} else {
-		if next, _ := binary.Uvarint(ht.File.Buf[bucketAddr : bucketAddr+BUCKET_HEADER_SIZE]); next != 0 && next <= bucket {
+		if next, _ := binary.Uvarint(ht.File.Buf[bucketAddr : bucketAddr+BUCKET_HEADER_SIZE]); next != 0 && next != BUCKET_HEADER_NEW && next <= bucket {
 			log.Printf("Loop detected in hash table %s at bucket %d, address %d\n", ht.File.Name, bucket, bucketAddr)
 			return 0
-		} else if next >= ht.File.Append-BUCKET_HEADER_SIZE {
+		} else if next > ht.File.Append-BUCKET_HEADER_SIZE {
 			log.Printf("Bucket reference out of bound in hash table %s at bucket %d, address %d\n", ht.File.Name, bucket, bucketAddr)
+			return 0
+		} else if next == BUCKET_HEADER_NEW {
 			return 0
 		} else {
 			return next
@@ -113,6 +116,9 @@ func (ht *HashTable) grow(bucket uint64) {
 	}
 	lastBucketAddr := ht.lastBucket(bucket) * ht.BucketSize
 	binary.PutUvarint(ht.File.Buf[lastBucketAddr:lastBucketAddr+8], ht.numberBuckets())
+	// mark the new bucket
+	newBucket := ht.File.Append
+	binary.PutUvarint(ht.File.Buf[newBucket:newBucket+10], BUCKET_HEADER_NEW)
 	ht.File.Append += ht.BucketSize
 	ht.tableGrowMutex.Unlock()
 }
@@ -130,6 +136,10 @@ func (ht *HashTable) Put(key, val uint64) {
 	mutex.Lock()
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
+		if entryAddr > ht.File.Append-ENTRY_SIZE {
+			mutex.Unlock()
+			return
+		}
 		if ht.File.Buf[entryAddr] != ENTRY_VALID {
 			ht.File.Buf[entryAddr] = ENTRY_VALID
 			binary.PutUvarint(ht.File.Buf[entryAddr+1:entryAddr+11], key)
@@ -140,7 +150,7 @@ func (ht *HashTable) Put(key, val uint64) {
 		if entry++; entry == ht.PerBucket {
 			mutex.Unlock()
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 {
+			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket > ht.File.Append-BUCKET_HEADER_SIZE {
 				ht.grow(ht.hashKey(key))
 				ht.Put(key, val)
 				return
@@ -167,6 +177,10 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 	mutex.RLock()
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
+		if entryAddr > ht.File.Append-ENTRY_SIZE {
+			mutex.RUnlock()
+			return
+		}
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+11 : entryAddr+21])
 		if ht.File.Buf[entryAddr] == ENTRY_VALID {
@@ -185,7 +199,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		if entry++; entry == ht.PerBucket {
 			mutex.RUnlock()
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 {
+			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket > ht.File.Append-BUCKET_HEADER_SIZE {
 				return
 			}
 			region = bucket / HASH_TABLE_REGION_SIZE
@@ -203,6 +217,10 @@ func (ht *HashTable) Remove(key, val uint64) {
 	mutex.Lock()
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
+		if entryAddr > ht.File.Append-ENTRY_SIZE {
+			mutex.Unlock()
+			return
+		}
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+11 : entryAddr+21])
 		if ht.File.Buf[entryAddr] == ENTRY_VALID {
@@ -218,7 +236,7 @@ func (ht *HashTable) Remove(key, val uint64) {
 		if entry++; entry == ht.PerBucket {
 			mutex.Unlock()
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 {
+			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket > ht.File.Append-BUCKET_HEADER_SIZE {
 				return
 			}
 			region = bucket / HASH_TABLE_REGION_SIZE
@@ -240,6 +258,10 @@ func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
 		mutex.RLock()
 		for {
 			entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
+			if entryAddr > ht.File.Append-ENTRY_SIZE {
+				mutex.RUnlock()
+				return
+			}
 			entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
 			entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+11 : entryAddr+21])
 			if ht.File.Buf[entryAddr] == ENTRY_VALID {
@@ -257,7 +279,7 @@ func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
 			if entry++; entry == ht.PerBucket {
 				mutex.RUnlock()
 				entry = 0
-				if bucket = ht.nextBucket(bucket); bucket == 0 {
+				if bucket = ht.nextBucket(bucket); bucket == 0 || bucket > ht.File.Append-BUCKET_HEADER_SIZE {
 					return
 				}
 				region = bucket / HASH_TABLE_REGION_SIZE
