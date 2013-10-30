@@ -142,7 +142,7 @@ func (col *Col) Read(id uint64, doc interface{}) error {
 		return errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.Dir))
 	}
 	if err := json.Unmarshal(data, &doc); err != nil {
-		msg := fmt.Sprintf("Cannot parse document %d in %s to JSON, data: %s", id, col.Dir, string(data))
+		msg := fmt.Sprintf("ERROR: Cannot parse document %d in %s to JSON", id, col.Dir)
 		log.Println(msg)       // for the srv
 		return errors.New(msg) // for embedded usage
 	}
@@ -251,7 +251,7 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	if err = json.Unmarshal(oldData, &oldDoc); err == nil {
 		col.UnindexDoc(id, oldDoc)
 	} else {
-		log.Printf("Original document %d in %s is corrupted, this update will attempt to overwrite it", id, col.Dir)
+		log.Printf("ERROR: The original document %d in %s is corrupted, this update will attempt to overwrite it", id, col.Dir)
 	}
 	if newID, err = col.Data.Update(id, data); err != nil {
 		return
@@ -407,7 +407,7 @@ func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
 	col.Data.ForAll(func(id uint64, data []byte) bool {
 		var parsed interface{}
 		if err := json.Unmarshal(data, &parsed); err != nil {
-			log.Printf("Cannot parse document '%v' in %s to JSON", data, col.Dir)
+			log.Printf("ERROR: Cannot parse document %d in %s to JSON", id, col.Dir)
 			return true
 		} else {
 			return fun(id, parsed)
@@ -429,12 +429,12 @@ func (col *Col) DeserializeAll(template interface{}, fun func(id uint64) bool) {
 // Flush collection data files.
 func (col *Col) Flush() error {
 	if err := col.Data.File.Flush(); err != nil {
-		log.Printf("Failed to flush %s, reason: %v", col.Data.File.Name, err)
+		log.Printf("ERROR: Failed to flush %s, reason: %v", col.Data.File.Name, err)
 		return err
 	}
 	for _, ht := range col.StrHT {
 		if err := ht.File.Flush(); err != nil {
-			log.Printf("Failed to flush %s, reason: %v", ht.File.Name, err)
+			log.Printf("ERROR: Failed to flush %s, reason: %v", ht.File.Name, err)
 			return err
 		}
 	}
@@ -444,11 +444,11 @@ func (col *Col) Flush() error {
 // Close a collection.
 func (col *Col) Close() {
 	if err := col.Data.File.Close(); err != nil {
-		log.Printf("Failed to close %s, reason: %v", col.Data.File.Name, err)
+		log.Printf("ERROR: Failed to close %s, reason: %v", col.Data.File.Name, err)
 	}
 	for _, ht := range col.StrHT {
 		if err := ht.File.Close(); err != nil {
-			log.Printf("Failed to close %s, reason: %v", ht.File.Name, err)
+			log.Printf("ERROR: Failed to close %s, reason: %v", ht.File.Name, err)
 		}
 	}
 }

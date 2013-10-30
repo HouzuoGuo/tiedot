@@ -18,8 +18,8 @@ func TestOpenFlushClose(t *testing.T) {
 	if tmpFile.Name != tmp {
 		t.Fatal("Name not set")
 	}
-	if tmpFile.Append != 0 {
-		t.Fatal("Incorrect Append")
+	if tmpFile.UsedSize != 0 {
+		t.Fatal("Incorrect UsedSize")
 	}
 	if tmpFile.Growth != 1000 {
 		t.Fatal("Growth not set")
@@ -45,8 +45,8 @@ func TestFindingAppend(t *testing.T) {
 		t.Fatalf("Failed to open: %v", err)
 		return
 	}
-	if tmpFile.Append != 0 {
-		t.Fatal("Incorrect Append")
+	if tmpFile.UsedSize != 0 {
+		t.Fatal("Incorrect UsedSize")
 	}
 	// Write something
 	tmpFile.Buf[0] = 0
@@ -59,8 +59,8 @@ func TestFindingAppend(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
-	if tmpFile.Append != 3 {
-		t.Fatal("Incorrect Append")
+	if tmpFile.UsedSize != 3 {
+		t.Fatal("Incorrect UsedSize")
 	}
 
 	// Write something again
@@ -72,7 +72,7 @@ func TestFindingAppend(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
-	if tmpFile.Append != 4 {
+	if tmpFile.UsedSize != 4 {
 		t.Fatalf("Incorrect Append")
 	}
 	tmpFile.Close()

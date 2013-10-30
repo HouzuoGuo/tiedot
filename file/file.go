@@ -12,16 +12,16 @@ import (
 const FILE_GROWTH_INCREMENTAL = uint64(16777216)
 
 type File struct {
-	Name                 string
-	Fh                   *os.File
-	Append, Size, Growth uint64
-	Buf                  gommap.MMap
+	Name                   string
+	Fh                     *os.File
+	UsedSize, Size, Growth uint64
+	Buf                    gommap.MMap
 }
 
 // Open (create if non-exist) the file.
 func Open(name string, growth uint64) (file *File, err error) {
 	if growth < 1 {
-		err = errors.New(fmt.Sprintf("Opening %s, file growth (%d) is too small", name, growth))
+		err = errors.New(fmt.Sprintf("Growth size (%d) is too small (opening %s)", growth, name))
 	}
 	file = &File{Name: name, Growth: growth}
 	if file.Fh, err = os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0600); err != nil {
@@ -43,21 +43,25 @@ func Open(name string, growth uint64) (file *File, err error) {
 	// find append position
 	for pos := file.Size - 1; pos > 0; pos-- {
 		if file.Buf[pos] != 0 {
-			file.Append = pos + 1
+			file.UsedSize = pos + 1
 			break
 		}
 	}
+	if file.UsedSize == 1 && file.Buf[0] == 0 {
+		file.UsedSize = 0
+	}
+	log.Printf("%s has %d bytes out of %d bytes in-use", name, file.UsedSize, file.Size)
 	return
 }
 
 // Ensure the file has room for more data.
 func (file *File) CheckSize(more uint64) bool {
-	return file.Append+more <= file.Size
+	return file.UsedSize+more <= file.Size
 }
 
 // Ensure the file ahs room for more data.
 func (file *File) CheckSizeAndEnsure(more uint64) {
-	if file.Append+more <= file.Size {
+	if file.UsedSize+more <= file.Size {
 		return
 	}
 	var err error
@@ -73,8 +77,8 @@ func (file *File) CheckSizeAndEnsure(more uint64) {
 	zeroBuf := make([]byte, FILE_GROWTH_INCREMENTAL)
 	for i := uint64(0); i < file.Growth; i += FILE_GROWTH_INCREMENTAL {
 		var slice []byte
-		if i > file.Growth {
-			slice = zeroBuf[0:file.Growth]
+		if i+FILE_GROWTH_INCREMENTAL > file.Growth {
+			slice = zeroBuf[0 : i+FILE_GROWTH_INCREMENTAL-file.Growth]
 		} else {
 			slice = zeroBuf
 		}

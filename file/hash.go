@@ -21,16 +21,16 @@ const (
 )
 
 type HashTable struct {
-	File                            *File
-	BucketSize, HashBits, PerBucket uint64
-	tableGrowMutex                  sync.Mutex
-	regionRWMutex                   []*sync.RWMutex
+	File                                        *File
+	BucketSize, HashBits, PerBucket, NumBuckets uint64
+	tableGrowMutex                              sync.Mutex
+	regionRWMutex                               []*sync.RWMutex
 }
 
 // Open a hash table file.
 func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error) {
-	if hashBits < 1 || perBucket < 1 {
-		return nil, errors.New(fmt.Sprintf("Invalid hash table parameter (%d hash bits, %d per bucket)", hashBits, perBucket))
+	if hashBits < 2 || perBucket < 2 {
+		return nil, errors.New(fmt.Sprintf("ERROR: Hash table is too small (%d hash bits, %d per bucket)", hashBits, perBucket))
 	}
 	file, err := Open(name, HASH_TABLE_GROWTH)
 	if err != nil {
@@ -45,38 +45,33 @@ func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error
 		regionRWMutex:  rwMutexes}
 	ht.BucketSize = BUCKET_HEADER_SIZE + ENTRY_SIZE*perBucket
 	// file has to be big enough to contain all initial buckets
-	if minAppend := uint64(math.Pow(2, float64(hashBits))) * ht.BucketSize; ht.File.Append < minAppend {
-		ht.File.CheckSizeAndEnsure(minAppend - ht.File.Append)
-		ht.File.Append = minAppend
+	if minUsedSize := uint64(math.Pow(2, float64(hashBits))) * ht.BucketSize; ht.File.UsedSize < minUsedSize {
+		ht.File.CheckSizeAndEnsure(minUsedSize - ht.File.UsedSize)
+		ht.File.UsedSize = minUsedSize
 	}
 	// move append position to end of final bucket
-	if extra := ht.File.Append % ht.BucketSize; extra != 0 {
-		ht.File.Append += ht.BucketSize - extra
+	if extra := ht.File.UsedSize % ht.BucketSize; extra != 0 {
+		ht.File.UsedSize += ht.BucketSize - extra
 	}
+	ht.NumBuckets = ht.File.UsedSize / ht.BucketSize
 	return ht, nil
-}
-
-// Return total number of buckets.
-func (ht *HashTable) numberBuckets() uint64 {
-	return ht.File.Append / ht.BucketSize
 }
 
 // Return the number of next chained bucket, 0 if there is not any.
 func (ht *HashTable) nextBucket(bucket uint64) uint64 {
-	if bucketAddr := bucket * ht.BucketSize; bucketAddr < 0 || bucketAddr >= ht.File.Append-BUCKET_HEADER_SIZE {
+	if bucket >= ht.NumBuckets {
+		return 0
+	}
+	bucketAddr := bucket * ht.BucketSize
+	if next, _ := binary.Uvarint(ht.File.Buf[bucketAddr : bucketAddr+BUCKET_HEADER_SIZE]); next != 0 && next != BUCKET_HEADER_NEW && next <= bucket {
+		log.Printf("ERROR: Bucket loop in hash table %s at bucket no.%d, address %d\n", ht.File.Name, bucket, bucketAddr)
+		return 0
+	} else if next >= ht.NumBuckets {
+		return 0
+	} else if next == BUCKET_HEADER_NEW {
 		return 0
 	} else {
-		if next, _ := binary.Uvarint(ht.File.Buf[bucketAddr : bucketAddr+BUCKET_HEADER_SIZE]); next != 0 && next != BUCKET_HEADER_NEW && next <= bucket {
-			log.Printf("Loop detected in hash table %s at bucket %d, address %d\n", ht.File.Name, bucket, bucketAddr)
-			return 0
-		} else if next >= ht.File.Append-BUCKET_HEADER_SIZE {
-			log.Printf("Bucket reference out of bound in hash table %s at bucket %d, address %d\n", ht.File.Name, bucket, bucketAddr)
-			return 0
-		} else if next == BUCKET_HEADER_NEW {
-			return 0
-		} else {
-			return next
-		}
+		return next
 	}
 }
 
@@ -115,11 +110,12 @@ func (ht *HashTable) grow(bucket uint64) {
 		}
 	}
 	lastBucketAddr := ht.lastBucket(bucket) * ht.BucketSize
-	binary.PutUvarint(ht.File.Buf[lastBucketAddr:lastBucketAddr+8], ht.numberBuckets())
+	binary.PutUvarint(ht.File.Buf[lastBucketAddr:lastBucketAddr+10], ht.NumBuckets)
 	// mark the new bucket
-	newBucket := ht.File.Append
-	binary.PutUvarint(ht.File.Buf[newBucket:newBucket+10], BUCKET_HEADER_NEW)
-	ht.File.Append += ht.BucketSize
+	newBucketAddr := ht.File.UsedSize
+	binary.PutUvarint(ht.File.Buf[newBucketAddr:newBucketAddr+10], BUCKET_HEADER_NEW)
+	ht.File.UsedSize += ht.BucketSize
+	ht.NumBuckets += 1
 	ht.tableGrowMutex.Unlock()
 }
 
@@ -136,10 +132,6 @@ func (ht *HashTable) Put(key, val uint64) {
 	mutex.Lock()
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
-		if entryAddr > ht.File.Append-ENTRY_SIZE {
-			mutex.Unlock()
-			return
-		}
 		if ht.File.Buf[entryAddr] != ENTRY_VALID {
 			ht.File.Buf[entryAddr] = ENTRY_VALID
 			binary.PutUvarint(ht.File.Buf[entryAddr+1:entryAddr+11], key)
@@ -150,7 +142,7 @@ func (ht *HashTable) Put(key, val uint64) {
 		if entry++; entry == ht.PerBucket {
 			mutex.Unlock()
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket >= ht.File.Append-BUCKET_HEADER_SIZE {
+			if bucket = ht.nextBucket(bucket); bucket == 0 {
 				ht.grow(ht.hashKey(key))
 				ht.Put(key, val)
 				return
@@ -177,10 +169,6 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 	mutex.RLock()
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
-		if entryAddr > ht.File.Append-ENTRY_SIZE {
-			mutex.RUnlock()
-			return
-		}
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+11 : entryAddr+21])
 		if ht.File.Buf[entryAddr] == ENTRY_VALID {
@@ -199,7 +187,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		if entry++; entry == ht.PerBucket {
 			mutex.RUnlock()
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket >= ht.File.Append-BUCKET_HEADER_SIZE {
+			if bucket = ht.nextBucket(bucket); bucket == 0 {
 				return
 			}
 			region = bucket / HASH_TABLE_REGION_SIZE
@@ -217,10 +205,6 @@ func (ht *HashTable) Remove(key, val uint64) {
 	mutex.Lock()
 	for {
 		entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
-		if entryAddr > ht.File.Append-ENTRY_SIZE {
-			mutex.Unlock()
-			return
-		}
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+11 : entryAddr+21])
 		if ht.File.Buf[entryAddr] == ENTRY_VALID {
@@ -236,7 +220,7 @@ func (ht *HashTable) Remove(key, val uint64) {
 		if entry++; entry == ht.PerBucket {
 			mutex.Unlock()
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 || bucket >= ht.File.Append-BUCKET_HEADER_SIZE {
+			if bucket = ht.nextBucket(bucket); bucket == 0 {
 				return
 			}
 			region = bucket / HASH_TABLE_REGION_SIZE
@@ -258,10 +242,6 @@ func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
 		mutex.RLock()
 		for {
 			entryAddr := bucket*ht.BucketSize + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
-			if entryAddr > ht.File.Append-ENTRY_SIZE {
-				mutex.RUnlock()
-				return
-			}
 			entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
 			entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+11 : entryAddr+21])
 			if ht.File.Buf[entryAddr] == ENTRY_VALID {
@@ -279,7 +259,7 @@ func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
 			if entry++; entry == ht.PerBucket {
 				mutex.RUnlock()
 				entry = 0
-				if bucket = ht.nextBucket(bucket); bucket == 0 || bucket >= ht.File.Append-BUCKET_HEADER_SIZE {
+				if bucket = ht.nextBucket(bucket); bucket == 0 {
 					return
 				}
 				region = bucket / HASH_TABLE_REGION_SIZE

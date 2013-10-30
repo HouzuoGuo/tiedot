@@ -28,7 +28,7 @@ func OpenDB(dir string) (db *DB, err error) {
 	for _, f := range files {
 		if f.IsDir() {
 			if db.StrCol[f.Name()], err = OpenCol(path.Join(dir, f.Name())); err != nil {
-				log.Printf("Failed to open collection %s, reason: %v", f.Name(), err)
+				log.Printf("ERROR: Failed to open collection %s, reason: %v", f.Name(), err)
 			} else {
 				log.Printf("Successfully opened collection %s", f.Name())
 			}
@@ -106,7 +106,7 @@ func (db *DB) Scrub(name string) (err error) {
 		// recreate documents
 		col.ForAll(func(id uint64, doc interface{}) bool {
 			if _, err = scrub.Insert(doc); err != nil {
-				log.Printf("Scrub %s: could not insert '%v' back", name, doc)
+				log.Printf("ERROR: Scrubing %s, I could not insert '%v' back", name, doc)
 			}
 			return true
 		})

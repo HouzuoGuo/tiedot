@@ -50,7 +50,7 @@ func OpenCol(name string) (*ColFile, error) {
 
 // Retrieve document data given its ID.
 func (col *ColFile) Read(id uint64) []byte {
-	if id < 0 || id >= col.File.Append-DOC_HEADER {
+	if col.File.UsedSize < DOC_HEADER || id >= col.File.UsedSize-DOC_HEADER {
 		return nil
 	}
 	region := id / COL_FILE_REGION_SIZE
@@ -79,7 +79,7 @@ func (col *ColFile) Insert(data []byte) (id uint64, err error) {
 		return 0, errors.New(fmt.Sprintf("Document is too large"))
 	}
 	col.docInsertMutex.Lock()
-	id = col.File.Append
+	id = col.File.UsedSize
 	// when file is full, we have lots to do
 	if !col.File.CheckSize(DOC_HEADER + room) {
 		originalMutexes := col.regionRWMutex
@@ -99,7 +99,7 @@ func (col *ColFile) Insert(data []byte) (id uint64, err error) {
 		}
 	}
 	// reposition next append
-	col.File.Append = id + DOC_HEADER + room
+	col.File.UsedSize = id + DOC_HEADER + room
 	// make doc header and copy data
 	col.File.Buf[id] = 1
 	binary.PutUvarint(col.File.Buf[id+1:id+DOC_HEADER], room)
@@ -123,7 +123,7 @@ func (col *ColFile) Insert(data []byte) (id uint64, err error) {
 
 // Update a document, return its new ID.
 func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
-	if id < 0 || id >= col.File.Append-DOC_HEADER {
+	if col.File.UsedSize < DOC_HEADER || id >= col.File.UsedSize-DOC_HEADER {
 		return id, errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.File.Name))
 	}
 	len64 := uint64(len(data))
@@ -166,7 +166,7 @@ func (col *ColFile) Update(id uint64, data []byte) (uint64, error) {
 
 // Delete a document.
 func (col *ColFile) Delete(id uint64) {
-	if id < 0 || id >= col.File.Append-DOC_HEADER {
+	if col.File.UsedSize < DOC_HEADER || id >= col.File.UsedSize-DOC_HEADER {
 		return
 	}
 	region := id / COL_FILE_REGION_SIZE
@@ -182,27 +182,21 @@ func (col *ColFile) Delete(id uint64) {
 func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 	addr := uint64(0)
 	for {
-		if addr >= col.File.Append {
+		if col.File.UsedSize < DOC_HEADER || addr >= col.File.UsedSize-DOC_HEADER {
 			break
 		}
 		region := addr / COL_FILE_REGION_SIZE
 		mutex := col.regionRWMutex[region]
 		mutex.RLock()
 		validity := col.File.Buf[addr]
-		if addr >= col.File.Append-DOC_HEADER {
-			// if by any chance, addr goes out of bounce, we shall stop the search
-			mutex.RUnlock()
-			break
-		}
 		room, _ := binary.Uvarint(col.File.Buf[addr+1 : addr+11])
 		if validity != DOC_VALID && validity != DOC_INVALID || room > DOC_MAX_ROOM {
 			mutex.RUnlock()
-			log.Printf("In %s at %d, the document is corrupted\n", col.File.Name, addr)
+			log.Printf("ERROR: The document at %d in %s is corrupted", addr, col.File.Name)
 			// skip corrupted document
 			addr++
-			for ; col.File.Buf[addr] != DOC_VALID && col.File.Buf[addr] != DOC_INVALID && addr < col.File.Append-DOC_HEADER; addr++ {
+			for ; col.File.Buf[addr] != DOC_VALID && col.File.Buf[addr] != DOC_INVALID && addr < col.File.UsedSize-DOC_HEADER; addr++ {
 			}
-			log.Printf("Corrupted document is skipped, now at %d\n", addr)
 			continue
 		}
 		if validity == DOC_VALID && !fun(addr, col.File.Buf[addr+DOC_HEADER:addr+DOC_HEADER+room]) {

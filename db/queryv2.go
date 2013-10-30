@@ -116,7 +116,7 @@ func V2PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col,
 		}
 	}
 	// depends on the availability of index and size of collection, determine whether to do hash scan or collection scan
-	if ht, indexScan := src.StrHT[strings.Join(vecPath, ",")]; indexScan && src.Data.File.Append >= 67108864 {
+	if ht, indexScan := src.StrHT[strings.Join(vecPath, ",")]; indexScan && src.Data.File.UsedSize >= 67108864 {
 		// ht.GetAll is actually quite expensive (50-100 ops/sec), so it may not be necessary if data is smaller than 64MB
 		_, vals := ht.GetAll(intLimit)
 		for _, docID := range vals {
