@@ -57,9 +57,15 @@ func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error
 			longestBucketChain = lastBucket + 1
 		}
 	}
-	// last, calculate used size according to number of buckets
+	// calculate used size according to number of buckets
 	ht.NumBuckets = longestBucketChain
-	ht.File.UsedSize = ht.NumBuckets * ht.BucketSize
+	usedSize := ht.NumBuckets * ht.BucketSize
+	// grow the file if the size is not enough
+	if usedSize > ht.File.Size {
+		ht.File.UsedSize = ht.File.Size
+		ht.File.CheckSizeAndEnsure(((usedSize-ht.File.Size)/ht.BucketSize + 1) * ht.BucketSize)
+	}
+	ht.File.UsedSize = usedSize
 	log.Printf("%s has %d initial buckets, %d buckets, and %d bytes out of %d bytes in-use", name, ht.InitialBuckets, ht.NumBuckets, ht.File.UsedSize, ht.File.Size)
 	return ht, nil
 }
