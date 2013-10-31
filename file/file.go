@@ -40,15 +40,27 @@ func Open(name string, growth uint64) (file *File, err error) {
 	if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
 		return
 	}
-	// find append position
-	for pos := file.Size - 1; pos > 0; pos-- {
-		if file.Buf[pos] != 0 {
-			file.UsedSize = pos + 1
-			break
+	// find used size
+	for low, mid, high := uint64(0), file.Size/2, file.Size; ; {
+		switch {
+		case high-mid == 1:
+			if file.Buf[mid] == 0 {
+				if file.Buf[mid-1] == 0 {
+					file.UsedSize = mid - 1
+				} else {
+					file.UsedSize = mid
+				}
+				return
+			}
+			file.UsedSize = high
+			return
+		case file.Buf[mid] == 0:
+			high = mid
+			mid = low + (mid-low)/2
+		default:
+			low = mid
+			mid = mid + (high-mid)/2
 		}
-	}
-	if file.UsedSize == 1 && file.Buf[0] == 0 {
-		file.UsedSize = 0
 	}
 	log.Printf("%s has %d bytes out of %d bytes in-use", name, file.UsedSize, file.Size)
 	return
