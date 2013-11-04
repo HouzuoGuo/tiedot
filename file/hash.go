@@ -16,7 +16,7 @@ const (
 	ENTRY_INVALID          = byte(0)
 	ENTRY_SIZE             = uint64(1 + 10 + 10) // byte(validity), uint64(hash key), uint64(value)
 	BUCKET_HEADER_SIZE     = uint64(10)          // uint64(next bucket)
-	HASH_TABLE_REGION_SIZE = 1024 * 4            // 4KB per locking region, roughly the size of a single bucket
+	HASH_TABLE_REGION_SIZE = 1024 * 16384        // each region has a lock
 )
 
 type HashTable struct {
@@ -138,7 +138,7 @@ func (ht *HashTable) hashKey(key uint64) uint64 {
 // Put a new key-value pair.
 func (ht *HashTable) Put(key, val uint64) {
 	var bucket, entry uint64 = ht.hashKey(key), 0
-	region := bucket / HASH_TABLE_REGION_SIZE
+	region := bucket * ht.BucketSize / HASH_TABLE_REGION_SIZE
 	mutex := ht.regionRWMutex[region]
 	mutex.Lock()
 	for {
@@ -158,7 +158,7 @@ func (ht *HashTable) Put(key, val uint64) {
 				ht.Put(key, val)
 				return
 			}
-			region = bucket / HASH_TABLE_REGION_SIZE
+			region = bucket * ht.BucketSize / HASH_TABLE_REGION_SIZE
 			mutex = ht.regionRWMutex[region]
 			mutex.Lock()
 		}
@@ -175,7 +175,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		keys = make([]uint64, 0, limit)
 		vals = make([]uint64, 0, limit)
 	}
-	region := bucket / HASH_TABLE_REGION_SIZE
+	region := bucket * ht.BucketSize / HASH_TABLE_REGION_SIZE
 	mutex := ht.regionRWMutex[region]
 	mutex.RLock()
 	for {
@@ -201,7 +201,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 			if bucket = ht.nextBucket(bucket); bucket == 0 {
 				return
 			}
-			region = bucket / HASH_TABLE_REGION_SIZE
+			region = bucket * ht.BucketSize / HASH_TABLE_REGION_SIZE
 			mutex = ht.regionRWMutex[region]
 			mutex.RLock()
 		}
@@ -211,7 +211,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 // Remove specific key-value pair.
 func (ht *HashTable) Remove(key, val uint64) {
 	var entry, bucket uint64 = 0, ht.hashKey(key)
-	region := bucket / HASH_TABLE_REGION_SIZE
+	region := bucket * ht.BucketSize / HASH_TABLE_REGION_SIZE
 	mutex := ht.regionRWMutex[region]
 	mutex.Lock()
 	for {
@@ -234,7 +234,7 @@ func (ht *HashTable) Remove(key, val uint64) {
 			if bucket = ht.nextBucket(bucket); bucket == 0 {
 				return
 			}
-			region = bucket / HASH_TABLE_REGION_SIZE
+			region = bucket * ht.BucketSize / HASH_TABLE_REGION_SIZE
 			mutex = ht.regionRWMutex[region]
 			mutex.Lock()
 		}
@@ -248,7 +248,7 @@ func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
 	counter := uint64(0)
 	for head := uint64(0); head < uint64(math.Pow(2, float64(ht.HashBits))); head++ {
 		var entry, bucket uint64 = 0, head
-		region := bucket / HASH_TABLE_REGION_SIZE
+		region := bucket * ht.BucketSize / HASH_TABLE_REGION_SIZE
 		mutex := ht.regionRWMutex[region]
 		mutex.RLock()
 		for {
@@ -273,7 +273,7 @@ func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
 				if bucket = ht.nextBucket(bucket); bucket == 0 {
 					return
 				}
-				region = bucket / HASH_TABLE_REGION_SIZE
+				region = bucket * ht.BucketSize / HASH_TABLE_REGION_SIZE
 				mutex = ht.regionRWMutex[region]
 				mutex.RLock()
 			}
