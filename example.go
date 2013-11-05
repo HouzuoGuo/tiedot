@@ -44,29 +44,16 @@ func embeddedExample() {
 	// Start using collection
 	A := myDB.Use("A")
 
-	/*
-		Insert document.
-
-		You may insert/update any interface{} to collection, for example:
-		var doc interface{}
-		json.Unmarshal([]byte(`{"a": 1, "b": 2}`), &doc)
-		A.Insert(doc)
-
-		And here is an example using struct:
-	*/
-
-	type Document struct {
-		Url, Owner string
-	}
-
-	docID, err := A.Insert(Document{"http://google.com", "Google Inc."})
+	// Collection insert/update/delete operations require the document to be a map[string]interface{}
+	// Otherwise index may not work
+	docID, err := A.Insert(map[string]interface{}{"Url": "http://google.com", "Owner": "Google Inc."})
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("Inserted document at %d (document ID)\n", docID)
 
 	// Update document (you can still use struct, but this example uses generic interface{})
-	var doc interface{}
+	var doc map[string]interface{}
 	json.Unmarshal([]byte(`{"Url": "http://www.google.com.au", "Owner": "Google Inc."}`), &doc)
 	newID, err := A.Update(docID, doc) // newID may or may not be the same!
 	if err != nil {
@@ -75,7 +62,7 @@ func embeddedExample() {
 	fmt.Printf("Updated document %d to %v, new ID is %d\n", docID, doc, newID)
 
 	// Read document
-	var readback Document
+	var readback map[string]interface{}
 	if err := A.Read(newID, &readback); err != nil {
 		panic(err)
 	}
