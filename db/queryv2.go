@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 )
 
@@ -321,6 +322,51 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 	return
 }
 
+// Execute value match regexp using hash lookup or collection scan.
+func V2RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
+	// figure out lookup path - JSON array "in"
+	path, hasPath := expr["in"]
+	if !hasPath {
+		return errors.New("Missing lookup path `in`")
+	}
+	vecPath := make([]string, 0)
+	if vecPathInterface, ok := path.([]interface{}); ok {
+		for _, v := range vecPathInterface {
+			vecPath = append(vecPath, fmt.Sprint(v))
+		}
+	} else {
+		return errors.New(fmt.Sprintf("Expecting vector lookup path `in`, but %v given", path))
+	}
+	// figure out result number limit
+	intLimit := uint64(0)
+	if limit, hasLimit := expr["limit"]; hasLimit {
+		if floatLimit, ok := limit.(float64); ok {
+			intLimit = uint64(floatLimit)
+		} else {
+			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
+		}
+	}
+	regexpStrValue := fmt.Sprint(lookupRegexp)
+	validRegexp := regexp.MustCompile(regexpStrValue)
+	// do collection scan
+	log.Printf("Query %v is a collection scan, which may be inefficient", expr)
+	counter := uint64(0)
+	docMatcher := func(id uint64, doc interface{}) bool {
+		// get inside the document and find value match
+		for _, v := range GetIn(doc, vecPath) {
+			if validRegexp.MatchString(fmt.Sprint(v)) {
+				(*result)[id] = struct{}{}
+				counter += 1
+				return counter != intLimit
+			}
+		}
+		return true
+	}
+	src.ForAll(docMatcher)
+
+	return
+}
+
 // Main entrance to query processor - evaluate a query and put result into result map (as map keys).
 func EvalQueryV2(q interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	switch expr := q.(type) {
@@ -346,6 +392,8 @@ func EvalQueryV2(q interface{}, src *Col, result *map[uint64]struct{}) (err erro
 			return V2Complement(subExprs, src, result)
 		} else if intFrom, htRange := expr["int-from"]; htRange { // int-from, int-to - integer range query
 			return V2IntRange(intFrom, expr, src, result)
+		} else if lookupRegexp, lookup := expr["re"]; lookup {
+			return V2RegexpLookup(lookupRegexp, expr, src, result)
 		} else {
 			return errors.New(fmt.Sprintf("Query %v does not contain any operation (lookup/union/etc)", expr))
 		}

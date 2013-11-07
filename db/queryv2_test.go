@@ -191,4 +191,13 @@ func TestQueryV2(t *testing.T) {
 	if !ensureMapHasKeys(q, ids[4], ids[3]) {
 		t.Fatal(q)
 	}
+
+	q, err = runQueryV2(`{"re": "^[0-9]*$", "in": ["f"], "limit": 5}`, col)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ensureMapHasKeys(q, ids[0], ids[1], ids[2], ids[3], ids[4]) {
+		fmt.Printf("%+v\n", q)
+		t.Fatal(q)
+	}
 }
