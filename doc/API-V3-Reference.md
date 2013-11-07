@@ -230,6 +230,10 @@ Lookup finds documents with specific value in a path: `{"in": [ path ... ], "eq"
 
 For example: `{"in": ["Author", "Name", "First Name"], "eq": "John"}`.
 
+You can also find documents by using regex: `{"in": [ path ... ], "re": "Go regular expression"}`.
+
+For example: `{"in": ["Author, "Name", "First Name"], "re": "^John.*ed$"}`
+
 Another operation, "has", finds any document with any value in the path: `{"has": [ path ...] }`.
 
 For example: `{"has": ["Author", "Name", "Pen Name"]}`.
