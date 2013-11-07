@@ -119,7 +119,11 @@ func (col *Col) LoadConf() error {
 
 // Get inside the data structure, along the given path.
 func GetIn(doc interface{}, path []string) (ret []interface{}) {
-	thing := doc
+	docMap, ok := doc.(map[string]interface{})
+	if !ok {
+		log.Printf("%v cannot be indexed because type conversation to map[string]interface{} failed", doc)
+	}
+	var thing interface{} = docMap
 	for _, seg := range path {
 		if aMap, ok := thing.(map[string]interface{}); ok {
 			thing = aMap[seg]
