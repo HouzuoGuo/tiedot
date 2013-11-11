@@ -231,6 +231,12 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 		} else {
 			return errors.New(fmt.Sprintf("Expecting `int-to` as an integer, but %v given", to))
 		}
+	} else if intTo, ok := expr["int to"]; ok {
+		if floatTo, ok := intTo.(float64); ok {
+			to = int(floatTo)
+		} else {
+			return errors.New(fmt.Sprintf("Expecting `int-to` as an integer, but %v given", to))
+		}
 	} else {
 		return errors.New(fmt.Sprintf("Missing `int-to`"))
 	}
@@ -392,7 +398,9 @@ func EvalQueryV2(q interface{}, src *Col, result *map[uint64]struct{}) (err erro
 			return V2Complement(subExprs, src, result)
 		} else if intFrom, htRange := expr["int-from"]; htRange { // int-from, int-to - integer range query
 			return V2IntRange(intFrom, expr, src, result)
-		} else if lookupRegexp, lookup := expr["re"]; lookup {
+		} else if intFrom, htRange := expr["int from"]; htRange { // "int from, "int to" - integer range query - same as above, just without dash
+			return V2IntRange(intFrom, expr, src, result)
+		} else if lookupRegexp, lookup := expr["re"]; lookup { // find documents using regular expression
 			return V2RegexpLookup(lookupRegexp, expr, src, result)
 		} else {
 			return errors.New(fmt.Sprintf("Query %v does not contain any operation (lookup/union/etc)", expr))

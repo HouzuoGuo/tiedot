@@ -176,6 +176,21 @@ func TestQueryV2(t *testing.T) {
 	if !ensureMapHasKeys(q, ids[1], ids[2]) {
 		t.Fatal(q)
 	}
+	// int collection scan using alternative syntax "int from/int to"
+	q, err = runQueryV2(`{"int from": 2, "int to": 4, "in": ["g"]}`, col)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ensureMapHasKeys(q, ids[1], ids[2], ids[3]) {
+		t.Fatal(q)
+	}
+	q, err = runQueryV2(`{"int from": 2, "int to": 4, "in": ["g"], "limit": 2}`, col)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ensureMapHasKeys(q, ids[1], ids[2]) {
+		t.Fatal(q)
+	}
 	// int collection scan with reversed range and limit
 	q, err = runQueryV2(`{"int-from": 10, "int-to": 0, "in": ["f"]}`, col)
 	if err != nil {
