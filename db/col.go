@@ -124,16 +124,20 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 		log.Printf("%v cannot be indexed because type conversation to map[string]interface{} failed", doc)
 	}
 	var thing interface{} = docMap
-	for _, seg := range path {
+	for i, seg := range path {
 		if aMap, ok := thing.(map[string]interface{}); ok {
 			thing = aMap[seg]
+		} else if anArray, ok := thing.([]interface{}); ok {
+			for _, element := range anArray {
+				ret = append(ret, GetIn(element, path[i:])...)
+			}
 		} else {
 			return nil
 		}
 	}
 	switch thing.(type) {
 	case []interface{}:
-		return thing.([]interface{})
+		return append(ret, thing.([]interface{})...)
 	default:
 		return append(ret, thing)
 	}

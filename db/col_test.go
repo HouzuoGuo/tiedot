@@ -9,6 +9,39 @@ import (
 
 const COL_BENCH_SIZE = 200000 // Number of documents made available for collection benchmark
 
+func TestGetIn(t *testing.T) {
+	var obj interface{}
+	// Get inside a JSON object
+	json.Unmarshal([]byte(`{"a": {"b": {"c": 1}}}`), &obj)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
+		t.Fatal()
+	}
+
+	// Get inside a JSON array
+	json.Unmarshal([]byte(`{"a": {"b": {"c": [1, 2, 3]}}}`), &obj)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
+		t.Fatal()
+	}
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 2 {
+		t.Fatal()
+	}
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 3 {
+		t.Fatal()
+	}
+
+	// Get inside JSON objects contained in JSON array
+	json.Unmarshal([]byte(`{"a": [{"b": {"c": [1]}}, {"b": {"c": [2, 3]}}]}`), &obj)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
+		t.Fatal()
+	}
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 2 {
+		t.Fatal()
+	}
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 3 {
+		t.Fatal()
+	}
+}
+
 func TestInsertRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
@@ -240,9 +273,9 @@ func TestIndex(t *testing.T) {
 	defer col.Close()
 	docs := []string{
 		`{"a": {"b": {"c": 1}}, "d": 0}`,
-		`{"a": {"b": {"c": 2}}, "d": 0}`,
-		`{"a": {"b": {"c": 3}}, "d": 0}`,
-		`{"a": {"b": {"c": 4}}, "d": [0, 9]}`,
+		`{"a": {"b": [{"c": 2}]}, "d": 0}`,
+		`{"a": [{"b": {"c": 3}}], "d": 0}`,
+		`{"a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`,
 		`{"a": {"b": {"c": null}}, "d": null}`}
 	var jsonDoc [4]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
@@ -250,6 +283,7 @@ func TestIndex(t *testing.T) {
 	json.Unmarshal([]byte(docs[2]), &jsonDoc[2])
 	json.Unmarshal([]byte(docs[3]), &jsonDoc[3])
 	ids := [3]uint64{}
+	// Insert first document
 	ids[0], _ = col.Insert(jsonDoc[0])
 	if err = col.Index([]string{"a", "b", "c"}); err != nil {
 		t.Fatal(err)
@@ -259,13 +293,16 @@ func TestIndex(t *testing.T) {
 		t.Fatal(err)
 		return
 	}
+	// There should be one document on index - the first doc
 	keys, vals := col.StrHT["a,b,c"].GetAll(0)
 	if !(len(keys) == 1 && len(vals) == 1 && vals[0] == ids[0]) {
 		t.Fatalf("Did not index existing document, got %v, %v", keys, vals)
 	}
+	// Insert second and third document, replace third document by fouth document
 	ids[1], _ = col.Insert(jsonDoc[1])
 	ids[2], _ = col.Insert(jsonDoc[2])
 	ids[2], _ = col.Update(ids[2], jsonDoc[3])
+	// Then remove second document
 	col.Delete(ids[1])
 	// jsonDoc[0,3], ids[0, 2] are the ones left
 	index1 := col.StrHT["a,b,c"]
@@ -290,11 +327,23 @@ func TestIndex(t *testing.T) {
 	k4, v4 := index1.Get(StrHash(4), 0, func(k, v uint64) bool {
 		return true
 	})
+	k5, v5 := index1.Get(StrHash(5), 0, func(k, v uint64) bool {
+		return true
+	})
+	k6, v6 := index1.Get(StrHash(6), 0, func(k, v uint64) bool {
+		return true
+	})
 	if !(len(k1) == 1 && len(v1) == 1 && k1[0] == StrHash(1) && v1[0] == ids[0]) {
 		t.Fatalf("Index fault, %v, %v", k1, v1)
 	}
 	if !(len(k4) == 1 && len(v4) == 1 && k4[0] == StrHash(4) && v4[0] == ids[2]) {
 		t.Fatalf("Index fault, %v, %v", k4, v4)
+	}
+	if !(len(k5) == 1 && len(v5) == 1 && k5[0] == StrHash(5) && v5[0] == ids[2]) {
+		t.Fatalf("Index fault, %v, %v", k5, v5)
+	}
+	if !(len(k6) == 1 && len(v6) == 1 && k6[0] == StrHash(6) && v6[0] == ids[2]) {
+		t.Fatalf("Index fault, %v, %v", k6, v6)
 	}
 	// now remove a,b,c index
 	if err = col.Unindex([]string{"a", "b", "c"}); err != nil {

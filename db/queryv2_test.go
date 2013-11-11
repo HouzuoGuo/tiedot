@@ -30,10 +30,11 @@ func TestQueryV2(t *testing.T) {
 	docs := []string{
 		`{"a": {"b": [1]}, "c": 1, "d": 1, "f": 1, "g": 1, "special": {"thing": null} }`,
 		`{"a": {"b": 1}, "c": [1], "d": 2, "f": 2, "g": 2}`,
-		`{"a": {"b": [2]}, "c": 2, "d": 1, "f": 3, "g": 3}`,
+		`{"a": [{"b": [2]}], "c": 2, "d": 1, "f": 3, "g": 3}`,
 		`{"a": {"b": 3}, "c": [3], "d": 2, "f": 4, "g": 4}`,
-		`{"a": {"b": [4]}, "c": 4, "d": 1, "f": 5, "g": 5}`}
-	ids := [5]uint64{}
+		`{"a": {"b": [4]}, "c": 4, "d": 1, "f": 5, "g": 5}`,
+		`{"a": [{"b": 5}, {"b": 6}], "c": 4, "d": 1, "f": 5, "g": 5}`}
+	ids := [6]uint64{}
 	for i, doc := range docs {
 		var jsonDoc interface{}
 		json.Unmarshal([]byte(doc), &jsonDoc)
@@ -58,6 +59,20 @@ func TestQueryV2(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !ensureMapHasKeys(q, ids[0], ids[1]) {
+		t.Fatal(q)
+	}
+	q, err = runQueryV2(`{"eq": 5, "in": ["a", "b"]}`, col)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ensureMapHasKeys(q, ids[5]) {
+		t.Fatal(q)
+	}
+	q, err = runQueryV2(`{"eq": 6, "in": ["a", "b"]}`, col)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ensureMapHasKeys(q, ids[5]) {
 		t.Fatal(q)
 	}
 	q, err = runQueryV2(`{"eq": 1, "limit": 1, "in": ["a", "b"]}`, col)
@@ -87,7 +102,7 @@ func TestQueryV2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ensureMapHasKeys(q, ids[0], ids[1], ids[2], ids[3], ids[4]) {
+	if !ensureMapHasKeys(q, ids[0], ids[1], ids[2], ids[3], ids[4], ids[5]) {
 		t.Fatal(q)
 	}
 	// union
@@ -196,14 +211,14 @@ func TestQueryV2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ensureMapHasKeys(q, ids[4], ids[3], ids[2], ids[1], ids[0]) {
+	if !ensureMapHasKeys(q, ids[5], ids[4], ids[3], ids[2], ids[1], ids[0]) {
 		t.Fatal(q)
 	}
 	q, err = runQueryV2(`{"int-from": 10, "int-to": 0, "in": ["f"], "limit": 2}`, col)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ensureMapHasKeys(q, ids[4], ids[3]) {
+	if !ensureMapHasKeys(q, ids[5], ids[4]) {
 		t.Fatal(q)
 	}
 	// regexes
@@ -211,15 +226,14 @@ func TestQueryV2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ensureMapHasKeys(q, ids[0], ids[1], ids[2], ids[3], ids[4]) {
-		fmt.Printf("%+v\n", q)
+	if !ensureMapHasKeys(q, ids[0], ids[1], ids[2], ids[3], ids[4], ids[5]) {
 		t.Fatal(q)
 	}
 	q, err = runQueryV2(`{"re": ".*", "in": ["a"]}`, col)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ensureMapHasKeys(q, ids[0], ids[1], ids[2], ids[3], ids[4]) {
+	if !ensureMapHasKeys(q, ids[0], ids[1], ids[2], ids[3], ids[4], ids[5]) {
 		fmt.Printf("%+v\n", q)
 		t.Fatal(q)
 	}
