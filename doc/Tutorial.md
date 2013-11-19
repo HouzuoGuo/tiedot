@@ -9,7 +9,7 @@ You will need:
 ## Run tiedot
 
     mkdir tiedot && cd tiedot
-    export GOPATH=`pwd`
+    export GOPATH=`pwd`  # backticks surround pwd
     go get loveoneanother.at/tiedot
 
     ./bin/tiedot -mode=v2 -dir=/tmp/MyDatabase -port=8080
