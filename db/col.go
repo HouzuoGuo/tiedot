@@ -27,17 +27,16 @@ type Config struct {
 }
 
 type Col struct {
-	Data                                    *file.ColFile
-	Config                                  *Config
-	Dir, ConfigFileName, ConfBackupFileName string
-	StrHT                                   map[string]*file.HashTable
-	StrIC                                   map[string]*IndexConf
+	Data                                    *file.ColFile              // Data file
+	Config                                  *Config                    // Index configuration
+	Dir, ConfigFileName, ConfBackupFileName string                     // Directory and file names
+	StrHT                                   map[string]*file.HashTable // Index path to Hash Table mapping
+	StrIC                                   map[string]*IndexConf      // Index path to index configuration mapping
 }
 
-// Return string hash code.
+// Return string hash code (algorithm inspired by Java String.hashCode())
 func StrHash(thing interface{}) uint64 {
-	// very similar to Java String.hashCode()
-	// you must review (even rewrite) most collection test cases, if you change the hash algorithm
+	// You may need to re-write many collection test cases when this algorithm is changed
 	str := fmt.Sprint(thing)
 	hash := 0
 	for _, c := range str {
@@ -52,23 +51,28 @@ func OpenCol(dir string) (col *Col, err error) {
 		return
 	}
 	col = &Col{ConfigFileName: path.Join(dir, "config"), ConfBackupFileName: path.Join(dir, "config.bak"), Dir: dir}
-	// open data file
+	// Open data file
 	if col.Data, err = file.OpenCol(path.Join(dir, "data")); err != nil {
 		return
 	}
-	// make sure the config file exists
+	// Create an index configuration file, if it does not yet exist
 	tryOpen, err := os.OpenFile(col.ConfigFileName, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return
 	} else if err = tryOpen.Close(); err != nil {
 		return
 	}
+	// Load all indexes
 	col.LoadConf()
 	return
 }
 
-// Copy existing config file content to backup config file.
+// Copy existing index configuration to backup, then save the latest index configuration.
 func (col *Col) BackupAndSaveConf() error {
+	if col.Config == nil {
+		return nil
+	}
+	// Read existing file content and copy to backup
 	oldConfig, err := ioutil.ReadFile(col.ConfigFileName)
 	if err != nil {
 		return err
@@ -76,21 +80,23 @@ func (col *Col) BackupAndSaveConf() error {
 	if err = ioutil.WriteFile(col.ConfBackupFileName, []byte(oldConfig), 0600); err != nil {
 		return err
 	}
-	if col.Config != nil {
-		newConfig, err := json.Marshal(col.Config)
-		if err != nil {
-			return err
-		}
-		if err = ioutil.WriteFile(col.ConfigFileName, newConfig, 0600); err != nil {
-			return err
-		}
+	if col.Config == nil {
+		return nil
+	}
+	// Marshal index configuration into file
+	newConfig, err := json.Marshal(col.Config)
+	if err != nil {
+		return err
+	}
+	if err = ioutil.WriteFile(col.ConfigFileName, newConfig, 0600); err != nil {
+		return err
 	}
 	return nil
 }
 
-// (Re)load configuration to collection.
+// Load index configurations, and open each index file.
 func (col *Col) LoadConf() error {
-	// read index config
+	// Deserialize index configuration from file
 	config, err := ioutil.ReadFile(col.ConfigFileName)
 	if err != nil {
 		return err
@@ -100,9 +106,9 @@ func (col *Col) LoadConf() error {
 	} else if err = json.Unmarshal(config, &col.Config); err != nil {
 		return err
 	}
-	// create UID index config (UID index is not specified in config file)
+	// Open UID index
 	col.Config.Indexes = append(col.Config.Indexes, IndexConf{FileName: "_uid", PerBucket: 200, HashBits: 14, IndexedPath: []string{"_uid"}})
-	// open each index file
+	// Open indexes
 	col.StrHT = make(map[string]*file.HashTable)
 	col.StrIC = make(map[string]*IndexConf)
 	for i, index := range col.Config.Indexes {
@@ -113,17 +119,18 @@ func (col *Col) LoadConf() error {
 		col.StrHT[strings.Join(index.IndexedPath, ",")] = ht
 		col.StrIC[strings.Join(index.IndexedPath, ",")] = &col.Config.Indexes[i]
 	}
-	// open UID index
 	return nil
 }
 
-// Get inside the data structure, along the given path.
+// Resolve the attribute(s) in the document structure along the given path.
 func GetIn(doc interface{}, path []string) (ret []interface{}) {
 	docMap, ok := doc.(map[string]interface{})
 	if !ok {
 		log.Printf("%v cannot be indexed because type conversation to map[string]interface{} failed", doc)
+		return
 	}
 	var thing interface{} = docMap
+	// Get into each path segment
 	for i, seg := range path {
 		if aMap, ok := thing.(map[string]interface{}); ok {
 			thing = aMap[seg]
@@ -143,7 +150,7 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 	}
 }
 
-// Retrieve document data given its ID.
+// Retrieve document by ID.
 func (col *Col) Read(id uint64, doc interface{}) error {
 	data := col.Data.Read(id)
 	if data == nil {
@@ -151,27 +158,26 @@ func (col *Col) Read(id uint64, doc interface{}) error {
 	}
 	if err := json.Unmarshal(data, &doc); err != nil {
 		msg := fmt.Sprintf("ERROR: Cannot parse document %d in %s to JSON", id, col.Dir)
-		log.Println(msg)       // for the srv
-		return errors.New(msg) // for embedded usage
+		log.Println(msg)
+		return errors.New(msg)
 	}
 	return nil
 }
 
-// Retrieve document ID and data given its UID.
+// Retrieve documentby UID, return its ID.
 func (col *Col) ReadByUID(uid string, doc interface{}) (uint64, error) {
 	var docID uint64
 	found := false
-	// scan UID hash table
+	// Scan UID hash table, find potential matches
 	col.StrHT["_uid"].Get(StrHash(uid), 1, func(key, value uint64) bool {
-		// potential match is found
 		var candidate interface{}
 		if col.Read(value, &candidate) == nil {
 			if docMap, ok := candidate.(map[string]interface{}); ok {
-				// make sure this is not a case of hash collission
+				// Physically read the document to avoid hash collision
 				if candidateUID, ok := docMap["_uid"]; ok {
 					if stringUID, ok := candidateUID.(string); ok {
 						if stringUID != uid {
-							return false // this IS a hash collission
+							return false // A hash collision
 						}
 						docID = value
 						found = true
@@ -179,7 +185,6 @@ func (col *Col) ReadByUID(uid string, doc interface{}) (uint64, error) {
 				}
 			}
 		}
-		// there was no hash collision, and UID was either found or not found, stop searching
 		return true
 	})
 	if !found {
@@ -188,7 +193,7 @@ func (col *Col) ReadByUID(uid string, doc interface{}) (uint64, error) {
 	return docID, col.Read(docID, doc)
 }
 
-// Index the document on all indexes
+// Put the document on all indexes.
 func (col *Col) IndexDoc(id uint64, doc interface{}) {
 	for k, v := range col.StrIC {
 		for _, thing := range GetIn(doc, v.IndexedPath) {
@@ -199,7 +204,7 @@ func (col *Col) IndexDoc(id uint64, doc interface{}) {
 	}
 }
 
-// Remove the document from all indexes
+// Remove the document from all indexes.
 func (col *Col) UnindexDoc(id uint64, doc interface{}) {
 	for k, v := range col.StrIC {
 		for _, thing := range GetIn(doc, v.IndexedPath) {
@@ -221,7 +226,7 @@ func (col *Col) Insert(doc interface{}) (id uint64, err error) {
 	return
 }
 
-// Insert a new document, and assign a UID to it,
+// Insert a new document, and assign it a UID.
 func (col *Col) InsertWithUID(doc interface{}) (newID uint64, newUID string, err error) {
 	newUID = uid.NextUID()
 	if docMap, ok := doc.(map[string]interface{}); !ok {
@@ -250,20 +255,23 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	if err != nil {
 		return
 	}
-	// read original document
+	// Read the original document
 	oldData := col.Data.Read(id)
 	if oldData == nil {
 		return id, errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.Dir))
 	}
+	// Remove the original document from indexes
 	var oldDoc interface{}
 	if err = json.Unmarshal(oldData, &oldDoc); err == nil {
 		col.UnindexDoc(id, oldDoc)
 	} else {
 		log.Printf("ERROR: The original document %d in %s is corrupted, this update will attempt to overwrite it", id, col.Dir)
 	}
+	// Update document data
 	if newID, err = col.Data.Update(id, data); err != nil {
 		return
 	}
+	// Index updated document
 	col.IndexDoc(newID, doc)
 	return
 }
@@ -330,7 +338,7 @@ func (col *Col) DurableDelete(id uint64) error {
 	return col.Flush()
 }
 
-// Add an index.
+// Create a new index. Do not operate on this collection until it finishes!
 func (col *Col) Index(path []string) error {
 	joinedPath := strings.Join(path, ",")
 	if _, found := col.StrHT[joinedPath]; found {
@@ -340,11 +348,11 @@ func (col *Col) Index(path []string) error {
 	if len(newFileName) > 100 {
 		newFileName = newFileName[0:100]
 	}
-	// close all indexes
+	// Close all existing indexes
 	for _, v := range col.StrHT {
 		v.File.Close()
 	}
-	// save and reload config
+	// Save new index in configuration file
 	col.Config.Indexes = append(col.Config.Indexes, IndexConf{FileName: newFileName + strconv.Itoa(int(time.Now().UnixNano())), PerBucket: 200, HashBits: 14, IndexedPath: path})
 	if err := col.BackupAndSaveConf(); err != nil {
 		return err
@@ -352,7 +360,7 @@ func (col *Col) Index(path []string) error {
 	if err := col.LoadConf(); err != nil {
 		return err
 	}
-	// put all documents in the new index
+	// Put all documents on the new index
 	newIndex, ok := col.StrHT[strings.Join(path, ",")]
 	if !ok {
 		return errors.New(fmt.Sprintf("The new index %v in %s is gone??", path, col.Dir))
@@ -368,16 +376,17 @@ func (col *Col) Index(path []string) error {
 	return nil
 }
 
-// Remove an index.
+// Remove an index. Do not operate on this collection until it finishes!
 func (col *Col) Unindex(path []string) error {
 	joinedPath := strings.Join(path, ",")
 	if _, found := col.StrHT[joinedPath]; !found {
 		return errors.New(fmt.Sprintf("Path %v was never indexed in collection %s", path, col.Dir))
 	}
-	// close all indexes
+	// Close all existing indexes
 	for _, v := range col.StrHT {
 		v.File.Close()
 	}
+	// Find the index to remove
 	found := 0
 	for i, index := range col.Config.Indexes {
 		match := true
@@ -392,14 +401,13 @@ func (col *Col) Unindex(path []string) error {
 			break
 		}
 	}
-	// delete hash table file
+	// Delete the index file
 	indexConf := col.Config.Indexes[found]
 	indexHT := col.StrHT[strings.Join(indexConf.IndexedPath, ",")]
-	indexHT.File.Close()
 	if err := os.Remove(indexHT.File.Name); err != nil {
 		return err
 	}
-	// remove it from config
+	// Remove the from configuration
 	col.Config.Indexes = append(col.Config.Indexes[0:found], col.Config.Indexes[found+1:len(col.Config.Indexes)]...)
 	if err := col.BackupAndSaveConf(); err != nil {
 		return err
@@ -410,7 +418,7 @@ func (col *Col) Unindex(path []string) error {
 	return nil
 }
 
-// Do fun for all documents (deserialized into generic interface).
+// Deserialize each document and invoke the function on the deserialized docuemnt (Collection Scsn).
 func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
 	col.Data.ForAll(func(id uint64, data []byte) bool {
 		var parsed interface{}
@@ -423,7 +431,7 @@ func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
 	})
 }
 
-// Do fun for all documents (deserialized into target interface). template must be a pointer to an initialized structure.
+// Deserialize each document into template (pointer to an initialized struct), invoke the function on the deserialized document (Collection Scan).
 func (col *Col) DeserializeAll(template interface{}, fun func(id uint64) bool) {
 	col.Data.ForAll(func(id uint64, data []byte) bool {
 		if err := json.Unmarshal(data, template); err != nil {
@@ -434,7 +442,7 @@ func (col *Col) DeserializeAll(template interface{}, fun func(id uint64) bool) {
 	})
 }
 
-// Flush collection data files.
+// Flush collection data and index files.
 func (col *Col) Flush() error {
 	if err := col.Data.File.Flush(); err != nil {
 		log.Printf("ERROR: Failed to flush %s, reason: %v", col.Data.File.Name, err)
@@ -449,7 +457,7 @@ func (col *Col) Flush() error {
 	return nil
 }
 
-// Close a collection.
+// Close the collection.
 func (col *Col) Close() {
 	if err := col.Data.File.Close(); err != nil {
 		log.Printf("ERROR: Failed to close %s, reason: %v", col.Data.File.Name, err)

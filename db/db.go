@@ -1,4 +1,4 @@
-/* Collection management (Database is a collection of collections). */
+/* Collection management (Database is a collection of collections). Collection management functions may not be invoked concurrently. */
 package db
 
 import (
@@ -12,10 +12,11 @@ import (
 )
 
 type DB struct {
-	Dir    string
-	StrCol map[string]*Col
+	Dir    string          // Database directory path
+	StrCol map[string]*Col // Collection name to collection mapping
 }
 
+// Open a database.
 func OpenDB(dir string) (db *DB, err error) {
 	if err = os.MkdirAll(dir, 0700); err != nil {
 		return
@@ -25,6 +26,7 @@ func OpenDB(dir string) (db *DB, err error) {
 	if err != nil {
 		return
 	}
+	// Try to open sub-directory as document collection
 	for _, f := range files {
 		if f.IsDir() {
 			if db.StrCol[f.Name()], err = OpenCol(path.Join(dir, f.Name())); err != nil {
@@ -37,7 +39,7 @@ func OpenDB(dir string) (db *DB, err error) {
 	return
 }
 
-// Create a new collection.
+// Create a collection.
 func (db *DB) Create(name string) (err error) {
 	if _, nope := db.StrCol[name]; nope {
 		return errors.New(fmt.Sprintf("Collection %s already exists in %s", name, db.Dir))
@@ -46,7 +48,7 @@ func (db *DB) Create(name string) (err error) {
 	return err
 }
 
-// Return collection reference.
+// Return collection reference by collection name. This function is safe for concurrent use.
 func (db *DB) Use(name string) *Col {
 	if col, ok := db.StrCol[name]; ok {
 		return col
@@ -83,10 +85,11 @@ func (db *DB) Drop(name string) (err error) {
 	}
 }
 
-// Repair (remove) damaged/deleted documents.
+// Repair damaged documents/indexes, collect unused space along the way.
 func (db *DB) Scrub(name string) (err error) {
 	if col, ok := db.StrCol[name]; ok {
 		db.Drop("scrub-" + name)
+		// Create a temporary collection
 		if err = db.Create("scrub-" + name); err != nil {
 			return
 		}
@@ -94,23 +97,22 @@ func (db *DB) Scrub(name string) (err error) {
 		if scrub == nil {
 			return errors.New(fmt.Sprint("Scrub temporary collection has disappeared, please try again."))
 		}
-		// recreate indexes
+		// Recreate indexes
 		for path := range col.StrIC {
-			// skip UID index, which has its config created automatically rather than manually
-			if path[0] != '_' {
+			if path[0] != '_' { // Skip _uid index
 				if err = scrub.Index(strings.Split(path, ",")); err != nil {
 					return
 				}
 			}
 		}
-		// recreate documents
+		// Recover as many documents as possible, insert them into the temporary collection
 		col.ForAll(func(id uint64, doc interface{}) bool {
 			if _, err = scrub.Insert(doc); err != nil {
 				log.Printf("ERROR: Scrubing %s, I could not insert '%v' back", name, doc)
 			}
 			return true
 		})
-		// replace original collection
+		// Replace original collection by the "temporary collection"
 		if err = db.Drop(name); err != nil {
 			return
 		}
@@ -121,7 +123,7 @@ func (db *DB) Scrub(name string) (err error) {
 	return nil
 }
 
-// Flush all collection data files.
+// Flush all collection data and index files.
 func (db *DB) Flush() {
 	for _, col := range db.StrCol {
 		col.Flush()

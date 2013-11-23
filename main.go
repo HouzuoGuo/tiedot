@@ -1,3 +1,4 @@
+// tiedot main entrance.
 package main
 
 import (
@@ -7,25 +8,28 @@ import (
 	"loveoneanother.at/tiedot/srv/v1"
 	"loveoneanother.at/tiedot/srv/v2"
 	"loveoneanother.at/tiedot/srv/v3"
+	"math/rand"
 	"os"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
+	"time"
 )
 
 func main() {
-	var err error
+	rand.Seed(time.Now().UTC().UnixNano())
 
+	var err error
 	var defaultMaxprocs int
 	if defaultMaxprocs, err = strconv.Atoi(os.Getenv("GOMAXPROCS")); err != nil {
 		defaultMaxprocs = runtime.NumCPU() * 2
 	}
 
-	// parse CLI parameters
+	// Parse CLI parameters
 	var mode, dir string
 	var port, maxprocs, benchSize int
 	var profile bool
-	flag.StringVar(&mode, "mode", "", "[v1|v2|v3|bench|bench2|bench3|durable-bench|example]")
+	flag.StringVar(&mode, "mode", "", "[v1|v2|v3|bench|bench2|bench3|example]")
 	flag.StringVar(&dir, "dir", "", "database directory")
 	flag.IntVar(&port, "port", 0, "listening port number")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
@@ -33,19 +37,20 @@ func main() {
 	flag.BoolVar(&profile, "profile", false, "write profiler results to prof.out")
 	flag.Parse()
 
+	// User must specify a mode to run
 	if mode == "" {
 		flag.PrintDefaults()
 		return
 	}
 
-	// set appropriate gomaxprocs
+	// Setup appropriate GOMAXPROCS parameter
 	runtime.GOMAXPROCS(maxprocs)
 	log.Printf("GOMAXPROCS is set to %d", maxprocs)
 	if maxprocs < runtime.NumCPU() {
 		log.Printf("GOMAXPROCS (%d) is less than number of CPUs (%d), this may affect performance. You can change it via environment variable GOMAXPROCS or by passing CLI parameter -gomaxprocs", maxprocs, runtime.NumCPU())
 	}
 
-	// enable profiler
+	// Start profiler if enabled
 	if profile {
 		resultFile, err := os.Create("perf.out")
 		if err != nil {
@@ -56,7 +61,8 @@ func main() {
 	}
 
 	switch mode {
-	case "v1":
+
+	case "v1": // HTTP services (version 1, 2 and 3)
 		fallthrough
 	case "v2":
 		fallthrough
@@ -78,15 +84,15 @@ func main() {
 		} else if mode == "v3" {
 			v3.Start(db, port)
 		}
-	case "bench":
+
+	case "bench": // Benchmark scenarios
 		benchmark(benchSize)
 	case "bench2":
 		benchmark2(benchSize)
 	case "bench3":
 		benchmark3(benchSize)
-	case "durable-bench":
-		durableBenchmark()
-	case "example":
+
+	case "example": // Embedded usage example
 		embeddedExample()
 	default:
 		flag.PrintDefaults()

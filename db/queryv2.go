@@ -12,7 +12,7 @@ import (
 // Calculate union of sub-query results.
 func V2EvalUnion(exprs []interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	for _, subExpr := range exprs {
-		// simply evaluate all sub-queries, they will put their results into the result map
+		// Evaluate all sub-queries - they will put their result into the result map
 		if err = EvalQueryV2(subExpr, src, result); err != nil {
 			return
 		}
@@ -32,7 +32,7 @@ func V2EvalAllIDs(src *Col, result *map[uint64]struct{}) (err error) {
 
 // Execute value equity check ("attribute == value") using hash lookup or collection scan.
 func V2Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
-	// figure out lookup path - JSON array "in"
+	// Figure out lookup path - JSON array "in"
 	path, hasPath := expr["in"]
 	if !hasPath {
 		return errors.New("Missing lookup path `in`")
@@ -45,7 +45,7 @@ func V2Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, re
 	} else {
 		return errors.New(fmt.Sprintf("Expecting vector lookup path `in`, but %v given", path))
 	}
-	// figure out result number limit
+	// Figure out result number limit
 	intLimit := uint64(0)
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
@@ -56,13 +56,14 @@ func V2Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, re
 	}
 	lookupStrValue := fmt.Sprint(lookupValue) // the value to match
 	if ht, indexScan := src.StrHT[strings.Join(vecPath, ",")]; indexScan {
-		// do hash scan where possible
+		// If index is available, do index scan
+		// Hash collision detection function
 		collisionDetection := func(k, v uint64) bool {
 			var doc interface{}
 			if src.Read(v, &doc) != nil {
 				return false
 			}
-			// make sure that hash table match is not a collision case
+			// Actually get inside the document and match the value
 			for _, v := range GetIn(doc, vecPath) {
 				if fmt.Sprint(v) == lookupStrValue {
 					return true
@@ -71,17 +72,17 @@ func V2Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, re
 			return false
 		}
 		hashValue := StrHash(lookupStrValue)
-		// do hash scan
+		// Do hash scan
 		_, scanResult := ht.Get(hashValue, intLimit, collisionDetection)
 		for _, docID := range scanResult {
 			(*result)[docID] = struct{}{}
 		}
 	} else {
-		// index is not available, do collection scan instead
+		// Do collection scan, when index is not available
 		log.Printf("Query %v is a collection scan, which may be inefficient", expr)
 		counter := uint64(0)
 		docMatcher := func(id uint64, doc interface{}) bool {
-			// get inside the document and find value match
+			// Get inside each document and find match
 			for _, v := range GetIn(doc, vecPath) {
 				if fmt.Sprint(v) == lookupStrValue {
 					(*result)[id] = struct{}{}
@@ -98,7 +99,7 @@ func V2Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, re
 
 // Execute value existence check.
 func V2PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
-	// figure out the path
+	// Figure out the path
 	vecPath := make([]string, 0)
 	if vecPathInterface, ok := hasPath.([]interface{}); ok {
 		for _, v := range vecPathInterface {
@@ -107,7 +108,7 @@ func V2PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col,
 	} else {
 		return errors.New(fmt.Sprintf("Expecting vector path, but %v given", hasPath))
 	}
-	// figure out result number limit
+	// Figure out result number limit
 	intLimit := uint64(0)
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
@@ -116,7 +117,7 @@ func V2PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col,
 			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
 		}
 	}
-	// depends on the availability of index and size of collection, determine whether to do hash scan or collection scan
+	// Depends on the availability of index and size of collection, determine whether to do hash scan or collection scan
 	if ht, indexScan := src.StrHT[strings.Join(vecPath, ",")]; indexScan && src.Data.File.UsedSize >= 67108864 {
 		// ht.GetAll is actually quite expensive (50-100 ops/sec), so it may not be necessary if data is smaller than 64MB
 		_, vals := ht.GetAll(intLimit)
@@ -124,6 +125,7 @@ func V2PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col,
 			(*result)[docID] = struct{}{}
 		}
 	} else {
+		// Get inside each document to find match
 		counter := uint64(0)
 		matchDocFunc := func(id uint64, doc interface{}) bool {
 			vals := GetIn(doc, vecPath)
@@ -200,7 +202,7 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 	if !hasPath {
 		return errors.New("Missing path `in`")
 	}
-	// figure out the path
+	// Figure out the path
 	vecPath := make([]string, 0)
 	if vecPathInterface, ok := path.([]interface{}); ok {
 		for _, v := range vecPathInterface {
@@ -209,7 +211,7 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 	} else {
 		return errors.New(fmt.Sprintf("Expecting vector path `in`, but %v given", path))
 	}
-	// figure out result number limit
+	// Figure out result number limit
 	intLimit := int(0)
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
@@ -218,7 +220,7 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
 		}
 	}
-	// figure out the range ("from" value & "to" value)
+	// Figure out the range ("from" value & "to" value)
 	from, to := int(0), int(0)
 	if floatFrom, ok := intFrom.(float64); ok {
 		from = int(floatFrom)
@@ -243,20 +245,20 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 	if to > from && to-from > 1000 || from > to && from-to > 1000 {
 		log.Printf("Query %v is an index lookup of more than 1000 values, which may be inefficient", expr)
 	}
-	counter := int(0) // number of results already collected
+	counter := int(0) // Number of results already collected
 	if ht, indexScan := src.StrHT[strings.Join(vecPath, ",")]; indexScan {
-		// if index is available, do index scan
+		// Use index scan if it is available
 		if from < to {
-			// direction is forward
+			// Forward scan - from low value to high value
 			for lookupValue := from; lookupValue <= to; lookupValue++ {
 				lookupStrValue := fmt.Sprint(lookupValue)
 				hashValue := StrHash(lookupStrValue)
+				// Hash collision detection function
 				collisionDetection := func(k, v uint64) bool {
 					var doc interface{}
 					if src.Read(v, &doc) != nil {
 						return false
 					}
-					// make sure that hash table match is not a collision case
 					for _, v := range GetIn(doc, vecPath) {
 						if fmt.Sprint(v) == lookupStrValue {
 							return true
@@ -274,7 +276,7 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 				}
 			}
 		} else {
-			// direction is backward
+			// Backward scan - from high value to low value
 			for lookupValue := from; lookupValue >= to; lookupValue-- {
 				lookupStrValue := fmt.Sprint(lookupValue)
 				hashValue := StrHash(lookupStrValue)
@@ -283,7 +285,6 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 					if src.Read(v, &doc) != nil {
 						return false
 					}
-					// make sure that hash table match is not a collision case
 					for _, v := range GetIn(doc, vecPath) {
 						if fmt.Sprint(v) == lookupStrValue {
 							return true
@@ -302,9 +303,9 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 			}
 		}
 	} else {
-		// do collection scan when index is not available
+		// Fall back to collection scan, when index is not available
 		log.Printf("Query %v is a collection scan which can be *very* inefficient, also query \"limit\" and reverse range support is unavailable!", expr)
-		// reverse range is close to impossible in collection scan, sorry!
+		// Reversed range cannot be supported, sorry
 		if to < from {
 			tmp := from
 			from = to
@@ -330,7 +331,7 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 
 // Execute value match regexp using hash lookup or collection scan.
 func V2RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
-	// figure out lookup path - JSON array "in"
+	// Figure out lookup path - JSON array "in"
 	path, hasPath := expr["in"]
 	if !hasPath {
 		return errors.New("Missing lookup path `in`")
@@ -343,7 +344,7 @@ func V2RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *
 	} else {
 		return errors.New(fmt.Sprintf("Expecting vector lookup path `in`, but %v given", path))
 	}
-	// figure out result number limit
+	// Figure out result number limit
 	intLimit := uint64(0)
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
@@ -354,11 +355,10 @@ func V2RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *
 	}
 	regexpStrValue := fmt.Sprint(lookupRegexp)
 	validRegexp := regexp.MustCompile(regexpStrValue)
-	// do collection scan
-	log.Printf("Query %v is a collection scan, which may be inefficient", expr)
+	// Do collection scan
 	counter := uint64(0)
 	docMatcher := func(id uint64, doc interface{}) bool {
-		// get inside the document and find value match
+		// Get inside the document and find value match
 		for _, v := range GetIn(doc, vecPath) {
 			if validRegexp.MatchString(fmt.Sprint(v)) {
 				(*result)[id] = struct{}{}
@@ -376,13 +376,12 @@ func V2RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *
 // Main entrance to query processor - evaluate a query and put result into result map (as map keys).
 func EvalQueryV2(q interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	switch expr := q.(type) {
-	case float64:
-		// single document number
+	case float64: // Single document number
 		(*result)[uint64(expr)] = struct{}{}
 	case []interface{}: // [sub query 1, sub query 2, etc]
 		return V2EvalUnion(expr, src, result)
 	case string:
-		if expr == "all" { // put all IDs into result
+		if expr == "all" { // Put all IDs into result
 			return V2EvalAllIDs(src, result)
 		} else {
 			return errors.New(fmt.Sprintf("Do not know what %v means, did you mean 'all' (getting all document IDs)?", expr))

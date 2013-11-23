@@ -1,3 +1,4 @@
+// Test cases for collection document operations (insert, read, update and delete).
 package db
 
 import (
@@ -6,8 +7,6 @@ import (
 	"os"
 	"testing"
 )
-
-const COL_BENCH_SIZE = 200000 // Number of documents made available for collection benchmark
 
 func TestGetIn(t *testing.T) {
 	var obj interface{}
@@ -345,7 +344,7 @@ func TestIndex(t *testing.T) {
 	if !(len(k6) == 1 && len(v6) == 1 && k6[0] == StrHash(6) && v6[0] == ids[2]) {
 		t.Fatalf("Index fault, %v, %v", k6, v6)
 	}
-	// now remove a,b,c index
+	// Now remove a,b,c index
 	if err = col.Unindex([]string{"a", "b", "c"}); err != nil {
 		t.Fatal(err)
 		return

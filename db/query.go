@@ -1,4 +1,4 @@
-/* Query processor for embedded and HTTP API V1. */
+/* (Deprecated, use EvalQueryV2 instead) Query processor for embedded and HTTP API V1. */
 package db
 
 import (
@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Evaluate a query and return query result (as map keys).
+// (Deprecated, use EvalQueryV2 instead) Evaluate a query and return query result (as map keys).
 func EvalQuery(q interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	switch expr := q.(type) {
 	// 1, 2.0, etc
