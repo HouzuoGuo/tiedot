@@ -1,5 +1,3 @@
-> To use `go get`, please use URL `loveoneanother.at/tiedot`. See INSTALL for more details.
-
 Your contribution means a lot to tiedot! Please read [ways to contribute][].
 
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>

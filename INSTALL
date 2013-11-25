@@ -1,6 +1,0 @@
-If you wish to use tiedot, please use `go get`; the path should be loveoneanother.at/tiedot
-
-If you wish to contribute to tiedot, please clone this git repository and place it inside your go workspace, under:
-src/loveoneanother.at/tiedot/
-
-2013-08-12 Howard

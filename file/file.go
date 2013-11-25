@@ -4,8 +4,8 @@ package file
 import (
 	"errors"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/gommap"
 	"log"
-	"loveoneanother.at/tiedot/gommap"
 	"os"
 )
 

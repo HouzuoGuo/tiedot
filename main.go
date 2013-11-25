@@ -3,11 +3,11 @@ package main
 
 import (
 	"flag"
+	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/srv/v1"
+	"github.com/HouzuoGuo/tiedot/srv/v2"
+	"github.com/HouzuoGuo/tiedot/srv/v3"
 	"log"
-	"loveoneanother.at/tiedot/db"
-	"loveoneanother.at/tiedot/srv/v1"
-	"loveoneanother.at/tiedot/srv/v2"
-	"loveoneanother.at/tiedot/srv/v3"
 	"math/rand"
 	"os"
 	"runtime"

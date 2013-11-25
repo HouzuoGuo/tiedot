@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"loveoneanother.at/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/db"
 	"os"
 )
 

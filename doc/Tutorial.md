@@ -10,9 +10,9 @@ You will need:
 
     mkdir tiedot && cd tiedot
     export GOPATH=`pwd`  # backticks surround pwd
-    go get loveoneanother.at/tiedot
+    go get github.com/HouzuoGuo/tiedot
 
-    ./bin/tiedot -mode=v2 -dir=/tmp/MyDatabase -port=8080
+    ./bin/tiedot -mode=v3 -dir=/tmp/MyDatabase -port=8080
 
 ## Basics
 
