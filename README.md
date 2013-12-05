@@ -1,4 +1,4 @@
-Your contribution means a lot to tiedot! Please read [ways to contribute][].
+Keywords: Go, Golang, document database, NoSQL, JSON
 
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
@@ -65,6 +65,8 @@ tiedot scales very well on SMP computers. The following performance results are 
 Mix\* runs simultaneous insert/read/update/delete/query operations. See [Performance tuning and benchmarks] for more details
 
 > Did you know? The largest known tiedot deployment powers a personal offline Wikipedia indexing project, it has 5.9 million documents and over 73GB of data.
+
+> Your contribution means a lot to tiedot! Please read [ways to contribute][].
 
 ### References
 
