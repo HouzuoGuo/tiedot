@@ -11,99 +11,119 @@ import (
 // There are few exceptions - see individual package/functions for details.
 
 func embeddedExample() {
+	// ****************** Collection Management ******************
+	// Create and open database
 	dir := "/tmp/MyDatabase"
 	os.RemoveAll(dir)
 	defer os.RemoveAll(dir)
 
-	// Open database
 	myDB, err := db.OpenDB(dir)
 	if err != nil {
 		panic(err)
 	}
 
-	// Create collection
-	if err := myDB.Create("A"); err != nil {
+	// Create two collections Feeds and Votes
+	if err := myDB.Create("Feeds"); err != nil {
 		panic(err)
 	}
-	if err := myDB.Create("B"); err != nil {
-		panic(err)
-	}
-
-	// Rename collection
-	if err := myDB.Rename("B", "C"); err != nil {
+	if err := myDB.Create("Votes"); err != nil {
 		panic(err)
 	}
 
-	// Which collections do I have?
+	// What collections do I now have?
 	for name := range myDB.StrCol {
 		fmt.Printf("I have a collection called %s\n", name)
 	}
 
-	// Drop collection
-	if err := myDB.Drop("C"); err != nil {
+	// Rename collection "Votes" to "Points"
+	if err := myDB.Rename("Votes", "Points"); err != nil {
 		panic(err)
 	}
 
-	// Start using collection
-	A := myDB.Use("A")
+	// Drop (delete) collection "Points"
+	if err := myDB.Drop("Points"); err != nil {
+		panic(err)
+	}
 
-	// Collection insert/update/delete operations require the document to be a map[string]interface{}, otherwise index may not work
+	// Scrub (repair and compact) "Feeds"
+	if err := myDB.Scrub("Feeds"); err != nil {
+		panic(err)
+	}
 
-	// Insert a docuemnt
-	docID, err := A.Insert(map[string]interface{}{"Url": "http://google.com", "Owner": "Google Inc."})
+	// ****************** Document Management ******************
+	// Start using a collection
+	feeds := myDB.Use("Feeds")
+
+	// Insert document (document must be map[string]interface{})
+	docID, err := feeds.Insert(map[string]interface{}{
+		"name": "Go 1.2 is released",
+		"url":  "golang.org"})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Inserted document at %d (document ID)\n", docID)
-
-	// Update document
-	var doc map[string]interface{}
-	json.Unmarshal([]byte(`{"Url": "http://www.google.com.au", "Owner": "Google Inc."}`), &doc)
-	newID, err := A.Update(docID, doc)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("Updated document %d to %v, new ID is %d\n", docID, doc, newID)
-	// Updated document may or may not retain the original ID.
-	// Optionally, each document may have a unique/persistent/never changing ID assigned to it, this is called "UID"
-	// Check out "InsertWithUID", "ReadByUID", "UpdateByUID", "DeleteByUID"
 
 	// Read document
-	var readback map[string]interface{}
-	if err := A.Read(newID, &readback); err != nil {
+	var readBack interface{}
+	feeds.Read(docID, &readBack) // pass in document's physical ID
+	fmt.Println(readBack)
+
+	// Update document (document must be map[string]interface{})
+	newID, err := feeds.Update(docID, map[string]interface{}{
+		"name": "Go is very popular",
+		"url":  "google.com"})
+	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Read document ID %d: %v\n", newID, readback)
 
 	// Delete document
-	A.Delete(123) // An ID which does not exist does no harm
+	feeds.Delete(newID)
 
-	// Create index
-	if err := A.Index([]string{"a", "b", "c"}); err != nil {
+	// Delete document
+	feeds.Delete(123) // An ID which does not exist does no harm
+
+	// ****************** Index Management ******************
+	// Create index (path leads to document JSON attribute)
+	if err := feeds.Index([]string{"author", "name", "first_name"}); err != nil {
 		panic(err)
 	}
 
-	// Which indexes do I have on collection A?
-	for path := range A.StrHT {
+	// What indexes do I have on collection A?
+	for path := range feeds.StrHT {
 		fmt.Printf("I have an index on path %s\n", path)
 	}
 
 	// Remove index
-	if err := A.Unindex([]string{"a", "b", "c"}); err != nil {
+	if err := feeds.Unindex([]string{"author", "name", "first_name"}); err != nil {
 		panic(err)
 	}
 
-	// Execute query
-	result := make(map[uint64]struct{})
+	// ****************** Queries ******************
+	// Let's prepare a number of docments for a start
+	feeds.Insert(map[string]interface{}{"Title": "New Go release", "Source": "golang.org", "Age": 3})
+	feeds.Insert(map[string]interface{}{"Title": "Kitkat is here", "Source": "google.com", "Age": 2})
+	feeds.Insert(map[string]interface{}{"Title": "Good Slackware", "Source": "slackware.com", "Age": 1})
+
+	// There are two ways to construct query - by deserializing tiedot query string
+	// Or construct a Golang map[string]interface{} (essentially, deserialized JSON)
+	queryStr := `[{"eq": "New Go release", "in": ["Title"]}, {"eq": "slackware.com", "in": ["Source"]}]`
 	var query interface{}
-	json.Unmarshal([]byte(`"all"`), &query)
-	if err := db.EvalQueryV2(query, A, &result); err != nil {
+	json.Unmarshal([]byte(queryStr), &query)
+
+	queryResult := make(map[uint64]struct{}) // query result goes into map keys
+
+	if err := db.EvalQueryV2(query, feeds, &queryResult); err != nil {
 		panic(err)
 	}
-	for id := range result {
-		// Map keys are query results - result document IDs
+
+	// Query results are physical document IDs
+	for id := range queryResult {
 		fmt.Printf("Query returned document ID %d\n", id)
-		// Optionally, use A.read(ID) to get actual document content from query result
+	}
+
+	// To use the document itself, simply read it back
+	for id := range queryResult {
+		feeds.Read(id, &readBack)
+		fmt.Printf("Query returned document %v\n", readBack)
 	}
 
 	// Gracefully close database
