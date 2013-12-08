@@ -20,8 +20,6 @@ Invoked by `tiedot -mode=bench`, the benchmark prepares a collection with two in
 
 It is designed to test performance of each individual document operation, to assist in finding performance regressions. The result should accurately reflect batch CRUD operation performance.
 
-Try adjustment `BENCH_SIZE` if you wish to conduct the benchmark with a larger or smaller sample size.
-
 ### Benchmark 2
 
 Invoked by `tiedot -mode=bench2`, the benchmark first prepares a collection with two indexes and 1000 documents, then do *all* these operations at the same time:

@@ -1,5 +1,7 @@
 ## General info
 
+There have been three versions of HTTP APIs: V1, 2 and 3. Newer versions are compatible with older versions so far.
+
 API requests may use any of GET/PUT/POST methods.
 
 Server response always contains `Cache-Control: must-revalidate` header. Most responses use `applicaton/json` content type, but there are exceptions.
@@ -165,6 +167,12 @@ Document ID is the physical location of document, it uniquely identifies documen
     <th>Normal response</th>
   </tr>
   <tr>
+    <td>Dump (backup) database*</td>
+    <td>/dump</td>
+    <td>Destination directory `dest`</td>
+    <td>HTTP 200</td>
+  </tr>
+  <tr>
     <td>Shutdown server</td>
     <td>/shutdown</td>
     <td>(nil)</td>
@@ -184,6 +192,7 @@ Document ID is the physical location of document, it uniquely identifies documen
   </tr>
 </table>
 
+\* Further requests will not be processed until dumping is completed.
 
 ## Query endpoints
 
@@ -238,9 +247,9 @@ Another operation, "has", finds any document with any value in the path: `{"has"
 
 For example: `{"has": ["Author", "Name", "Pen Name"]}`.
 
-Integer range query is also supported: `{"in": [ path ... ], "int-from": xx, "int-to": yy}`
+Integer range query is also supported (here you may also use `limit`): `{"in": [ path ... ], "int-from": xx, "int-to": yy}`
 
-For example: `{"in": ["Publish", "Year"], "int-from": 1993, "int-to": 2013}`
+For example: `{"in": ["Publish", "Year"], "int-from": 1993, "int-to": 2013, "limit": 10}`
 
 `"all"` returns all document IDs, may be useful for set operation (especially, complement).
 
