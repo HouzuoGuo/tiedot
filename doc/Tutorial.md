@@ -40,7 +40,7 @@ Drop (delete) collection "Points":
 
     > curl "http://localhost:8080/drop?col=Points"
 
-Scrub (repair and compact) "Votes":
+Scrub (repair and compact) "Feeds":
 
     > curl "http://localhost:8080/scrub?col=Feeds"
 

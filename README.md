@@ -1,4 +1,4 @@
-Keywords: Go, Golang, document database, NoSQL, JSON
+Keywords: Golang, go, document database, NoSQL, JSON
 
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
@@ -16,7 +16,7 @@ tiedot is a document database that uses __JSON__ for documents and queries; it c
 
 ### High Performance!
 
-tiedot scales very well on SMP computers. The following performance results are collected from three machines types, using tiedot built-in benchmark:
+tiedot scales very well on SMP computers. Here are results collected from tiedot built-in benchmarks:
 
 (Operations per second)
 <table>
@@ -32,12 +32,12 @@ tiedot scales very well on SMP computers. The following performance results are 
 </tr>
 <tr>
   <td>Mobile Intel Core i7 2.8GHZ</td>
-  <td>430,000</td>
-  <td>697,000</td>
-  <td>152,000</td>
-  <td>204,000</td>
-  <td>495,000</td>
-  <td>375,000</td>
+  <td>345,000</td>
+  <td>680,000</td>
+  <td>155,000</td>
+  <td>200,000</td>
+  <td>490,000</td>
+  <td>435,000</td>
   <td>2013 model MacBook</td>
 </tr>
 <tr>
@@ -71,9 +71,7 @@ Mix\* runs simultaneous insert/read/update/delete/query operations. See [Perform
 ### References
 
 - [Quick Start Guide: tiedot in 10 minutes]
-- [API V1 reference]
-- [API V2 reference]
-- [API V3 reference]
+- [API reference (V3)]
 - [Embedded usage]
 - [Data structures]
 - [Query processor and index]
@@ -87,37 +85,27 @@ See [Version History] for detailed change logs, known issues, etc.
 
 <table>
 <tr>
-  <th>Branch</th>
-  <th>Release Version</th>
-  <th>API Support</th>
+  <th>Version (and branch name)</th>
   <th>Release Date</th>
   <th>Highlights</th>
 </tr>
 <tr>
-  <td>alpha</td>
   <td>Alpha</td>
-  <td>V1 only</td>
   <td>2013-06-28</td>
   <td>First release</td>
 </tr>
 <tr>
-  <td>beta</td>
   <td>Beta</td>
-  <td>V1 only</td>
   <td>2013-07-12</td>
   <td>Platform support and data durability improvements.</td>
 </tr>
 <tr>
   <td>1.0</td>
-  <td>1.0</td>
-  <td>V1 and V2</td>
   <td>2013-09-21</td>
   <td>Query performance/syntax, and documentation improvements.</td>
 </tr>
 <tr>
   <td>1.1</td>
-  <td>1.1</td>
-  <td>V1 V2 V3</td>
   <td>2013-10-06</td>
   <td>Memory consumption improvements; persistent document ID system.</td>
 </tr>
@@ -148,9 +136,7 @@ __Why the name "tiedot"?__
 "tiedot" is a Finnish word standing for "data". I enjoy learning (natural and computer) languages, also enjoy listening to music in many languages. "Tiedot" sounds cute, doesn't it?
 
 [Quick Start Guide: tiedot in 10 minutes]: https://github.com/HouzuoGuo/tiedot/wiki/Tutorial
-[API V1 reference]: https://github.com/HouzuoGuo/tiedot/wiki/API-V1-Reference
-[API V2 reference]: https://github.com/HouzuoGuo/tiedot/wiki/API-V2-Reference
-[API V3 reference]: https://github.com/HouzuoGuo/tiedot/wiki/API-V3-Reference
+[API reference (V3)]: https://github.com/HouzuoGuo/tiedot/wiki/API-V3-Reference
 [Version History]: https://github.com/HouzuoGuo/tiedot/wiki/Version-History
 [Embedded usage]: https://github.com/HouzuoGuo/tiedot/wiki/Embedded-Usage
 [Data structures]: https://github.com/HouzuoGuo/tiedot/wiki/Data-structures

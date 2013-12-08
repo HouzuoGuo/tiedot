@@ -1,16 +1,33 @@
-### 1.1 (2013-10-06)
+### master
+
+Bug fix:
+
+- Better embedded usage examples.
+- Code comments rewritten to be more readable.
+
+Improvements:
+
+- Benchmark sample size is now configurable via CLI parameters.
+- Structures inside array may now be indexed as well.
+- New HTTP service endpoint to dump database while staying online.
+
+### 1.1 (2013-11-07)
 
 Bug fix:
 
 - Panic due to out of memory on several 32-bit machines.
 - Fix several incorrect HTTP API content type.
+- Fix wrong new bucket position in opened hash tables.
 
 Improvements:
 
 - Remove per-collection padding buffer and replace it by a shared string buffer, to reduce memory consumption.
 - Creation of data file no longer creates a giant empty buffer beforehand, therefore reducing memory consumption.
 - Documents may now have optional persistent IDs (called UID) which will never change during its life time.
-- API version 3 (New!) supports document operations based on UIDs.
+- API version 3 (New and backward compatible) supports document operations based on UIDs.
+- Lock granularity is further tweaked.
+- When a document cannot be indexed due to having incompatible data structure, a warning message is logged.
+- Query now supports regex collection scan and reversed integer range lookup.
 
 ### 1.0 (2013-09-21)
 
@@ -24,7 +41,7 @@ Bug fix:
 Improvements:
 
 - Data file IO now uses more granular locks (RWlock-per-bucket and RWlock-per-document) instead of giant RW file lock.
-- API version 2 (New!)
+- API version 2 (New and backward compatible)
 - New HTTP endpoints to report server runtime performance.
 - New query syntax - easier and more efficient, together with a new query processor.
 - A specific type of range query (integer lookup in a range) is now supported.
@@ -37,7 +54,7 @@ A maintenance release to address outstanding issues discovered in alpha.
 
 Bug fixes:
 
-- Data durability is greatly enhanced by periodically (every minute) synchronising file buffers with storage device.
+- Data durability is greatly enhanced by periodically (every minute) synchronizing file buffers with storage device.
 - Support durable write operations which flush all buffers immediately after collection operation.
 - Fix wrong content type returned by several HTTP API endpoints.
 
@@ -58,4 +75,4 @@ Known issues:
 
 - Under a rare and specific data corruption situation, document update may panic.
 - Several HTTP API endpoints return incorrect content type.
-- File buffers in memory are not periodically synchronised with underlying storage device, thus reducing data durability.
+- File buffers in memory are not periodically synchronized with underlying storage device.

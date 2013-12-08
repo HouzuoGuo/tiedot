@@ -6,9 +6,11 @@ tiedot has three built-in benchmark cases. To invoke benchmark, compile and run 
     ./tiedot -mode=bench2  # benchmark 2
     ./tiedot -mode=bench3  # benchmark 3
 
+The default benchmark sample size is 400,000 for all three cases; it can be changed via CLI parameter `-benchsize=<new_size>`.
+
 ### Benchmark 1
 
-Invoked by `tiedot -mode=bench`, the benchmark prepares a collection with two indexes, and then:
+Invoked by `tiedot -mode=bench`, the benchmark prepares a collection with two indexes, and prepares a large sample of documents (all deserialized, which uses a LOT of memory), then runs:
 
 - Insert documents (effective on both indexes)
 - Read document at random locations
@@ -16,18 +18,18 @@ Invoked by `tiedot -mode=bench`, the benchmark prepares a collection with two in
 - Update document at random locations
 - Delete document at random locations
 
-The benchmark makes a large sample (defined as `BENCH_SIZE` in `benchmark.go`) that requires plenty of free memory (minimum of 2GB) to complete. It is designed to test performance of each individual document operation, to assist in finding performance regressions. The result should accurately reflect batch CRUD operation performance.
+It is designed to test performance of each individual document operation, to assist in finding performance regressions. The result should accurately reflect batch CRUD operation performance.
 
 Try adjustment `BENCH_SIZE` if you wish to conduct the benchmark with a larger or smaller sample size.
 
 ### Benchmark 2
 
-Invoked by `tiedot -mode=bench2`, the benchmark prepares a collection with two indexes and 1000 documents, then do *all* these operations at the same time:
+Invoked by `tiedot -mode=bench2`, the benchmark first prepares a collection with two indexes and 1000 documents, then do *all* these operations at the same time:
 
 - Insert/update/delete documents
 - Read documents and do lookup queries
 
-The sample size is controlled by `BENCH2_SIZE` in `benchmark.go`; unlike Benchmark 1, Benchmark 2 does not require large amount of free memory even with very large `BENCH2_SIZE`.
+Unlike Benchmark 1, Benchmark 2 does not require large amount of free memory even if a very large `benchsize` is given.
 
 This benchmark focuses on concurrency, to reflect performance under mixed workloads.
 
@@ -37,7 +39,7 @@ Invoked by `tiedot -mode=bench3`. Similar to benchmark 1, this benchmark tests i
 
 ## Available memory VS performance
 
-tiedot runs well with even less than 100 MB of available memory during normal operations. Similar to other NoSQL solutions, having larger free memory usually improves performance.
+tiedot runs well with even less than 100 MB of available memory during normal operations. Similar to other NoSQL solutions, having larger free memory usually benefits performance.
 
 ### When data size < available memory
 

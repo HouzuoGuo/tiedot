@@ -1,14 +1,12 @@
 ## High level picture: ACID?
 
-Similar to some other popular NoSQL solutions, tiedot does not provide ACID transactions. However, atomic operations are possible within the scope of a single document.
+Similar to many other popular NoSQL solutions, tiedot does not provide ACID transactions. However, atomic operations are possible within the scope of a single document.
 
-Before Beta release, buffer management was entirely automated and manual "commit" (flush all buffers) was not available.
-
-Since Beta release, buffer management is still automated, but manual "commit" APIs are also supported - check out in `col.go` `durableInsert`, `durableUpdate` `durableDelete` and `Flush` - these operations commit all buffers immediately without waiting for periodic buffer synchronization.
+Buffer synchronization ("durability") is entirely automated when tiedot runs HTTP services, however embedded tiedot instance must manually invoke buffer synchronization APIs.
 
 ## IO operation synchronization
 
-For maximum performance and scalability, tiedot only synchronizes IO operations at very low level - each data file (documents or index) has a `RWMutex` (read-write lock).
+For maximum performance and scalability, tiedot synchronizes IO operations at very low level - each data file (document data or index) is divided into regions, and each region has a RW mutex to control concurrent access.
 
 There are only 4 operations which incur read lock:
 
@@ -22,14 +20,13 @@ And only 5 operations incur write lock:
 - Insert/update/delete document ( __without__ JSON parsing)
 - Put/remove hash entry
 
-Nothing else locks!
-
 ## HTTP endpoint synchronization
 
 Most of HTTP endpoints never lock, however there is a small number of operations which must "stop the world" to ensure safe operation - these operations block __all__ other HTTP endpoints until completed:
 
 - Create/rename/drop/scrub collection
 - Create/remove index
+- Dump database
 
 The synchronization behaviour is controlled by a `RWMutex` - "stop the world" operations put write lock on it, all other operations put read lock on it.
 
