@@ -56,6 +56,7 @@ func Start(db *db.DB, port int) {
 	http.HandleFunc("/unindex", Unindex)
 	// misc (synchronized)
 	http.HandleFunc("/shutdown", Shutdown)
+	http.HandleFunc("/dump", Dump)
 	// misc (asynchronized)
 	http.HandleFunc("/version", Version)
 	http.HandleFunc("/memstats", MemStats)
