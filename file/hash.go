@@ -11,20 +11,20 @@ import (
 )
 
 const (
-	HASH_TABLE_GROWTH      = uint64(134217728) // Grows every 128MB
-	ENTRY_VALID            = byte(1)
-	ENTRY_INVALID          = byte(0)
-	ENTRY_SIZE             = uint64(1 + 10 + 10) // byte(validity), uint64(hash key), uint64(value)
-	BUCKET_HEADER_SIZE     = uint64(10)          // uint64(next bucket)
-	HASH_TABLE_REGION_SIZE = 1024 * 16384        // each region has a lock
+	HASH_TABLE_GROWTH      = uint64(134217728)   // Grows every 128MB
+	ENTRY_VALID            = byte(1)             // Entry valid flag
+	ENTRY_INVALID          = byte(0)             // Entry invalid flag
+	ENTRY_SIZE             = uint64(1 + 10 + 10) // Entry header: validity (byte), hash key (uint64) and value (uint64)
+	BUCKET_HEADER_SIZE     = uint64(10)          // Bucket header: next bucket in chain (uint64)
+	HASH_TABLE_REGION_SIZE = 1024 * 16384        // Granularity of locks
 )
 
 type HashTable struct {
 	File                            *File
-	BucketSize, HashBits, PerBucket uint64
-	NumBuckets, InitialBuckets      uint64
-	tableGrowMutex                  sync.Mutex
-	regionRWMutex                   []*sync.RWMutex
+	BucketSize, HashBits, PerBucket uint64          // Hash table configuration - size of bucket, number of bits
+	NumBuckets, InitialBuckets      uint64          // Total number of buckets, and number of "head" buckets
+	tableGrowMutex                  sync.Mutex      // Lock for making new buckets
+	regionRWMutex                   []*sync.RWMutex // Lock for bucket access
 }
 
 // Open a hash table file.
@@ -36,6 +36,7 @@ func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error
 	if err != nil {
 		return
 	}
+	// Devide hash file into regions (each bucket belongs to only one region), make one RW mutex per region.
 	rwMutexes := make([]*sync.RWMutex, file.Size/HASH_TABLE_REGION_SIZE+1)
 	for i := range rwMutexes {
 		rwMutexes[i] = new(sync.RWMutex)
@@ -44,11 +45,11 @@ func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error
 		tableGrowMutex: sync.Mutex{},
 		regionRWMutex:  rwMutexes}
 	ht.BucketSize = BUCKET_HEADER_SIZE + ENTRY_SIZE*perBucket
-	// find out how many buckets are there in table
-	// first, assume that entire file is full of buckets
+	// Find out how many buckets there are in table - hence the amount of used space
+	// .. assume the entire file is Full of buckets
 	ht.File.UsedSize = ht.File.Size
 	ht.NumBuckets = ht.File.Size / ht.BucketSize
-	// next, find the longest bucket train
+	// .. starting from every head bucket, find the longest chain
 	ht.InitialBuckets = uint64(math.Pow(2, float64(hashBits)))
 	longestBucketChain := ht.InitialBuckets
 	for i := uint64(0); i < ht.InitialBuckets; i++ {
@@ -57,10 +58,10 @@ func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error
 			longestBucketChain = lastBucket + 1
 		}
 	}
-	// calculate used size according to number of buckets
+	// .. the longest chain tells amount of used space
 	ht.NumBuckets = longestBucketChain
 	usedSize := ht.NumBuckets * ht.BucketSize
-	// grow the file if the size is not enough
+	// Grow the file, if it is not yet large enough for all the buckets used
 	if usedSize > ht.File.Size {
 		ht.File.UsedSize = ht.File.Size
 		ht.File.CheckSizeAndEnsure(((usedSize-ht.File.Size)/ht.BucketSize + 1) * ht.BucketSize)
@@ -70,7 +71,7 @@ func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error
 	return ht, nil
 }
 
-// Return the number of next chained bucket, 0 if there is not any.
+// Return the number (not address) of next chained bucket, 0 if there is not any.
 func (ht *HashTable) nextBucket(bucket uint64) uint64 {
 	if bucket >= ht.NumBuckets {
 		return 0
@@ -89,7 +90,7 @@ func (ht *HashTable) nextBucket(bucket uint64) uint64 {
 	}
 }
 
-// Return the last bucket number in chain.
+// Return the last bucket number (not address) in chain.
 func (ht *HashTable) lastBucket(bucket uint64) uint64 {
 	curr := bucket
 	for {
@@ -103,26 +104,27 @@ func (ht *HashTable) lastBucket(bucket uint64) uint64 {
 
 // Grow a new bucket on the chain of buckets.
 func (ht *HashTable) grow(bucket uint64) {
-	// lock both bucket creation and the bucket affected
+	// Lock bucket creation
 	ht.tableGrowMutex.Lock()
-	// when file is full, we have to lock down everything before growing the file
 	if !ht.File.CheckSize(ht.BucketSize) {
+		// Lock down all regions
 		originalMutexes := ht.regionRWMutex
 		for _, region := range originalMutexes {
 			region.Lock()
 		}
+		// Grow file size and make more mutexes
 		ht.File.CheckSizeAndEnsure(ht.BucketSize)
-		// make more mutexes
 		moreMutexes := make([]*sync.RWMutex, HASH_TABLE_GROWTH/HASH_TABLE_REGION_SIZE+1)
 		for i := range moreMutexes {
 			moreMutexes[i] = new(sync.RWMutex)
 		}
-		// merge mutexes together
+		// Merge original and new mutexes
 		ht.regionRWMutex = append(ht.regionRWMutex, moreMutexes...)
 		for _, region := range originalMutexes {
 			region.Unlock()
 		}
 	}
+	// Write down new bucket number
 	lastBucketAddr := ht.lastBucket(bucket) * ht.BucketSize
 	binary.PutUvarint(ht.File.Buf[lastBucketAddr:lastBucketAddr+10], ht.NumBuckets)
 	ht.File.UsedSize += ht.BucketSize
