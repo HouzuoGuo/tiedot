@@ -11,7 +11,7 @@ import (
 )
 
 var V3DB *db.DB
-var V3Sync = new(sync.RWMutex)
+var V3Sync = new(sync.RWMutex) // To synchronize "stop-the-world" operations
 
 // Store form parameter value of specified key to *val and return true; if key does not exist, set HTTP status 400 and return false.
 func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bool {
@@ -25,9 +25,6 @@ func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bo
 
 func Start(db *db.DB, port int) {
 	V3DB = db
-
-	/* Certain handlers are synchronized via mutex to guarantee safety, such as scrubbing a collection or dropping a collection.
-	Other handlers are asynchronized for maximum concurrency. */
 
 	// collection management (synchronized)
 	http.HandleFunc("/create", Create)

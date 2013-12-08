@@ -4,8 +4,6 @@ package main
 import (
 	"flag"
 	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/HouzuoGuo/tiedot/srv/v1"
-	"github.com/HouzuoGuo/tiedot/srv/v2"
 	"github.com/HouzuoGuo/tiedot/srv/v3"
 	"log"
 	"math/rand"
@@ -61,12 +59,7 @@ func main() {
 	}
 
 	switch mode {
-
-	case "v1": // HTTP services (version 1, 2 and 3)
-		fallthrough
-	case "v2":
-		fallthrough
-	case "v3":
+	case "v3": // Run HTTP service (API V3)
 		if dir == "" {
 			log.Fatal("Please specify database directory, for example -dir=/tmp/db")
 		}
@@ -77,13 +70,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if mode == "v1" {
-			v1.Start(db, port)
-		} else if mode == "v2" {
-			v2.Start(db, port)
-		} else if mode == "v3" {
-			v3.Start(db, port)
-		}
+		v3.Start(db, port)
 
 	case "bench": // Benchmark scenarios
 		benchmark(benchSize)
