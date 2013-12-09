@@ -25,8 +25,6 @@ func Shutdown(w http.ResponseWriter, r *http.Request) {
 
 // Pause all activities and make a dump of entire database to another file system location.
 func Dump(w http.ResponseWriter, r *http.Request) {
-	V3Sync.Lock()
-	defer V3Sync.Unlock()
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
 	var dest string
@@ -71,6 +69,9 @@ func Dump(w http.ResponseWriter, r *http.Request) {
 		}
 		return nil
 	}
+	V3Sync.Lock()
+	defer V3Sync.Unlock()
+	V3DB.Flush()
 	err := filepath.Walk(V3DB.Dir, walkFun)
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), 500)
