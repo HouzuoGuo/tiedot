@@ -2,15 +2,14 @@
 package file
 
 import (
+	"errors"
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/gommap"
 	"log"
 	"os"
 )
 
-const (
-	FILE_GROWTH_INCREMENTAL = uint64(16777216)
-	DEFAULT_GROWTH          = uint64(33554432)
-)
+const FILE_GROWTH_INCREMENTAL = uint64(16777216)
 
 type File struct {
 	Name                   string   // File path and name
@@ -20,8 +19,11 @@ type File struct {
 }
 
 // Open the file, or create it if non-existing.
-func Open(name string) (file *File, err error) {
-	file = &File{Name: name, Growth: DEFAULT_GROWTH}
+func Open(name string, growth uint64) (file *File, err error) {
+	if growth < 1 {
+		err = errors.New(fmt.Sprintf("Growth size (%d) is too small (opening %s)", growth, name))
+	}
+	file = &File{Name: name, Growth: growth}
 	// Open file (get a handle) and determine its size
 	if file.Fh, err = os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0600); err != nil {
 		return
@@ -31,7 +33,6 @@ func Open(name string) (file *File, err error) {
 		return
 	}
 	file.Size = uint64(fsize)
-	file.recalculateGrowth()
 	if file.Size == 0 {
 		// Grow the file if it appears too small
 		file.CheckSizeAndEnsure(file.Growth)
@@ -67,15 +68,6 @@ func Open(name string) (file *File, err error) {
 	return
 }
 
-func (file *File) recalculateGrowth() {
-	switch {
-	case file.Size < 134217728: // 128MB
-		file.Growth = 33554432
-	default: // above 128MB
-		file.Growth = 134217728
-	}
-}
-
 // Return true only if the file has enough room for more data.
 func (file *File) CheckSize(more uint64) bool {
 	return file.UsedSize+more <= file.Size
@@ -86,7 +78,6 @@ func (file *File) CheckSizeAndEnsure(more uint64) {
 	if file.UsedSize+more <= file.Size {
 		return
 	}
-	file.recalculateGrowth()
 	// Unmap file buffer
 	var err error
 	if file.Buf != nil {

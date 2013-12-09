@@ -9,7 +9,7 @@ func TestOpenFlushClose(t *testing.T) {
 	tmp := "/tmp/tiedot_file_test"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	tmpFile, err := Open(tmp)
+	tmpFile, err := Open(tmp, 1000)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -21,7 +21,7 @@ func TestOpenFlushClose(t *testing.T) {
 	if tmpFile.UsedSize != 0 {
 		t.Fatal("Incorrect UsedSize")
 	}
-	if tmpFile.Growth != DEFAULT_GROWTH {
+	if tmpFile.Growth != 1000 {
 		t.Fatal("Growth not set")
 	}
 	if tmpFile.Fh == nil || tmpFile.Buf == nil {
@@ -40,7 +40,7 @@ func TestFindingAppend(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	// Open
-	tmpFile, err := Open(tmp)
+	tmpFile, err := Open(tmp, 1000)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -55,7 +55,7 @@ func TestFindingAppend(t *testing.T) {
 	tmpFile.Close()
 
 	// Re-open
-	tmpFile, err = Open(tmp)
+	tmpFile, err = Open(tmp, 1000)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestFindingAppend(t *testing.T) {
 	tmpFile.Close()
 
 	// Re-open again
-	tmpFile, err = Open(tmp)
+	tmpFile, err = Open(tmp, 1000)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
