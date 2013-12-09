@@ -10,12 +10,11 @@ import (
 )
 
 const (
-	COL_FILE_GROWTH      = uint64(134217728) // Grows by 128MB
-	DOC_MAX_ROOM         = 33554432          // Maximum size of a single document (initial size is halved)
-	DOC_HEADER           = 1 + 10            // Document header: validity (byte), document room (uint64)
-	DOC_VALID            = byte(1)           // Document valid flag
-	DOC_INVALID          = byte(0)           // Document invalid flag
-	COL_FILE_REGION_SIZE = 1024 * 64         // Granulairty of locks
+	DOC_MAX_ROOM         = 33554432  // Maximum size of a single document (initial size is halved)
+	DOC_HEADER           = 1 + 10    // Document header: validity (byte), document room (uint64)
+	DOC_VALID            = byte(1)   // Document valid flag
+	DOC_INVALID          = byte(0)   // Document invalid flag
+	COL_FILE_REGION_SIZE = 1024 * 64 // Granulairty of locks
 
 	// Document padding made of spaces (pre-compiled, 2048 bytes)
 	PADDING = "                                                                                                                                " +
@@ -37,7 +36,7 @@ type ColFile struct {
 
 // Open a collection file.
 func OpenCol(name string) (*ColFile, error) {
-	file, err := Open(name, COL_FILE_GROWTH)
+	file, err := Open(name)
 	// Devide collection file into regions, make one RW lock per region
 	rwMutexes := make([]*sync.RWMutex, file.Size/COL_FILE_REGION_SIZE)
 	for i := range rwMutexes {
@@ -90,7 +89,7 @@ func (col *ColFile) Insert(data []byte) (id uint64, err error) {
 		}
 		// Grow the data file, and make more mutexes for the new space
 		col.File.CheckSizeAndEnsure(DOC_HEADER + room)
-		moreMutexes := make([]*sync.RWMutex, COL_FILE_GROWTH/COL_FILE_REGION_SIZE+1)
+		moreMutexes := make([]*sync.RWMutex, col.File.Growth/COL_FILE_REGION_SIZE+1)
 		for i := range moreMutexes {
 			moreMutexes[i] = new(sync.RWMutex)
 		}

@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	HASH_TABLE_GROWTH      = uint64(134217728)   // Grows every 128MB
 	ENTRY_VALID            = byte(1)             // Entry valid flag
 	ENTRY_INVALID          = byte(0)             // Entry invalid flag
 	ENTRY_SIZE             = uint64(1 + 10 + 10) // Entry header: validity (byte), hash key (uint64) and value (uint64)
@@ -32,7 +31,7 @@ func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error
 	if hashBits < 2 || perBucket < 2 {
 		return nil, errors.New(fmt.Sprintf("ERROR: Hash table is too small (%d hash bits, %d per bucket)", hashBits, perBucket))
 	}
-	file, err := Open(name, HASH_TABLE_GROWTH)
+	file, err := Open(name)
 	if err != nil {
 		return
 	}
@@ -114,7 +113,7 @@ func (ht *HashTable) grow(bucket uint64) {
 		}
 		// Grow file size and make more mutexes
 		ht.File.CheckSizeAndEnsure(ht.BucketSize)
-		moreMutexes := make([]*sync.RWMutex, HASH_TABLE_GROWTH/HASH_TABLE_REGION_SIZE+1)
+		moreMutexes := make([]*sync.RWMutex, ht.File.Growth/HASH_TABLE_REGION_SIZE+1)
 		for i := range moreMutexes {
 			moreMutexes[i] = new(sync.RWMutex)
 		}
