@@ -18,6 +18,16 @@ type File struct {
 	Buf                    gommap.MMap // Mapped file buffer
 }
 
+// Return true if the buffer begins with ten consecutive 0s.
+func ConsecutiveTwenty0s(buf gommap.MMap) bool {
+	for i := 0; i < 20; i++ {
+		if buf[i] != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // Open the file, or create it if non-existing.
 func Open(name string, growth uint64) (file *File, err error) {
 	if growth < 1 {
@@ -46,8 +56,8 @@ func Open(name string, growth uint64) (file *File, err error) {
 	for low, mid, high := uint64(0), file.Size/2, file.Size; ; {
 		switch {
 		case high-mid == 1:
-			if file.Buf[mid] == 0 {
-				if file.Buf[mid-1] == 0 {
+			if ConsecutiveTwenty0s(file.Buf[mid:]) {
+				if ConsecutiveTwenty0s(file.Buf[mid-1:]) {
 					file.UsedSize = mid - 1
 				} else {
 					file.UsedSize = mid
@@ -56,7 +66,7 @@ func Open(name string, growth uint64) (file *File, err error) {
 			}
 			file.UsedSize = high
 			return
-		case file.Buf[mid] == 0:
+		case ConsecutiveTwenty0s(file.Buf[mid:]):
 			high = mid
 			mid = low + (mid-low)/2
 		default:
