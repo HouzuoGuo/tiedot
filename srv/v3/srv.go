@@ -32,6 +32,7 @@ func Start(db *db.DB, port int) {
 	http.HandleFunc("/drop", Drop)
 	http.HandleFunc("/all", All)
 	http.HandleFunc("/scrub", Scrub)
+	http.HandleFunc("/flush", Flush)
 	// query (asynchronized)
 	http.HandleFunc("/query", Query)
 	http.HandleFunc("/queryID", QueryID)

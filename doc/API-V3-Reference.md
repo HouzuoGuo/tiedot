@@ -54,6 +54,12 @@ HTTP 4xx/5xx response will always include a text message (not JSON) to help with
     <td>HTTP 200</td>
   </tr>
   <tr>
+    <td>Flush all database file</td>
+    <td>/flush</td>
+    <td></td>
+    <td>HTTP 200</td>
+  </tr>
+  <tr>
     <td>Scrub (repair and compact) collection</td>
     <td>/scrub</td>
     <td>Collection name `col`</td>

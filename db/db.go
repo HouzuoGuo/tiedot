@@ -128,6 +128,7 @@ func (db *DB) Flush() {
 	for _, col := range db.StrCol {
 		col.Flush()
 	}
+	tdlog.Printf("All buffers flushed (database %s)", db.Dir)
 }
 
 // Close all collections.
@@ -135,4 +136,5 @@ func (db *DB) Close() {
 	for _, col := range db.StrCol {
 		col.Close()
 	}
+	tdlog.Printf("Database closed (%s)", db.Dir)
 }

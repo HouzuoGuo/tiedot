@@ -84,3 +84,11 @@ func Scrub(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprint(err), 400)
 	}
 }
+
+func Flush(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "text/plain")
+	V3Sync.Lock()
+	defer V3Sync.Unlock()
+	V3DB.Flush()
+}
