@@ -7,6 +7,18 @@ import (
 	"testing"
 )
 
+func ensureMapHasKeys(m map[uint64]struct{}, keys ...uint64) bool {
+	if len(m) != len(keys) {
+		return false
+	}
+	for _, v := range keys {
+		if _, ok := m[v]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func runQueryV2(query string, col *Col) (map[uint64]struct{}, error) {
 	result := make(map[uint64]struct{})
 	var jq interface{}
