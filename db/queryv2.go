@@ -4,7 +4,7 @@ package db
 import (
 	"errors"
 	"fmt"
-	"log"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"regexp"
 	"strings"
 )
@@ -79,7 +79,7 @@ func V2Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, re
 		}
 	} else {
 		// Do collection scan, when index is not available
-		log.Printf("Query %v is a collection scan, which may be inefficient", expr)
+		tdlog.Printf("Query %v is a collection scan, which may be inefficient", expr)
 		counter := uint64(0)
 		docMatcher := func(id uint64, doc interface{}) bool {
 			// Get inside each document and find match
@@ -243,7 +243,7 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 		return errors.New(fmt.Sprintf("Missing `int-to`"))
 	}
 	if to > from && to-from > 1000 || from > to && from-to > 1000 {
-		log.Printf("Query %v is an index lookup of more than 1000 values, which may be inefficient", expr)
+		tdlog.Printf("Query %v is an index lookup of more than 1000 values, which may be inefficient", expr)
 	}
 	counter := int(0) // Number of results already collected
 	if ht, indexScan := src.StrHT[strings.Join(vecPath, ",")]; indexScan {
@@ -304,7 +304,7 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 		}
 	} else {
 		// Fall back to collection scan, when index is not available
-		log.Printf("Query %v is a collection scan which can be *very* inefficient, also query \"limit\" and reverse range support is unavailable!", expr)
+		tdlog.Printf("Query %v is a collection scan which can be *very* inefficient, also query \"limit\" and reverse range support is unavailable!", expr)
 		// Reversed range cannot be supported, sorry
 		if to < from {
 			tmp := from

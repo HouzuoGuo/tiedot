@@ -4,8 +4,8 @@ package v3
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -43,7 +43,7 @@ func Dump(w http.ResponseWriter, r *http.Request) {
 			if err := os.MkdirAll(destDir, 0700); err != nil {
 				return err
 			}
-			log.Printf("Dump created directory %s with permission 0700", destDir)
+			tdlog.Printf("Dump created directory %s with permission 0700", destDir)
 		} else {
 			// Open the file to be copied (collection data/index)
 			src, err := os.Open(currPath)
@@ -65,7 +65,7 @@ func Dump(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return err
 			}
-			log.Printf("Dump create file %s with permission 666 (before umask), size is %d", destPath, written)
+			tdlog.Printf("Dump create file %s with permission 666 (before umask), size is %d", destPath, written)
 		}
 		return nil
 	}

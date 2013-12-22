@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
-	"log"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"net/http"
 	"strconv"
 )
@@ -47,7 +47,7 @@ func Query(w http.ResponseWriter, r *http.Request) {
 		}
 		resp, err := json.Marshal(doc)
 		if err != nil {
-			log.Printf("Query returned invalid JSON '%v'", doc)
+			tdlog.Printf("Query returned invalid JSON '%v'", doc)
 			continue
 		}
 		w.Write([]byte(string(resp) + "\r\n"))

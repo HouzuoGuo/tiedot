@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/gommap"
-	"log"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"os"
 )
 
@@ -74,7 +74,7 @@ func Open(name string, growth uint64) (file *File, err error) {
 			mid = mid + (high-mid)/2
 		}
 	}
-	log.Printf("%s has %d bytes out of %d bytes in-use", name, file.UsedSize, file.Size)
+	tdlog.Printf("%s has %d bytes out of %d bytes in-use", name, file.UsedSize, file.Size)
 	return
 }
 
@@ -119,7 +119,7 @@ func (file *File) CheckSizeAndEnsure(more uint64) {
 		panic(err)
 	}
 	file.Size += file.Growth
-	log.Printf("File %s has grown %d bytes\n", file.Name, file.Growth)
+	tdlog.Printf("File %s has grown %d bytes\n", file.Name, file.Growth)
 	file.CheckSizeAndEnsure(more)
 }
 

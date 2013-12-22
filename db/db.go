@@ -4,8 +4,8 @@ package db
 import (
 	"errors"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -30,9 +30,9 @@ func OpenDB(dir string) (db *DB, err error) {
 	for _, f := range files {
 		if f.IsDir() {
 			if db.StrCol[f.Name()], err = OpenCol(path.Join(dir, f.Name())); err != nil {
-				log.Printf("ERROR: Failed to open collection %s, reason: %v", f.Name(), err)
+				tdlog.Errorf("ERROR: Failed to open collection %s, reason: %v", f.Name(), err)
 			} else {
-				log.Printf("Successfully opened collection %s", f.Name())
+				tdlog.Printf("Successfully opened collection %s", f.Name())
 			}
 		}
 	}
@@ -108,7 +108,7 @@ func (db *DB) Scrub(name string) (err error) {
 		// Recover as many documents as possible, insert them into the temporary collection
 		col.ForAll(func(id uint64, doc interface{}) bool {
 			if _, err = scrub.Insert(doc); err != nil {
-				log.Printf("ERROR: Scrubing %s, I could not insert '%v' back", name, doc)
+				tdlog.Errorf("ERROR: Scrubing %s, I could not insert '%v' back", name, doc)
 			}
 			return true
 		})

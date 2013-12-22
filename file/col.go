@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"sync"
 )
 
@@ -197,7 +197,7 @@ func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 		if validity != DOC_VALID && validity != DOC_INVALID || room > DOC_MAX_ROOM {
 			// If the document does not contain valid header, skip it
 			mutex.RUnlock()
-			log.Printf("ERROR: The document at %d in %s is corrupted", addr, col.File.Name)
+			tdlog.Errorf("ERROR: The document at %d in %s is corrupted", addr, col.File.Name)
 			// Move forward until we meet a valid document header
 			for addr++; col.File.Buf[addr] != DOC_VALID && col.File.Buf[addr] != DOC_INVALID && addr < col.File.UsedSize-DOC_HEADER; addr++ {
 			}

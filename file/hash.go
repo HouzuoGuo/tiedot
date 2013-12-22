@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math"
 	"sync"
 )
@@ -67,7 +67,7 @@ func OpenHash(name string, hashBits, perBucket uint64) (ht *HashTable, err error
 		ht.File.CheckSizeAndEnsure(((usedSize-ht.File.Size)/ht.BucketSize + 1) * ht.BucketSize)
 	}
 	ht.File.UsedSize = usedSize
-	log.Printf("%s has %d initial buckets, %d buckets, and %d bytes out of %d bytes in-use", name, ht.InitialBuckets, ht.NumBuckets, ht.File.UsedSize, ht.File.Size)
+	tdlog.Printf("%s has %d initial buckets, %d buckets, and %d bytes out of %d bytes in-use", name, ht.InitialBuckets, ht.NumBuckets, ht.File.UsedSize, ht.File.Size)
 	return ht, nil
 }
 
@@ -80,10 +80,10 @@ func (ht *HashTable) nextBucket(bucket uint64) uint64 {
 	if next, _ := binary.Uvarint(ht.File.Buf[bucketAddr : bucketAddr+BUCKET_HEADER_SIZE]); next == 0 {
 		return 0
 	} else if next <= bucket {
-		log.Printf("ERROR: Bucket loop in hash table %s at bucket no.%d, address %d", ht.File.Name, bucket, bucketAddr)
+		tdlog.Errorf("ERROR: Bucket loop in hash table %s at bucket no.%d, address %d", ht.File.Name, bucket, bucketAddr)
 		return 0
 	} else if next >= ht.NumBuckets || next < ht.InitialBuckets {
-		log.Printf("ERROR: Bad bucket refernece (%d is out of range %d - %d) in %s", next, ht.InitialBuckets, ht.NumBuckets, ht.File.Name)
+		tdlog.Errorf("ERROR: Bad bucket refernece (%d is out of range %d - %d) in %s", next, ht.InitialBuckets, ht.NumBuckets, ht.File.Name)
 		return 0
 	} else {
 		return next

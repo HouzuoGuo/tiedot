@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/file"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"github.com/HouzuoGuo/tiedot/uid"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"strconv"
@@ -126,7 +126,7 @@ func (col *Col) LoadConf() error {
 func GetIn(doc interface{}, path []string) (ret []interface{}) {
 	docMap, ok := doc.(map[string]interface{})
 	if !ok {
-		log.Printf("%v cannot be indexed because type conversation to map[string]interface{} failed", doc)
+		tdlog.Printf("%v cannot be indexed because type conversation to map[string]interface{} failed", doc)
 		return
 	}
 	var thing interface{} = docMap
@@ -158,7 +158,7 @@ func (col *Col) Read(id uint64, doc interface{}) error {
 	}
 	if err := json.Unmarshal(data, &doc); err != nil {
 		msg := fmt.Sprintf("ERROR: Cannot parse document %d in %s to JSON", id, col.Dir)
-		log.Println(msg)
+		tdlog.Println(msg)
 		return errors.New(msg)
 	}
 	return nil
@@ -265,7 +265,7 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	if err = json.Unmarshal(oldData, &oldDoc); err == nil {
 		col.UnindexDoc(id, oldDoc)
 	} else {
-		log.Printf("ERROR: The original document %d in %s is corrupted, this update will attempt to overwrite it", id, col.Dir)
+		tdlog.Errorf("ERROR: The original document %d in %s is corrupted, this update will attempt to overwrite it", id, col.Dir)
 	}
 	// Update document data
 	if newID, err = col.Data.Update(id, data); err != nil {
@@ -423,7 +423,7 @@ func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
 	col.Data.ForAll(func(id uint64, data []byte) bool {
 		var parsed interface{}
 		if err := json.Unmarshal(data, &parsed); err != nil {
-			log.Printf("ERROR: Cannot parse document %d in %s to JSON", id, col.Dir)
+			tdlog.Errorf("ERROR: Cannot parse document %d in %s to JSON", id, col.Dir)
 			return true
 		} else {
 			return fun(id, parsed)
@@ -445,12 +445,12 @@ func (col *Col) DeserializeAll(template interface{}, fun func(id uint64) bool) {
 // Flush collection data and index files.
 func (col *Col) Flush() error {
 	if err := col.Data.File.Flush(); err != nil {
-		log.Printf("ERROR: Failed to flush %s, reason: %v", col.Data.File.Name, err)
+		tdlog.Errorf("ERROR: Failed to flush %s, reason: %v", col.Data.File.Name, err)
 		return err
 	}
 	for _, ht := range col.StrHT {
 		if err := ht.File.Flush(); err != nil {
-			log.Printf("ERROR: Failed to flush %s, reason: %v", ht.File.Name, err)
+			tdlog.Errorf("ERROR: Failed to flush %s, reason: %v", ht.File.Name, err)
 			return err
 		}
 	}
@@ -460,11 +460,11 @@ func (col *Col) Flush() error {
 // Close the collection.
 func (col *Col) Close() {
 	if err := col.Data.File.Close(); err != nil {
-		log.Printf("ERROR: Failed to close %s, reason: %v", col.Data.File.Name, err)
+		tdlog.Errorf("ERROR: Failed to close %s, reason: %v", col.Data.File.Name, err)
 	}
 	for _, ht := range col.StrHT {
 		if err := ht.File.Close(); err != nil {
-			log.Printf("ERROR: Failed to close %s, reason: %v", ht.File.Name, err)
+			tdlog.Errorf("ERROR: Failed to close %s, reason: %v", ht.File.Name, err)
 		}
 	}
 }

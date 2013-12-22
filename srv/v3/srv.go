@@ -4,7 +4,7 @@ package v3
 import (
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
-	"log"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"net/http"
 	"sync"
 	"time"
@@ -62,9 +62,9 @@ func Start(db *db.DB, port int) {
 		ticker := time.Tick(time.Minute)
 		for _ = range ticker {
 			V3DB.Flush()
-			log.Printf("Buffers flushed at %s", time.Now())
+			tdlog.Printf("Buffers flushed at %s", time.Now())
 		}
 	}()
-	log.Printf("Listening on all interfaces, port %d", port)
+	tdlog.Printf("Listening on all interfaces, port %d", port)
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
