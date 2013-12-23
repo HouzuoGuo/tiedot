@@ -33,7 +33,7 @@ func main() {
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
 	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
 	flag.BoolVar(&profile, "profile", false, "write profiler results to prof.out")
-	flag.BoolVar(&tdlog.DefaultLogger.Verbose, "verbose", true, "verbose logging true/false (default is true)")
+	flag.BoolVar(&tdlog.VerboseLog, "verbose", true, "verbose logging true/false (default is true)")
 	flag.Parse()
 
 	// User must specify a mode to run
