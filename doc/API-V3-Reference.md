@@ -54,12 +54,6 @@ HTTP 4xx/5xx response will always include a text message (not JSON) to help with
     <td>HTTP 200</td>
   </tr>
   <tr>
-    <td>Flush all database file</td>
-    <td>/flush</td>
-    <td></td>
-    <td>HTTP 200</td>
-  </tr>
-  <tr>
     <td>Scrub (repair and compact) collection</td>
     <td>/scrub</td>
     <td>Collection name `col`</td>
@@ -128,6 +122,12 @@ HTTP 4xx/5xx response will always include a text message (not JSON) to help with
     <td>Delete a document by UID</td>
     <td>/deleteByUID</td>
     <td>Collection name `col` and document UID `uid`</td>
+    <td>HTTP 200</td>
+  </tr>
+  <tr>
+    <td>Flush all database file</td>
+    <td>/flush</td>
+    <td>(nil)</td>
     <td>HTTP 200</td>
   </tr>
 </table>

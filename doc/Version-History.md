@@ -1,4 +1,4 @@
-### master
+### 1.2 (2013-12-31)
 
 Bug fix:
 
@@ -10,6 +10,13 @@ Improvements:
 - Benchmark sample size is now configurable via CLI parameters.
 - Structures inside array may now be indexed as well.
 - New HTTP service endpoint to dump database while staying online.
+- New HTTP service endpoint to flush all data buffers.
+- Verbose log messages can be turned on/off.
+
+Be aware that:
+
+- Original V1 and V2 HTTP APIs have been removed, together with their documents.
+- Old query processor (used by V1 and V2 APIs) has been removed.
 
 ### 1.1 (2013-11-07)
 
