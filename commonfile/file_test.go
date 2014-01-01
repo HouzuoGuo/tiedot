@@ -1,3 +1,4 @@
+/* CommonFile feature test cases. */
 package commonfile
 
 import (
