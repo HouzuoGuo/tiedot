@@ -192,7 +192,7 @@ func TestOutOfBoundAccess(t *testing.T) {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	// Test UsedSize
-	correctUsedSize := uint64((DOC_HEADER + 3*2) + (DOC_HEADER+4*2)*2)
+	correctUsedSize := uint64((DOC_HEADER_SIZE + 3*2) + (DOC_HEADER_SIZE+4*2)*2)
 	if col.File.UsedSize != correctUsedSize {
 		t.Fatalf("Invalid UsedSize")
 	}

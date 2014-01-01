@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	COL_FILE_SIZE = uint64(1024 * 1024 * 16) // Size of collection data file
-	DOC_MAX_ROOM  = uint64(1024 * 1024 * 16) // Max single document size
-	DOC_HEADER    = 1 + 10                   // Size of document header - validity (byte), document room (uint64)
-	DOC_VALID     = byte(1)                  // Document valid flag
-	DOC_INVALID   = byte(0)                  // Document invalid flag
+	COL_FILE_SIZE   = uint64(1024 * 1024 * 16) // Size of collection data file
+	DOC_MAX_ROOM    = uint64(1024 * 1024 * 16) // Max single document size
+	DOC_HEADER_SIZE = 1 + 10                   // Size of document header - validity (byte), document room (uint64)
+	DOC_VALID       = byte(1)                  // Document valid flag
+	DOC_INVALID     = byte(0)                  // Document invalid flag
 
 	// Pre-compiled document padding (2048 spaces)
 	PADDING = "                                                                                                                                " +
@@ -40,7 +40,7 @@ func OpenCol(name string) (*ColFile, error) {
 
 // Retrieve document data given its ID.
 func (col *ColFile) Read(id uint64) []byte {
-	if col.File.UsedSize < DOC_HEADER || id >= col.File.UsedSize-DOC_HEADER {
+	if col.File.UsedSize < DOC_HEADER_SIZE || id >= col.File.UsedSize-DOC_HEADER_SIZE {
 		return nil
 	}
 	if col.File.Buf[id] != DOC_VALID {
@@ -50,11 +50,11 @@ func (col *ColFile) Read(id uint64) []byte {
 		return nil
 	} else {
 		docCopy := make([]byte, room)
-		docEnd := id + DOC_HEADER + room
+		docEnd := id + DOC_HEADER_SIZE + room
 		if docEnd >= col.File.Size {
 			return nil
 		}
-		copy(docCopy, col.File.Buf[id+DOC_HEADER:docEnd])
+		copy(docCopy, col.File.Buf[id+DOC_HEADER_SIZE:docEnd])
 		return docCopy
 	}
 }
@@ -69,18 +69,18 @@ func (col *ColFile) Insert(data []byte) (id uint64, outOfSpace bool, err error) 
 	}
 	// Keep track of new document ID and used space
 	id = col.File.UsedSize
-	if !col.File.CheckSize(DOC_HEADER + room) {
+	if !col.File.CheckSize(DOC_HEADER_SIZE + room) {
 		outOfSpace = true
 		return
 	}
-	col.File.UsedSize = id + DOC_HEADER + room
+	col.File.UsedSize = id + DOC_HEADER_SIZE + room
 	// Make document header, then copy document data
 	col.File.Buf[id] = 1
-	binary.PutUvarint(col.File.Buf[id+1:id+DOC_HEADER], room)
-	paddingBegin := id + DOC_HEADER + len64
-	copy(col.File.Buf[id+DOC_HEADER:paddingBegin], data)
+	binary.PutUvarint(col.File.Buf[id+1:id+DOC_HEADER_SIZE], room)
+	paddingBegin := id + DOC_HEADER_SIZE + len64
+	copy(col.File.Buf[id+DOC_HEADER_SIZE:paddingBegin], data)
 	// Fill up padding space
-	paddingEnd := id + DOC_HEADER + room
+	paddingEnd := id + DOC_HEADER_SIZE + room
 	for segBegin := paddingBegin; segBegin < paddingEnd; segBegin += LEN_PADDING {
 		segSize := LEN_PADDING
 		segEnd := segBegin + LEN_PADDING
@@ -101,7 +101,7 @@ func (col *ColFile) Update(id uint64, data []byte) (newID uint64, outOfSpace boo
 		err = errors.New(fmt.Sprintf("Updated document is too large"))
 		return
 	}
-	if col.File.UsedSize < DOC_HEADER || id >= col.File.UsedSize-DOC_HEADER {
+	if col.File.UsedSize < DOC_HEADER_SIZE || id >= col.File.UsedSize-DOC_HEADER_SIZE {
 		err = errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.File.Name))
 		return
 	}
@@ -116,10 +116,10 @@ func (col *ColFile) Update(id uint64, data []byte) (newID uint64, outOfSpace boo
 		if len64 <= room {
 			// There is enough room for the updated document
 			// Overwrite document data
-			paddingBegin := id + DOC_HEADER + len64
-			copy(col.File.Buf[id+DOC_HEADER:paddingBegin], data)
+			paddingBegin := id + DOC_HEADER_SIZE + len64
+			copy(col.File.Buf[id+DOC_HEADER_SIZE:paddingBegin], data)
 			// Overwrite padding space
-			paddingEnd := id + DOC_HEADER + room
+			paddingEnd := id + DOC_HEADER_SIZE + room
 			for segBegin := paddingBegin; segBegin < paddingEnd; segBegin += LEN_PADDING {
 				segSize := LEN_PADDING
 				segEnd := segBegin + LEN_PADDING
@@ -140,7 +140,7 @@ func (col *ColFile) Update(id uint64, data []byte) (newID uint64, outOfSpace boo
 
 // Delete a document.
 func (col *ColFile) Delete(id uint64) {
-	if col.File.UsedSize < DOC_HEADER || id >= col.File.UsedSize-DOC_HEADER {
+	if col.File.UsedSize < DOC_HEADER_SIZE || id >= col.File.UsedSize-DOC_HEADER_SIZE {
 		return
 	}
 	if col.File.Buf[id] == DOC_VALID {
@@ -152,7 +152,7 @@ func (col *ColFile) Delete(id uint64) {
 func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 	addr := uint64(0)
 	for {
-		if col.File.UsedSize < DOC_HEADER || addr >= col.File.UsedSize-DOC_HEADER {
+		if col.File.UsedSize < DOC_HEADER_SIZE || addr >= col.File.UsedSize-DOC_HEADER_SIZE {
 			break
 		}
 		// Read document header - validity and room
@@ -162,14 +162,14 @@ func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 			// If the document does not contain valid header, skip it
 			tdlog.Errorf("ERROR: The document at %d in %s is corrupted", addr, col.File.Name)
 			// Move forward until we meet a valid document header
-			for addr++; col.File.Buf[addr] != DOC_VALID && col.File.Buf[addr] != DOC_INVALID && addr < col.File.UsedSize-DOC_HEADER; addr++ {
+			for addr++; col.File.Buf[addr] != DOC_VALID && col.File.Buf[addr] != DOC_INVALID && addr < col.File.UsedSize-DOC_HEADER_SIZE; addr++ {
 			}
 			continue
 		}
 		// If the function returns false, do not continue scanning
-		if validity == DOC_VALID && !fun(addr, col.File.Buf[addr+DOC_HEADER:addr+DOC_HEADER+room]) {
+		if validity == DOC_VALID && !fun(addr, col.File.Buf[addr+DOC_HEADER_SIZE:addr+DOC_HEADER_SIZE+room]) {
 			break
 		}
-		addr += DOC_HEADER + room
+		addr += DOC_HEADER_SIZE + room
 	}
 }
