@@ -1,5 +1,5 @@
 /* Common data file features. */
-package file
+package commonfile
 
 import (
 	"errors"

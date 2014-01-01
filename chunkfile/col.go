@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/file"
+	"github.com/HouzuoGuo/tiedot/commonfile"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
@@ -29,12 +29,12 @@ const (
 )
 
 type ColFile struct {
-	File *file.File
+	File *commonfile.File
 }
 
 // Open a collection file.
 func OpenCol(name string) (*ColFile, error) {
-	file, err := file.Open(name, COL_FILE_SIZE)
+	file, err := commonfile.Open(name, COL_FILE_SIZE)
 	return &ColFile{File: file}, err
 }
 
