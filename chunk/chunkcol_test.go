@@ -320,6 +320,15 @@ func TestIndex(t *testing.T) {
 	if _, ok := col.Path2HT["a,b,c"]; ok {
 		t.Fatal("did not delete index")
 	}
+	if len(col.Path2HT) != 2 || len(col.Hashtables) != 2 || len(col.HTPaths) != 2 {
+		t.Fatal("did not delete index")
+	}
+	if col.HTPaths[0][0] != UID_PATH {
+		t.Fatal("index fault")
+	}
+	if col.HTPaths[1][0] != "d" {
+		t.Fatal("index fault")
+	}
 	newID, outOfSpace, err := col.Insert(jsonDoc[0])
 	if err != nil || outOfSpace {
 		t.Fatal("insert error")
@@ -356,15 +365,15 @@ func TestUIDDocCRUD(t *testing.T) {
 	// insert
 	ids[0], uids[0], outOfSpace, err = col.InsertWithUID(jsonDocs[0])
 	if err != nil || outOfSpace {
-		t.Fatal(err)
+		t.Fatal("insert error")
 	}
 	ids[1], uids[1], outOfSpace, err = col.InsertWithUID(jsonDocs[1])
 	if err != nil || outOfSpace {
-		t.Fatal(err)
+		t.Fatal("insert error")
 	}
 	ids[2], uids[2], outOfSpace, err = col.InsertWithUID(jsonDocs[2])
 	if err != nil || outOfSpace {
-		t.Fatal(err)
+		t.Fatal("insert error")
 	}
 	if len(uids[0]) != 32 || len(uids[1]) != 32 || len(uids[2]) != 32 ||
 		uids[0] == uids[1] || uids[1] == uids[2] || uids[2] == uids[0] ||

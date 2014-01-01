@@ -89,6 +89,7 @@ func OpenChunk(baseDir string) (chunk *ChunkCol, err error) {
 	if err = chunk.OpenIndex(UID_PATH, path.Join(baseDir, UID_FILENAME_MAGIC)); err != nil {
 		return
 	}
+	chunk.UidHT = chunk.Hashtables[0] // so far, the UID hashtable is the only one opened
 
 	// Walk the chunk's directory and look for other files to be opened
 	walker := func(currPath string, info os.FileInfo, err2 error) error {
@@ -130,22 +131,22 @@ func (col *ChunkCol) OpenIndex(joinedIndexPath string, filename string) (err err
 }
 
 // Create a new index. Do not operate on this collection until it finishes!
-func (col *ChunkCol) Index(path []string) error {
-	joinedIndexPath := strings.Join(path, ",")
+func (col *ChunkCol) Index(indexPath []string) error {
+	joinedIndexPath := strings.Join(indexPath, ",")
 	// Return error if the path is already indexed
 	if _, alreadyExists := col.Path2HT[joinedIndexPath]; alreadyExists {
-		return errors.New(fmt.Sprintf("Path %v is already indexed in collection %s", path, col.BaseDir))
+		return errors.New(fmt.Sprintf("Path %v is already indexed in collection %s", indexPath, col.BaseDir))
 	}
 	// Open new index
 	newIndexFileName := HASHTABLE_FILENAME_MAGIC + joinedIndexPath
-	col.OpenIndex(joinedIndexPath, newIndexFileName)
+	col.OpenIndex(joinedIndexPath, path.Join(col.BaseDir, newIndexFileName))
 	// Put all documents on the new index
-	newIndex, ok := col.Path2HT[strings.Join(path, ",")]
+	newIndex, ok := col.Path2HT[strings.Join(indexPath, ",")]
 	if !ok {
-		return errors.New(fmt.Sprintf("The new index %v is gone from %s??", path, col.BaseDir))
+		return errors.New(fmt.Sprintf("The new index %v is gone from %s??", indexPath, col.BaseDir))
 	}
 	col.ForAll(func(id uint64, doc interface{}) bool {
-		for _, thing := range GetIn(doc, path) {
+		for _, thing := range GetIn(doc, indexPath) {
 			if thing != nil {
 				newIndex.Put(StrHash(thing), id)
 			}
@@ -282,7 +283,7 @@ func (col *ChunkCol) InsertWithUID(doc interface{}) (newID uint64, newUID string
 		err = errors.New("Only JSON object document may have UID")
 		return
 	} else {
-		docMap["_uid"] = newUID
+		docMap[UID_PATH] = newUID
 		newID, outOfSpace, err = col.Insert(doc)
 		return
 	}
@@ -298,7 +299,7 @@ func (col *ChunkCol) ReadByUID(uid string, doc interface{}) (uint64, error) {
 		if col.Read(value, &candidate) == nil {
 			if docMap, ok := candidate.(map[string]interface{}); ok {
 				// Physically read the document to avoid hash collision
-				if candidateUID, ok := docMap["_uid"]; ok {
+				if candidateUID, ok := docMap[UID_PATH]; ok {
 					if stringUID, ok := candidateUID.(string); ok {
 						if stringUID != uid {
 							return false // A hash collision
@@ -338,7 +339,7 @@ func (col *ChunkCol) ReassignUID(id uint64) (newID uint64, newUID string, newDoc
 		err = errors.New("Only JSON object document may have UID")
 		return
 	} else {
-		docWithUID["_uid"] = newUID
+		docWithUID[UID_PATH] = newUID
 		newDoc = docWithUID
 		newID, outOfSpace, err = col.Update(id, docWithUID)
 		return
