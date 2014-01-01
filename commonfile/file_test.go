@@ -36,7 +36,7 @@ func TestOpenFlushClose(t *testing.T) {
 	}
 }
 
-func TestFindingAppend(t *testing.T) {
+func TestFindingAppendAndClear(t *testing.T) {
 	tmp := "/tmp/tiedot_file_test"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
@@ -73,6 +73,11 @@ func TestFindingAppend(t *testing.T) {
 	}
 	if tmpFile.UsedSize != 751 {
 		t.Fatalf("Incorrect Append")
+	}
+	// Clear the file and test size
+	tmpFile.Clear()
+	if !(len(tmpFile.Buf) == 1000 && tmpFile.Buf[750] == 0 && tmpFile.Growth == 1000 && tmpFile.Size == 1000 && tmpFile.UsedSize == 0) {
+		t.Fatal("Did not clear")
 	}
 	tmpFile.Close()
 }

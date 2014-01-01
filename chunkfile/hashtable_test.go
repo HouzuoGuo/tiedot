@@ -6,13 +6,17 @@ import (
 	"testing"
 )
 
-func TestPutGetReopen(t *testing.T) {
+func TestPutGetReopenClear(t *testing.T) {
 	tmp := "/tmp/tiedot_hash_test"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
+	}
+	// Test initial size information
+	if !(ht.NumBuckets == INITIAL_BUCKETS && ht.File.UsedSize == INITIAL_BUCKETS*BUCKET_SIZE && ht.File.Size == HT_FILE_SIZE) {
+		t.Fatal("Wrong size")
 	}
 	defer ht.File.Close()
 	for i := uint64(0); i < 1024*1024*2; i++ {
@@ -45,6 +49,15 @@ func TestPutGetReopen(t *testing.T) {
 		if !(len(keys) == 1 && keys[0] == i && len(vals) == 1 && vals[0] == i) {
 			t.Fatalf("Get failed on key %d, got %v and %v", i, keys, vals)
 		}
+	}
+	// Clear the hash table
+	reopened.Clear()
+	if !(reopened.NumBuckets == INITIAL_BUCKETS && reopened.File.UsedSize == INITIAL_BUCKETS*BUCKET_SIZE) {
+		t.Fatal("Did not clear the hash table")
+	}
+	keys, vals := ht.GetAll(0)
+	if len(keys) != 0 || len(vals) != 0 {
+		t.Fatal("Did not clear the hash table")
 	}
 }
 

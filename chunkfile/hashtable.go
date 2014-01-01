@@ -34,6 +34,12 @@ func OpenHash(name string) (ht *HashTable, err error) {
 		return
 	}
 	ht = &HashTable{File: file}
+	ht.calculateSizeInfo()
+	return ht, nil
+}
+
+// Calculate used size, total size, total number of buckets.
+func (ht *HashTable) calculateSizeInfo() {
 	// Find out how many buckets there are in table - hence the amount of used space
 	// .. assume the entire file is Full of buckets
 	ht.File.UsedSize = ht.File.Size
@@ -55,8 +61,7 @@ func OpenHash(name string) (ht *HashTable, err error) {
 		ht.File.CheckSizeAndEnsure(((usedSize-ht.File.Size)/BUCKET_SIZE + 1) * BUCKET_SIZE)
 	}
 	ht.File.UsedSize = usedSize
-	tdlog.Printf("%s has %d buckets, and %d bytes out of %d bytes in-use", name, ht.NumBuckets, ht.File.UsedSize, ht.File.Size)
-	return ht, nil
+	tdlog.Printf("%s has %d buckets, and %d bytes out of %d bytes in-use", ht.File.Name, ht.NumBuckets, ht.File.UsedSize, ht.File.Size)
 }
 
 // Return the number (not address) of next chained bucket, 0 if there is not any.
@@ -103,6 +108,13 @@ func (ht *HashTable) grow(bucket uint64) {
 // Return a hash key to be used by hash table by masking non-key bits.
 func (ht *HashTable) hashKey(key uint64) uint64 {
 	return key & ((1 << HASH_BITS) - 1)
+}
+
+// Clear all index entries, return to the initial size as well.
+func (ht *HashTable) Clear() {
+	ht.File.Clear()
+	// Recalculate size information
+	ht.calculateSizeInfo()
 }
 
 // Put a new key-value pair.

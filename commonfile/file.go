@@ -105,6 +105,30 @@ func (file *File) CheckSizeAndEnsure(more uint64) {
 	file.CheckSizeAndEnsure(more)
 }
 
+// Overwrite the file with 0s and return to its initial size.
+func (file *File) Clear() {
+	var err error
+	if err = file.Close(); err != nil {
+		panic(err)
+	}
+	// Shrink to 0 size, then enlarge
+	if err = os.Truncate(file.Name, int64(0)); err != nil {
+		panic(err)
+	}
+	if err = os.Truncate(file.Name, int64(file.Growth)); err != nil {
+		panic(err)
+	}
+	// Re-open and reset current size
+	if file.Fh, err = os.OpenFile(file.Name, os.O_CREATE|os.O_RDWR, 0600); err != nil {
+		panic(err)
+	}
+	if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
+		panic(err)
+	}
+	file.UsedSize = 0
+	file.Size = file.Growth
+}
+
 // Synchronize file buffer with underlying storage device.
 func (file *File) Flush() error {
 	return file.Buf.Flush()

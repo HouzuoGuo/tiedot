@@ -3,7 +3,9 @@ package chunk
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/chunkfile"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -380,8 +382,12 @@ func TestUIDDocCRUD(t *testing.T) {
 		ids[0] == ids[1] || ids[1] == ids[2] || ids[2] == ids[0] {
 		t.Fatalf("Malformed UIDs or IDs: %v %v", uids, ids)
 	}
-	// read
+	// read - inexisting UID
 	var readDoc interface{}
+	if _, readErr := col.ReadByUID("abcde", &readDoc); readErr == nil {
+		t.Fatal("It should have triggered UID not found error")
+	}
+	// read - existing UID
 	readID, readErr := col.ReadByUID(uids[1], &readDoc)
 	if readErr != nil {
 		t.Fatal(readErr)
@@ -397,7 +403,7 @@ func TestUIDDocCRUD(t *testing.T) {
 	if _, outOfSpace, err := col.UpdateByUID(uids[0], docWithoutUID); err != nil || outOfSpace { // intentionally remove UID
 		t.Fatal(err)
 	}
-	if _, err = col.ReadByUID(uids[0], &readDoc); err == nil { // UID was removed therefore the error should happen
+	if _, err = col.ReadByUID(uids[0], &readDoc); err == nil { // UID was removed therefore the UID is not found
 		t.Fatalf("UpdateByUID did not work, still read %v", readDoc)
 	}
 	// update (reassign UID)
@@ -410,13 +416,55 @@ func TestUIDDocCRUD(t *testing.T) {
 	if newID != ids[0] || len(newUID) != 32 || err != nil || outOfSpace {
 		t.Fatalf("ReassignUID did not work: %v %v %v", newID, newUID, err)
 	}
-	uids[0] = newUID
-	if _, err = col.ReadByUID(uids[0], &readDoc); err != nil { // UID was reassigned, the error should NOT happen
+	// after UID reassignment, the old UID should be gone
+	if _, readErr := col.ReadByUID(uids[0], &readDoc); readErr == nil {
+		t.Fatal("It should have triggered UID not found error")
+	}
+	if _, err = col.ReadByUID(newUID, &readDoc); err != nil { // UID was reassigned, the error should NOT happen
 		t.Fatalf("ReassignUID did not work")
 	}
 	// delete
-	col.DeleteByUID(uids[0])
-	if _, err = col.ReadByUID(uids[0], &readDoc); err == nil {
+	col.DeleteByUID(newUID)
+	if _, err = col.ReadByUID(newUID, &readDoc); err == nil {
 		t.Fatalf("DeleteByUID did not work")
 	}
+}
+
+func TestOutOfSpace(t *testing.T) {
+	tmp := "/tmp/tiedot_col_test"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenChunk(tmp)
+	if err != nil {
+		t.Fatalf("Failed to open: %v", err)
+		return
+	}
+	defer col.Close()
+	var outOfSpace bool
+	// Prepare a very long document - a single one will fill up 2/5 of a chunk
+	longDocStr := `{"a": "` + strings.Repeat(" ", int(chunkfile.DOC_MAX_ROOM/5)) + `"}`
+	var longDoc interface{}
+	json.Unmarshal([]byte(longDocStr), &longDoc)
+	_, _, outOfSpace, err = col.InsertWithUID(longDoc)
+	if err != nil || outOfSpace {
+		t.Fatalf("Failed to insert a long document: %v %v", err, outOfSpace)
+	}
+	_, docUID, outOfSpace, err := col.InsertWithUID(longDoc)
+	if err != nil || outOfSpace {
+		t.Fatalf("Failed to insert a long document: %v %v", err, outOfSpace)
+	}
+	// It should run out of space this time
+	_, _, outOfSpace, err = col.InsertWithUID(longDoc)
+	if err != nil || !outOfSpace {
+		t.Fatalf("It should run out of space")
+	}
+	// Prepare a even longer document to overwrite the previous one (to trigger re-insert)
+	longerDocStr := `{"a": "` + strings.Repeat(" ", int(chunkfile.DOC_MAX_ROOM/2-100)) + `"}`
+	var longerDoc interface{}
+	json.Unmarshal([]byte(longerDocStr), &longerDoc)
+	_, outOfSpace, err = col.UpdateByUID(docUID, longerDoc)
+	if !outOfSpace || err != nil {
+		t.Fatalf("It Should run out of space %v %v", err, outOfSpace)
+	}
+
 }
