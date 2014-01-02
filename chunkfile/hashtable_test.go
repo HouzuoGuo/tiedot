@@ -2,6 +2,7 @@
 package chunkfile
 
 import (
+	"fmt"
 	"os"
 	"testing"
 )
@@ -19,6 +20,7 @@ func TestPutGetReopenClear(t *testing.T) {
 		t.Fatal("Wrong size")
 	}
 	defer ht.File.Close()
+	fmt.Println("Please be patient, this may take a minute.")
 	for i := uint64(0); i < 1024*1024*2; i++ {
 		ht.Put(i, i)
 	}
