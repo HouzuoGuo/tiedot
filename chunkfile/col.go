@@ -164,6 +164,7 @@ func (col *ColFile) ForAll(fun func(id uint64, doc []byte) bool) {
 			// Move forward until we meet a valid document header
 			for addr++; col.File.Buf[addr] != DOC_VALID && col.File.Buf[addr] != DOC_INVALID && addr < col.File.UsedSize-DOC_HEADER_SIZE; addr++ {
 			}
+			tdlog.Errorf("ERROR: Corrupted document skipped, now at %d", addr)
 			continue
 		}
 		// If the function returns false, do not continue scanning

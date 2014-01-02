@@ -145,8 +145,22 @@ func TestGetAll(t *testing.T) {
 	ht.Put(2, 1)
 	ht.Put(2, 2)
 	ht.Put(2, 3)
+	ht.Put(2, 3)
+	ht.Put(2, 3)
+	ht.Put(2, 3)
+	ht.Put(2, 3)
+	ht.Put(2, 3)
+	ht.Put(2, 3)
+	ht.Put(2, 3)
+	ht.Put(2, 3)
+	ht.Put(2, 3)
+	ht.Put(2, 3)
 	keys, vals := ht.GetAll(0)
-	if !(len(keys) == 6 && len(vals) == 6) {
-		t.Fatalf("Did not have all, got only %v, %v", keys, vals)
+	if !(len(keys) == 16 && len(vals) == 16) {
+		t.Fatalf("Did not get everything, got only %v, %v", keys, vals)
+	}
+	keys, vals = ht.GetAll(3)
+	if !(len(keys) == 3 && len(vals) == 3) {
+		t.Fatalf("Did not get three values, got %v, %v", keys, vals)
 	}
 }

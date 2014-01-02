@@ -79,6 +79,8 @@ func TestFindingAppendAndClear(t *testing.T) {
 	if !(len(tmpFile.Buf) == 1000 && tmpFile.Buf[750] == 0 && tmpFile.Growth == 1000 && tmpFile.Size == 1000 && tmpFile.UsedSize == 0) {
 		t.Fatal("Did not clear")
 	}
+	// Can still write to the buffer?
+	tmpFile.Buf[999] = 1
 	tmpFile.Close()
 }
 
@@ -113,4 +115,9 @@ func TestFileGrow(t *testing.T) {
 	if tmpFile.Growth != 4 {
 		t.Fatalf("Incorrect Growth")
 	}
+	// Can write to the new (now larger) region
+	tmpFile.Buf[10] = 1
+	tmpFile.Buf[11] = 1
+	tmpFile.Close()
+
 }

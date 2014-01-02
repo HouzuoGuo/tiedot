@@ -62,6 +62,7 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 			for _, element := range anArray {
 				ret = append(ret, GetIn(element, path[i:])...)
 			}
+			return ret
 		} else {
 			return nil
 		}
@@ -112,7 +113,7 @@ func OpenChunk(baseDir string) (chunk *ChunkCol, err error) {
 		case strings.HasPrefix(info.Name(), HASHTABLE_FILENAME_MAGIC):
 			// Open a hash table index
 			tdlog.Printf("Opening collection index hashtable %s", info.Name())
-			chunk.OpenIndex(info.Name()[len(HASHTABLE_FILENAME_MAGIC):], info.Name())
+			chunk.OpenIndex(info.Name()[len(HASHTABLE_FILENAME_MAGIC):], path.Join(baseDir, info.Name()))
 		}
 		return nil
 	}
@@ -361,7 +362,7 @@ func (col *ChunkCol) DeleteByUID(uid string) {
 func (col *ChunkCol) ForAll(fun func(id uint64, doc interface{}) bool) {
 	col.Data.ForAll(func(id uint64, data []byte) bool {
 		var parsed interface{}
-		if err := json.Unmarshal(data, &parsed); err != nil {
+		if err := json.Unmarshal(data, &parsed); err != nil || parsed == nil {
 			tdlog.Errorf("Cannot parse document %d in %s to JSON", id, col.BaseDir)
 			return true
 		} else {
@@ -387,20 +388,35 @@ func (col *ChunkCol) Scrub() {
 	bakFileName := DAT_FILENAME_MAGIC + "_" + strconv.Itoa(int(time.Now().UnixNano()))
 	bakDest, err := os.Create(path.Join(col.BaseDir, bakFileName))
 	if err != nil {
-		tdlog.Errorf("Scrub: failed to backup existing data file, error %v", err)
+		tdlog.Errorf("Scrub: failed to backup existing data file %s, error %v", col.Data.File.Name, err)
 	}
 	defer bakDest.Close()
 	if _, err := io.Copy(col.Data.File.Fh, bakDest); err != nil {
-		tdlog.Errorf("Scrub: failed to backup existing data file, error %v", err)
+		tdlog.Errorf("Scrub: failed to backup existing data file %s, error %v", col.Data.File.Name, err)
 	}
 	// Read all documents into memory
-	allDocs := make([]interface{}, 2048)
+	allDocs := make([]interface{}, 0)
 	col.ForAll(func(_ uint64, doc interface{}) bool {
 		allDocs = append(allDocs, doc)
 		return true
 	})
-	// Clear all indexes
-
+	tdlog.Printf("Scrub: about to recover %d documents from %s", len(allDocs), col.Data.File.Name)
+	// Clear document data and indexes
+	col.Data.File.Clear()
+	for _, index := range col.Hashtables {
+		index.Clear()
+	}
+	// Insert all documents back into collection
+	counter := 0
+	for _, doc := range allDocs {
+		_, outOfSpace, err := col.Insert(doc)
+		if outOfSpace || err != nil {
+			tdlog.Errorf("Scrub: failed to put a document back to %s, error %v, outOfSpace %v", col.Data.File.Name, err, outOfSpace)
+		} else {
+			counter++
+		}
+	}
+	tdlog.Printf("Scrub: recovered %d documents from %s", counter, col.Data.File.Name)
 }
 
 // Flush collection data and index files.

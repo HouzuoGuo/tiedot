@@ -127,6 +127,7 @@ func (file *File) Clear() {
 	}
 	file.UsedSize = 0
 	file.Size = file.Growth
+	tdlog.Printf("File %s has been cleared, and the size is now %d", file.Name, file.Size)
 }
 
 // Synchronize file buffer with underlying storage device.

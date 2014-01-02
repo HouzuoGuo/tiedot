@@ -199,8 +199,12 @@ func (ht *HashTable) Remove(key, val uint64) {
 
 // Return all entries in the hash table.
 func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
-	keys = make([]uint64, 0, INITIAL_BUCKETS*PER_BUCKET/2)
-	vals = make([]uint64, 0, INITIAL_BUCKETS*PER_BUCKET/2)
+	prealloc := limit
+	if prealloc == 0 {
+		prealloc = INITIAL_BUCKETS * PER_BUCKET / 2
+	}
+	keys = make([]uint64, 0, prealloc)
+	vals = make([]uint64, 0, prealloc)
 	counter := uint64(0)
 	for head := uint64(0); head < uint64(math.Pow(2, float64(HASH_BITS))); head++ {
 		var entry, bucket uint64 = 0, head

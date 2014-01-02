@@ -38,6 +38,37 @@ func TestGetIn(t *testing.T) {
 	if val, ok := GetIn(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 3 {
 		t.Fatal()
 	}
+	// Get inside a JSON array and fetch attributes from array elements, which are JSON objects
+	json.Unmarshal([]byte(`{"a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`), &obj)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 4 {
+		t.Fatal()
+	}
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 5 {
+		t.Fatal()
+	}
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 6 {
+		t.Fatal()
+	}
+	if len(GetIn(obj, []string{"a", "b", "c"})) != 3 {
+		t.Fatal()
+	}
+	if val, ok := GetIn(obj, []string{"d"})[0].(float64); !ok || val != 0 {
+		t.Fatal()
+	}
+	if val, ok := GetIn(obj, []string{"d"})[1].(float64); !ok || val != 9 {
+		t.Fatal()
+	}
+	if len(GetIn(obj, []string{"d"})) != 2 {
+		t.Fatal()
+	}
+	// Another example
+	json.Unmarshal([]byte(`{"a": {"b": [{"c": 2}]}, "d": 0}`), &obj)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 2 {
+		t.Fatal()
+	}
+	if len(GetIn(obj, []string{"a", "b", "c"})) != 1 {
+		t.Fatal()
+	}
 }
 
 func TestHash(t *testing.T) {
@@ -216,7 +247,7 @@ func TestInsertDeleteRead(t *testing.T) {
 	}
 }
 
-func TestIndex(t *testing.T) {
+func TestIndexAndReopen(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
@@ -225,7 +256,6 @@ func TestIndex(t *testing.T) {
 		t.Fatalf("Failed to open: %v", err)
 		return
 	}
-	defer col.Close()
 	docs := []string{
 		`{"a": {"b": {"c": 1}}, "d": 0}`,
 		`{"a": {"b": [{"c": 2}]}, "d": 0}`,
@@ -289,8 +319,20 @@ func TestIndex(t *testing.T) {
 	if !(len(k9) == 1 && len(v9) == 1 && k9[0] == StrHash(9) && v9[0] == ids[2]) {
 		t.Fatalf("Index fault on key 9, %v, %v", k9, v9)
 	}
+	// abc index and d index should contain correct number of values
+	keys, vals = col.Path2HT["a,b,c"].GetAll(0)
+	if !(len(keys) == 4 && len(vals) == 4) { // doc 0, 3
+		t.Fatalf("Index has too many values: %d, %d", keys, vals)
+	}
+	keys, vals = col.Path2HT["d"].GetAll(0)
+	if !(len(keys) == 3 && len(vals) == 3) { // doc 0, 3
+		t.Fatal("Index has too many values")
+	}
 	// abc index
 	k1, v1 := index1.Get(StrHash(1), 0, func(k, v uint64) bool {
+		return true
+	})
+	k2, v2 := index1.Get(StrHash(2), 0, func(k, v uint64) bool {
 		return true
 	})
 	k4, v4 := index1.Get(StrHash(4), 0, func(k, v uint64) bool {
@@ -305,6 +347,9 @@ func TestIndex(t *testing.T) {
 	if !(len(k1) == 1 && len(v1) == 1 && k1[0] == StrHash(1) && v1[0] == ids[0]) {
 		t.Fatalf("Index fault, %v, %v", k1, v1)
 	}
+	if !(len(k2) == 0 && len(v2) == 0) {
+		t.Fatalf("Index fault, %v, %v", k2, v2)
+	}
 	if !(len(k4) == 1 && len(v4) == 1 && k4[0] == StrHash(4) && v4[0] == ids[2]) {
 		t.Fatalf("Index fault, %v, %v", k4, v4)
 	}
@@ -313,6 +358,15 @@ func TestIndex(t *testing.T) {
 	}
 	if !(len(k6) == 1 && len(v6) == 1 && k6[0] == StrHash(6) && v6[0] == ids[2]) {
 		t.Fatalf("Index fault, %v, %v", k6, v6)
+	}
+	// Reopen the collection and test number of indexes
+	col.Close()
+	col, err = OpenChunk(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !(len(col.Path2HT) == 3 && len(col.Hashtables) == 3 && len(col.HTPaths) == 3) {
+		t.Fatal("Did not reopen 3 indexes")
 	}
 	// Now remove a,b,c index
 	if err = col.Unindex([]string{"a", "b", "c"}); err != nil {
@@ -341,9 +395,10 @@ func TestIndex(t *testing.T) {
 	if !(len(k0) == 3 && len(v0) == 3 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[2] == ids[2] && k0[2] == StrHash(0) && v0[1] == newID) {
 		t.Fatalf("Index fault, %d, %v, %v", newID, k0, v0)
 	}
+	col.Close()
 }
 
-func TestUIDDocCRUD(t *testing.T) {
+func TestUIDDocCRUDAndReopen(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
@@ -352,7 +407,6 @@ func TestUIDDocCRUD(t *testing.T) {
 		t.Fatalf("Failed to open: %v", err)
 		return
 	}
-	defer col.Close()
 	docs := []string{
 		`{"a": {"b": {"c": 1}}, "d": 1}`,
 		`{"a": {"b": {"c": 2}}, "d": 2}`,
@@ -428,6 +482,20 @@ func TestUIDDocCRUD(t *testing.T) {
 	if _, err = col.ReadByUID(newUID, &readDoc); err == nil {
 		t.Fatalf("DeleteByUID did not work")
 	}
+	col.Close()
+	// Reopen and test read again
+	reopen, err := OpenChunk(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !(len(col.Hashtables) == 1 && len(col.HTPaths) == 1 && len(col.Path2HT) == 1) {
+		t.Fatal("Did not reopen UID index")
+	}
+	// UID index should work
+	if _, err = reopen.ReadByUID(uids[1], &readDoc); err != nil {
+		t.Fatalf("Reopen failed UID index?")
+	}
+	reopen.Close()
 }
 
 func TestOutOfSpace(t *testing.T) {
@@ -466,5 +534,80 @@ func TestOutOfSpace(t *testing.T) {
 	if !outOfSpace || err != nil {
 		t.Fatalf("It Should run out of space %v %v", err, outOfSpace)
 	}
+}
 
+func TestScrub(t *testing.T) {
+	t.SkipNow()
+	tmp := "/tmp/tiedot_col_test"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenChunk(tmp)
+	if err != nil {
+		t.Fatalf("Failed to open: %v", err)
+		return
+	}
+	// Create two indexes
+	if err = col.Index([]string{"a", "b", "c"}); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = col.Index([]string{"d"}); err != nil {
+		t.Fatal(err)
+		return
+	}
+	// Insert 10000 documents
+	var doc interface{}
+	json.Unmarshal([]byte(`{"a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`), &doc)
+	for i := 0; i < 10000; i++ {
+		_, outOfSpace, err := col.Insert(doc)
+		if outOfSpace || err != nil {
+			t.Fatal("Insert fault")
+		}
+	}
+	// Do some serious damage to index and collection data
+	for i := 0; i < 1024*1024*1; i++ {
+		col.Hashtables[0].File.Buf[i] = 6
+	}
+	for i := 0; i < 1024*1024*1; i++ {
+		col.Hashtables[1].File.Buf[i] = 6
+	}
+	for i := 1024 * 1024 * 1; i < 1024*1024*2; i++ {
+		col.Hashtables[2].File.Buf[i] = 6
+	}
+	for i := 1024; i < 1024*128; i++ {
+		col.Data.File.Buf[i] = 6
+	}
+	for i := 1024 * 256; i < 1024*512; i++ {
+		col.Data.File.Buf[i] = 6
+	}
+	col.Close()
+	// Reopen the chunk and expect data structure failure messages from log
+	fmt.Println("Please ignore the following error messages")
+	reopen, err := OpenChunk(tmp)
+	reopen.Scrub()
+	// Confirm that 6528 documents are successfully recovered in three ways
+	counter := 0
+	// first - deserialization & scan
+	var recovered interface{}
+	reopen.DeserializeAll(&recovered, func(id uint64) bool {
+		counter++
+		return true
+	})
+	if counter != 6528 {
+		t.Fatal("Did not recover enough documents")
+	}
+	// second - collection scan
+	counter = 0
+	reopen.ForAll(func(id uint64, doc interface{}) bool {
+		counter++
+		return true
+	})
+	if counter != 6528 {
+		t.Fatal("Did not recover enough documents")
+	}
+	// third - index scan
+	keys, vals := reopen.Hashtables[1].GetAll(0)
+	if !(len(keys) == 6528 && len(vals) == 6528) {
+		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals))
+	}
 }
