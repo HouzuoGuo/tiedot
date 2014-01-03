@@ -45,8 +45,6 @@ func OpenCol(baseDir string) (col *Col, err error) {
 				if chunkNum > maxChunk {
 					maxChunk = chunkNum
 				}
-			} else {
-				tdlog.Errorf("Directory %s does not seem to belong to tiedot, it is ignored", info.Name())
 			}
 			return nil
 		}
@@ -65,6 +63,26 @@ func OpenCol(baseDir string) (col *Col, err error) {
 		col.ChunkMutexes = append(col.ChunkMutexes, new(sync.Mutex))
 	}
 	return
+}
+
+// Create a new chunk.
+func (col *Col) CreateNewChunk() {
+	col.NewChunkMutex.Lock()
+	tdlog.Printf("Going to create a new chunk (number %d) in collection %s", col.NumChunks, col.BaseDir)
+	newChunk, err := chunk.OpenChunk(col.NumChunks, path.Join(col.BaseDir, strconv.Itoa(int(col.NumChunks))))
+	col.NumChunks += 1
+	if err != nil {
+		col.NewChunkMutex.Unlock()
+		return
+	}
+	// Make indexes
+	for _, path := range col.Chunks[0].HTPaths {
+		newChunk.Index(path)
+	}
+	// Put the new chunk into col structures
+	col.Chunks = append(col.Chunks, newChunk)
+	col.ChunkMutexes = append(col.ChunkMutexes, new(sync.Mutex))
+	col.NewChunkMutex.Unlock()
 }
 
 // Insert a new document, return new document's ID.
@@ -93,18 +111,7 @@ func (col *Col) Insert(doc interface{}) (id uint64, err error) {
 	}
 	lastChunkMutexes.Unlock()
 	// If the last chunk is full, make a new chunk
-	col.NewChunkMutex.Lock()
-	tdlog.Printf("Going to create a new chunk (number %d) in collection %s", col.NumChunks, col.BaseDir)
-	newChunk, err := chunk.OpenChunk(col.NumChunks, path.Join(col.BaseDir, strconv.Itoa(int(col.NumChunks))))
-	col.NumChunks += 1
-	if err != nil {
-		col.NewChunkMutex.Unlock()
-		return
-	}
-	// Put the new chunk into col structures
-	col.Chunks = append(col.Chunks, newChunk)
-	col.ChunkMutexes = append(col.ChunkMutexes, new(sync.Mutex))
-	col.NewChunkMutex.Unlock()
+	col.CreateNewChunk()
 	// Now there is a new chunk, let us try again
 	return col.Insert(doc)
 }
@@ -138,6 +145,7 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	newID, outOfSpace, err := chunk.Update(chunkDocID, doc)
 	chunkMutex.Unlock()
 	if !outOfSpace {
+		newID += chunkNum * chunkfile.COL_FILE_SIZE
 		return
 	}
 	// The chunk does not have enough space for the updated document, let us put it somewhere else
@@ -157,4 +165,61 @@ func (col *Col) Delete(id uint64) {
 	chunkMutex.Lock()
 	chunk.Delete(chunkDocID)
 	chunkMutex.Unlock()
+}
+
+// Create an index on the path.
+func (col *Col) Index(path []string) (err error) {
+	// Do not allow new chunk creation for now
+	col.NewChunkMutex.Lock()
+	defer col.NewChunkMutex.Unlock()
+	for _, chunk := range col.Chunks {
+		if err = chunk.Index(path); err != nil {
+			return
+		}
+	}
+	return
+}
+
+// Remove an index.
+func (col *Col) Unindex(path []string) (err error) {
+	// Do not allow new chunk creation for now
+	col.NewChunkMutex.Lock()
+	defer col.NewChunkMutex.Unlock()
+	for _, chunk := range col.Chunks {
+		if err = chunk.Unindex(path); err != nil {
+			return
+		}
+	}
+	return
+}
+
+// Compact the collection and automatically repair any data/index damage.
+func (col *Col) Scrub() (recovered uint64) {
+	// Do not allow new chunk creation for now
+	col.NewChunkMutex.Lock()
+	defer col.NewChunkMutex.Unlock()
+	for _, chunk := range col.Chunks {
+		recovered += chunk.Scrub()
+	}
+	return
+}
+
+// Flush collection data and index files.
+func (col *Col) Flush() error {
+	// Do not allow new chunk creation for now
+	col.NewChunkMutex.Lock()
+	defer col.NewChunkMutex.Unlock()
+	for _, chunk := range col.Chunks {
+		if err := chunk.Flush(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Close the collection.
+func (col *Col) Close() {
+	for _, chunk := range col.Chunks {
+		chunk.Close()
+	}
 }

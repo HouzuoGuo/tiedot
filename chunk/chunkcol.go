@@ -135,7 +135,7 @@ func (col *ChunkCol) OpenIndex(joinedIndexPath string, filename string) (err err
 	return
 }
 
-// Create a new index. Do not operate on this collection until it finishes!
+// Create a new index.
 func (col *ChunkCol) Index(indexPath []string) error {
 	joinedIndexPath := strings.Join(indexPath, ",")
 	// Return error if the path is already indexed
@@ -383,7 +383,7 @@ func (col *ChunkCol) DeserializeAll(template interface{}, fun func(id uint64) bo
 }
 
 // Compact the chunk and automatically repair any data/index damage.
-func (col *ChunkCol) Scrub() {
+func (col *ChunkCol) Scrub() (recovered uint64) {
 	// Safety first - make a backup of existing data file
 	bakFileName := DAT_FILENAME_MAGIC + "_" + strconv.Itoa(int(time.Now().UnixNano()))
 	bakDest, err := os.Create(path.Join(col.BaseDir, bakFileName))
@@ -407,16 +407,16 @@ func (col *ChunkCol) Scrub() {
 		index.Clear()
 	}
 	// Insert all documents back into collection
-	counter := 0
 	for _, doc := range allDocs {
 		_, outOfSpace, err := col.Insert(doc)
 		if outOfSpace || err != nil {
 			tdlog.Errorf("Scrub: failed to put a document back to %s, error %v, outOfSpace %v", col.Data.File.Name, err, outOfSpace)
 		} else {
-			counter++
+			recovered++
 		}
 	}
-	tdlog.Printf("Scrub: recovered %d documents from %s", counter, col.Data.File.Name)
+	tdlog.Printf("Scrub: recovered %d documents from %s", recovered, col.Data.File.Name)
+	return
 }
 
 // Flush collection data and index files.

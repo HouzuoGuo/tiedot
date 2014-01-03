@@ -531,7 +531,7 @@ func TestOutOfSpace(t *testing.T) {
 	}
 }
 
-func TestScrub(t *testing.T) {
+func TestScrubAndColScan(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
@@ -578,12 +578,12 @@ func TestScrub(t *testing.T) {
 	// Reopen the chunk and expect data structure failure messages from log
 	fmt.Println("Please ignore the following error messages")
 	reopen, err := OpenChunk(0, tmp)
-	reopen.Scrub()
-	// Confirm that 6528 documents are successfully recovered in three ways
+	recoveredNum := reopen.Scrub()
+	// Confirm that 6528 documents are successfully recovered in four ways
 	counter := 0
 	// first - deserialization & scan
-	var recovered interface{}
-	reopen.DeserializeAll(&recovered, func(id uint64) bool {
+	var recoveredDoc interface{}
+	reopen.DeserializeAll(&recoveredDoc, func(id uint64) bool {
 		counter++
 		return true
 	})
@@ -603,5 +603,9 @@ func TestScrub(t *testing.T) {
 	keys, vals := reopen.Hashtables[1].GetAll(0)
 	if !(len(keys) == 6528*3 && len(vals) == 6528*3) {
 		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals))
+	}
+	// fourth - scrub return value
+	if recoveredNum != 6528 {
+		t.Fatal("Scrub return value is wrong")
 	}
 }
