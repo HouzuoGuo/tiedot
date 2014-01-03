@@ -23,9 +23,8 @@ const (
 	UID_FILENAME_MAGIC       = "_uid"
 	HASHTABLE_FILENAME_MAGIC = "ht_"
 
-	UID_FMT        = "%6d%s" // Format of UID, including a prefix of chunk number (maximum of 6 digits)
-	UID_PATH       = "_uid"  // Index path to the UID attribute
-	INDEX_PATH_SEP = ","     // Separator between index path segments
+	UID_PATH       = "_uid" // Index path to the UID attribute
+	INDEX_PATH_SEP = ","    // Separator between index path segments
 )
 
 type ChunkCol struct {
@@ -284,7 +283,7 @@ func (col *ChunkCol) Delete(id uint64) {
 
 // Insert a new document, and assign it a UID.
 func (col *ChunkCol) InsertWithUID(doc interface{}) (newID uint64, newUID string, outOfSpace bool, err error) {
-	newUID = fmt.Sprintf(UID_FMT, col.Number, uid.NextUID())
+	newUID = uid.NextUID()
 	if docMap, ok := doc.(map[string]interface{}); !ok {
 		err = errors.New("Only JSON object document may have UID")
 		return
@@ -336,7 +335,7 @@ func (col *ChunkCol) UpdateByUID(uid string, doc interface{}) (newID uint64, out
 
 // Give a document (identified by ID) a new UID.
 func (col *ChunkCol) ReassignUID(id uint64) (newID uint64, newUID string, outOfSpace bool, err error) {
-	newUID = fmt.Sprintf(UID_FMT, col.Number, uid.NextUID())
+	newUID = uid.NextUID()
 	var originalDoc interface{}
 	if err = col.Read(id, &originalDoc); err != nil {
 		return

@@ -402,7 +402,7 @@ func TestUIDDocCRUDAndReopen(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(930718, tmp)
+	col, err := OpenChunk(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -420,18 +420,18 @@ func TestUIDDocCRUDAndReopen(t *testing.T) {
 	json.Unmarshal([]byte(docs[2]), &jsonDocs[2])
 	// insert
 	ids[0], uids[0], outOfSpace, err = col.InsertWithUID(jsonDocs[0])
-	if err != nil || outOfSpace || !strings.HasPrefix(uids[0], "930718") {
+	if err != nil || outOfSpace {
 		t.Fatal("insert error")
 	}
 	ids[1], uids[1], outOfSpace, err = col.InsertWithUID(jsonDocs[1])
-	if err != nil || outOfSpace || !strings.HasPrefix(uids[1], "930718") {
+	if err != nil || outOfSpace {
 		t.Fatal("insert error")
 	}
 	ids[2], uids[2], outOfSpace, err = col.InsertWithUID(jsonDocs[2])
-	if err != nil || outOfSpace || !strings.HasPrefix(uids[2], "930718") {
+	if err != nil || outOfSpace {
 		t.Fatal("insert error")
 	}
-	if len(uids[0]) != 32+6 || len(uids[1]) != 32+6 || len(uids[2]) != 32+6 ||
+	if len(uids[0]) != 32 || len(uids[1]) != 32 || len(uids[2]) != 32 ||
 		uids[0] == uids[1] || uids[1] == uids[2] || uids[2] == uids[0] ||
 		ids[0] == ids[1] || ids[1] == ids[2] || ids[2] == ids[0] {
 		t.Fatalf("Malformed UIDs or IDs: %v %v", uids, ids)
@@ -462,7 +462,7 @@ func TestUIDDocCRUDAndReopen(t *testing.T) {
 	}
 	// update (reassign UID)
 	newID, newUID, outOfSpace, err := col.ReassignUID(ids[0])
-	if newID != ids[0] || len(newUID) != 32+6 || err != nil || outOfSpace || !strings.HasPrefix(newUID, "930718") {
+	if newID != ids[0] || len(newUID) != 32 || err != nil || outOfSpace {
 		t.Fatalf("ReassignUID did not work: %v %v %v", newID, newUID, err)
 	}
 	// after UID reassignment, the old UID should be gone
