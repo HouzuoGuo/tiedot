@@ -115,10 +115,46 @@ func (col *Col) Read(id uint64, doc interface{}) (err error) {
 	if chunkNum >= col.NumChunks {
 		return errors.New(fmt.Sprintf("Document %d does not exist in %s - out of bound chunk", id, col.BaseDir))
 	}
+	chunkDocID := id % chunkfile.COL_FILE_SIZE
 	chunk := col.Chunks[chunkNum]
 	chunkMutex := col.ChunkMutexes[chunkNum]
 	chunkMutex.Lock()
-	err = chunk.Read(id, doc)
+	err = chunk.Read(chunkDocID, doc)
 	chunkMutex.Unlock()
 	return
+}
+
+// Update a document, return its new ID.
+func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
+	chunkNum := id / chunkfile.COL_FILE_SIZE
+	if chunkNum >= col.NumChunks {
+		err = errors.New(fmt.Sprintf("Document %d does not exist in %s - out of bound chunk", id, col.BaseDir))
+		return
+	}
+	chunkDocID := id % chunkfile.COL_FILE_SIZE
+	chunk := col.Chunks[chunkNum]
+	chunkMutex := col.ChunkMutexes[chunkNum]
+	chunkMutex.Lock()
+	newID, outOfSpace, err := chunk.Update(chunkDocID, doc)
+	chunkMutex.Unlock()
+	if !outOfSpace {
+		return
+	}
+	// The chunk does not have enough space for the updated document, let us put it somewhere else
+	// The document has already been removed from its original chunk
+	return col.Insert(doc)
+}
+
+// Delete a document by ID.
+func (col *Col) Delete(id uint64) {
+	chunkNum := id / chunkfile.COL_FILE_SIZE
+	if chunkNum >= col.NumChunks {
+		return
+	}
+	chunkDocID := id % chunkfile.COL_FILE_SIZE
+	chunk := col.Chunks[chunkNum]
+	chunkMutex := col.ChunkMutexes[chunkNum]
+	chunkMutex.Lock()
+	chunk.Delete(chunkDocID)
+	chunkMutex.Unlock()
 }
