@@ -85,7 +85,7 @@ func TestInsertRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(tmp)
+	col, err := OpenChunk(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -118,7 +118,7 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(tmp)
+	col, err := OpenChunk(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -173,7 +173,7 @@ func TestInsertDeserialize(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(tmp)
+	col, err := OpenChunk(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -218,7 +218,7 @@ func TestInsertDeleteRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(tmp)
+	col, err := OpenChunk(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -251,7 +251,7 @@ func TestIndexAndReopen(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(tmp)
+	col, err := OpenChunk(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -361,7 +361,7 @@ func TestIndexAndReopen(t *testing.T) {
 	}
 	// Reopen the collection and test number of indexes
 	col.Close()
-	col, err = OpenChunk(tmp)
+	col, err = OpenChunk(0, tmp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,7 +402,7 @@ func TestUIDDocCRUDAndReopen(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(tmp)
+	col, err := OpenChunk(930718, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -420,18 +420,18 @@ func TestUIDDocCRUDAndReopen(t *testing.T) {
 	json.Unmarshal([]byte(docs[2]), &jsonDocs[2])
 	// insert
 	ids[0], uids[0], outOfSpace, err = col.InsertWithUID(jsonDocs[0])
-	if err != nil || outOfSpace {
+	if err != nil || outOfSpace || !strings.HasPrefix(uids[0], "930718") {
 		t.Fatal("insert error")
 	}
 	ids[1], uids[1], outOfSpace, err = col.InsertWithUID(jsonDocs[1])
-	if err != nil || outOfSpace {
+	if err != nil || outOfSpace || !strings.HasPrefix(uids[1], "930718") {
 		t.Fatal("insert error")
 	}
 	ids[2], uids[2], outOfSpace, err = col.InsertWithUID(jsonDocs[2])
-	if err != nil || outOfSpace {
+	if err != nil || outOfSpace || !strings.HasPrefix(uids[2], "930718") {
 		t.Fatal("insert error")
 	}
-	if len(uids[0]) != 32 || len(uids[1]) != 32 || len(uids[2]) != 32 ||
+	if len(uids[0]) != 32+6 || len(uids[1]) != 32+6 || len(uids[2]) != 32+6 ||
 		uids[0] == uids[1] || uids[1] == uids[2] || uids[2] == uids[0] ||
 		ids[0] == ids[1] || ids[1] == ids[2] || ids[2] == ids[0] {
 		t.Fatalf("Malformed UIDs or IDs: %v %v", uids, ids)
@@ -461,13 +461,8 @@ func TestUIDDocCRUDAndReopen(t *testing.T) {
 		t.Fatalf("UpdateByUID did not work, still read %v", readDoc)
 	}
 	// update (reassign UID)
-	newID, newUID, newDoc, outOfSpace, err := col.ReassignUID(ids[0])
-	if newDocMap, ok := newDoc.(map[string]interface{}); !ok {
-		t.Fatal("newDoc is not map[string]interface{}")
-	} else if newDocMap[UID_PATH] != newUID {
-		t.Fatal("newDoc's UID is different")
-	}
-	if newID != ids[0] || len(newUID) != 32 || err != nil || outOfSpace {
+	newID, newUID, outOfSpace, err := col.ReassignUID(ids[0])
+	if newID != ids[0] || len(newUID) != 32+6 || err != nil || outOfSpace || !strings.HasPrefix(newUID, "930718") {
 		t.Fatalf("ReassignUID did not work: %v %v %v", newID, newUID, err)
 	}
 	// after UID reassignment, the old UID should be gone
@@ -484,7 +479,7 @@ func TestUIDDocCRUDAndReopen(t *testing.T) {
 	}
 	col.Close()
 	// Reopen and test read again
-	reopen, err := OpenChunk(tmp)
+	reopen, err := OpenChunk(931807, tmp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -502,7 +497,7 @@ func TestOutOfSpace(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(tmp)
+	col, err := OpenChunk(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -537,11 +532,10 @@ func TestOutOfSpace(t *testing.T) {
 }
 
 func TestScrub(t *testing.T) {
-	t.SkipNow()
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(tmp)
+	col, err := OpenChunk(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -583,7 +577,7 @@ func TestScrub(t *testing.T) {
 	col.Close()
 	// Reopen the chunk and expect data structure failure messages from log
 	fmt.Println("Please ignore the following error messages")
-	reopen, err := OpenChunk(tmp)
+	reopen, err := OpenChunk(0, tmp)
 	reopen.Scrub()
 	// Confirm that 6528 documents are successfully recovered in three ways
 	counter := 0
@@ -607,7 +601,7 @@ func TestScrub(t *testing.T) {
 	}
 	// third - index scan
 	keys, vals := reopen.Hashtables[1].GetAll(0)
-	if !(len(keys) == 6528 && len(vals) == 6528) {
+	if !(len(keys) == 6528*3 && len(vals) == 6528*3) {
 		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals))
 	}
 }

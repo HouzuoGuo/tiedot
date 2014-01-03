@@ -23,11 +23,13 @@ const (
 	UID_FILENAME_MAGIC       = "_uid"
 	HASHTABLE_FILENAME_MAGIC = "ht_"
 
-	UID_PATH       = "_uid"
-	INDEX_PATH_SEP = "," // Separator between index path segments
+	UID_FMT        = "%6d%s" // Format of UID, including a prefix of chunk number (maximum of 6 digits)
+	UID_PATH       = "_uid"  // Index path to the UID attribute
+	INDEX_PATH_SEP = ","     // Separator between index path segments
 )
 
 type ChunkCol struct {
+	Number  uint64             // Number of the chunk in collection
 	BaseDir string             // File system directory path of the chunk
 	Data    *chunkfile.ColFile // Collection document data file
 
@@ -76,13 +78,13 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 }
 
 // Open a chunk.
-func OpenChunk(baseDir string) (chunk *ChunkCol, err error) {
+func OpenChunk(number uint64, baseDir string) (chunk *ChunkCol, err error) {
 	// Create the directory if it does not yet exist
 	if err = os.MkdirAll(baseDir, 0700); err != nil {
 		return
 	}
 	tdlog.Printf("Opening chunk %s", baseDir)
-	chunk = &ChunkCol{BaseDir: baseDir, Path2HT: make(map[string]*chunkfile.HashTable)}
+	chunk = &ChunkCol{Number: number, BaseDir: baseDir, Path2HT: make(map[string]*chunkfile.HashTable)}
 	// Open collection document data file
 	tdlog.Printf("Opening collection data file %s", DAT_FILENAME_MAGIC)
 	if chunk.Data, err = chunkfile.OpenCol(path.Join(baseDir, DAT_FILENAME_MAGIC)); err != nil {
@@ -282,7 +284,7 @@ func (col *ChunkCol) Delete(id uint64) {
 
 // Insert a new document, and assign it a UID.
 func (col *ChunkCol) InsertWithUID(doc interface{}) (newID uint64, newUID string, outOfSpace bool, err error) {
-	newUID = uid.NextUID()
+	newUID = fmt.Sprintf(UID_FMT, col.Number, uid.NextUID())
 	if docMap, ok := doc.(map[string]interface{}); !ok {
 		err = errors.New("Only JSON object document may have UID")
 		return
@@ -333,8 +335,8 @@ func (col *ChunkCol) UpdateByUID(uid string, doc interface{}) (newID uint64, out
 }
 
 // Give a document (identified by ID) a new UID.
-func (col *ChunkCol) ReassignUID(id uint64) (newID uint64, newUID string, newDoc interface{}, outOfSpace bool, err error) {
-	newUID = uid.NextUID()
+func (col *ChunkCol) ReassignUID(id uint64) (newID uint64, newUID string, outOfSpace bool, err error) {
+	newUID = fmt.Sprintf(UID_FMT, col.Number, uid.NextUID())
 	var originalDoc interface{}
 	if err = col.Read(id, &originalDoc); err != nil {
 		return
@@ -344,7 +346,6 @@ func (col *ChunkCol) ReassignUID(id uint64) (newID uint64, newUID string, newDoc
 		return
 	} else {
 		docWithUID[UID_PATH] = newUID
-		newDoc = docWithUID
 		newID, outOfSpace, err = col.Update(id, docWithUID)
 		return
 	}
