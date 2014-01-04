@@ -90,26 +90,26 @@ func (col *Col) Insert(doc interface{}) (id uint64, err error) {
 	// Try to insert the doc into a random chunk
 	randChunkNum := uint64(rand.Int63n(int64(col.NumChunks)))
 	randChunk := col.Chunks[randChunkNum]
-	randChunkMutexes := col.ChunkMutexes[randChunkNum]
-	randChunkMutexes.Lock()
+	randChunkMutex := col.ChunkMutexes[randChunkNum]
+	randChunkMutex.Lock()
 	idInChunk, outOfSpace, err := randChunk.Insert(doc)
 	if !outOfSpace {
-		randChunkMutexes.Unlock()
+		randChunkMutex.Unlock()
 		id = randChunkNum*chunkfile.COL_FILE_SIZE + idInChunk
 		return
 	}
-	randChunkMutexes.Unlock()
+	randChunkMutex.Unlock()
 	// If the random chunk was full, try again with the last chunk
 	lastChunk := col.Chunks[col.NumChunks-1]
-	lastChunkMutexes := col.ChunkMutexes[col.NumChunks-1]
-	lastChunkMutexes.Lock()
+	lastChunkMutex := col.ChunkMutexes[col.NumChunks-1]
+	lastChunkMutex.Lock()
 	idInChunk, outOfSpace, err = lastChunk.Insert(doc)
 	if !outOfSpace {
 		id = (col.NumChunks-1)*chunkfile.COL_FILE_SIZE + idInChunk
-		lastChunkMutexes.Unlock()
+		lastChunkMutex.Unlock()
 		return
 	}
-	lastChunkMutexes.Unlock()
+	lastChunkMutex.Unlock()
 	// If the last chunk is full, make a new chunk
 	col.CreateNewChunk()
 	// Now there is a new chunk, let us try again

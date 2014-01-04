@@ -367,7 +367,7 @@ func (col *ChunkCol) ForAll(fun func(id uint64, doc interface{}) bool) {
 			tdlog.Errorf("Cannot parse document %d in %s to JSON", id, col.BaseDir)
 			return true
 		} else {
-			return fun(id, parsed)
+			return fun(id+col.Number*chunkfile.COL_FILE_SIZE, parsed)
 		}
 	})
 }
@@ -378,7 +378,7 @@ func (col *ChunkCol) DeserializeAll(template interface{}, fun func(id uint64) bo
 		if err := json.Unmarshal(data, template); err != nil {
 			return true
 		} else {
-			return fun(id)
+			return fun(id + col.Number*chunkfile.COL_FILE_SIZE)
 		}
 	})
 }

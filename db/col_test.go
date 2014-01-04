@@ -125,7 +125,11 @@ func TestDocIndexAndCRUD(t *testing.T) {
 	// Two collection scan
 	counter := 0
 	var template interface{}
+	var throwAway interface{}
 	col.DeserializeAll(&template, func(id uint64) bool {
+		if err = col.Read(id, &throwAway); err != nil {
+			t.Fatal(err)
+		}
 		counter++
 		return true
 	})
@@ -134,6 +138,9 @@ func TestDocIndexAndCRUD(t *testing.T) {
 	}
 	counter = 0
 	col.ForAll(func(id uint64, doc interface{}) bool {
+		if err = col.Read(id, &throwAway); err != nil {
+			t.Fatal(err)
+		}
 		counter++
 		return true
 	})

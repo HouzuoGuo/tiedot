@@ -40,7 +40,7 @@ func average(name string, total int, init func(), do func()) {
 // Benchmark document insert, read, query, update and delete.
 func benchmark(benchSize int) {
 	docs := make([]interface{}, benchSize)
-	ids := make([]uint64, benchSize)
+	ids := make([]uint64, 0)
 
 	// Prepare serialized documents to be inserted
 	for i := range docs {
@@ -72,13 +72,13 @@ func benchmark(benchSize int) {
 
 	// Collect all document IDs and benchmark document read
 	average("read", benchSize, func() {
-		col.ForAll(func(id uint64, doc interface{}) bool {
+		col.ForAll(func(id uint64, _ interface{}) bool {
 			ids = append(ids, id)
 			return true
 		})
 	}, func() {
 		var doc interface{}
-		err := col.Read(ids[rand.Intn(benchSize)], &doc)
+		err := col.Read(ids[rand.Intn(len(ids))], &doc)
 		if err != nil {
 			panic(err)
 		}
@@ -102,14 +102,14 @@ func benchmark(benchSize int) {
 
 	// Benchmark document update
 	average("update", benchSize, func() {}, func() {
-		if _, err := col.Update(ids[rand.Intn(benchSize)], docs[rand.Intn(benchSize)]); err != nil {
+		if _, err := col.Update(ids[rand.Intn(len(ids))], docs[rand.Intn(benchSize)]); err != nil {
 			panic("update error")
 		}
 	})
 
 	// Benchmark document delete
 	average("delete", benchSize, func() {}, func() {
-		col.Delete(ids[rand.Intn(benchSize)])
+		col.Delete(ids[rand.Intn(len(ids))])
 	})
 	col.Close()
 }
