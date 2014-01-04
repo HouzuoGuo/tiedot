@@ -217,7 +217,7 @@ func TestUIDDocCRUD(t *testing.T) {
 	docMap1 := readDoc.(map[string]interface{})
 	docMap2 := jsonDocs[1].(map[string]interface{})
 	if readID != ids[1] || fmt.Sprint(docMap1["a"]) != fmt.Sprint(docMap2["a"]) {
-		t.Fatalf("Cannot read back original document by UID: %v %d %d", readDoc, readID, ids[1])
+		t.Fatalf("Cannot read back original document by UID: %d %d", readID, ids[1])
 	}
 	// update
 	var docWithoutUID interface{}

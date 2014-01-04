@@ -193,8 +193,8 @@ func (col *ChunkCol) Unindex(path []string) (err error) {
 	return nil
 }
 
-// Put the document on all indexes.
-func (col *ChunkCol) IndexDoc(id uint64, doc interface{}) {
+// Put the document on all indexes (ID is the absolute ID, not relative to this chunk).
+func (col *ChunkCol) indexDoc(id uint64, doc interface{}) {
 	for i, path := range col.HTPaths {
 		for _, toBeIndexed := range GetIn(doc, path) {
 			if toBeIndexed != nil {
@@ -204,8 +204,8 @@ func (col *ChunkCol) IndexDoc(id uint64, doc interface{}) {
 	}
 }
 
-// Remove the document from all indexes.
-func (col *ChunkCol) UnindexDoc(id uint64, doc interface{}) {
+// Remove the document from all indexes (ID is the absolute ID, not relative to this chunk).
+func (col *ChunkCol) unindexDoc(id uint64, doc interface{}) {
 	for i, path := range col.HTPaths {
 		for _, toBeIndexed := range GetIn(doc, path) {
 			if toBeIndexed != nil {
@@ -224,13 +224,15 @@ func (col *ChunkCol) Insert(doc interface{}) (id uint64, outOfSpace bool, err er
 	if id, outOfSpace, err = col.Data.Insert(data); err != nil || outOfSpace {
 		return
 	}
-	col.IndexDoc(id, doc)
+	id += col.Number * chunkfile.COL_FILE_SIZE
+	col.indexDoc(id, doc)
 	return
 }
 
 // Retrieve document by ID.
 func (col *ChunkCol) Read(id uint64, doc interface{}) error {
-	data := col.Data.Read(id)
+	relativeID := id - col.Number*chunkfile.COL_FILE_SIZE
+	data := col.Data.Read(relativeID)
 	if data == nil {
 		return errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.BaseDir))
 	}
@@ -244,12 +246,13 @@ func (col *ChunkCol) Read(id uint64, doc interface{}) error {
 
 // Update a document, return its new ID.
 func (col *ChunkCol) Update(id uint64, doc interface{}) (newID uint64, outOfSpace bool, err error) {
+	relativeID := id - col.Number*chunkfile.COL_FILE_SIZE
 	data, err := json.Marshal(doc)
 	if err != nil {
 		return
 	}
 	// Read the original document
-	oldData := col.Data.Read(id)
+	oldData := col.Data.Read(relativeID)
 	if oldData == nil {
 		err = errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.BaseDir))
 		return
@@ -257,16 +260,17 @@ func (col *ChunkCol) Update(id uint64, doc interface{}) (newID uint64, outOfSpac
 	// Remove the original document from indexes
 	var oldDoc interface{}
 	if err = json.Unmarshal(oldData, &oldDoc); err == nil {
-		col.UnindexDoc(id, oldDoc)
+		col.unindexDoc(id, oldDoc)
 	} else {
 		tdlog.Errorf("ERROR: The original document %d in %s is corrupted, this update will attempt to overwrite it", id, col.BaseDir)
 	}
 	// Update document data
-	if newID, outOfSpace, err = col.Data.Update(id, data); err != nil {
+	if newID, outOfSpace, err = col.Data.Update(relativeID, data); err != nil {
 		return
 	}
 	// Index updated document
-	col.IndexDoc(newID, doc)
+	newID += col.Number * chunkfile.COL_FILE_SIZE
+	col.indexDoc(newID, doc)
 	return
 }
 
@@ -277,8 +281,8 @@ func (col *ChunkCol) Delete(id uint64) {
 	if err != nil {
 		return
 	}
-	col.Data.Delete(id)
-	col.UnindexDoc(id, oldDoc)
+	col.Data.Delete(id - col.Number*chunkfile.COL_FILE_SIZE)
+	col.unindexDoc(id, oldDoc)
 }
 
 // Insert a new document, and assign it a UID.

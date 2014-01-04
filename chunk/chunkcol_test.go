@@ -483,7 +483,7 @@ func TestUIDDocCRUDAndReopen(t *testing.T) {
 	}
 	col.Close()
 	// Reopen and test read again
-	reopen, err := OpenChunk(931807, tmp)
+	reopen, err := OpenChunk(0, tmp)
 	if err != nil {
 		t.Fatal(err)
 	}

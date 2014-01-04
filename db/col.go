@@ -92,10 +92,9 @@ func (col *Col) Insert(doc interface{}) (id uint64, err error) {
 	randChunk := col.Chunks[randChunkNum]
 	randChunkMutex := col.ChunkMutexes[randChunkNum]
 	randChunkMutex.Lock()
-	idInChunk, outOfSpace, err := randChunk.Insert(doc)
+	id, outOfSpace, err := randChunk.Insert(doc)
 	if !outOfSpace {
 		randChunkMutex.Unlock()
-		id = randChunkNum*chunkfile.COL_FILE_SIZE + idInChunk
 		return
 	}
 	randChunkMutex.Unlock()
@@ -103,9 +102,8 @@ func (col *Col) Insert(doc interface{}) (id uint64, err error) {
 	lastChunk := col.Chunks[col.NumChunks-1]
 	lastChunkMutex := col.ChunkMutexes[col.NumChunks-1]
 	lastChunkMutex.Lock()
-	idInChunk, outOfSpace, err = lastChunk.Insert(doc)
+	id, outOfSpace, err = lastChunk.Insert(doc)
 	if !outOfSpace {
-		id = (col.NumChunks-1)*chunkfile.COL_FILE_SIZE + idInChunk
 		lastChunkMutex.Unlock()
 		return
 	}
@@ -122,11 +120,10 @@ func (col *Col) Read(id uint64, doc interface{}) (err error) {
 	if chunkNum >= col.NumChunks {
 		return errors.New(fmt.Sprintf("Document %d does not exist in %s - out of bound chunk", id, col.BaseDir))
 	}
-	chunkDocID := id % chunkfile.COL_FILE_SIZE
 	chunk := col.Chunks[chunkNum]
 	chunkMutex := col.ChunkMutexes[chunkNum]
 	chunkMutex.RLock()
-	err = chunk.Read(chunkDocID, doc)
+	err = chunk.Read(id, doc)
 	chunkMutex.RUnlock()
 	return
 }
@@ -138,11 +135,10 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 		err = errors.New(fmt.Sprintf("Document %d does not exist in %s - out of bound chunk", id, col.BaseDir))
 		return
 	}
-	chunkDocID := id % chunkfile.COL_FILE_SIZE
 	chunk := col.Chunks[chunkNum]
 	chunkMutex := col.ChunkMutexes[chunkNum]
 	chunkMutex.Lock()
-	newID, outOfSpace, err := chunk.Update(chunkDocID, doc)
+	newID, outOfSpace, err := chunk.Update(id, doc)
 	chunkMutex.Unlock()
 	if !outOfSpace {
 		newID += chunkNum * chunkfile.COL_FILE_SIZE
@@ -160,11 +156,10 @@ func (col *Col) Delete(id uint64) {
 	if chunkNum >= col.NumChunks {
 		return
 	}
-	chunkDocID := id % chunkfile.COL_FILE_SIZE
 	chunk := col.Chunks[chunkNum]
 	chunkMutex := col.ChunkMutexes[chunkNum]
 	chunkMutex.Lock()
-	chunk.Delete(chunkDocID)
+	chunk.Delete(id)
 	chunkMutex.Unlock()
 }
 
@@ -235,10 +230,9 @@ func (col *Col) InsertWithUID(doc interface{}) (id uint64, uid string, err error
 	randChunk := col.Chunks[randChunkNum]
 	randChunkMutexes := col.ChunkMutexes[randChunkNum]
 	randChunkMutexes.Lock()
-	idInChunk, uid, outOfSpace, err := randChunk.InsertWithUID(doc)
+	id, uid, outOfSpace, err := randChunk.InsertWithUID(doc)
 	if !outOfSpace {
 		randChunkMutexes.Unlock()
-		id = randChunkNum*chunkfile.COL_FILE_SIZE + idInChunk
 		return
 	}
 	randChunkMutexes.Unlock()
@@ -246,9 +240,8 @@ func (col *Col) InsertWithUID(doc interface{}) (id uint64, uid string, err error
 	lastChunk := col.Chunks[col.NumChunks-1]
 	lastChunkMutexes := col.ChunkMutexes[col.NumChunks-1]
 	lastChunkMutexes.Lock()
-	idInChunk, uid, outOfSpace, err = lastChunk.InsertWithUID(doc)
+	id, uid, outOfSpace, err = lastChunk.InsertWithUID(doc)
 	if !outOfSpace {
-		id = (col.NumChunks-1)*chunkfile.COL_FILE_SIZE + idInChunk
 		lastChunkMutexes.Unlock()
 		return
 	}
@@ -266,7 +259,7 @@ func (col *Col) ReadByUID(uid string, doc interface{}) (id uint64, err error) {
 		selfID, selfErr := chunk.ReadByUID(uid, &doc)
 		if selfErr == nil {
 			found = true
-			id = chunk.Number*chunkfile.COL_FILE_SIZE + selfID
+			id = selfID
 		}
 	})
 	if !found {
@@ -286,7 +279,7 @@ func (col *Col) UpdateByUID(uid string, doc interface{}) (newID uint64, err erro
 			// Here, this chunk has the document!
 			found = true
 			outOfSpace = selfOutOfSpace
-			newID = chunk.Number*chunkfile.COL_FILE_SIZE + selfNewID
+			newID = selfNewID
 		}
 	})
 	if !found {
