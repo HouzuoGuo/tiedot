@@ -148,6 +148,7 @@ func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 		newID += chunkNum * chunkfile.COL_FILE_SIZE
 		return
 	}
+	tdlog.Printf("Out of space")
 	// The chunk does not have enough space for the updated document, let us put it somewhere else
 	// The document has already been removed from its original chunk
 	return col.Insert(doc)
