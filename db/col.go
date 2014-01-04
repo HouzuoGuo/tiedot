@@ -329,6 +329,27 @@ func (col *Col) DeleteByUID(uid string) {
 	})
 }
 
+/* In parallel, deserialize all documents and invoke the function on each document (Collection Scan).
+The function must not write to this collection. */
+func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
+	col.ParForeachChunkR(func(chunk *chunk.ChunkCol) {
+		chunk.ForAll(fun)
+	})
+}
+
+/* Sequentially, deserialize all documents into the template (pointer to struct) and invoke the function on each document (Collection Scan).
+The function must not write to this collection. */
+func (col *Col) DeserializeAll(template interface{}, fun func(id uint64) bool) {
+	numChunks := col.NumChunks
+	for i := uint64(0); i < numChunks; i++ {
+		chunk := col.Chunks[i]
+		chunkMutex := col.ChunkMutexes[i]
+		chunkMutex.RLock()
+		chunk.DeserializeAll(template, fun)
+		chunkMutex.RUnlock()
+	}
+}
+
 // Compact the collection and automatically repair any data/index damage.
 func (col *Col) Scrub() (recovered uint64) {
 	// Do not allow new chunk creation for now

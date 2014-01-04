@@ -81,6 +81,11 @@ func TestDocIndexAndCRUD(t *testing.T) {
 	}
 	col.Read(shortNewID, &shortDoc)
 	matchIDAttr(shortDoc, 11)
+	// Reopen the collection
+	col.Close()
+	if col, err = OpenCol(tmp); err != nil {
+		t.Fatal(err)
+	}
 	// Update a long document - relocation happens
 	var longDoc interface{}
 	json.Unmarshal([]byte(`{"a": "`+strings.Repeat("1", int(chunkfile.DOC_MAX_ROOM/3+2048))+`", "id": 11}`), &longDoc)
@@ -115,6 +120,25 @@ func TestDocIndexAndCRUD(t *testing.T) {
 	col.Delete(longDocIDs[7])
 	if err = col.Read(longDocIDs[7], &longDoc); err == nil {
 		t.Fatal("Did not delete the document")
+	}
+
+	// Two collection scan
+	counter := 0
+	var template interface{}
+	col.DeserializeAll(&template, func(id uint64) bool {
+		counter++
+		return true
+	})
+	if counter != 19 { // 10 long docs, 10 short docs, one less long doc
+		t.Fatal("Collection scan wrong number of docs")
+	}
+	counter = 0
+	col.ForAll(func(id uint64, doc interface{}) bool {
+		counter++
+		return true
+	})
+	if counter != 19 {
+		t.Fatal("Collection scan wrong number of docs")
 	}
 	// Remove index - it should be removed from all chunks
 	if err = col.Unindex([]string{"id"}); err != nil {
