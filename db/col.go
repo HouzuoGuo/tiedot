@@ -18,9 +18,9 @@ import (
 type Col struct {
 	BaseDir       string // Collection dir path
 	Chunks        []*chunk.ChunkCol
-	ChunkMutexes  []*sync.Mutex // Synchronize access to chunks
-	NewChunkMutex sync.Mutex    // Synchronize creation of new chunk
-	NumChunks     uint64        // Total number of chunks
+	ChunkMutexes  []*sync.RWMutex // Synchronize access to chunks
+	NewChunkMutex sync.Mutex      // Synchronize creation of new chunk
+	NumChunks     uint64          // Total number of chunks
 }
 
 // Open a collection (made of chunks).
@@ -30,7 +30,7 @@ func OpenCol(baseDir string) (col *Col, err error) {
 		return
 	}
 	col = &Col{BaseDir: baseDir, NewChunkMutex: sync.Mutex{},
-		Chunks: make([]*chunk.ChunkCol, 0), ChunkMutexes: make([]*sync.Mutex, 0)}
+		Chunks: make([]*chunk.ChunkCol, 0), ChunkMutexes: make([]*sync.RWMutex, 0)}
 	// Walk the collection directory and look for how many chunks there are
 	maxChunk := 0
 	walker := func(currPath string, info os.FileInfo, err2 error) error {
@@ -60,7 +60,7 @@ func OpenCol(baseDir string) (col *Col, err error) {
 		var oneChunk *chunk.ChunkCol
 		oneChunk, err = chunk.OpenChunk(uint64(i), path.Join(baseDir, strconv.Itoa(i)))
 		col.Chunks = append(col.Chunks, oneChunk)
-		col.ChunkMutexes = append(col.ChunkMutexes, new(sync.Mutex))
+		col.ChunkMutexes = append(col.ChunkMutexes, new(sync.RWMutex))
 	}
 	return
 }
@@ -70,7 +70,6 @@ func (col *Col) CreateNewChunk() {
 	col.NewChunkMutex.Lock()
 	tdlog.Printf("Going to create a new chunk (number %d) in collection %s", col.NumChunks, col.BaseDir)
 	newChunk, err := chunk.OpenChunk(col.NumChunks, path.Join(col.BaseDir, strconv.Itoa(int(col.NumChunks))))
-	col.NumChunks += 1
 	if err != nil {
 		col.NewChunkMutex.Unlock()
 		return
@@ -81,7 +80,8 @@ func (col *Col) CreateNewChunk() {
 	}
 	// Put the new chunk into col structures
 	col.Chunks = append(col.Chunks, newChunk)
-	col.ChunkMutexes = append(col.ChunkMutexes, new(sync.Mutex))
+	col.ChunkMutexes = append(col.ChunkMutexes, new(sync.RWMutex))
+	col.NumChunks += 1
 	col.NewChunkMutex.Unlock()
 }
 
@@ -125,9 +125,9 @@ func (col *Col) Read(id uint64, doc interface{}) (err error) {
 	chunkDocID := id % chunkfile.COL_FILE_SIZE
 	chunk := col.Chunks[chunkNum]
 	chunkMutex := col.ChunkMutexes[chunkNum]
-	chunkMutex.Lock()
+	chunkMutex.RLock()
 	err = chunk.Read(chunkDocID, doc)
-	chunkMutex.Unlock()
+	chunkMutex.RUnlock()
 	return
 }
 
@@ -180,6 +180,40 @@ func (col *Col) Index(path []string) (err error) {
 	return
 }
 
+// Execute the function (only reads chunk data) for all chunks in parallel.
+func (col *Col) ParForeachChunkR(fun func(*chunk.ChunkCol)) {
+	numChunks := col.NumChunks
+	wg := sync.WaitGroup{}
+	for i := uint64(0); i < numChunks; i++ {
+		wg.Add(1)
+		go func(i uint64) {
+			col.ChunkMutexes[i].RLock()
+			fun(col.Chunks[i])
+			col.ChunkMutexes[i].RUnlock()
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+	return
+}
+
+// Execute the function (presumably modifies chunk data) for all chunks in parallel.
+func (col *Col) ParForeachChunk(fun func(*chunk.ChunkCol)) {
+	numChunks := col.NumChunks
+	wg := sync.WaitGroup{}
+	for i := uint64(0); i < numChunks; i++ {
+		wg.Add(1)
+		go func(i uint64) {
+			col.ChunkMutexes[i].Lock()
+			fun(col.Chunks[i])
+			col.ChunkMutexes[i].Unlock()
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+	return
+}
+
 // Remove an index.
 func (col *Col) Unindex(path []string) (err error) {
 	// Do not allow new chunk creation for now
@@ -191,6 +225,108 @@ func (col *Col) Unindex(path []string) (err error) {
 		}
 	}
 	return
+}
+
+// Insert a new document, and assign it a UID.
+func (col *Col) InsertWithUID(doc interface{}) (id uint64, uid string, err error) {
+	// Try to insert the doc into a random chunk
+	randChunkNum := uint64(rand.Int63n(int64(col.NumChunks)))
+	randChunk := col.Chunks[randChunkNum]
+	randChunkMutexes := col.ChunkMutexes[randChunkNum]
+	randChunkMutexes.Lock()
+	idInChunk, uid, outOfSpace, err := randChunk.InsertWithUID(doc)
+	if !outOfSpace {
+		randChunkMutexes.Unlock()
+		id = randChunkNum*chunkfile.COL_FILE_SIZE + idInChunk
+		return
+	}
+	randChunkMutexes.Unlock()
+	// If the random chunk was full, try again with the last chunk
+	lastChunk := col.Chunks[col.NumChunks-1]
+	lastChunkMutexes := col.ChunkMutexes[col.NumChunks-1]
+	lastChunkMutexes.Lock()
+	idInChunk, uid, outOfSpace, err = lastChunk.InsertWithUID(doc)
+	if !outOfSpace {
+		id = (col.NumChunks-1)*chunkfile.COL_FILE_SIZE + idInChunk
+		lastChunkMutexes.Unlock()
+		return
+	}
+	lastChunkMutexes.Unlock()
+	// If the last chunk is full, make a new chunk
+	col.CreateNewChunk()
+	// Now there is a new chunk, let us try again
+	return col.InsertWithUID(doc)
+}
+
+// Retrieve documentby UID, return its ID.
+func (col *Col) ReadByUID(uid string, doc interface{}) (id uint64, err error) {
+	var found bool
+	col.ParForeachChunkR(func(chunk *chunk.ChunkCol) {
+		selfID, selfErr := chunk.ReadByUID(uid, &doc)
+		if selfErr == nil {
+			found = true
+			id = chunk.Number*chunkfile.COL_FILE_SIZE + selfID
+		}
+	})
+	if !found {
+		return 0, errors.New(fmt.Sprintf("Document %s does not exist in %s", uid, col.BaseDir))
+	}
+	return
+}
+
+// Identify a document using UID and update it, return its new ID.
+func (col *Col) UpdateByUID(uid string, doc interface{}) (newID uint64, err error) {
+	var found bool
+	var outOfSpace bool
+	// Attempt to "Update by UID" in each chunk
+	col.ParForeachChunk(func(chunk *chunk.ChunkCol) {
+		selfNewID, selfOutOfSpace, selfErr := chunk.UpdateByUID(uid, doc)
+		if selfErr == nil {
+			// Here, this chunk has the document!
+			found = true
+			outOfSpace = selfOutOfSpace
+			newID = chunk.Number*chunkfile.COL_FILE_SIZE + selfNewID
+		}
+	})
+	if !found {
+		return 0, errors.New(fmt.Sprintf("Document %s does not exist in %s", uid, col.BaseDir))
+	}
+	// If the original chunk ran out of space, the document is no longer there (deleted by col.Update)
+	// So let us put back the updated document
+	if outOfSpace {
+		return col.Insert(doc)
+	}
+	return
+}
+
+// Give a document (identified by ID) a new UID.
+func (col *Col) ReassignUID(id uint64) (newID uint64, newUID string, err error) {
+	chunkNum := id / chunkfile.COL_FILE_SIZE
+	if chunkNum >= col.NumChunks {
+		err = errors.New(fmt.Sprintf("Document %d does not exist in %s - out of bound chunk", id, col.BaseDir))
+		return
+	}
+	chunkDocID := id % chunkfile.COL_FILE_SIZE
+	chunk := col.Chunks[chunkNum]
+	chunkMutex := col.ChunkMutexes[chunkNum]
+	chunkMutex.Lock()
+	// Attempt to reassign UID in the original chunk
+	newID, newUID, newDoc, outOfSpace, err := chunk.ReassignUID(chunkDocID)
+	chunkMutex.Unlock()
+	// If the original chunk is full, the document no longer exists in the chunk (deleted by col.Update)
+	// So let us put back the new document (with UID)
+	if outOfSpace {
+		newID, err = col.Insert(newDoc)
+	}
+
+	return
+}
+
+// Delete a document by UID.
+func (col *Col) DeleteByUID(uid string) {
+	col.ParForeachChunk(func(chunk *chunk.ChunkCol) {
+		chunk.DeleteByUID(uid)
+	})
 }
 
 // Compact the collection and automatically repair any data/index damage.

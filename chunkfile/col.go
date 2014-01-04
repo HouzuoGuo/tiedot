@@ -10,6 +10,9 @@ import (
 )
 
 const (
+	/* Be aware that, changing the following constants will almost certainly
+	require a large number of test cases to be re-written. */
+
 	COL_FILE_SIZE   = uint64(1024 * 1024 * 16) // Size of collection data file
 	DOC_MAX_ROOM    = uint64(1024 * 1024 * 16) // Max single document size
 	DOC_HEADER_SIZE = 1 + 10                   // Size of document header - validity (byte), document room (uint64)

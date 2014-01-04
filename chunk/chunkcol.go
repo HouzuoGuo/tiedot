@@ -334,7 +334,7 @@ func (col *ChunkCol) UpdateByUID(uid string, doc interface{}) (newID uint64, out
 }
 
 // Give a document (identified by ID) a new UID.
-func (col *ChunkCol) ReassignUID(id uint64) (newID uint64, newUID string, outOfSpace bool, err error) {
+func (col *ChunkCol) ReassignUID(id uint64) (newID uint64, newUID string, newDoc interface{}, outOfSpace bool, err error) {
 	newUID = uid.NextUID()
 	var originalDoc interface{}
 	if err = col.Read(id, &originalDoc); err != nil {
@@ -345,6 +345,7 @@ func (col *ChunkCol) ReassignUID(id uint64) (newID uint64, newUID string, outOfS
 		return
 	} else {
 		docWithUID[UID_PATH] = newUID
+		newDoc = docWithUID
 		newID, outOfSpace, err = col.Update(id, docWithUID)
 		return
 	}

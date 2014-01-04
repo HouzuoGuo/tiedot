@@ -461,9 +461,13 @@ func TestUIDDocCRUDAndReopen(t *testing.T) {
 		t.Fatalf("UpdateByUID did not work, still read %v", readDoc)
 	}
 	// update (reassign UID)
-	newID, newUID, outOfSpace, err := col.ReassignUID(ids[0])
+	newID, newUID, newDoc, outOfSpace, err := col.ReassignUID(ids[0])
 	if newID != ids[0] || len(newUID) != 32 || err != nil || outOfSpace {
 		t.Fatalf("ReassignUID did not work: %v %v %v", newID, newUID, err)
+	}
+	newDocMap, _ := newDoc.(map[string]interface{})
+	if fmt.Sprint(newDocMap[UID_PATH]) != newUID {
+		t.Fatalf("Reassign UID did not return correct new document")
 	}
 	// after UID reassignment, the old UID should be gone
 	if _, readErr := col.ReadByUID(uids[0], &readDoc); readErr == nil {

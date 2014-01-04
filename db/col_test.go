@@ -3,6 +3,7 @@ package db
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/chunkfile"
 	"os"
 	"strconv"
@@ -133,4 +134,101 @@ func TestDocIndexAndCRUD(t *testing.T) {
 	}
 	col.Delete(99999999) // shall not crash
 	col.Close()
+}
+
+func TestUIDDocCRUD(t *testing.T) {
+	tmp := "/tmp/tiedot_col_test"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenCol(tmp)
+	if err != nil {
+		t.Fatalf("Failed to open: %v", err)
+		return
+	}
+	docs := []string{
+		`{"a": {"b": {"c": 1}}, "d": 1, "more": "` + strings.Repeat(" ", int(chunkfile.DOC_MAX_ROOM/3)) + `"}`,
+		`{"a": {"b": {"c": 2}}, "d": 2, "more": "` + strings.Repeat(" ", int(chunkfile.DOC_MAX_ROOM/3)) + `"}`,
+		`{"a": {"b": {"c": 3}}, "d": 3, "more": "` + strings.Repeat(" ", int(chunkfile.DOC_MAX_ROOM/3)) + `"}`}
+	var jsonDocs [3]interface{}
+	var ids [3]uint64
+	var uids [3]string
+	json.Unmarshal([]byte(docs[0]), &jsonDocs[0])
+	json.Unmarshal([]byte(docs[1]), &jsonDocs[1])
+	json.Unmarshal([]byte(docs[2]), &jsonDocs[2])
+	// insert
+	ids[0], uids[0], err = col.InsertWithUID(jsonDocs[0])
+	if err != nil {
+		t.Fatal("insert error")
+	}
+	ids[1], uids[1], err = col.InsertWithUID(jsonDocs[1])
+	if err != nil {
+		t.Fatal("insert error")
+	}
+	ids[2], uids[2], err = col.InsertWithUID(jsonDocs[2])
+	if err != nil {
+		t.Fatal("insert error")
+	}
+	if len(uids[0]) != 32 || len(uids[1]) != 32 || len(uids[2]) != 32 ||
+		uids[0] == uids[1] || uids[1] == uids[2] || uids[2] == uids[0] ||
+		ids[0] == ids[1] || ids[1] == ids[2] || ids[2] == ids[0] {
+		t.Fatalf("Malformed UIDs or IDs: %v %v", uids, ids)
+	}
+	// read - inexisting UID
+	var readDoc interface{}
+	if _, readErr := col.ReadByUID("abcde", &readDoc); readErr == nil {
+		t.Fatal("It should have triggered UID not found error")
+	}
+	// read - existing UID
+	readID, readErr := col.ReadByUID(uids[1], &readDoc)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	docMap1 := readDoc.(map[string]interface{})
+	docMap2 := jsonDocs[1].(map[string]interface{})
+	if readID != ids[1] || fmt.Sprint(docMap1["a"]) != fmt.Sprint(docMap2["a"]) {
+		t.Fatalf("Cannot read back original document by UID: %v %d %d", readDoc, readID, ids[1])
+	}
+	// update
+	var docWithoutUID interface{}
+	json.Unmarshal([]byte(docs[1]), &docWithoutUID)
+	if _, err := col.UpdateByUID(uids[0], docWithoutUID); err != nil { // intentionally remove UID
+		t.Fatal(err)
+	}
+	if _, err = col.ReadByUID(uids[0], &readDoc); err == nil { // UID was removed therefore the UID is not found
+		t.Fatalf("UpdateByUID did not work, still read %v", readDoc)
+	}
+	// update (reassign UID)
+	_, newUID, err := col.ReassignUID(ids[0])
+	if len(newUID) != 32 || err != nil {
+		t.Fatalf("ReassignUID did not work: %v %v %v", ids[0], newUID, err)
+	}
+	if _, err = col.ReadByUID(uids[1], &readDoc); err != nil {
+		t.Fatalf("col failed UID index? %s %v", uids[1], err)
+	}
+	// after UID reassignment, the old UID should be gone
+	if _, readErr := col.ReadByUID(uids[0], &readDoc); readErr == nil {
+		t.Fatal("It should have triggered UID not found error")
+	}
+	if _, err = col.ReadByUID(newUID, &readDoc); err != nil { // UID was reassigned, the error should NOT happen
+		t.Fatalf("ReassignUID did not work")
+	}
+	// delete
+	col.DeleteByUID(newUID)
+	if _, err = col.ReadByUID(newUID, &readDoc); err == nil {
+		t.Fatalf("DeleteByUID did not work")
+	}
+	if _, err = col.ReadByUID(uids[1], &readDoc); err != nil {
+		t.Fatalf("col failed UID index? %s %v", uids[1], err)
+	}
+	col.Close()
+	// Reopen and test read again
+	reopen, err := OpenCol(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// UID index should work
+	if _, err = reopen.ReadByUID(uids[1], &readDoc); err != nil {
+		t.Fatalf("Reopen failed UID index? %s %v", uids[1], err)
+	}
+	reopen.Close()
 }
