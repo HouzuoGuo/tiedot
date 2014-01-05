@@ -356,11 +356,13 @@ func (col *ChunkCol) ReassignUID(id uint64) (newID uint64, newUID string, newDoc
 }
 
 // Delete a document by UID.
-func (col *ChunkCol) DeleteByUID(uid string) {
+func (col *ChunkCol) DeleteByUID(uid string) bool {
 	var throwAway interface{}
 	if id, err := col.ReadByUID(uid, &throwAway); err == nil {
 		col.Delete(id)
+		return true
 	}
+	return false
 }
 
 // Deserialize each document and invoke the function on the deserialized docuemnt (Collection Scsn).

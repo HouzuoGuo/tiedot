@@ -180,40 +180,6 @@ func (col *Col) Index(path []string) (err error) {
 	return
 }
 
-// Execute the function (only reads chunk data) for all chunks in parallel.
-func (col *Col) ParForeachChunkR(fun func(*chunk.ChunkCol)) {
-	numChunks := col.NumChunks
-	wg := sync.WaitGroup{}
-	for i := uint64(0); i < numChunks; i++ {
-		wg.Add(1)
-		go func(i uint64) {
-			col.ChunkMutexes[i].RLock()
-			fun(col.Chunks[i])
-			col.ChunkMutexes[i].RUnlock()
-			wg.Done()
-		}(i)
-	}
-	wg.Wait()
-	return
-}
-
-// Execute the function (presumably modifies chunk data) for all chunks in parallel.
-func (col *Col) ParForeachChunk(fun func(*chunk.ChunkCol)) {
-	numChunks := col.NumChunks
-	wg := sync.WaitGroup{}
-	for i := uint64(0); i < numChunks; i++ {
-		wg.Add(1)
-		go func(i uint64) {
-			col.ChunkMutexes[i].Lock()
-			fun(col.Chunks[i])
-			col.ChunkMutexes[i].Unlock()
-			wg.Done()
-		}(i)
-	}
-	wg.Wait()
-	return
-}
-
 // Remove an index.
 func (col *Col) Unindex(path []string) (err error) {
 	// Do not allow new chunk creation for now
@@ -258,43 +224,43 @@ func (col *Col) InsertWithUID(doc interface{}) (id uint64, uid string, err error
 
 // Retrieve documentby UID, return its ID.
 func (col *Col) ReadByUID(uid string, doc interface{}) (id uint64, err error) {
-	var found bool
-	col.ParForeachChunkR(func(chunk *chunk.ChunkCol) {
-		selfID, selfErr := chunk.ReadByUID(uid, &doc)
-		if selfErr == nil {
-			found = true
-			id = selfID
+	numChunks := col.NumChunks
+	// Ask all chunks to look for the UID
+	for i := uint64(0); i < numChunks; i++ {
+		lock := col.ChunkMutexes[i]
+		lock.RLock()
+		if id, err = col.Chunks[i].ReadByUID(uid, &doc); err == nil {
+			lock.RUnlock()
+			return
 		}
-	})
-	if !found {
-		return 0, errors.New(fmt.Sprintf("Document %s does not exist in %s", uid, col.BaseDir))
+		lock.RUnlock()
 	}
-	return
+	return 0, errors.New(fmt.Sprintf("Document %s does not exist in %s", uid, col.BaseDir))
 }
 
 // Identify a document using UID and update it, return its new ID.
 func (col *Col) UpdateByUID(uid string, doc interface{}) (newID uint64, err error) {
-	var found bool
-	var outOfSpace bool
-	// Attempt to "Update by UID" in each chunk
-	col.ParForeachChunk(func(chunk *chunk.ChunkCol) {
-		selfNewID, selfOutOfSpace, selfErr := chunk.UpdateByUID(uid, doc)
-		if selfErr == nil {
-			// Here, this chunk has the document!
+	numChunks := col.NumChunks
+	var outOfSpace, found bool
+	// Ask all chunks to updated doc by ID
+	for i := uint64(0); i < numChunks; i++ {
+		lock := col.ChunkMutexes[i]
+		lock.Lock()
+		newID, outOfSpace, err = col.Chunks[i].UpdateByUID(uid, doc)
+		lock.Unlock()
+		if err == nil {
 			found = true
-			outOfSpace = selfOutOfSpace
-			newID = selfNewID
+			break
 		}
-	})
-	if !found {
-		return 0, errors.New(fmt.Sprintf("Document %s does not exist in %s", uid, col.BaseDir))
 	}
-	// If the original chunk ran out of space, the document is no longer there (deleted by col.Update)
-	// So let us put back the updated document
-	if outOfSpace {
-		return col.Insert(doc)
+	if found {
+		// If the original chunk runs out of space, the update doc needs to be re-inserted
+		if outOfSpace {
+			newID, err = col.Insert(doc)
+		}
+		return
 	}
-	return
+	return 0, errors.New(fmt.Sprintf("Document %s does not exist in %s", uid, col.BaseDir))
 }
 
 // Give a document (identified by ID) a new UID.
@@ -322,20 +288,33 @@ func (col *Col) ReassignUID(id uint64) (newID uint64, newUID string, err error) 
 
 // Delete a document by UID.
 func (col *Col) DeleteByUID(uid string) {
-	col.ParForeachChunk(func(chunk *chunk.ChunkCol) {
-		chunk.DeleteByUID(uid)
-	})
+	numChunks := col.NumChunks
+	// Ask all chunks to delete the UID
+	for i := uint64(0); i < numChunks; i++ {
+		lock := col.ChunkMutexes[i]
+		lock.RLock()
+		if col.Chunks[i].DeleteByUID(uid) {
+			lock.RUnlock()
+			return
+		}
+		lock.RUnlock()
+	}
 }
 
-/* In parallel, deserialize all documents and invoke the function on each document (Collection Scan).
+/* Sequentially deserialize all documents and invoke the function on each document (Collection Scan).
 The function must not write to this collection. */
 func (col *Col) ForAll(fun func(id uint64, doc interface{}) bool) {
-	col.ParForeachChunkR(func(chunk *chunk.ChunkCol) {
+	numChunks := col.NumChunks
+	for i := uint64(0); i < numChunks; i++ {
+		chunk := col.Chunks[i]
+		chunkMutex := col.ChunkMutexes[i]
+		chunkMutex.RLock()
 		chunk.ForAll(fun)
-	})
+		chunkMutex.RUnlock()
+	}
 }
 
-/* Sequentially, deserialize all documents into the template (pointer to struct) and invoke the function on each document (Collection Scan).
+/* Sequentially deserialize all documents into the template (pointer to struct) and invoke the function on each document (Collection Scan).
 The function must not write to this collection. */
 func (col *Col) DeserializeAll(template interface{}, fun func(id uint64) bool) {
 	numChunks := col.NumChunks

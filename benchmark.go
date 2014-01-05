@@ -4,6 +4,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/chunk"
 	"github.com/HouzuoGuo/tiedot/db"
 	"math/rand"
 	"os"
@@ -66,19 +67,22 @@ func benchmark(benchSize int) {
 	// Benchmark document insert
 	average("insert", benchSize, func() {}, func() {
 		if _, err := col.Insert(docs[rand.Intn(benchSize)]); err != nil {
-			panic("insert error")
+			panic(err)
 		}
 	})
 
 	// Collect all document IDs and benchmark document read
+	idsMutex := sync.Mutex{}
 	average("read", benchSize, func() {
 		col.ForAll(func(id uint64, _ interface{}) bool {
+			idsMutex.Lock()
 			ids = append(ids, id)
+			idsMutex.Unlock()
 			return true
 		})
 	}, func() {
 		var doc interface{}
-		err := col.Read(ids[rand.Intn(len(ids))], &doc)
+		err := col.Read(ids[rand.Intn(benchSize)], &doc)
 		if err != nil {
 			panic(err)
 		}
@@ -102,14 +106,14 @@ func benchmark(benchSize int) {
 
 	// Benchmark document update
 	average("update", benchSize, func() {}, func() {
-		if _, err := col.Update(ids[rand.Intn(len(ids))], docs[rand.Intn(benchSize)]); err != nil {
-			panic("update error")
+		if _, err := col.Update(ids[rand.Intn(benchSize)], docs[rand.Intn(benchSize)]); err != nil {
+			panic(err)
 		}
 	})
 
 	// Benchmark document delete
 	average("delete", benchSize, func() {}, func() {
-		col.Delete(ids[rand.Intn(len(ids))])
+		col.Delete(ids[rand.Intn(benchSize)])
 	})
 	col.Close()
 }
@@ -119,7 +123,7 @@ func benchmark2(benchSize int) {
 	docs := make([]uint64, 0, benchSize*2+1000)
 	wp := new(sync.WaitGroup)
 	numThreads := runtime.GOMAXPROCS(-1)
-	wp.Add(5 * numThreads) // There are 5 goroutines: insert, read, query, update and delete
+	wp.Add(4 * numThreads) // There are 5 goroutines: insert, read, query, update and delete
 
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_bench"
@@ -278,30 +282,43 @@ func benchmark3(benchSize int) {
 
 	// Benchmark insert document with UID
 	average("insert", benchSize, func() {}, func() {
-		if _, uid, err := col.InsertWithUID(docs[rand.Intn(benchSize)]); err == nil {
-			uidsMutex.Lock()
-			uids = append(uids, uid)
-			uidsMutex.Unlock()
-		} else {
+		if _, _, err := col.InsertWithUID(docs[rand.Intn(benchSize)]); err != nil {
 			panic("insert error")
 		}
 	})
-
 	// Benchmark read document by UID
 	average("read", benchSize, func() {
+		col.ForAll(func(id uint64, doc interface{}) bool {
+			docMap := doc.(map[string]interface{})
+			uidsMutex.Lock()
+			uids = append(uids, docMap[chunk.UID_PATH].(string))
+			uidsMutex.Unlock()
+			return true
+		})
 	}, func() {
 		var doc interface{}
-		col.ReadByUID(uids[rand.Intn(benchSize)], &doc)
+		uid := uids[rand.Intn(benchSize)]
+		if _, err := col.ReadByUID(uid, &doc); err != nil {
+			fmt.Println(err)
+		}
 	})
+	// Try each UID
+	for _, uid := range uids {
+		var throwAway interface{}
+		if _, err := col.ReadByUID(uid, &throwAway); err != nil {
+			fmt.Println("This UID cannot be read back", uid, err)
+		}
+	}
 
 	// Benchmark update document by UID
-	average("update", benchSize, func() {}, func() {
-		col.UpdateByUID(uids[rand.Intn(benchSize)], docs[rand.Intn(benchSize)])
+	halfBenchSize := benchSize / 2
+	average("update", halfBenchSize, func() {}, func() {
+		col.UpdateByUID(uids[rand.Intn(halfBenchSize)], docs[rand.Intn(halfBenchSize)])
 	})
 
 	// Benchmark delete document by UID
-	average("delete", benchSize, func() {}, func() {
-		col.DeleteByUID(uids[rand.Intn(benchSize)])
+	average("delete", benchSize/2, func() {}, func() {
+		col.DeleteByUID(uids[halfBenchSize+rand.Intn(halfBenchSize)])
 	})
 	col.Close()
 }
