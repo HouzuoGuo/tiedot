@@ -68,6 +68,7 @@ func OpenCol(baseDir string) (col *Col, err error) {
 // Create a new chunk.
 func (col *Col) CreateNewChunk() {
 	col.NewChunkMutex.Lock()
+	defer col.NewChunkMutex.Unlock()
 	tdlog.Printf("Going to create a new chunk (number %d) in collection %s", col.NumChunks, col.BaseDir)
 	newChunk, err := chunk.OpenChunk(col.NumChunks, path.Join(col.BaseDir, strconv.Itoa(int(col.NumChunks))))
 	if err != nil {
@@ -76,13 +77,16 @@ func (col *Col) CreateNewChunk() {
 	}
 	// Make indexes
 	for _, path := range col.Chunks[0].HTPaths {
-		newChunk.Index(path)
+		if path[0] != chunk.UID_PATH {
+			if err := newChunk.Index(path); err != nil {
+				tdlog.Panicf("Failed to create index %s, error: %v", path, err)
+			}
+		}
 	}
 	// Put the new chunk into col structures
 	col.Chunks = append(col.Chunks, newChunk)
 	col.ChunkMutexes = append(col.ChunkMutexes, new(sync.RWMutex))
 	col.NumChunks += 1
-	col.NewChunkMutex.Unlock()
 }
 
 // Insert a new document, return new document's ID.
