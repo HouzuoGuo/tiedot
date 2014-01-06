@@ -302,13 +302,13 @@ func benchmark3(benchSize int) {
 			fmt.Println(err)
 		}
 	})
-	// Try each UID
-	for _, uid := range uids {
-		var throwAway interface{}
-		if _, err := col.ReadByUID(uid, &throwAway); err != nil {
-			fmt.Println("This UID cannot be read back", uid, err)
-		}
-	}
+	//// Try each UID
+	//for _, uid := range uids {
+	//	var throwAway interface{}
+	//	if _, err := col.ReadByUID(uid, &throwAway); err != nil {
+	//		fmt.Println("This UID cannot be read back", uid, err)
+	//	}
+	//}
 
 	// Benchmark update document by UID
 	halfBenchSize := benchSize / 2

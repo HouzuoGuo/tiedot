@@ -7,6 +7,7 @@ import (
 	"github.com/HouzuoGuo/tiedot/chunk"
 	"github.com/HouzuoGuo/tiedot/chunkfile"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"github.com/HouzuoGuo/tiedot/uid"
 	"math/rand"
 	"os"
 	"path"
@@ -194,111 +195,101 @@ func (col *Col) Unindex(path []string) (err error) {
 }
 
 // Insert a new document, and assign it a UID.
-func (col *Col) InsertWithUID(doc interface{}) (id uint64, uid string, err error) {
-	// Try to insert the doc into a random chunk
-	randChunkNum := uint64(rand.Int63n(int64(col.NumChunks)))
-	randChunk := col.Chunks[randChunkNum]
-	randChunkMutexes := col.ChunkMutexes[randChunkNum]
-	randChunkMutexes.Lock()
-	id, uid, outOfSpace, err := randChunk.InsertWithUID(doc)
-	if !outOfSpace {
-		randChunkMutexes.Unlock()
+func (col *Col) InsertWithUID(doc interface{}) (newID uint64, newUID string, err error) {
+	newUID = uid.NextUID()
+	if docMap, ok := doc.(map[string]interface{}); !ok {
+		err = errors.New("Only JSON object document may have UID")
+		return
+	} else {
+		docMap[chunk.UID_PATH] = newUID
+		newID, err = col.Insert(doc)
 		return
 	}
-	randChunkMutexes.Unlock()
-	// If the random chunk was full, try again with the last chunk
-	lastChunk := col.Chunks[col.NumChunks-1]
-	lastChunkMutexes := col.ChunkMutexes[col.NumChunks-1]
-	lastChunkMutexes.Lock()
-	id, uid, outOfSpace, err = lastChunk.InsertWithUID(doc)
-	if !outOfSpace {
-		lastChunkMutexes.Unlock()
-		return
+}
+
+// Hash scan across all chunks.
+func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, uint64) bool) (keys, vals []uint64) {
+	keys = make([]uint64, 0, limit)
+	vals = make([]uint64, 0, limit)
+	numChunks := col.NumChunks
+	for i := uint64(0); i < numChunks; i++ {
+		chunk := col.Chunks[i]
+		ht := chunk.Path2HT[htPath]
+		k, v := ht.Get(key, limit, filter)
+		keys = append(keys, k...)
+		vals = append(vals, v...)
+		if uint64(len(keys)) >= limit {
+			return
+		}
 	}
-	lastChunkMutexes.Unlock()
-	// If the last chunk is full, make a new chunk
-	col.CreateNewChunk()
-	// Now there is a new chunk, let us try again
-	return col.InsertWithUID(doc)
+	return
 }
 
 // Retrieve documentby UID, return its ID.
 func (col *Col) ReadByUID(uid string, doc interface{}) (id uint64, err error) {
-	numChunks := col.NumChunks
-	// Ask all chunks to look for the UID
-	for i := uint64(0); i < numChunks; i++ {
-		lock := col.ChunkMutexes[i]
-		lock.RLock()
-		if id, err = col.Chunks[i].ReadByUID(uid, &doc); err == nil {
-			lock.RUnlock()
-			return
+	var docID uint64
+	found := false
+	// Scan UID hash table, find potential matches
+	col.HashScan(chunk.UID_PATH, chunk.StrHash(uid), 1, func(key, value uint64) bool {
+		var candidate interface{}
+		if col.Read(value, &candidate) == nil {
+			if docMap, ok := candidate.(map[string]interface{}); ok {
+				// Physically read the document to avoid hash collision
+				if candidateUID, ok := docMap[chunk.UID_PATH]; ok {
+					if stringUID, ok := candidateUID.(string); ok {
+						if stringUID != uid {
+							return false // A hash collision
+						}
+						docID = value
+						found = true
+					}
+				}
+			}
 		}
-		lock.RUnlock()
+		return true
+	})
+	if !found {
+		return 0, errors.New(fmt.Sprintf("Document %s does not exist in %s", uid, col.BaseDir))
 	}
-	return 0, errors.New(fmt.Sprintf("Document %s does not exist in %s", uid, col.BaseDir))
+	return docID, col.Read(docID, doc)
 }
 
 // Identify a document using UID and update it, return its new ID.
 func (col *Col) UpdateByUID(uid string, doc interface{}) (newID uint64, err error) {
-	numChunks := col.NumChunks
-	var outOfSpace, found bool
-	// Ask all chunks to updated doc by ID
-	for i := uint64(0); i < numChunks; i++ {
-		lock := col.ChunkMutexes[i]
-		lock.Lock()
-		newID, outOfSpace, err = col.Chunks[i].UpdateByUID(uid, doc)
-		lock.Unlock()
-		if err == nil {
-			found = true
-			break
-		}
-	}
-	if found {
-		// If the original chunk runs out of space, the update doc needs to be re-inserted
-		if outOfSpace {
-			newID, err = col.Insert(doc)
-		}
+	var throwAway interface{}
+	if newID, err = col.ReadByUID(uid, &throwAway); err != nil {
 		return
+	} else {
+		return col.Update(newID, doc)
 	}
-	return 0, errors.New(fmt.Sprintf("Document %s does not exist in %s", uid, col.BaseDir))
 }
 
 // Give a document (identified by ID) a new UID.
 func (col *Col) ReassignUID(id uint64) (newID uint64, newUID string, err error) {
-	chunkNum := id / chunkfile.COL_FILE_SIZE
-	if chunkNum >= col.NumChunks {
-		err = errors.New(fmt.Sprintf("Document %d does not exist in %s - out of bound chunk", id, col.BaseDir))
+	newUID = uid.NextUID()
+	var originalDoc interface{}
+	if err = col.Read(id, &originalDoc); err != nil {
 		return
 	}
-	chunkDocID := id % chunkfile.COL_FILE_SIZE
-	chunk := col.Chunks[chunkNum]
-	chunkMutex := col.ChunkMutexes[chunkNum]
-	chunkMutex.Lock()
-	// Attempt to reassign UID in the original chunk
-	newID, newUID, newDoc, outOfSpace, err := chunk.ReassignUID(chunkDocID)
-	chunkMutex.Unlock()
-	// If the original chunk is full, the document no longer exists in the chunk (deleted by col.Update)
-	// So let us put back the new document (with UID)
-	if outOfSpace {
-		newID, err = col.Insert(newDoc)
+	if docWithUID, ok := originalDoc.(map[string]interface{}); !ok {
+		err = errors.New("Only JSON object document may have UID")
+		return
+	} else {
+		docWithUID[chunk.UID_PATH] = newUID
+		newID, err = col.Update(id, docWithUID)
+		return
 	}
-
 	return
 }
 
 // Delete a document by UID.
-func (col *Col) DeleteByUID(uid string) {
-	numChunks := col.NumChunks
-	// Ask all chunks to delete the UID
-	for i := uint64(0); i < numChunks; i++ {
-		lock := col.ChunkMutexes[i]
-		lock.RLock()
-		if col.Chunks[i].DeleteByUID(uid) {
-			lock.RUnlock()
-			return
-		}
-		lock.RUnlock()
+func (col *Col) DeleteByUID(uid string) bool {
+	var throwAway interface{}
+	if id, err := col.ReadByUID(uid, &throwAway); err == nil {
+		col.Delete(id)
+		return true
 	}
+	return false
 }
 
 /* Sequentially deserialize all documents and invoke the function on each document (Collection Scan).

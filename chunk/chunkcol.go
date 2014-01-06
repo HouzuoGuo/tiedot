@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/chunkfile"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"github.com/HouzuoGuo/tiedot/uid"
 	"io"
 	"os"
 	"path"
@@ -283,86 +282,6 @@ func (col *ChunkCol) Delete(id uint64) {
 	}
 	col.Data.Delete(id - col.Number*chunkfile.COL_FILE_SIZE)
 	col.unindexDoc(id, oldDoc)
-}
-
-// Insert a new document, and assign it a UID.
-func (col *ChunkCol) InsertWithUID(doc interface{}) (newID uint64, newUID string, outOfSpace bool, err error) {
-	newUID = uid.NextUID()
-	if docMap, ok := doc.(map[string]interface{}); !ok {
-		err = errors.New("Only JSON object document may have UID")
-		return
-	} else {
-		docMap[UID_PATH] = newUID
-		newID, outOfSpace, err = col.Insert(doc)
-		return
-	}
-}
-
-// Retrieve documentby UID, return its ID.
-func (col *ChunkCol) ReadByUID(uid string, doc interface{}) (uint64, error) {
-	var docID uint64
-	found := false
-	// Scan UID hash table, find potential matches
-	col.UidHT.Get(StrHash(uid), 1, func(key, value uint64) bool {
-		var candidate interface{}
-		if col.Read(value, &candidate) == nil {
-			if docMap, ok := candidate.(map[string]interface{}); ok {
-				// Physically read the document to avoid hash collision
-				if candidateUID, ok := docMap[UID_PATH]; ok {
-					if stringUID, ok := candidateUID.(string); ok {
-						if stringUID != uid {
-							return false // A hash collision
-						}
-						docID = value
-						found = true
-					}
-				}
-			}
-		}
-		return true
-	})
-	if !found {
-		return 0, errors.New(fmt.Sprintf("Document %s does not exist in %s", uid, col.BaseDir))
-	}
-	return docID, col.Read(docID, doc)
-}
-
-// Identify a document using UID and update it, return its new ID.
-func (col *ChunkCol) UpdateByUID(uid string, doc interface{}) (newID uint64, outOfSpace bool, err error) {
-	var throwAway interface{}
-	if newID, err = col.ReadByUID(uid, &throwAway); err != nil {
-		return
-	} else {
-		return col.Update(newID, doc)
-	}
-}
-
-// Give a document (identified by ID) a new UID.
-func (col *ChunkCol) ReassignUID(id uint64) (newID uint64, newUID string, newDoc interface{}, outOfSpace bool, err error) {
-	newUID = uid.NextUID()
-	var originalDoc interface{}
-	if err = col.Read(id, &originalDoc); err != nil {
-		return
-	}
-	if docWithUID, ok := originalDoc.(map[string]interface{}); !ok {
-		err = errors.New("Only JSON object document may have UID")
-		return
-	} else {
-		docWithUID[UID_PATH] = newUID
-		newDoc = docWithUID
-		newID, outOfSpace, err = col.Update(id, docWithUID)
-		return
-	}
-}
-
-// Delete a document by UID.
-func (col *ChunkCol) DeleteByUID(uid string) bool {
-	var throwAway interface{}
-	if id, err := col.ReadByUID(uid, &throwAway); err == nil {
-		col.Delete(id)
-		return true
-	}
-	return false
 }
 
 // Deserialize each document and invoke the function on the deserialized docuemnt (Collection Scsn).
