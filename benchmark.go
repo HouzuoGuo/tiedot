@@ -99,7 +99,7 @@ func benchmark(benchSize int) {
 			panic("json error")
 		}
 		result := make(map[uint64]struct{})
-		if err := db.EvalQueryV2(query, col, &result); err != nil {
+		if err := db.EvalQuery(query, col, &result); err != nil {
 			panic("query error")
 		}
 	})
@@ -202,7 +202,7 @@ func benchmark2(benchSize int) {
 					panic("json error")
 				}
 				result := make(map[uint64]struct{})
-				if err = db.EvalQueryV2(query, col, &result); err != nil {
+				if err = db.EvalQuery(query, col, &result); err != nil {
 					panic("query error")
 				}
 			}

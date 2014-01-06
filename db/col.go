@@ -218,11 +218,16 @@ func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, u
 		k, v := ht.Get(key, limit, filter)
 		keys = append(keys, k...)
 		vals = append(vals, v...)
-		if uint64(len(keys)) >= limit {
-			return
+		if limit > 0 && uint64(len(keys)) >= limit {
+			break
 		}
 	}
-	return
+	if limit == 0 {
+		return
+	} else {
+		// Return only `limit` number of results
+		return keys[:limit], vals[:limit]
+	}
 }
 
 // Retrieve documentby UID, return its ID.

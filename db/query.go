@@ -11,10 +11,10 @@ import (
 )
 
 // Calculate union of sub-query results.
-func V2EvalUnion(exprs []interface{}, src *Col, result *map[uint64]struct{}) (err error) {
+func EvalUnion(exprs []interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	for _, subExpr := range exprs {
 		// Evaluate all sub-queries - they will put their result into the result map
-		if err = EvalQueryV2(subExpr, src, result); err != nil {
+		if err = EvalQuery(subExpr, src, result); err != nil {
 			return
 		}
 	}
@@ -22,8 +22,8 @@ func V2EvalUnion(exprs []interface{}, src *Col, result *map[uint64]struct{}) (er
 }
 
 // Put all document IDs into result.
-func V2EvalAllIDs(src *Col, result *map[uint64]struct{}) (err error) {
-	collectIDs := func(id uint64, _ []byte) bool {
+func EvalAllIDs(src *Col, result *map[uint64]struct{}) (err error) {
+	collectIDs := func(id uint64, _ interface{}) bool {
 		(*result)[id] = struct{}{}
 		return true
 	}
@@ -31,14 +31,14 @@ func V2EvalAllIDs(src *Col, result *map[uint64]struct{}) (err error) {
 	for i := uint64(0); i < numChunks; i++ {
 		lock := src.ChunkMutexes[i]
 		lock.RLock()
-		src.Chunks[i].Data.ForAll(collectIDs)
+		src.ForAll(collectIDs)
 		lock.RUnlock()
 	}
 	return
 }
 
 // Execute value equity check ("attribute == value") using hash lookup or collection scan.
-func V2Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
+func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	// Figure out lookup path - JSON array "in"
 	path, hasPath := expr["in"]
 	if !hasPath {
@@ -92,9 +92,11 @@ func V2Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, re
 			// Get inside each document and find match
 			for _, v := range chunk.GetIn(doc, vecPath) {
 				if fmt.Sprint(v) == lookupStrValue {
+					if intLimit > 0 && counter == intLimit {
+						return false
+					}
 					(*result)[id] = struct{}{}
 					counter += 1
-					return counter != intLimit
 				}
 			}
 			return true
@@ -105,7 +107,7 @@ func V2Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, re
 }
 
 // Execute value existence check.
-func V2PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
+func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	// Figure out the path
 	vecPath := make([]string, 0)
 	if vecPathInterface, ok := hasPath.([]interface{}); ok {
@@ -130,9 +132,11 @@ func V2PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col,
 	matchDocFunc := func(id uint64, doc interface{}) bool {
 		vals := chunk.GetIn(doc, vecPath)
 		if !(vals == nil || len(vals) == 1 && vals[0] == nil) {
+			if intLimit > 0 && counter == intLimit {
+				return false
+			}
 			(*result)[id] = struct{}{}
 			counter += 1
-			return counter != intLimit
 		}
 		return true
 	}
@@ -141,13 +145,13 @@ func V2PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col,
 }
 
 // Calculate intersection of sub query results.
-func V2Intersect(subExprs interface{}, src *Col, result *map[uint64]struct{}) (err error) {
+func Intersect(subExprs interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		first := true
 		for _, subExpr := range subExprVecs {
 			subResult := make(map[uint64]struct{})
 			intersection := make(map[uint64]struct{})
-			if err = EvalQueryV2(subExpr, src, &subResult); err != nil {
+			if err = EvalQuery(subExpr, src, &subResult); err != nil {
 				return
 			}
 			if first {
@@ -169,12 +173,12 @@ func V2Intersect(subExprs interface{}, src *Col, result *map[uint64]struct{}) (e
 }
 
 // Calculate complement of sub query results.
-func V2Complement(subExprs interface{}, src *Col, result *map[uint64]struct{}) (err error) {
+func Complement(subExprs interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		for _, subExpr := range subExprVecs {
 			subResult := make(map[uint64]struct{})
 			complement := make(map[uint64]struct{})
-			if err = EvalQueryV2(subExpr, src, &subResult); err != nil {
+			if err = EvalQuery(subExpr, src, &subResult); err != nil {
 				return
 			}
 			for k, _ := range subResult {
@@ -196,7 +200,7 @@ func V2Complement(subExprs interface{}, src *Col, result *map[uint64]struct{}) (
 }
 
 // Scan hash table or collection documents using an integer range.
-func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
+func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	path, hasPath := expr["in"]
 	if !hasPath {
 		return errors.New("Missing path `in`")
@@ -268,7 +272,7 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 				}
 				_, vals := src.HashScan(htPath, hashValue, uint64(intLimit), collisionDetection)
 				for _, docID := range vals {
-					if intLimit != 0 && counter == intLimit {
+					if intLimit > 0 && counter == intLimit {
 						break
 					}
 					counter += 1
@@ -294,7 +298,7 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 				}
 				_, vals := src.HashScan(htPath, hashValue, uint64(intLimit), collisionDetection)
 				for _, docID := range vals {
-					if intLimit != 0 && counter == intLimit {
+					if intLimit > 0 && counter == intLimit {
 						break
 					}
 					counter += 1
@@ -316,9 +320,11 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 			for _, v := range chunk.GetIn(doc, vecPath) {
 				if floatV, ok := v.(float64); ok {
 					if intV := int(floatV); intV <= to && intV >= from {
+						if intLimit > 0 && counter == intLimit {
+							return false
+						}
 						(*result)[id] = struct{}{}
 						counter += 1
-						return counter != intLimit
 					}
 				}
 			}
@@ -330,7 +336,7 @@ func V2IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, resu
 }
 
 // Execute value match regexp using hash lookup or collection scan.
-func V2RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
+func RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	// Figure out lookup path - JSON array "in"
 	path, hasPath := expr["in"]
 	if !hasPath {
@@ -361,9 +367,11 @@ func V2RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *
 		// Get inside the document and find value match
 		for _, v := range chunk.GetIn(doc, vecPath) {
 			if validRegexp.MatchString(fmt.Sprint(v)) {
+				if intLimit > 0 && counter == intLimit {
+					return false
+				}
 				(*result)[id] = struct{}{}
 				counter += 1
-				return counter != intLimit
 			}
 		}
 		return true
@@ -374,33 +382,33 @@ func V2RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *
 }
 
 // Main entrance to query processor - evaluate a query and put result into result map (as map keys).
-func EvalQueryV2(q interface{}, src *Col, result *map[uint64]struct{}) (err error) {
+func EvalQuery(q interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	switch expr := q.(type) {
 	case float64: // Single document number
 		(*result)[uint64(expr)] = struct{}{}
 	case []interface{}: // [sub query 1, sub query 2, etc]
-		return V2EvalUnion(expr, src, result)
+		return EvalUnion(expr, src, result)
 	case string:
 		if expr == "all" { // Put all IDs into result
-			return V2EvalAllIDs(src, result)
+			return EvalAllIDs(src, result)
 		} else {
 			return errors.New(fmt.Sprintf("Do not know what %v means, did you mean 'all' (getting all document IDs)?", expr))
 		}
 	case map[string]interface{}:
 		if lookupValue, lookup := expr["eq"]; lookup { // eq - lookup
-			return V2Lookup(lookupValue, expr, src, result)
+			return Lookup(lookupValue, expr, src, result)
 		} else if hasPath, exist := expr["has"]; exist { // has - path existence test
-			return V2PathExistence(hasPath, expr, src, result)
+			return PathExistence(hasPath, expr, src, result)
 		} else if subExprs, intersect := expr["n"]; intersect { // n - intersection
-			return V2Intersect(subExprs, src, result)
+			return Intersect(subExprs, src, result)
 		} else if subExprs, complement := expr["c"]; complement { // c - complement
-			return V2Complement(subExprs, src, result)
+			return Complement(subExprs, src, result)
 		} else if intFrom, htRange := expr["int-from"]; htRange { // int-from, int-to - integer range query
-			return V2IntRange(intFrom, expr, src, result)
+			return IntRange(intFrom, expr, src, result)
 		} else if intFrom, htRange := expr["int from"]; htRange { // "int from, "int to" - integer range query - same as above, just without dash
-			return V2IntRange(intFrom, expr, src, result)
+			return IntRange(intFrom, expr, src, result)
 		} else if lookupRegexp, lookup := expr["re"]; lookup { // find documents using regular expression
-			return V2RegexpLookup(lookupRegexp, expr, src, result)
+			return RegexpLookup(lookupRegexp, expr, src, result)
 		} else {
 			return errors.New(fmt.Sprintf("Query %v does not contain any operation (lookup/union/etc)", expr))
 		}
