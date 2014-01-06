@@ -209,8 +209,8 @@ func (col *Col) InsertWithUID(doc interface{}) (newID uint64, newUID string, err
 
 // Hash scan across all chunks.
 func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, uint64) bool) (keys, vals []uint64) {
-	keys = make([]uint64, 0, limit)
-	vals = make([]uint64, 0, limit)
+	keys = make([]uint64, 0)
+	vals = make([]uint64, 0)
 	numChunks := col.NumChunks
 	for i := uint64(0); i < numChunks; i++ {
 		chunk := col.Chunks[i]
@@ -222,7 +222,7 @@ func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, u
 			break
 		}
 	}
-	if limit == 0 {
+	if limit == 0 || uint64(len(keys)) <= limit {
 		return
 	} else {
 		// Return only `limit` number of results
