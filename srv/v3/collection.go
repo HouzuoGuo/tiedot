@@ -80,8 +80,11 @@ func Scrub(w http.ResponseWriter, r *http.Request) {
 	}
 	V3Sync.Lock()
 	defer V3Sync.Unlock()
-	if err := V3DB.Scrub(col); err != nil {
-		http.Error(w, fmt.Sprint(err), 400)
+	dbCol := V3DB.Use(col)
+	if dbCol == nil {
+		http.Error(w, fmt.Sprintf("Collection %s does not exist", col), 400)
+	} else {
+		dbCol.Scrub()
 	}
 }
 

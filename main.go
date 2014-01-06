@@ -3,6 +3,8 @@ package main
 
 import (
 	"flag"
+	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/srv/v3"
 	"log"
 	"math/rand"
 	"os"
@@ -25,7 +27,7 @@ func main() {
 	var mode, dir string
 	var port, maxprocs, benchSize int
 	var profile bool
-	flag.StringVar(&mode, "mode", "", "[http|bench|bench2|bench3|example]")
+	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|bench3|example]")
 	flag.StringVar(&dir, "dir", "", "database directory")
 	flag.IntVar(&port, "port", 0, "listening port number")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
@@ -57,6 +59,18 @@ func main() {
 	}
 
 	switch mode {
+	case "httpd": // Run HTTP API server
+		if dir == "" {
+			tdlog.Fatal("Please specify database directory, for example -dir=/tmp/db")
+		}
+		if port == 0 {
+			tdlog.Fatal("Please specify port number, for example -port=8080")
+		}
+		db, err := db.OpenDB(dir)
+		if err != nil {
+			tdlog.Fatal(err)
+		}
+		v3.Start(db, port)
 	case "example": // Run embedded usage examples
 		embeddedExample()
 	case "bench": // Benchmark scenarios

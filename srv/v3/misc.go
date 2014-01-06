@@ -35,7 +35,7 @@ func Dump(w http.ResponseWriter, r *http.Request) {
 	walkFun := func(currPath string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			// Calculate directory path at destination and create it
-			relPath, err := filepath.Rel(V3DB.Dir, currPath)
+			relPath, err := filepath.Rel(V3DB.BaseDir, currPath)
 			if err != nil {
 				return err
 			}
@@ -51,7 +51,7 @@ func Dump(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 			// Calculate file path at destination and create it
-			relPath, err := filepath.Rel(V3DB.Dir, currPath)
+			relPath, err := filepath.Rel(V3DB.BaseDir, currPath)
 			if err != nil {
 				return err
 			}
@@ -72,7 +72,7 @@ func Dump(w http.ResponseWriter, r *http.Request) {
 	V3Sync.Lock()
 	defer V3Sync.Unlock()
 	V3DB.Flush()
-	err := filepath.Walk(V3DB.Dir, walkFun)
+	err := filepath.Walk(V3DB.BaseDir, walkFun)
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), 500)
 	}

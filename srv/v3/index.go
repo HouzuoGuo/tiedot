@@ -47,7 +47,7 @@ func Indexes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	indexes := make([]string, 0)
-	for path := range dbcol.StrHT {
+	for path := range dbcol.Chunks[0].Path2HT {
 		indexes = append(indexes, path)
 	}
 	resp, err := json.Marshal(indexes)
