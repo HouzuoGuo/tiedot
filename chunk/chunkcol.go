@@ -7,13 +7,10 @@ import (
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/chunkfile"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"io"
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"time"
 )
 
 const (
@@ -310,16 +307,8 @@ func (col *ChunkCol) DeserializeAll(template interface{}, fun func(id uint64) bo
 
 // Compact the chunk and automatically repair any data/index damage.
 func (col *ChunkCol) Scrub() (recovered uint64) {
-	// Safety first - make a backup of existing data file
-	bakFileName := DAT_FILENAME_MAGIC + "_" + strconv.Itoa(int(time.Now().UnixNano()))
-	bakDest, err := os.Create(path.Join(col.BaseDir, bakFileName))
-	if err != nil {
-		tdlog.Errorf("Scrub: failed to backup existing data file %s, error %v", col.Data.File.Name, err)
-	}
-	defer bakDest.Close()
-	if _, err := io.Copy(col.Data.File.Fh, bakDest); err != nil {
-		tdlog.Errorf("Scrub: failed to backup existing data file %s, error %v", col.Data.File.Name, err)
-	}
+	// Save all buffers
+	col.Flush()
 	// Read all documents into memory
 	allDocs := make([]interface{}, 0)
 	col.ForAll(func(_ uint64, doc interface{}) bool {

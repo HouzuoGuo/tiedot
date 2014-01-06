@@ -5,6 +5,7 @@ import (
 	"flag"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/srv/v3"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"log"
 	"math/rand"
 	"os"

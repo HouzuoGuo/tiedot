@@ -86,7 +86,9 @@ func (db *DB) Drop(name string) (err error) {
 // Flush all collection data and index files.
 func (db *DB) Flush() {
 	for _, col := range db.StrCol {
-		col.Flush()
+		if err := col.Flush(); err != nil {
+			tdlog.Errorf("Error during database flush: %v", err)
+		}
 	}
 }
 

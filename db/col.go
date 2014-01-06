@@ -344,6 +344,7 @@ func (col *Col) Flush() error {
 			return err
 		}
 	}
+	tdlog.Printf("Collection %s has all buffers flushed", col.BaseDir)
 	return nil
 }
 
@@ -352,4 +353,5 @@ func (col *Col) Close() {
 	for _, chunk := range col.Chunks {
 		chunk.Close()
 	}
+	tdlog.Printf("Collection %s is closed", col.BaseDir)
 }
