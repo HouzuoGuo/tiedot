@@ -25,7 +25,7 @@ func main() {
 	var mode, dir string
 	var port, maxprocs, benchSize int
 	var profile bool
-	flag.StringVar(&mode, "mode", "", "[v1|v2|v3|bench|bench2|bench3|example]")
+	flag.StringVar(&mode, "mode", "", "[http|bench|bench2|bench3|example]")
 	flag.StringVar(&dir, "dir", "", "database directory")
 	flag.IntVar(&port, "port", 0, "listening port number")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
@@ -57,6 +57,8 @@ func main() {
 	}
 
 	switch mode {
+	case "example": // Run embedded usage examples
+		embeddedExample()
 	case "bench": // Benchmark scenarios
 		benchmark(benchSize)
 	case "bench2":
