@@ -92,17 +92,17 @@ func benchmark(benchSize int) {
 	})
 
 	// Benchmark lookup query (two attributes)
-	//average("lookup", benchSize, func() {}, func() {
-	//	var query interface{}
-	//	if err := json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a", "b", "c"], "limit": 1}, `+
-	//		`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
-	//		panic("json error")
-	//	}
-	//	result := make(map[uint64]struct{})
-	//	if err := db.EvalQueryV2(query, col, &result); err != nil {
-	//		panic("query error")
-	//	}
-	//})
+	average("lookup", benchSize, func() {}, func() {
+		var query interface{}
+		if err := json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a", "b", "c"], "limit": 1}, `+
+			`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
+			panic("json error")
+		}
+		result := make(map[uint64]struct{})
+		if err := db.EvalQueryV2(query, col, &result); err != nil {
+			panic("query error")
+		}
+	})
 
 	// Benchmark document update
 	average("update", benchSize, func() {}, func() {
@@ -123,7 +123,7 @@ func benchmark2(benchSize int) {
 	docs := make([]uint64, 0, benchSize*2+1000)
 	wp := new(sync.WaitGroup)
 	numThreads := runtime.GOMAXPROCS(-1)
-	wp.Add(4 * numThreads) // There are 5 goroutines: insert, read, query, update and delete
+	wp.Add(5 * numThreads) // There are 5 goroutines: insert, read, query, update and delete
 
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_bench"
@@ -190,25 +190,25 @@ func benchmark2(benchSize int) {
 	}
 
 	// Query benchSize times (lookup on two attributes)
-	//for i := 0; i < numThreads; i++ {
-	//	go func(i int) {
-	//		fmt.Printf("Query thread %d starting\n", i)
-	//		defer wp.Done()
-	//		var query interface{}
-	//		var err error
-	//		for j := 0; j < benchSize/numThreads; j++ {
-	//			if err = json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a", "b", "c"], "limit": 1}, `+
-	//				`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
-	//				panic("json error")
-	//			}
-	//			result := make(map[uint64]struct{})
-	//			if err = db.EvalQueryV2(query, col, &result); err != nil {
-	//				panic("query error")
-	//			}
-	//		}
-	//		fmt.Printf("Query thread %d completed\n", i)
-	//	}(i)
-	//}
+	for i := 0; i < numThreads; i++ {
+		go func(i int) {
+			fmt.Printf("Query thread %d starting\n", i)
+			defer wp.Done()
+			var query interface{}
+			var err error
+			for j := 0; j < benchSize/numThreads; j++ {
+				if err = json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a", "b", "c"], "limit": 1}, `+
+					`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
+					panic("json error")
+				}
+				result := make(map[uint64]struct{})
+				if err = db.EvalQueryV2(query, col, &result); err != nil {
+					panic("query error")
+				}
+			}
+			fmt.Printf("Query thread %d completed\n", i)
+		}(i)
+	}
 
 	// Update benchSize documents
 	for i := 0; i < numThreads; i++ {
