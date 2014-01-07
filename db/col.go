@@ -92,12 +92,17 @@ func (col *Col) CreateNewChunk() {
 
 // Insert a new document, return new document's ID.
 func (col *Col) Insert(doc interface{}) (id uint64, err error) {
+	fmt.Println("insert", doc)
 	// Try to insert the doc into a random chunk
 	randChunkNum := uint64(rand.Int63n(int64(col.NumChunks)))
+	fmt.Println("t0", doc)
 	randChunk := col.Chunks[randChunkNum]
 	randChunkMutex := col.ChunkMutexes[randChunkNum]
+	fmt.Println("t1", doc)
 	randChunkMutex.Lock()
+	fmt.Println("t2", doc)
 	id, outOfSpace, err := randChunk.Insert(doc)
+	fmt.Println("t3", doc)
 	if !outOfSpace {
 		randChunkMutex.Unlock()
 		return
@@ -213,6 +218,7 @@ func (col *Col) InsertWithUID(doc interface{}) (newID uint64, newUID string, err
 		return
 	} else {
 		docMap[chunk.UID_PATH] = newUID
+		fmt.Println("about to insert", doc)
 		newID, err = col.Insert(doc)
 		return
 	}
@@ -261,6 +267,7 @@ func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, u
 
 // Retrieve documentby UID, return its ID.
 func (col *Col) ReadByUID(uid string, doc interface{}) (id uint64, err error) {
+	fmt.Println("reading", chunk.StrHash(uid), " ", uid)
 	var docID uint64
 	found := false
 	// Scan UID hash table, find potential matches
@@ -272,6 +279,7 @@ func (col *Col) ReadByUID(uid string, doc interface{}) (id uint64, err error) {
 				if candidateUID, ok := docMap[chunk.UID_PATH]; ok {
 					if stringUID, ok := candidateUID.(string); ok {
 						if stringUID != uid {
+							fmt.Println("!!!!!!!!!!!!!!!")
 							return false // A hash collision
 						}
 						docID = value

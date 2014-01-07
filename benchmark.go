@@ -282,8 +282,11 @@ func benchmark3(benchSize int) {
 
 	// Benchmark insert document with UID
 	average("insert", benchSize, func() {}, func() {
-		if _, _, err := col.InsertWithUID(docs[rand.Intn(benchSize)]); err != nil {
+		var doc interface{}
+		if _, uid, err := col.InsertWithUID(docs[rand.Intn(benchSize)]); err != nil {
 			panic("insert error")
+		} else if _, err = col.ReadByUID(uid, &doc); err != nil {
+			panic(err)
 		}
 	})
 	// Benchmark read document by UID

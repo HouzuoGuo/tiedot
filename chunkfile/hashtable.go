@@ -3,6 +3,7 @@ package chunkfile
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/commonfile"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math"
@@ -123,6 +124,7 @@ func (ht *HashTable) Put(key, val uint64) {
 	for {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		if ht.File.Buf[entryAddr] != ENTRY_VALID {
+			fmt.Println("entry put", key, val, entryAddr)
 			ht.File.Buf[entryAddr] = ENTRY_VALID
 			binary.PutUvarint(ht.File.Buf[entryAddr+1:entryAddr+11], key)
 			binary.PutUvarint(ht.File.Buf[entryAddr+11:entryAddr+21], val)
