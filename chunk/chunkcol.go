@@ -191,11 +191,9 @@ func (col *ChunkCol) Unindex(path []string) (err error) {
 
 // Put the document on all indexes (ID is the absolute ID, not relative to this chunk).
 func (col *ChunkCol) indexDoc(id uint64, doc interface{}) {
-	fmt.Println("about to index", doc)
 	for i, path := range col.HTPaths {
 		for _, toBeIndexed := range GetIn(doc, path) {
 			if toBeIndexed != nil {
-				fmt.Println("indexed", doc, id, toBeIndexed, StrHash(toBeIndexed))
 				col.Hashtables[i].Put(StrHash(toBeIndexed), id)
 			}
 		}
@@ -223,7 +221,6 @@ func (col *ChunkCol) Insert(doc interface{}) (id uint64, outOfSpace bool, err er
 		return
 	}
 	id += col.Number * chunkfile.COL_FILE_SIZE
-	fmt.Println("data ready", doc)
 	col.indexDoc(id, doc)
 	return
 }
