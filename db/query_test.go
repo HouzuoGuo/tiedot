@@ -97,8 +97,8 @@ func TestQuery(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	if !ensureMapHasKeys(q, ids[0]) {
-		t.Fatal(q)
+	if !ensureMapHasKeys(q, ids[1]) {
+		t.Fatal(q, ids[1])
 	}
 	// collection scan
 	q, err = runQuery(`{"eq": 1, "in": ["c"]}`, col)

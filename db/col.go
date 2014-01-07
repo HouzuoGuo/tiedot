@@ -133,6 +133,17 @@ func (col *Col) Read(id uint64, doc interface{}) (err error) {
 	return
 }
 
+// Read document at the given ID, without placing read lock in this chunk.
+func (col *Col) ReadNoLock(id uint64, doc interface{}) (err error) {
+	chunkNum := id / chunkfile.COL_FILE_SIZE
+	if chunkNum >= col.NumChunks {
+		return errors.New(fmt.Sprintf("Document %d does not exist in %s - out of bound chunk", id, col.BaseDir))
+	}
+	chunk := col.Chunks[chunkNum]
+	err = chunk.Read(id, doc)
+	return
+}
+
 // Update a document, return its new ID.
 func (col *Col) Update(id uint64, doc interface{}) (newID uint64, err error) {
 	chunkNum := id / chunkfile.COL_FILE_SIZE
@@ -207,7 +218,7 @@ func (col *Col) InsertWithUID(doc interface{}) (newID uint64, newUID string, err
 	}
 }
 
-// Hash scan across all chunks.
+// Hash scan across all chunks. The filter function must not place additional lock in this collection.
 func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, uint64) bool) (keys, vals []uint64) {
 	keys = make([]uint64, 0)
 	vals = make([]uint64, 0)
@@ -229,7 +240,10 @@ func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, u
 
 	for _, chunkNum := range scanSeq {
 		chunk := col.Chunks[chunkNum]
+		lock := col.ChunkMutexes[chunkNum]
+		lock.RLock()
 		ht := chunk.Path2HT[htPath]
+		lock.RUnlock()
 		k, v := ht.Get(key, limit, filter)
 		keys = append(keys, k...)
 		vals = append(vals, v...)
@@ -252,7 +266,7 @@ func (col *Col) ReadByUID(uid string, doc interface{}) (id uint64, err error) {
 	// Scan UID hash table, find potential matches
 	col.HashScan(chunk.UID_PATH, chunk.StrHash(uid), 1, func(key, value uint64) bool {
 		var candidate interface{}
-		if col.Read(value, &candidate) == nil {
+		if col.ReadNoLock(value, &candidate) == nil {
 			if docMap, ok := candidate.(map[string]interface{}); ok {
 				// Physically read the document to avoid hash collision
 				if candidateUID, ok := docMap[chunk.UID_PATH]; ok {

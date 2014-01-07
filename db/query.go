@@ -68,7 +68,7 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 		// Hash collision detection function
 		collisionDetection := func(k, v uint64) bool {
 			var doc interface{}
-			if src.Read(v, &doc) != nil {
+			if src.ReadNoLock(v, &doc) != nil {
 				return false
 			}
 			// Actually get inside the document and match the value
@@ -260,7 +260,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 				// Hash collision detection function
 				collisionDetection := func(k, v uint64) bool {
 					var doc interface{}
-					if src.Read(v, &doc) != nil {
+					if src.ReadNoLock(v, &doc) != nil {
 						return false
 					}
 					for _, v := range chunk.GetIn(doc, vecPath) {
@@ -286,7 +286,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 				hashValue := chunk.StrHash(lookupStrValue)
 				collisionDetection := func(k, v uint64) bool {
 					var doc interface{}
-					if src.Read(v, &doc) != nil {
+					if src.ReadNoLock(v, &doc) != nil {
 						return false
 					}
 					for _, v := range chunk.GetIn(doc, vecPath) {
