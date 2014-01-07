@@ -211,9 +211,24 @@ func (col *Col) InsertWithUID(doc interface{}) (newID uint64, newUID string, err
 func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, uint64) bool) (keys, vals []uint64) {
 	keys = make([]uint64, 0)
 	vals = make([]uint64, 0)
-	numChunks := col.NumChunks
-	for i := uint64(0); i < numChunks; i++ {
-		chunk := col.Chunks[i]
+	numChunks := int64(col.NumChunks)
+	// Scan begins from a random chunk, then scan toward left and right
+	scanSeq := make([]int64, numChunks)
+	scanPivot := rand.Int63n(numChunks)
+	counter := 0
+	// ... toward left
+	for i := scanPivot; i >= 0; i-- {
+		scanSeq[counter] = i
+		counter++
+	}
+	// ... toward right
+	for i := scanPivot + 1; i < numChunks; i++ {
+		scanSeq[counter] = i
+		counter++
+	}
+
+	for _, chunkNum := range scanSeq {
+		chunk := col.Chunks[chunkNum]
 		ht := chunk.Path2HT[htPath]
 		k, v := ht.Get(key, limit, filter)
 		keys = append(keys, k...)
