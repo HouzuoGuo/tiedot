@@ -22,6 +22,7 @@ type Col struct {
 	ChunkMutexes  []*sync.RWMutex // Synchronize access to chunks
 	NewChunkMutex sync.Mutex      // Synchronize creation of new chunk
 	NumChunks     uint64          // Total number of chunks
+	InsertMutex   sync.Mutex
 }
 
 // Open a collection (made of chunks).
@@ -70,7 +71,6 @@ func OpenCol(baseDir string) (col *Col, err error) {
 func (col *Col) CreateNewChunk() {
 	col.NewChunkMutex.Lock()
 	defer col.NewChunkMutex.Unlock()
-	tdlog.Printf("Going to create a new chunk (number %d) in collection %s", col.NumChunks, col.BaseDir)
 	newChunk, err := chunk.OpenChunk(col.NumChunks, path.Join(col.BaseDir, strconv.Itoa(int(col.NumChunks))))
 	if err != nil {
 		col.NewChunkMutex.Unlock()
@@ -104,8 +104,9 @@ func (col *Col) Insert(doc interface{}) (id uint64, err error) {
 	}
 	randChunkMutex.Unlock()
 	// If the random chunk was full, try again with the last chunk
-	lastChunk := col.Chunks[col.NumChunks-1]
-	lastChunkMutex := col.ChunkMutexes[col.NumChunks-1]
+	numChunks := col.NumChunks - 1
+	lastChunk := col.Chunks[numChunks]
+	lastChunkMutex := col.ChunkMutexes[numChunks]
 	lastChunkMutex.Lock()
 	id, outOfSpace, err = lastChunk.Insert(doc)
 	if !outOfSpace {
