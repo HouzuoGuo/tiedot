@@ -258,17 +258,6 @@ func benchmark3(benchSize int) {
 	uidsMutex := new(sync.Mutex)
 	uids := make([]string, 0, benchSize)
 
-	// Prepare serialized documents to be inserted
-	docs := make([]interface{}, benchSize)
-	for i := range docs {
-		if err := json.Unmarshal([]byte(
-			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(benchSize))+`}},`+
-				`"c": {"d": `+strconv.Itoa(rand.Intn(benchSize))+`},`+
-				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &docs[i]); err != nil {
-			panic("json error")
-		}
-	}
-
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
@@ -282,7 +271,12 @@ func benchmark3(benchSize int) {
 
 	// Benchmark insert document with UID
 	average("insert", benchSize, func() {}, func() {
-		if _, _, err := col.InsertWithUID(docs[rand.Intn(benchSize)]); err != nil {
+		var doc interface{}
+		json.Unmarshal([]byte(
+			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(benchSize))+`}},`+
+				`"c": {"d": `+strconv.Itoa(rand.Intn(benchSize))+`},`+
+				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &doc)
+		if _, _, err := col.InsertWithUID(doc); err != nil {
 			panic("insert error")
 		}
 	})
@@ -302,21 +296,16 @@ func benchmark3(benchSize int) {
 			fmt.Println(err)
 		}
 	})
-	// Try each UID
-	if len(uids) != benchSize {
-		panic(len(uids))
-	}
-	for _, uid := range uids {
-		var throwAway interface{}
-		if _, err := col.ReadByUID(uid, &throwAway); err != nil {
-			panic(fmt.Sprintf("This UID cannot be read back %v %v", uid, err))
-		}
-	}
 
 	// Benchmark update document by UID
 	halfBenchSize := benchSize / 2
 	average("update", halfBenchSize, func() {}, func() {
-		col.UpdateByUID(uids[rand.Intn(halfBenchSize)], docs[rand.Intn(halfBenchSize)])
+		var doc interface{}
+		json.Unmarshal([]byte(
+			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(benchSize))+`}},`+
+				`"c": {"d": `+strconv.Itoa(rand.Intn(benchSize))+`},`+
+				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &doc)
+		col.UpdateByUID(uids[rand.Intn(halfBenchSize)], doc)
 	})
 
 	// Benchmark delete document by UID

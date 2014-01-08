@@ -20,9 +20,8 @@ type Col struct {
 	BaseDir       string // Collection dir path
 	Chunks        []*chunk.ChunkCol
 	ChunkMutexes  []*sync.RWMutex // Synchronize access to chunks
-	NewChunkMutex sync.Mutex      // Synchronize creation of new chunk
+	newChunkMutex sync.Mutex      // Synchronize creation of new chunk
 	NumChunks     uint64          // Total number of chunks
-	InsertMutex   sync.Mutex
 }
 
 // Open a collection (made of chunks).
@@ -31,7 +30,7 @@ func OpenCol(baseDir string) (col *Col, err error) {
 	if err = os.MkdirAll(baseDir, 0700); err != nil {
 		return
 	}
-	col = &Col{BaseDir: baseDir, NewChunkMutex: sync.Mutex{},
+	col = &Col{BaseDir: baseDir, newChunkMutex: sync.Mutex{},
 		Chunks: make([]*chunk.ChunkCol, 0), ChunkMutexes: make([]*sync.RWMutex, 0)}
 	// Walk the collection directory and look for how many chunks there are
 	maxChunk := 0
@@ -69,11 +68,11 @@ func OpenCol(baseDir string) (col *Col, err error) {
 
 // Create a new chunk.
 func (col *Col) CreateNewChunk() {
-	col.NewChunkMutex.Lock()
-	defer col.NewChunkMutex.Unlock()
+	col.newChunkMutex.Lock()
+	defer col.newChunkMutex.Unlock()
 	newChunk, err := chunk.OpenChunk(col.NumChunks, path.Join(col.BaseDir, strconv.Itoa(int(col.NumChunks))))
 	if err != nil {
-		col.NewChunkMutex.Unlock()
+		col.newChunkMutex.Unlock()
 		return
 	}
 	// Make indexes
@@ -183,8 +182,8 @@ func (col *Col) Delete(id uint64) {
 // Create an index on the path.
 func (col *Col) Index(path []string) (err error) {
 	// Do not allow new chunk creation for now
-	col.NewChunkMutex.Lock()
-	defer col.NewChunkMutex.Unlock()
+	col.newChunkMutex.Lock()
+	defer col.newChunkMutex.Unlock()
 	for _, chunk := range col.Chunks {
 		if err = chunk.Index(path); err != nil {
 			return
@@ -196,8 +195,8 @@ func (col *Col) Index(path []string) (err error) {
 // Remove an index.
 func (col *Col) Unindex(path []string) (err error) {
 	// Do not allow new chunk creation for now
-	col.NewChunkMutex.Lock()
-	defer col.NewChunkMutex.Unlock()
+	col.newChunkMutex.Lock()
+	defer col.newChunkMutex.Unlock()
 	for _, chunk := range col.Chunks {
 		if err = chunk.Unindex(path); err != nil {
 			return
@@ -356,8 +355,8 @@ func (col *Col) DeserializeAll(template interface{}, fun func(id uint64) bool) {
 // Compact the collection and automatically repair any data/index damage.
 func (col *Col) Scrub() (recovered uint64) {
 	// Do not allow new chunk creation for now
-	col.NewChunkMutex.Lock()
-	defer col.NewChunkMutex.Unlock()
+	col.newChunkMutex.Lock()
+	defer col.newChunkMutex.Unlock()
 	for _, chunk := range col.Chunks {
 		recovered += chunk.Scrub()
 	}
@@ -367,8 +366,8 @@ func (col *Col) Scrub() (recovered uint64) {
 // Flush collection data and index files.
 func (col *Col) Flush() error {
 	// Do not allow new chunk creation for now
-	col.NewChunkMutex.Lock()
-	defer col.NewChunkMutex.Unlock()
+	col.newChunkMutex.Lock()
+	defer col.newChunkMutex.Unlock()
 	for _, chunk := range col.Chunks {
 		if err := chunk.Flush(); err != nil {
 			return err
