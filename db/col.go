@@ -72,8 +72,7 @@ func (col *Col) CreateNewChunk() {
 	defer col.newChunkMutex.Unlock()
 	newChunk, err := chunk.OpenChunk(col.NumChunks, path.Join(col.BaseDir, strconv.Itoa(int(col.NumChunks))))
 	if err != nil {
-		col.newChunkMutex.Unlock()
-		return
+		panic(err)
 	}
 	// Make indexes
 	for _, path := range col.Chunks[0].HTPaths {

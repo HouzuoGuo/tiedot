@@ -19,12 +19,11 @@ func TestPutGetReopenClear(t *testing.T) {
 	if !(ht.NumBuckets == INITIAL_BUCKETS && ht.File.UsedSize == INITIAL_BUCKETS*BUCKET_SIZE && ht.File.Size == HT_FILE_SIZE) {
 		t.Fatal("Wrong size")
 	}
-	defer ht.File.Close()
 	fmt.Println("Please be patient, this may take a minute.")
-	for i := uint64(0); i < 1024*1024*2; i++ {
+	for i := uint64(0); i < 1024*1024; i++ {
 		ht.Put(i, i)
 	}
-	for i := uint64(0); i < 1024*1024*2; i++ {
+	for i := uint64(0); i < 1024*1024; i++ {
 		keys, vals := ht.Get(i, 0, func(a, b uint64) bool {
 			return true
 		})
@@ -34,6 +33,9 @@ func TestPutGetReopenClear(t *testing.T) {
 	}
 	numBuckets := ht.NumBuckets
 	// Reopen the hash table and test the features
+	if ht.File.Close(); err != nil {
+		panic(err)
+	}
 	reopened, err := OpenHash(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
@@ -44,7 +46,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	if reopened.File.UsedSize != numBuckets*BUCKET_SIZE {
 		t.Fatalf("Wrong UsedSize")
 	}
-	for i := uint64(0); i < 1024*1024*2; i++ {
+	for i := uint64(0); i < 1024*1024; i++ {
 		keys, vals := reopened.Get(i, 0, func(a, b uint64) bool {
 			return true
 		})
@@ -57,7 +59,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	if !(reopened.NumBuckets == INITIAL_BUCKETS && reopened.File.UsedSize == INITIAL_BUCKETS*BUCKET_SIZE) {
 		t.Fatal("Did not clear the hash table")
 	}
-	keys, vals := ht.GetAll(0)
+	keys, vals := reopened.GetAll(0)
 	if len(keys) != 0 || len(vals) != 0 {
 		t.Fatal("Did not clear the hash table")
 	}
