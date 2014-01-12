@@ -11,7 +11,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	tmp := "/tmp/tiedot_hash_test"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	ht, err := OpenHash(tmp)
+	ht, err := OpenHash(tmp, []string{})
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
@@ -20,10 +20,10 @@ func TestPutGetReopenClear(t *testing.T) {
 		t.Fatal("Wrong size")
 	}
 	fmt.Println("Please be patient, this may take a minute.")
-	for i := uint64(0); i < 1024*1024; i++ {
+	for i := uint64(0); i < 1024*1024*4; i++ {
 		ht.Put(i, i)
 	}
-	for i := uint64(0); i < 1024*1024; i++ {
+	for i := uint64(0); i < 1024*1024*4; i++ {
 		keys, vals := ht.Get(i, 0, func(a, b uint64) bool {
 			return true
 		})
@@ -36,7 +36,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	if ht.File.Close(); err != nil {
 		panic(err)
 	}
-	reopened, err := OpenHash(tmp)
+	reopened, err := OpenHash(tmp, []string{})
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	if reopened.File.UsedSize != numBuckets*BUCKET_SIZE {
 		t.Fatalf("Wrong UsedSize")
 	}
-	for i := uint64(0); i < 1024*1024; i++ {
+	for i := uint64(0); i < 1024*1024*4; i++ {
 		keys, vals := reopened.Get(i, 0, func(a, b uint64) bool {
 			return true
 		})
@@ -69,7 +69,7 @@ func TestPutGet2(t *testing.T) {
 	tmp := "/tmp/tiedot_hash_test"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	ht, err := OpenHash(tmp)
+	ht, err := OpenHash(tmp, []string{})
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -105,7 +105,7 @@ func TestPutRemove(t *testing.T) {
 	tmp := "/tmp/tiedot_hash_test"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	ht, err := OpenHash(tmp)
+	ht, err := OpenHash(tmp, []string{})
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -137,7 +137,7 @@ func TestGetAll(t *testing.T) {
 	tmp := "/tmp/tiedot_hash_test"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	ht, err := OpenHash(tmp)
+	ht, err := OpenHash(tmp, []string{})
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return

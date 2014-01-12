@@ -1,177 +1,83 @@
-/* Collection chunks coordination test. */
 package db
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/chunk"
 	"github.com/HouzuoGuo/tiedot/chunkfile"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 )
 
-func TestDocIndexAndCRUD(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
-	if err != nil {
-		t.Fatal(err)
+func TestGetIn(t *testing.T) {
+	var obj interface{}
+	// Get inside a JSON object
+	json.Unmarshal([]byte(`{"a": {"b": {"c": 1}}}`), &obj)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
+		t.Fatal()
 	}
-	// Create an index
-	if err = col.Index([]string{"id"}); err != nil {
-		t.Fatal(err)
+	// Get inside a JSON array
+	json.Unmarshal([]byte(`{"a": {"b": {"c": [1, 2, 3]}}}`), &obj)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
+		t.Fatal()
 	}
-	// Insert 10 long documents, afterwards there should be 5 chunks
-	longDocIDs := make([]uint64, 10)
-	for i := 0; i < 10; i++ {
-		var longDoc interface{}
-		json.Unmarshal([]byte(`{"a": "`+strings.Repeat("1", int(chunkfile.DOC_MAX_ROOM/6))+`", "id": `+strconv.Itoa(i)+`}`), &longDoc)
-		if longDocIDs[i], err = col.Insert(longDoc); err != nil {
-			t.Fatal(err)
-		}
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 2 {
+		t.Fatal()
 	}
-	if !(len(col.ChunkMutexes) == 5 && len(col.Chunks) == 5 && col.NumChunks == 5) {
-		t.Fatalf("Wrong number of chunks, got %d instead", col.NumChunks)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 3 {
+		t.Fatal()
 	}
-	// There should still be enough room for 10 very short documents - even if they all go into one chunk
-	shortDocIDs := make([]uint64, 10)
-	for i := 0; i < 10; i++ {
-		var shortDoc interface{}
-		json.Unmarshal([]byte(`{"id": `+strconv.Itoa(i)+`}`), &shortDoc)
-		if shortDocIDs[i], err = col.Insert(shortDoc); err != nil {
-			t.Fatal(err)
-		}
+	// Get inside JSON objects contained in JSON array
+	json.Unmarshal([]byte(`{"a": [{"b": {"c": [1]}}, {"b": {"c": [2, 3]}}]}`), &obj)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
+		t.Fatal()
 	}
-	if !(len(col.ChunkMutexes) == 5 && len(col.Chunks) == 5 && col.NumChunks == 5) {
-		t.Fatalf("There are too many chunks %d", col.NumChunks)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 2 {
+		t.Fatal()
 	}
-	// Verify that docs can be read back using IDs
-	matchIDAttr := func(doc interface{}, toMatch int) {
-		docMap, _ := doc.(map[string]interface{})
-		idAttr := docMap["id"]
-		idAttrFloat, _ := idAttr.(float64)
-		if int(idAttrFloat) != toMatch {
-			t.Fatal("ID attribute mismatch")
-		}
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 3 {
+		t.Fatal()
 	}
-	for i := 0; i < 10; i++ {
-		var doc interface{}
-		if err = col.Read(longDocIDs[i], &doc); err != nil {
-			t.Fatal(err)
-		}
-		matchIDAttr(doc, i)
-		if err = col.Read(shortDocIDs[i], &doc); err != nil {
-			t.Fatal(err)
-		}
-		matchIDAttr(doc, i)
+	// Get inside a JSON array and fetch attributes from array elements, which are JSON objects
+	json.Unmarshal([]byte(`{"a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`), &obj)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 4 {
+		t.Fatal()
 	}
-	// Update a short document - no relocation
-	var shortDoc interface{}
-	err = json.Unmarshal([]byte(`{"id": 11}`), &shortDoc)
-	if err != nil {
-		t.Fatal(err)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 5 {
+		t.Fatal()
 	}
-	shortNewID, err := col.Update(shortDocIDs[0], shortDoc)
-	if err != nil {
-		t.Fatal(err)
-	} else if shortNewID != shortDocIDs[0] {
-		t.Fatal("Doc was relocated, but it should not happen")
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 6 {
+		t.Fatal()
 	}
-	col.Read(shortNewID, &shortDoc)
-	matchIDAttr(shortDoc, 11)
-	// Reopen the collection
-	col.Close()
-	if col, err = OpenCol(tmp); err != nil {
-		t.Fatal(err)
+	if len(GetIn(obj, []string{"a", "b", "c"})) != 3 {
+		t.Fatal()
 	}
-	// Update a long document - relocation happens
-	var longDoc interface{}
-	json.Unmarshal([]byte(`{"a": "`+strings.Repeat("1", int(chunkfile.DOC_MAX_ROOM/3+2048))+`", "id": 11}`), &longDoc)
-	longNewID, err := col.Update(longDocIDs[0], longDoc)
-	if err != nil {
-		t.Fatal(err)
-	} else if longNewID == longDocIDs[0] {
-		t.Fatal("Doc should be relocated, it did not happen")
-	} else if col.NumChunks != 6 {
-		// Relocated document has to go to a new chunk, therefore chunk number should be 6
-		t.Fatal("Relocated doc should cause a new chunk to be created")
+	if val, ok := GetIn(obj, []string{"d"})[0].(float64); !ok || val != 0 {
+		t.Fatal()
 	}
-	col.Read(longNewID, &longDoc)
-	matchIDAttr(longDoc, 11)
-	// Scrub the entire collection, number of chunks should remain
-	if col.Scrub() != 20 {
-		t.Fatal("Scrub recovered wrong number of documents")
+	if val, ok := GetIn(obj, []string{"d"})[1].(float64); !ok || val != 9 {
+		t.Fatal()
 	}
-	if col.NumChunks != 6 {
-		t.Fatal("Scrub caused chunk number change")
+	if len(GetIn(obj, []string{"d"})) != 2 {
+		t.Fatal()
 	}
-	if err = col.Flush(); err != nil {
-		t.Fatal(err)
+	// Another example
+	json.Unmarshal([]byte(`{"a": {"b": [{"c": 2}]}, "d": 0}`), &obj)
+	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 2 {
+		t.Fatal()
 	}
-	// All chunks should have identical indexes
-	for _, chunk := range col.Chunks {
-		if _, ok := chunk.Path2HT["id"]; !ok {
-			t.Fatal("Chunk does not have id index")
-		}
+	if len(GetIn(obj, []string{"a", "b", "c"})) != 1 {
+		t.Fatal()
 	}
-	// Delete a document
-	col.Delete(longDocIDs[7])
-	if err = col.Read(longDocIDs[7], &longDoc); err == nil {
-		t.Fatal("Did not delete the document")
-	}
-
-	// Two collection scan
-	counter := 0
-	var template interface{}
-	var throwAway interface{}
-	col.DeserializeAll(&template, func(id uint64) bool {
-		if err = col.ReadNoLock(id, &throwAway); err != nil {
-			t.Fatal(err)
-		}
-		counter++
-		return true
-	})
-	if counter != 19 { // 10 long docs, 10 short docs, one less long doc
-		t.Fatal("Collection scan wrong number of docs")
-	}
-	counter = 0
-	col.ForAll(func(id uint64, doc interface{}) bool {
-		if err = col.ReadNoLock(id, &throwAway); err != nil {
-			t.Fatal(err)
-		}
-		counter++
-		return true
-	})
-	if counter != 19 {
-		t.Fatal("Collection scan wrong number of docs")
-	}
-	// Remove index - it should be removed from all chunks
-	if err = col.Unindex([]string{"id"}); err != nil {
-		t.Fatal(err)
-	}
-	for _, chunk := range col.Chunks {
-		if _, ok := chunk.Path2HT["id"]; ok {
-			t.Fatal("Chunk should not have id index")
-		}
-	}
-	// Out of bound access
-	if err = col.Read(9999999, &longDoc); err == nil {
-		t.Fatal("Out of bound access did not return error")
-	}
-	if _, err = col.Update(9999999, longDoc); err == nil {
-		t.Fatal("Out of bound access did not return error")
-	}
-	col.Delete(99999999) // shall not crash
-	col.Close()
 }
 
-func TestUIDDocCRUD(t *testing.T) {
+func TestDocCRUD(t *testing.T) {
+	fmt.Println("Running CRUD test")
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp)
+	col, err := OpenCol(tmp, 4)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -180,86 +86,188 @@ func TestUIDDocCRUD(t *testing.T) {
 		`{"a": {"b": {"c": 1}}, "d": 1, "more": "` + strings.Repeat(" ", int(chunkfile.DOC_MAX_ROOM/3)) + `"}`,
 		`{"a": {"b": {"c": 2}}, "d": 2, "more": "` + strings.Repeat(" ", int(chunkfile.DOC_MAX_ROOM/3)) + `"}`,
 		`{"a": {"b": {"c": 3}}, "d": 3, "more": "` + strings.Repeat(" ", int(chunkfile.DOC_MAX_ROOM/3)) + `"}`}
-	var jsonDocs [3]interface{}
-	var ids [3]uint64
+	var jsonDocs [3]map[string]interface{}
 	var uids [3]string
 	json.Unmarshal([]byte(docs[0]), &jsonDocs[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDocs[1])
 	json.Unmarshal([]byte(docs[2]), &jsonDocs[2])
 	// insert
-	ids[0], uids[0], err = col.InsertWithUID(jsonDocs[0])
+	uids[0], err = col.Insert(jsonDocs[0])
 	if err != nil {
 		t.Fatal("insert error")
 	}
-	ids[1], uids[1], err = col.InsertWithUID(jsonDocs[1])
+	uids[1], err = col.Insert(jsonDocs[1])
 	if err != nil {
 		t.Fatal("insert error")
 	}
-	ids[2], uids[2], err = col.InsertWithUID(jsonDocs[2])
+	uids[2], err = col.Insert(jsonDocs[2])
 	if err != nil {
 		t.Fatal("insert error")
 	}
 	if len(uids[0]) != 32 || len(uids[1]) != 32 || len(uids[2]) != 32 ||
-		uids[0] == uids[1] || uids[1] == uids[2] || uids[2] == uids[0] ||
-		ids[0] == ids[1] || ids[1] == ids[2] || ids[2] == ids[0] {
-		t.Fatalf("Malformed UIDs or IDs: %v %v", uids, ids)
+		uids[0] == uids[1] || uids[1] == uids[2] || uids[2] == uids[0] {
+		t.Fatalf("Malformed UIDs or IDs: %v %v", uids)
 	}
-	// read - inexisting UID
-	var readDoc interface{}
-	if _, readErr := col.ReadByUID("abcde", &readDoc); readErr == nil {
+	// read - non-existing UID
+	var readDoc map[string]interface{}
+	if _, readErr := col.Read("abcde", &readDoc); readErr == nil {
 		t.Fatal("It should have triggered UID not found error")
 	}
 	// read - existing UID
-	readID, readErr := col.ReadByUID(uids[1], &readDoc)
+	_, readErr := col.Read(uids[1], &readDoc)
 	if readErr != nil {
 		t.Fatal(readErr)
 	}
-	docMap1 := readDoc.(map[string]interface{})
-	docMap2 := jsonDocs[1].(map[string]interface{})
-	if readID != ids[1] || fmt.Sprint(docMap1["a"]) != fmt.Sprint(docMap2["a"]) {
-		t.Fatalf("Cannot read back original document by UID: %d %d", readID, ids[1])
+	if fmt.Sprint(readDoc["a"]) != fmt.Sprint(jsonDocs[1]["a"]) {
+		t.Fatalf("Cannot read back original document by ID")
 	}
 	// update
-	var docWithoutUID interface{}
+	var docWithoutUID map[string]interface{}
 	json.Unmarshal([]byte(docs[1]), &docWithoutUID)
-	if _, err := col.UpdateByUID(uids[0], docWithoutUID); err != nil { // intentionally remove UID
+	if err := col.Update(uids[0], docWithoutUID); err != nil { // intentionally remove UID
 		t.Fatal(err)
 	}
-	if _, err = col.ReadByUID(uids[0], &readDoc); err == nil { // UID was removed therefore the UID is not found
-		t.Fatalf("UpdateByUID did not work, still read %v", readDoc)
-	}
-	// update (reassign UID)
-	_, newUID, err := col.ReassignUID(ids[0])
-	if len(newUID) != 32 || err != nil {
-		t.Fatalf("ReassignUID did not work: %v %v %v", ids[0], newUID, err)
-	}
-	if _, err = col.ReadByUID(uids[1], &readDoc); err != nil {
-		t.Fatalf("col failed UID index? %s %v", uids[1], err)
-	}
-	// after UID reassignment, the old UID should be gone
-	if _, readErr := col.ReadByUID(uids[0], &readDoc); readErr == nil {
-		t.Fatal("It should have triggered UID not found error")
-	}
-	if _, err = col.ReadByUID(newUID, &readDoc); err != nil { // UID was reassigned, the error should NOT happen
-		t.Fatalf("ReassignUID did not work")
+	if _, err = col.Read(uids[0], &readDoc); err != nil { // ID shall reappear
+		t.Fatalf("Document went missing after update: %v", err)
 	}
 	// delete
-	col.DeleteByUID(newUID)
-	if _, err = col.ReadByUID(newUID, &readDoc); err == nil {
+	col.Delete(uids[0])
+	if _, err = col.Read(uids[0], &readDoc); err == nil {
 		t.Fatalf("DeleteByUID did not work")
 	}
-	if _, err = col.ReadByUID(uids[1], &readDoc); err != nil {
+	if _, err = col.Read(uids[1], &readDoc); err != nil {
 		t.Fatalf("col failed UID index? %s %v", uids[1], err)
 	}
 	col.Close()
 	// Reopen and test read again
-	reopen, err := OpenCol(tmp)
+	reopen, err := OpenCol(tmp, 4)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// UID index should work
-	if _, err = reopen.ReadByUID(uids[1], &readDoc); err != nil {
+	if _, err = reopen.Read(uids[1], &readDoc); err != nil {
 		t.Fatalf("Reopen failed UID index? %s %v", uids[1], err)
 	}
+	// Scrub the entire collection, number of chunks should remain
+	//	if reopen.Scrub() != 2 {
+	//		t.Fatal("Scrub recovered wrong number of documents")
+	//	}
+	if reopen.NumChunks != 4 {
+		t.Fatal("Scrub caused chunk number change")
+	}
+	if err = reopen.Flush(); err != nil {
+		t.Fatal(err)
+	}
 	reopen.Close()
+}
+
+func SecIndexContainsAll(path string, col *Col, expectedKV map[uint64][]string) bool {
+	for k, ids := range expectedKV {
+		fmt.Printf("Looking for key %v, id %v\n", k, ids)
+		keys, vals := col.HashScan(path, k, 0, func(_, _ uint64) bool {
+			return true
+		})
+		if len(keys) == 0 || len(vals) == 0 {
+			fmt.Printf("Hash table does not have the key\n")
+			return false
+		}
+		if len(vals) != len(ids) {
+			fmt.Printf("Number not matched: %v %v\n", vals, ids)
+			return false
+		}
+		for _, id := range ids {
+			fmt.Printf("Checking for ID %s match among physical IDs %v\n", id, vals)
+			var doc interface{}
+			_, err := col.Read(id, &doc)
+			if err != nil {
+				fmt.Printf("ID given by function parameter does not exist %s\n", id)
+				panic(err)
+			}
+			match := false
+			for _, v := range vals {
+				if chunk.StrHash(id) == v {
+					match = true
+					break
+				}
+			}
+			if !match {
+				fmt.Printf("Hash table value does not match with ID hash %v %v\n", chunk.StrHash(id), vals[0])
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func TestIndex(t *testing.T) {
+	fmt.Println("Running index test")
+	tmp := "/tmp/tiedot_col_test"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenCol(tmp, 4)
+	if err != nil {
+		t.Fatalf("Failed to open: %v", err)
+		return
+	}
+	docs := []string{
+		`{"a": {"b": {"c": 1}}, "d": 0}`,
+		`{"a": {"b": [{"c": 2}]}, "d": 0}`,
+		`{"a": [{"b": {"c": 3}}], "d": 0}`,
+		`{"a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`,
+		`{"a": {"b": {"c": null}}, "d": null}`}
+	var jsonDoc [4]map[string]interface{}
+	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
+	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
+	json.Unmarshal([]byte(docs[2]), &jsonDoc[2])
+	json.Unmarshal([]byte(docs[3]), &jsonDoc[3])
+	var ids [4]string
+	// Insert a document, create two indexes and verify them
+	ids[0], _ = col.Insert(jsonDoc[0])
+	col.Index([]string{"a", "b", "c"})
+	col.Index([]string{"d"})
+	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0]}}) {
+		t.Fatal()
+	}
+	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0]}}) {
+		t.Fatal()
+	}
+	// Do the following:
+	// 1. Insert second and third document
+	// 2. Replace the third document by the fourth document
+	// 3. Remove the second document
+	ids[1], _ = col.Insert(jsonDoc[1])
+	ids[2], _ = col.Insert(jsonDoc[2])
+	col.Update(ids[2], jsonDoc[3])
+	col.Delete(ids[1])
+	// Now the first and fourth documents are left, scrub and reopen the collection and verify index
+	//	col.Scrub()
+	col.Close()
+	col, err = OpenCol(tmp, 4)
+	if err != nil {
+		t.Fatalf("Failed to reopen: %v", err)
+	}
+	if !SecIndexContainsAll("d", &col, map[uint64][]string{chunk.StrHash("0"): []string{ids[0], ids[2]}}) {
+		t.Fatal()
+	}
+	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0]}}) {
+		t.Fatal()
+	}
+	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("4"): []string{ids[2]}}) {
+		t.Fatal()
+	}
+	// Insert one more document and verify indexes
+	newID, _ := col.Insert(jsonDoc[0])
+	if !SecIndexContainsAll("d", &col, map[uint64][]string{chunk.StrHash("0"): []string{ids[0], ids[2], newID}}) {
+		t.Fatal()
+	}
+	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0], newID}}) {
+		t.Fatal()
+	}
+	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("4"): []string{ids[2]}}) {
+		t.Fatal()
+	}
+	if err = col.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	col.Close()
 }

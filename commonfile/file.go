@@ -28,11 +28,11 @@ func ConsecutiveTwenty0s(buf gommap.MMap) bool {
 }
 
 // Open the file, or create it if non-existing.
-func Open(name string, growth uint64) (file *File, err error) {
+func Open(name string, growth uint64) (file File, err error) {
 	if growth < 1 {
 		err = errors.New(fmt.Sprintf("File growth should be greater than one (opening %s)", growth, name))
 	}
-	file = &File{Name: name, Growth: growth}
+	file = File{Name: name, Growth: growth}
 	// Open file (get a handle) and determine its size
 	if file.Fh, err = os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0600); err != nil {
 		return

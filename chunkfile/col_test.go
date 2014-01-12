@@ -22,11 +22,10 @@ func TestInsertRead(t *testing.T) {
 		[]byte("abc"),
 		[]byte("1234")}
 	ids := [2]uint64{}
-	var outOfSpace bool
-	if ids[0], outOfSpace, err = col.Insert(docs[0]); err != nil || outOfSpace {
+	if ids[0], err = col.Insert(docs[0]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if ids[1], outOfSpace, err = col.Insert(docs[1]); err != nil || outOfSpace {
+	if ids[1], err = col.Insert(docs[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	if doc0 := col.Read(ids[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != string(docs[0]) {
@@ -50,25 +49,24 @@ func TestInsertReadAll(t *testing.T) {
 	}
 	defer col.File.Close()
 	var ids [5]uint64
-	var outOfSpace bool
-	ids[0], outOfSpace, err = col.Insert([]byte("abc"))
-	if err != nil || outOfSpace {
+	ids[0], err = col.Insert([]byte("abc"))
+	if err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
-	ids[1], outOfSpace, err = col.Insert([]byte("abc"))
-	if err != nil || outOfSpace {
+	ids[1], err = col.Insert([]byte("abc"))
+	if err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
-	ids[2], outOfSpace, err = col.Insert([]byte("abc"))
-	if err != nil || outOfSpace {
+	ids[2], err = col.Insert([]byte("abc"))
+	if err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
-	ids[3], outOfSpace, err = col.Insert([]byte("abc"))
-	if err != nil || outOfSpace {
+	ids[3], err = col.Insert([]byte("abc"))
+	if err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
-	ids[4], outOfSpace, err = col.Insert([]byte("abc"))
-	if err != nil || outOfSpace {
+	ids[4], err = col.Insert([]byte("abc"))
+	if err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
 	fmt.Println("Please ignore the following Corrupted Document error messages, they are intentional.")
@@ -103,18 +101,17 @@ func TestInsertUpdateRead(t *testing.T) {
 		[]byte("abc"),
 		[]byte("1234")}
 	ids := [2]uint64{}
-	var outOfSpace bool
-	if ids[0], outOfSpace, err = col.Insert(docs[0]); err != nil || outOfSpace {
+	if ids[0], err = col.Insert(docs[0]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if ids[1], outOfSpace, err = col.Insert(docs[1]); err != nil || outOfSpace {
+	if ids[1], err = col.Insert(docs[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	updated := [2]uint64{}
-	if updated[0], outOfSpace, err = col.Update(ids[0], []byte("abcdef")); err != nil || updated[0] != ids[0] || outOfSpace {
+	if updated[0], err = col.Update(ids[0], []byte("abcdef")); err != nil || updated[0] != ids[0] {
 		t.Fatalf("Failed to update: %v", err)
 	}
-	if updated[1], outOfSpace, err = col.Update(ids[1], []byte("longlonglonglonglonglonglong")); err != nil || updated[1] == ids[1] || outOfSpace {
+	if updated[1], err = col.Update(ids[1], []byte("longlonglonglonglonglonglong")); err != nil || updated[1] == ids[1] {
 		t.Fatalf("Failed to update: %v", err)
 	}
 	if doc0 := col.Read(updated[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != "abcdef" {
@@ -142,14 +139,13 @@ func TestInsertDeleteRead(t *testing.T) {
 		[]byte("1234"),
 		[]byte("2345")}
 	ids := [3]uint64{}
-	var outOfSpace bool
-	if ids[0], outOfSpace, err = col.Insert(docs[0]); err != nil || outOfSpace {
+	if ids[0], err = col.Insert(docs[0]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if ids[1], outOfSpace, err = col.Insert(docs[1]); err != nil || outOfSpace {
+	if ids[1], err = col.Insert(docs[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if ids[2], outOfSpace, err = col.Insert(docs[2]); err != nil || outOfSpace {
+	if ids[2], err = col.Insert(docs[2]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	if doc0 := col.Read(ids[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != string(docs[0]) {
@@ -166,7 +162,7 @@ func TestInsertDeleteRead(t *testing.T) {
 	col.Delete(col.File.Size)
 }
 
-func TestOutOfBoundAccess(t *testing.T) {
+func TestFileGrowAndOutOfBoundAccess(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
@@ -181,19 +177,18 @@ func TestOutOfBoundAccess(t *testing.T) {
 		[]byte("abc"),
 		[]byte("1234"),
 		[]byte("2345")}
-	var outOfSpace bool
-	if _, outOfSpace, err = col.Insert(docs[0]); err != nil || outOfSpace {
+	if _, err = col.Insert(docs[0]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if _, outOfSpace, err = col.Insert(docs[1]); err != nil || outOfSpace {
+	if _, err = col.Insert(docs[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if _, outOfSpace, err = col.Insert(docs[2]); err != nil || outOfSpace {
+	if _, err = col.Insert(docs[2]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	// Test UsedSize
-	correctUsedSize := uint64((DOC_HEADER_SIZE + 3*2) + (DOC_HEADER_SIZE+4*2)*2)
-	if col.File.UsedSize != correctUsedSize {
+	calculatedUsedSize := uint64((DOC_HEADER_SIZE + 3*2) + (DOC_HEADER_SIZE+4*2)*2)
+	if col.File.UsedSize != calculatedUsedSize {
 		t.Fatalf("Invalid UsedSize")
 	}
 	// Read invalid location
@@ -210,16 +205,16 @@ func TestOutOfBoundAccess(t *testing.T) {
 		t.Fatalf("Read invalid location")
 	}
 	// Update invalid location
-	if _, _, err := col.Update(1, []byte{}); err == nil {
+	if _, err := col.Update(1, []byte{}); err == nil {
 		t.Fatalf("Update invalid location")
 	}
-	if _, _, err := col.Update(col.File.UsedSize, []byte{}); err == nil {
+	if _, err := col.Update(col.File.UsedSize, []byte{}); err == nil {
 		t.Fatalf("Update invalid location")
 	}
-	if _, _, err := col.Update(col.File.Size, []byte{}); err == nil {
+	if _, err := col.Update(col.File.Size, []byte{}); err == nil {
 		t.Fatalf("Update invalid location")
 	}
-	if _, _, err := col.Update(999999999, []byte{}); err == nil {
+	if _, err := col.Update(999999999, []byte{}); err == nil {
 		t.Fatalf("Update invalid location")
 	}
 	// Delete invalid location
@@ -228,23 +223,25 @@ func TestOutOfBoundAccess(t *testing.T) {
 	col.Delete(col.File.Size)
 	col.Delete(999999999)
 	// Insert - not enough room (assuming COL_FILE_SIZE == DOC_MAX_ROOM)
-	if _, outOfSpace, _ := col.Insert(make([]byte, DOC_MAX_ROOM/2)); !outOfSpace {
-		t.Fatalf("Enough room?!")
+	if _, err := col.Insert(make([]byte, DOC_MAX_ROOM/2)); err != nil {
+		panic(err)
 	}
-	if col.File.UsedSize != correctUsedSize {
-		t.Fatalf("UsedSize changed?!")
+	calculatedUsedSize += DOC_HEADER_SIZE + DOC_MAX_ROOM
+	if col.File.UsedSize != calculatedUsedSize {
+		t.Fatalf("Wrong UsedSize")
 	}
-	if col.File.Size != COL_FILE_SIZE {
+	if col.File.Size != COL_FILE_SIZE+col.File.Growth {
 		t.Fatalf("Size changed?!")
 	}
 	// Update - not enough room (assuming COL_FILE_SIZE == DOC_MAX_ROOM)
-	if _, outOfSpace, _ := col.Update(0, make([]byte, DOC_MAX_ROOM/2)); !outOfSpace {
-		t.Fatalf("Enough room?!")
+	if _, err := col.Update(0, make([]byte, DOC_MAX_ROOM/2)); err != nil {
+		panic(err)
 	}
-	if col.File.UsedSize != correctUsedSize {
-		t.Fatalf("UsedSize changed?!")
+	calculatedUsedSize += DOC_HEADER_SIZE + DOC_MAX_ROOM
+	if col.File.UsedSize != calculatedUsedSize {
+		t.Fatalf("Wrong UsedSize")
 	}
-	if col.File.Size != COL_FILE_SIZE {
+	if col.File.Size != COL_FILE_SIZE+col.File.Growth+col.File.Growth {
 		t.Fatalf("Size changed?!")
 	}
 }

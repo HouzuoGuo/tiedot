@@ -3,71 +3,12 @@ package chunk
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/chunkfile"
+	"math/rand"
 	"os"
+	"strconv"
 	"testing"
 )
-
-func TestGetIn(t *testing.T) {
-	var obj interface{}
-	// Get inside a JSON object
-	json.Unmarshal([]byte(`{"a": {"b": {"c": 1}}}`), &obj)
-	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
-		t.Fatal()
-	}
-	// Get inside a JSON array
-	json.Unmarshal([]byte(`{"a": {"b": {"c": [1, 2, 3]}}}`), &obj)
-	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
-		t.Fatal()
-	}
-	if val, ok := GetIn(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 2 {
-		t.Fatal()
-	}
-	if val, ok := GetIn(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 3 {
-		t.Fatal()
-	}
-	// Get inside JSON objects contained in JSON array
-	json.Unmarshal([]byte(`{"a": [{"b": {"c": [1]}}, {"b": {"c": [2, 3]}}]}`), &obj)
-	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
-		t.Fatal()
-	}
-	if val, ok := GetIn(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 2 {
-		t.Fatal()
-	}
-	if val, ok := GetIn(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 3 {
-		t.Fatal()
-	}
-	// Get inside a JSON array and fetch attributes from array elements, which are JSON objects
-	json.Unmarshal([]byte(`{"a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`), &obj)
-	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 4 {
-		t.Fatal()
-	}
-	if val, ok := GetIn(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 5 {
-		t.Fatal()
-	}
-	if val, ok := GetIn(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 6 {
-		t.Fatal()
-	}
-	if len(GetIn(obj, []string{"a", "b", "c"})) != 3 {
-		t.Fatal()
-	}
-	if val, ok := GetIn(obj, []string{"d"})[0].(float64); !ok || val != 0 {
-		t.Fatal()
-	}
-	if val, ok := GetIn(obj, []string{"d"})[1].(float64); !ok || val != 9 {
-		t.Fatal()
-	}
-	if len(GetIn(obj, []string{"d"})) != 2 {
-		t.Fatal()
-	}
-	// Another example
-	json.Unmarshal([]byte(`{"a": {"b": [{"c": 2}]}, "d": 0}`), &obj)
-	if val, ok := GetIn(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 2 {
-		t.Fatal()
-	}
-	if len(GetIn(obj, []string{"a", "b", "c"})) != 1 {
-		t.Fatal()
-	}
-}
 
 func TestHash(t *testing.T) {
 	strings := []string{"", " ", "abc", "123"}
@@ -90,16 +31,15 @@ func TestInsertRead(t *testing.T) {
 	}
 	defer col.Close()
 	docs := []string{`{"a": 1}`, `{"b": 2}`}
-	var jsonDoc [2]interface{}
+	var jsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
 
 	ids := [2]uint64{}
-	var outOfSpace bool
-	if ids[0], outOfSpace, err = col.Insert(jsonDoc[0]); err != nil || outOfSpace {
+	if ids[0], err = col.Insert(jsonDoc[0]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if ids[1], outOfSpace, err = col.Insert(jsonDoc[1]); err != nil {
+	if ids[1], err = col.Insert(jsonDoc[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	var doc1 interface{}
@@ -109,6 +49,9 @@ func TestInsertRead(t *testing.T) {
 	var doc2 interface{}
 	if err = col.Read(ids[1], &doc2); doc2.(map[string]interface{})[string('b')].(float64) != 2.0 {
 		t.Fatalf("Failed to read back document, got %v", doc2)
+	}
+	if err = col.Flush(); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -124,28 +67,27 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	defer col.Close()
 
 	docs := []string{`{"a": 1}`, `{"b": 2}`}
-	var jsonDoc [2]interface{}
+	var jsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
 
 	updatedDocs := []string{`{"a": 2}`, `{"b": "abcdefghijklmnopqrstuvwxyz"}`}
-	var updatedJsonDoc [2]interface{}
+	var updatedJsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(updatedDocs[0]), &updatedJsonDoc[0])
 	json.Unmarshal([]byte(updatedDocs[1]), &updatedJsonDoc[1])
 
 	ids := [2]uint64{}
-	var outOfSpace bool
-	if ids[0], outOfSpace, err = col.Insert(jsonDoc[0]); err != nil || outOfSpace {
+	if ids[0], err = col.Insert(jsonDoc[0]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if ids[1], outOfSpace, err = col.Insert(jsonDoc[1]); err != nil {
+	if ids[1], err = col.Insert(jsonDoc[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 
-	if ids[0], outOfSpace, err = col.Update(ids[0], updatedJsonDoc[0]); err != nil || outOfSpace {
+	if ids[0], err = col.Update(ids[0], updatedJsonDoc[0]); err != nil {
 		t.Fatalf("Failed to update: %v", err)
 	}
-	if ids[1], outOfSpace, err = col.Update(ids[1], updatedJsonDoc[1]); err != nil || outOfSpace {
+	if ids[1], err = col.Update(ids[1], updatedJsonDoc[1]); err != nil {
 		t.Fatalf("Failed to update: %v", err)
 	}
 
@@ -158,12 +100,15 @@ func TestInsertUpdateReadAll(t *testing.T) {
 		t.Fatalf("Failed to read back document, got %v", doc2)
 	}
 	counter := 0
-	col.ForAll(func(id uint64, doc interface{}) bool {
+	col.ForAll(func(_ string, _ map[string]interface{}) bool {
 		counter++
 		return true
 	})
 	if counter != 2 {
 		t.Fatalf("Expected to read 2 documents, but %d read", counter)
+	}
+	if err = col.Flush(); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -178,38 +123,37 @@ func TestInsertDeserialize(t *testing.T) {
 	}
 	defer col.Close()
 
+	var docs [2]map[string]interface{}
+	if err = json.Unmarshal([]byte(`{"I": 0, "S": "a", "B": false}`), &docs[0]); err != nil {
+		panic(err)
+	}
+	if err = json.Unmarshal([]byte(`{"I": 1, "S": "b", "B": true}`), &docs[1]); err != nil {
+		panic(err)
+	}
+
+	ids := [2]uint64{}
+	if ids[0], err = col.Insert(docs[0]); err != nil {
+		t.Fatalf("Failed to insert: %v", err)
+	}
+	if ids[1], err = col.Insert(docs[1]); err != nil {
+		t.Fatalf("Failed to insert: %v", err)
+	}
+
 	type Struct struct {
 		I int
 		S string
 		B bool
 	}
-
-	doc0 := &Struct{0, "a", false}
-	doc1 := &Struct{1, "b", true}
-
-	ids := [2]uint64{}
-	var outOfSpace bool
-	if ids[0], outOfSpace, err = col.Insert(doc0); err != nil || outOfSpace {
-		t.Fatalf("Failed to insert: %v", err)
-	}
-	if ids[1], outOfSpace, err = col.Insert(doc1); err != nil || outOfSpace {
-		t.Fatalf("Failed to insert: %v", err)
-	}
-
 	template := new(Struct)
-	col.DeserializeAll(template, func(id uint64) bool {
-		switch id {
-		case ids[0]:
-			if !(template.I == 0 && template.S == "a" && template.B == false) {
-				t.Fatalf("Deserialized document is not expected: %v", template)
-			}
-		case ids[1]:
-			if !(template.I == 1 && template.S == "b" && template.B == true) {
-				t.Fatalf("Deserialized document is not expected: %v", template)
-			}
+	col.DeserializeAll(template, func() bool {
+		if !(template.I == 0 && template.S == "a" && template.B == false) && !(template.I == 1 && template.S == "b" && template.B == true) {
+			t.Fatalf("Deserialized document is not expected: %v", template)
 		}
 		return true
 	})
+	if err = col.Flush(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestInsertDeleteRead(t *testing.T) {
@@ -223,15 +167,14 @@ func TestInsertDeleteRead(t *testing.T) {
 	}
 	defer col.Close()
 	docs := []string{`{"a": 1}`, `{"b": 2}`}
-	var jsonDoc [2]interface{}
+	var jsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
 	ids := [2]uint64{}
-	var outOfSpace bool
-	if ids[0], outOfSpace, err = col.Insert(jsonDoc[0]); err != nil || outOfSpace {
+	if ids[0], err = col.Insert(jsonDoc[0]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if ids[1], outOfSpace, err = col.Insert(jsonDoc[1]); err != nil || outOfSpace {
+	if ids[1], err = col.Insert(jsonDoc[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	col.Delete(ids[0])
@@ -245,6 +188,58 @@ func TestInsertDeleteRead(t *testing.T) {
 	}
 }
 
+func TestScrubAndColScan(t *testing.T) {
+	tmp := "/tmp/tiedot_col_test"
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	col, err := OpenChunk(0, tmp)
+	if err != nil {
+		t.Fatalf("Failed to open: %v", err)
+		return
+	}
+	// Insert 10000 documents
+	var doc map[string]interface{}
+	json.Unmarshal([]byte(`{"_pk": "`+strconv.Itoa(rand.Intn(10000))+`", "a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`), &doc)
+	for i := 0; i < 10000; i++ {
+		_, err := col.Insert(doc)
+		if err != nil {
+			t.Fatal("Insert fault")
+		}
+	}
+	// Do some serious damage to index and collection data
+	for i := 0; i < 1024*1024*1; i++ {
+		col.PK.File.Buf[i] = 6
+	}
+	for i := 1024; i < 1024*128; i++ {
+		col.Data.File.Buf[i] = 6
+	}
+	for i := 1024 * 256; i < 1024*512; i++ {
+		col.Data.File.Buf[i] = 6
+	}
+	if err = col.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if err = col.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	col.Close()
+}
+
+func IndexContainsAll(index *chunkfile.HashTable, expectedKV map[uint64]uint64) bool {
+	keys, vals := index.GetAll(0)
+	kvMap := make(map[uint64]uint64)
+	for i, key := range keys {
+		kvMap[key] = vals[i]
+	}
+	fmt.Printf("Comparing %v with %v\n", kvMap, expectedKV)
+	for key, val := range expectedKV {
+		if kvMap[key] != val {
+			return false
+		}
+	}
+	return true
+}
+
 func TestIndexAndReopen(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
@@ -255,222 +250,64 @@ func TestIndexAndReopen(t *testing.T) {
 		return
 	}
 	docs := []string{
-		`{"a": {"b": {"c": 1}}, "d": 0}`,
-		`{"a": {"b": [{"c": 2}]}, "d": 0}`,
-		`{"a": [{"b": {"c": 3}}], "d": 0}`,
-		`{"a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`,
-		`{"a": {"b": {"c": null}}, "d": null}`}
-	var jsonDoc [4]interface{}
-	var outOfSpace bool
+		`{"_pk": 1, "a": {"b": {"c": 1}}, "d": 0}`,
+		`{"_pk": 2, "a": {"b": [{"c": 2}]}, "d": 0}`,
+		`{"_pk": 3, "a": [{"b": {"c": 3}}], "d": 0}`,
+		`{"_pk": 4, "a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`,
+		`{"_pk": 5, "a": {"b": {"c": null}}, "d": null}`}
+	var jsonDoc [5]map[string]interface{}
+
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
 	json.Unmarshal([]byte(docs[2]), &jsonDoc[2])
 	json.Unmarshal([]byte(docs[3]), &jsonDoc[3])
+	json.Unmarshal([]byte(docs[4]), &jsonDoc[4])
 	ids := [3]uint64{}
 	// Insert first document
-	ids[0], _, _ = col.Insert(jsonDoc[0])
-	if err = col.Index([]string{"a", "b", "c"}); err != nil {
-		t.Fatal(err)
-		return
-	}
-	if err = col.Index([]string{"d"}); err != nil {
-		t.Fatal(err)
-		return
-	}
-	// The index should be in structures
-	if len(col.Path2HT) != 3 || len(col.HTPaths) != 3 || len(col.Hashtables) != 3 {
-		t.Fatalf("index fault %v", col.Path2HT)
-	}
-	if col.HTPaths[0][0] != UID_PATH {
-		t.Fatal("index fault")
-	}
-	if col.HTPaths[1][0] != "a" || col.HTPaths[1][1] != "b" || col.HTPaths[1][2] != "c" {
-		t.Fatal("index fault")
-	}
-	if col.HTPaths[2][0] != "d" {
-		t.Fatal("index fault")
-	}
+	ids[0], _ = col.Insert(jsonDoc[0])
 	// There should be one document on index - the first doc
-	keys, vals := col.Path2HT["a,b,c"].GetAll(0)
-	if !(len(keys) == 1 && len(vals) == 1 && vals[0] == ids[0]) {
-		t.Fatalf("Did not index existing document, got %v, %v", keys, vals)
+	if !IndexContainsAll(&col.PK, map[uint64]uint64{StrHash(1): ids[0]}) {
+		t.Fatal()
 	}
-	// Insert second and third document, replace third document by fouth document
-	ids[1], _, _ = col.Insert(jsonDoc[1])
-	ids[2], _, _ = col.Insert(jsonDoc[2])
-	ids[2], _, _ = col.Update(ids[2], jsonDoc[3])
+	// Insert second and third document, replace third document by forth document
+	ids[1], _ = col.Insert(jsonDoc[1])
+	ids[2], _ = col.Insert(jsonDoc[2])
+	ids[2], _ = col.Update(ids[2], jsonDoc[3])
 	// Then remove second document
 	col.Delete(ids[1])
-	// jsonDoc[0,3], ids[0, 2] are the ones left
-	index1 := col.Path2HT["a,b,c"]
-	index2 := col.Path2HT["d"]
-	// d index
-	k0, v0 := index2.Get(StrHash(0), 0, func(k, v uint64) bool {
-		return true
-	})
-	k9, v9 := index2.Get(StrHash(9), 0, func(k, v uint64) bool {
-		return true
-	})
-	if !(len(k0) == 2 && len(v0) == 2 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[1] == ids[2]) {
-		t.Fatalf("Index fault on key 0, %v, %v", k0, v0)
+	// jsonDoc[0,3], ids[0, 3] are the ones left
+	if !IndexContainsAll(&col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2]}) {
+		t.Fatal()
 	}
-	if !(len(k9) == 1 && len(v9) == 1 && k9[0] == StrHash(9) && v9[0] == ids[2]) {
-		t.Fatalf("Index fault on key 9, %v, %v", k9, v9)
-	}
-	// abc index and d index should contain correct number of values
-	keys, vals = col.Path2HT["a,b,c"].GetAll(0)
-	if !(len(keys) == 4 && len(vals) == 4) { // doc 0, 3
-		t.Fatalf("Index has too many values: %d, %d", keys, vals)
-	}
-	keys, vals = col.Path2HT["d"].GetAll(0)
-	if !(len(keys) == 3 && len(vals) == 3) { // doc 0, 3
-		t.Fatal("Index has too many values")
-	}
-	// abc index
-	k1, v1 := index1.Get(StrHash(1), 0, func(k, v uint64) bool {
-		return true
-	})
-	k2, v2 := index1.Get(StrHash(2), 0, func(k, v uint64) bool {
-		return true
-	})
-	k4, v4 := index1.Get(StrHash(4), 0, func(k, v uint64) bool {
-		return true
-	})
-	k5, v5 := index1.Get(StrHash(5), 0, func(k, v uint64) bool {
-		return true
-	})
-	k6, v6 := index1.Get(StrHash(6), 0, func(k, v uint64) bool {
-		return true
-	})
-	if !(len(k1) == 1 && len(v1) == 1 && k1[0] == StrHash(1) && v1[0] == ids[0]) {
-		t.Fatalf("Index fault, %v, %v", k1, v1)
-	}
-	if !(len(k2) == 0 && len(v2) == 0) {
-		t.Fatalf("Index fault, %v, %v", k2, v2)
-	}
-	if !(len(k4) == 1 && len(v4) == 1 && k4[0] == StrHash(4) && v4[0] == ids[2]) {
-		t.Fatalf("Index fault, %v, %v", k4, v4)
-	}
-	if !(len(k5) == 1 && len(v5) == 1 && k5[0] == StrHash(5) && v5[0] == ids[2]) {
-		t.Fatalf("Index fault, %v, %v", k5, v5)
-	}
-	if !(len(k6) == 1 && len(v6) == 1 && k6[0] == StrHash(6) && v6[0] == ids[2]) {
-		t.Fatalf("Index fault, %v, %v", k6, v6)
-	}
-	// Reopen the collection and test number of indexes
+	// Reopen the collection and continue testing indexes
 	col.Close()
 	col, err = OpenChunk(0, tmp)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !(len(col.Path2HT) == 3 && len(col.Hashtables) == 3 && len(col.HTPaths) == 3) {
-		t.Fatal("Did not reopen 3 indexes")
+	if !IndexContainsAll(&col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2]}) {
+		t.Fatal()
 	}
-	// Now remove a,b,c index
-	if err = col.Unindex([]string{"a", "b", "c"}); err != nil {
-		t.Fatal(err)
-		return
-	}
-	if _, ok := col.Path2HT["a,b,c"]; ok {
-		t.Fatal("did not delete index")
-	}
-	if len(col.Path2HT) != 2 || len(col.Hashtables) != 2 || len(col.HTPaths) != 2 {
-		t.Fatal("did not delete index")
-	}
-	if col.HTPaths[0][0] != UID_PATH {
-		t.Fatal("index fault")
-	}
-	if col.HTPaths[1][0] != "d" {
-		t.Fatal("index fault")
-	}
-	newID, outOfSpace, err := col.Insert(jsonDoc[0])
-	if err != nil || outOfSpace {
+	// Insert a new document and try index
+	newID, err := col.Insert(jsonDoc[4])
+	if err != nil {
 		t.Fatal("insert error")
 	}
-	k0, v0 = col.Path2HT["d"].Get(StrHash(0), 0, func(k, v uint64) bool {
-		return true
-	})
-	if !(len(k0) == 3 && len(v0) == 3 && k0[0] == StrHash(0) && v0[0] == ids[0] && k0[1] == StrHash(0) && v0[2] == ids[2] && k0[2] == StrHash(0) && v0[1] == newID) {
-		t.Fatalf("Index fault, %d, %v, %v", newID, k0, v0)
+	if !IndexContainsAll(&col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2], StrHash(5): newID}) {
+		t.Fatal("Index failure")
+	}
+	// Try ID to physical ID conversion
+	if physID, err := col.GetPhysicalID("1"); physID != ids[0] || err != nil {
+		t.Fatal(err, physID, ids[0])
+	}
+	if physID, err := col.GetPhysicalID("4"); physID != ids[2] || err != nil {
+		t.Fatal(err, physID)
+	}
+	if physID, err := col.GetPhysicalID("5"); physID != newID || err != nil {
+		t.Fatal(err, physID)
+	}
+	if err = col.Flush(); err != nil {
+		t.Fatal(err)
 	}
 	col.Close()
-}
-
-func TestScrubAndColScan(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(0, tmp)
-	if err != nil {
-		t.Fatalf("Failed to open: %v", err)
-		return
-	}
-	// Create two indexes
-	if err = col.Index([]string{"a", "b", "c"}); err != nil {
-		t.Fatal(err)
-		return
-	}
-	if err = col.Index([]string{"d"}); err != nil {
-		t.Fatal(err)
-		return
-	}
-	// Insert 10000 documents
-	var doc interface{}
-	json.Unmarshal([]byte(`{"a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`), &doc)
-	for i := 0; i < 10000; i++ {
-		_, outOfSpace, err := col.Insert(doc)
-		if outOfSpace || err != nil {
-			t.Fatal("Insert fault")
-		}
-	}
-	// Do some serious damage to index and collection data
-	for i := 0; i < 1024*1024*1; i++ {
-		col.Hashtables[0].File.Buf[i] = 6
-	}
-	for i := 0; i < 1024*1024*1; i++ {
-		col.Hashtables[1].File.Buf[i] = 6
-	}
-	for i := 1024 * 1024 * 1; i < 1024*1024*2; i++ {
-		col.Hashtables[2].File.Buf[i] = 6
-	}
-	for i := 1024; i < 1024*128; i++ {
-		col.Data.File.Buf[i] = 6
-	}
-	for i := 1024 * 256; i < 1024*512; i++ {
-		col.Data.File.Buf[i] = 6
-	}
-	col.Close()
-	// Reopen the chunk and expect data structure failure messages from log
-	fmt.Println("Please ignore the following error messages")
-	reopen, err := OpenChunk(0, tmp)
-	recoveredNum := reopen.Scrub()
-	// Confirm that 6528 documents are successfully recovered in four ways
-	counter := 0
-	// first - deserialization & scan
-	var recoveredDoc interface{}
-	reopen.DeserializeAll(&recoveredDoc, func(id uint64) bool {
-		counter++
-		return true
-	})
-	if counter != 6528 {
-		t.Fatal("Did not recover enough documents")
-	}
-	// second - collection scan
-	counter = 0
-	reopen.ForAll(func(id uint64, doc interface{}) bool {
-		counter++
-		return true
-	})
-	if counter != 6528 {
-		t.Fatal("Did not recover enough documents")
-	}
-	// third - index scan
-	keys, vals := reopen.Hashtables[1].GetAll(0)
-	if !(len(keys) == 6528*3 && len(vals) == 6528*3) {
-		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals))
-	}
-	// fourth - scrub return value
-	if recoveredNum != 6528 {
-		t.Fatal("Scrub return value is wrong")
-	}
 }

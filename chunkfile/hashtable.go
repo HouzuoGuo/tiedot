@@ -15,25 +15,26 @@ const (
 	ENTRY_SIZE         = uint64(1 + 10 + 10)     // Size of entry header - validity (byte), hash key (uint64) and value (uint64)
 	BUCKET_HEADER_SIZE = uint64(10)              // Size of bucket header - next bucket in chain (uint64)
 	// Hash table configuration
-	PER_BUCKET  = uint64(50)
+	PER_BUCKET  = uint64(15)
 	BUCKET_SIZE = uint64(PER_BUCKET*ENTRY_SIZE + BUCKET_HEADER_SIZE)
+	HASH_BITS   = uint64(14)
 	// INITIAL_BUCKETS = 2 to the power of HASH_BITS
-	HASH_BITS       = uint64(12)
-	INITIAL_BUCKETS = uint64(4096)
+	INITIAL_BUCKETS = uint64(16384)
 )
 
 type HashTable struct {
-	File       *commonfile.File
+	Path       []string
+	File       commonfile.File
 	NumBuckets uint64 // Total number of buckets
 }
 
 // Open a hash table file.
-func OpenHash(name string) (ht *HashTable, err error) {
+func OpenHash(name string, path []string) (ht HashTable, err error) {
 	file, err := commonfile.Open(name, HT_FILE_SIZE)
 	if err != nil {
 		return
 	}
-	ht = &HashTable{File: file}
+	ht = HashTable{File: file, Path: path}
 	ht.calculateSizeInfo()
 	return ht, nil
 }
@@ -65,7 +66,7 @@ func (ht *HashTable) calculateSizeInfo() {
 }
 
 // Return the number (not address) of next chained bucket, 0 if there is not any.
-func (ht *HashTable) nextBucket(bucket uint64) uint64 {
+func (ht *HashTable) NextBucket(bucket uint64) uint64 {
 	if bucket >= ht.NumBuckets {
 		return 0
 	}
@@ -87,7 +88,7 @@ func (ht *HashTable) nextBucket(bucket uint64) uint64 {
 func (ht *HashTable) lastBucket(bucket uint64) uint64 {
 	curr := bucket
 	for {
-		next := ht.nextBucket(curr)
+		next := ht.NextBucket(curr)
 		if next == 0 {
 			return curr
 		}
@@ -106,7 +107,7 @@ func (ht *HashTable) grow(bucket uint64) {
 }
 
 // Return a hash key to be used by hash table by masking non-key bits.
-func (ht *HashTable) hashKey(key uint64) uint64 {
+func (ht *HashTable) HashKey(key uint64) uint64 {
 	return key & ((1 << HASH_BITS) - 1)
 }
 
@@ -119,7 +120,7 @@ func (ht *HashTable) Clear() {
 
 // Put a new key-value pair.
 func (ht *HashTable) Put(key, val uint64) {
-	var bucket, entry uint64 = ht.hashKey(key), 0
+	var bucket, entry uint64 = ht.HashKey(key), 0
 	for {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		if ht.File.Buf[entryAddr] != ENTRY_VALID {
@@ -130,8 +131,8 @@ func (ht *HashTable) Put(key, val uint64) {
 		}
 		if entry++; entry == PER_BUCKET {
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 {
-				ht.grow(ht.hashKey(key))
+			if bucket = ht.NextBucket(bucket); bucket == 0 {
+				ht.grow(ht.HashKey(key))
 				ht.Put(key, val)
 				return
 			}
@@ -141,7 +142,8 @@ func (ht *HashTable) Put(key, val uint64) {
 
 // Get key-value pairs.
 func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (keys, vals []uint64) {
-	var count, entry, bucket uint64 = 0, 0, ht.hashKey(key)
+	// This function is partially inlined in chunkcol.go
+	var count, entry, bucket uint64 = 0, 0, ht.HashKey(key)
 	if limit == 0 {
 		keys = make([]uint64, 0, 10)
 		vals = make([]uint64, 0, 10)
@@ -166,7 +168,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		}
 		if entry++; entry == PER_BUCKET {
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 {
+			if bucket = ht.NextBucket(bucket); bucket == 0 {
 				return
 			}
 		}
@@ -175,7 +177,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 
 // Remove specific key-value pair.
 func (ht *HashTable) Remove(key, val uint64) {
-	var entry, bucket uint64 = 0, ht.hashKey(key)
+	var entry, bucket uint64 = 0, ht.HashKey(key)
 	for {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER_SIZE + entry*ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
@@ -190,7 +192,7 @@ func (ht *HashTable) Remove(key, val uint64) {
 		}
 		if entry++; entry == PER_BUCKET {
 			entry = 0
-			if bucket = ht.nextBucket(bucket); bucket == 0 {
+			if bucket = ht.NextBucket(bucket); bucket == 0 {
 				return
 			}
 		}
@@ -224,7 +226,7 @@ func (ht *HashTable) GetAll(limit uint64) (keys, vals []uint64) {
 			}
 			if entry++; entry == PER_BUCKET {
 				entry = 0
-				if bucket = ht.nextBucket(bucket); bucket == 0 {
+				if bucket = ht.NextBucket(bucket); bucket == 0 {
 					return
 				}
 			}

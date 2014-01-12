@@ -10,14 +10,13 @@ import (
 )
 
 const (
-	/* Be aware that, changing the following constants will almost certainly
-	require a large number of test cases to be re-written. */
+	/* Be aware that, changing the following constants will almost certainly require a number of test cases to be re-written. */
 
-	COL_FILE_SIZE   = uint64(1024 * 1024 * 8) // Size of collection data file
-	DOC_MAX_ROOM    = uint64(1024 * 1024 * 8) // Max single document size
-	DOC_HEADER_SIZE = 1 + 10                  // Size of document header - validity (byte), document room (uint64)
-	DOC_VALID       = byte(1)                 // Document valid flag
-	DOC_INVALID     = byte(0)                 // Document invalid flag
+	COL_FILE_SIZE   = uint64(1024 * 1024 * 16) // Size of collection data file
+	DOC_MAX_ROOM    = uint64(1024 * 1024 * 16) // Max single document size
+	DOC_HEADER_SIZE = 1 + 10                   // Size of document header - validity (byte), document room (uint64)
+	DOC_VALID       = byte(1)                  // Document valid flag
+	DOC_INVALID     = byte(0)                  // Document invalid flag
 
 	// Pre-compiled document padding (2048 spaces)
 	PADDING = "                                                                                                                                " +
@@ -32,13 +31,13 @@ const (
 )
 
 type ColFile struct {
-	File *commonfile.File
+	File commonfile.File
 }
 
 // Open a collection file.
-func OpenCol(name string) (*ColFile, error) {
+func OpenCol(name string) (ColFile, error) {
 	file, err := commonfile.Open(name, COL_FILE_SIZE)
-	return &ColFile{File: file}, err
+	return ColFile{File: file}, err
 }
 
 // Retrieve document data given its ID.
@@ -63,7 +62,7 @@ func (col *ColFile) Read(id uint64) []byte {
 }
 
 // Insert a document, return its ID.
-func (col *ColFile) Insert(data []byte) (id uint64, outOfSpace bool, err error) {
+func (col *ColFile) Insert(data []byte) (id uint64, err error) {
 	len64 := uint64(len(data))
 	room := len64 + len64
 	if room > DOC_MAX_ROOM {
@@ -73,8 +72,7 @@ func (col *ColFile) Insert(data []byte) (id uint64, outOfSpace bool, err error) 
 	// Keep track of new document ID and used space
 	id = col.File.UsedSize
 	if !col.File.CheckSize(DOC_HEADER_SIZE + room) {
-		outOfSpace = true
-		return
+		col.File.CheckSizeAndEnsure(DOC_HEADER_SIZE + room)
 	}
 	col.File.UsedSize = id + DOC_HEADER_SIZE + room
 	// Make document header, then copy document data
@@ -98,7 +96,7 @@ func (col *ColFile) Insert(data []byte) (id uint64, outOfSpace bool, err error) 
 }
 
 // Update a document, return its new ID.
-func (col *ColFile) Update(id uint64, data []byte) (newID uint64, outOfSpace bool, err error) {
+func (col *ColFile) Update(id uint64, data []byte) (newID uint64, err error) {
 	len64 := uint64(len(data))
 	if len64 > DOC_MAX_ROOM {
 		err = errors.New(fmt.Sprintf("Updated document is too large"))
@@ -133,7 +131,7 @@ func (col *ColFile) Update(id uint64, data []byte) (newID uint64, outOfSpace boo
 				}
 				copy(col.File.Buf[segBegin:segEnd], PADDING[0:segSize])
 			}
-			return id, false, nil
+			return id, nil
 		}
 		// There is not enough room for updated content, so delete the original document and re-insert
 		col.Delete(id)
