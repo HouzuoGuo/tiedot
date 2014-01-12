@@ -266,7 +266,7 @@ func TestIndexAndReopen(t *testing.T) {
 	// Insert first document
 	ids[0], _ = col.Insert(jsonDoc[0])
 	// There should be one document on index - the first doc
-	if !IndexContainsAll(&col.PK, map[uint64]uint64{StrHash(1): ids[0]}) {
+	if !IndexContainsAll(col.PK, map[uint64]uint64{StrHash(1): ids[0]}) {
 		t.Fatal()
 	}
 	// Insert second and third document, replace third document by forth document
@@ -276,7 +276,7 @@ func TestIndexAndReopen(t *testing.T) {
 	// Then remove second document
 	col.Delete(ids[1])
 	// jsonDoc[0,3], ids[0, 3] are the ones left
-	if !IndexContainsAll(&col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2]}) {
+	if !IndexContainsAll(col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2]}) {
 		t.Fatal()
 	}
 	// Reopen the collection and continue testing indexes
@@ -285,7 +285,7 @@ func TestIndexAndReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !IndexContainsAll(&col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2]}) {
+	if !IndexContainsAll(col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2]}) {
 		t.Fatal()
 	}
 	// Insert a new document and try index
@@ -293,7 +293,7 @@ func TestIndexAndReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal("insert error")
 	}
-	if !IndexContainsAll(&col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2], StrHash(5): newID}) {
+	if !IndexContainsAll(col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2], StrHash(5): newID}) {
 		t.Fatal("Index failure")
 	}
 	// Try ID to physical ID conversion

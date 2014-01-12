@@ -31,13 +31,13 @@ const (
 )
 
 type ColFile struct {
-	File commonfile.File
+	File *commonfile.File
 }
 
 // Open a collection file.
-func OpenCol(name string) (ColFile, error) {
+func OpenCol(name string) (*ColFile, error) {
 	file, err := commonfile.Open(name, COL_FILE_SIZE)
-	return ColFile{File: file}, err
+	return &ColFile{File: file}, err
 }
 
 // Retrieve document data given its ID.

@@ -19,10 +19,10 @@ const (
 )
 
 type ChunkCol struct {
-	Number  uint64              // Number of the chunk in collection
-	BaseDir string              // File system directory path of the chunk
-	Data    chunkfile.ColFile   // Collection document data file
-	PK      chunkfile.HashTable // PK hash table
+	Number  uint64               // Number of the chunk in collection
+	BaseDir string               // File system directory path of the chunk
+	Data    *chunkfile.ColFile   // Collection document data file
+	PK      *chunkfile.HashTable // PK hash table
 }
 
 // Return string hash code using sdbm algorithm.
@@ -35,13 +35,13 @@ func StrHash(thing interface{}) uint64 {
 }
 
 // Open a chunk.
-func OpenChunk(number uint64, baseDir string) (chunk ChunkCol, err error) {
+func OpenChunk(number uint64, baseDir string) (chunk *ChunkCol, err error) {
 	// Create the directory if it does not yet exist
 	if err = os.MkdirAll(baseDir, 0700); err != nil {
 		return
 	}
 	tdlog.Printf("Opening chunk %s", baseDir)
-	chunk = ChunkCol{Number: number, BaseDir: baseDir}
+	chunk = &ChunkCol{Number: number, BaseDir: baseDir}
 	// Open collection document data file
 	tdlog.Printf("Opening collection data file %s", DAT_FILENAME_MAGIC)
 	if chunk.Data, err = chunkfile.OpenCol(path.Join(baseDir, DAT_FILENAME_MAGIC)); err != nil {

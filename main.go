@@ -3,8 +3,6 @@ package main
 
 import (
 	"flag"
-	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/HouzuoGuo/tiedot/srv/v3"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"log"
 	"math/rand"
@@ -67,19 +65,12 @@ func main() {
 		if port == 0 {
 			tdlog.Fatal("Please specify port number, for example -port=8080")
 		}
-		db, err := db.OpenDB(dir)
-		if err != nil {
-			tdlog.Fatal(err)
-		}
-		v3.Start(db, port)
 	case "example": // Run embedded usage examples
-		embeddedExample()
 	case "bench": // Benchmark scenarios
 		benchmark(benchSize)
 	case "bench2":
 		benchmark2(benchSize)
 	case "bench3":
-		benchmark3(benchSize)
 	default:
 		flag.PrintDefaults()
 		return

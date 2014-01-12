@@ -6,6 +6,7 @@ import (
 	"github.com/HouzuoGuo/tiedot/commonfile"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math"
+	"sync"
 )
 
 const (
@@ -24,17 +25,18 @@ const (
 
 type HashTable struct {
 	Path       []string
-	File       commonfile.File
+	File       *commonfile.File
+	Mutex      *sync.RWMutex
 	NumBuckets uint64 // Total number of buckets
 }
 
 // Open a hash table file.
-func OpenHash(name string, path []string) (ht HashTable, err error) {
+func OpenHash(name string, path []string) (ht *HashTable, err error) {
 	file, err := commonfile.Open(name, HT_FILE_SIZE)
 	if err != nil {
 		return
 	}
-	ht = HashTable{File: file, Path: path}
+	ht = &HashTable{File: file, Path: path, Mutex: &sync.RWMutex{}}
 	ht.calculateSizeInfo()
 	return ht, nil
 }

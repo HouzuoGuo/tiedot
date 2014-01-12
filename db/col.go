@@ -25,9 +25,9 @@ const (
 
 type Col struct {
 	BaseDir      string // Collection dir path
-	Chunks       []chunk.ChunkCol
-	ChunkMutexes []sync.RWMutex // Synchronize access to chunks
-	NumChunks    uint64         // Total number of chunks
+	Chunks       []*chunk.ChunkCol
+	ChunkMutexes []*sync.RWMutex // Synchronize access to chunks
+	NumChunks    uint64          // Total number of chunks
 
 	// Secondary indexes (hashtables)
 	SecIndexes map[string][]*chunkfile.HashTable
@@ -63,20 +63,20 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 }
 
 // Open a collection (made of chunks).
-func OpenCol(baseDir string, numChunks uint64) (col Col, err error) {
+func OpenCol(baseDir string, numChunks uint64) (col *Col, err error) {
 	// Create the directory if it does not yet exist
 	if err = os.MkdirAll(baseDir, 0700); err != nil {
 		return
 	}
-	col = Col{BaseDir: baseDir, NumChunks: numChunks, SecIndexes: make(map[string][]*chunkfile.HashTable),
-		Chunks: make([]chunk.ChunkCol, numChunks), ChunkMutexes: make([]sync.RWMutex, numChunks)}
+	col = &Col{BaseDir: baseDir, NumChunks: numChunks, SecIndexes: make(map[string][]*chunkfile.HashTable),
+		Chunks: make([]*chunk.ChunkCol, numChunks), ChunkMutexes: make([]*sync.RWMutex, numChunks)}
 	// Open each chunk
 	for i := uint64(0); i < numChunks; i++ {
 		col.Chunks[i], err = chunk.OpenChunk(i, path.Join(baseDir, CHUNK_DIRNAME_MAGIC+strconv.Itoa(int(i))))
 		if err != nil {
 			panic(err)
 		}
-		col.ChunkMutexes[i] = sync.RWMutex{}
+		col.ChunkMutexes[i] = &sync.RWMutex{}
 	}
 	// Look for hash table directories
 	walker := func(currPath string, info os.FileInfo, err2 error) error {
@@ -114,7 +114,7 @@ func (col *Col) openIndex(indexPath []string, baseDir string) {
 		if err != nil {
 			panic(err)
 		}
-		tables[i] = &table
+		tables[i] = table
 	}
 	col.SecIndexes[jointPath] = tables
 }
@@ -169,9 +169,12 @@ func (col *Col) indexDoc(id string, doc interface{}) {
 		for _, toBeIndexed := range GetIn(doc, index[0].Path) {
 			if toBeIndexed != nil {
 				// Figure out where to put it
-				hash := chunk.StrHash(toBeIndexed)
-				dest := hash % col.NumChunks
-				index[dest].Put(hash, chunk.StrHash(id))
+				hashKey := chunk.StrHash(toBeIndexed)
+				num := hashKey % col.NumChunks
+				ht := index[num]
+				ht.Mutex.Lock()
+				index[num].Put(hashKey, chunk.StrHash(id))
+				ht.Mutex.Unlock()
 			}
 		}
 	}
@@ -183,9 +186,12 @@ func (col *Col) unindexDoc(id string, doc interface{}) {
 		for _, toBeIndexed := range GetIn(doc, index[0].Path) {
 			if toBeIndexed != nil {
 				// Figure out where it was put
-				hash := chunk.StrHash(toBeIndexed)
-				dest := hash % col.NumChunks
-				index[dest].Remove(hash, chunk.StrHash(id))
+				hashKey := chunk.StrHash(toBeIndexed)
+				num := hashKey % col.NumChunks
+				ht := index[num]
+				ht.Mutex.Lock()
+				index[num].Remove(hashKey, chunk.StrHash(id))
+				ht.Mutex.Unlock()
 			}
 		}
 	}
@@ -241,15 +247,13 @@ func (col *Col) ReadNoLock(id string, doc interface{}) (physID uint64, err error
 
 func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, uint64) bool) (keys, vals []uint64) {
 	num := key % col.NumChunks
-	lock := col.ChunkMutexes[num]
-	// Although index is not maintained by chunk, but we lock it from other modifications
 	theIndex, exist := col.SecIndexes[htPath]
 	if !exist {
 		panic(fmt.Sprintf("Index %s does not exist", htPath))
 	}
-	lock.RLock()
+	theIndex[num].Mutex.RLock()
 	keys, vals = theIndex[num].Get(key, limit, filter)
-	lock.RUnlock()
+	theIndex[num].Mutex.RUnlock()
 	return
 }
 

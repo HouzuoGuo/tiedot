@@ -225,10 +225,10 @@ func TestIndex(t *testing.T) {
 	ids[0], _ = col.Insert(jsonDoc[0])
 	col.Index([]string{"a", "b", "c"})
 	col.Index([]string{"d"})
-	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0]}}) {
+	if !SecIndexContainsAll("a,b,c", col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0]}}) {
 		t.Fatal()
 	}
-	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0]}}) {
+	if !SecIndexContainsAll("a,b,c", col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0]}}) {
 		t.Fatal()
 	}
 	// Do the following:
@@ -246,24 +246,24 @@ func TestIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to reopen: %v", err)
 	}
-	if !SecIndexContainsAll("d", &col, map[uint64][]string{chunk.StrHash("0"): []string{ids[0], ids[2]}}) {
+	if !SecIndexContainsAll("d", col, map[uint64][]string{chunk.StrHash("0"): []string{ids[0], ids[2]}}) {
 		t.Fatal()
 	}
-	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0]}}) {
+	if !SecIndexContainsAll("a,b,c", col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0]}}) {
 		t.Fatal()
 	}
-	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("4"): []string{ids[2]}}) {
+	if !SecIndexContainsAll("a,b,c", col, map[uint64][]string{chunk.StrHash("4"): []string{ids[2]}}) {
 		t.Fatal()
 	}
 	// Insert one more document and verify indexes
 	newID, _ := col.Insert(jsonDoc[0])
-	if !SecIndexContainsAll("d", &col, map[uint64][]string{chunk.StrHash("0"): []string{ids[0], ids[2], newID}}) {
+	if !SecIndexContainsAll("d", col, map[uint64][]string{chunk.StrHash("0"): []string{ids[0], ids[2], newID}}) {
 		t.Fatal()
 	}
-	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0], newID}}) {
+	if !SecIndexContainsAll("a,b,c", col, map[uint64][]string{chunk.StrHash("1"): []string{ids[0], newID}}) {
 		t.Fatal()
 	}
-	if !SecIndexContainsAll("a,b,c", &col, map[uint64][]string{chunk.StrHash("4"): []string{ids[2]}}) {
+	if !SecIndexContainsAll("a,b,c", col, map[uint64][]string{chunk.StrHash("4"): []string{ids[2]}}) {
 		t.Fatal()
 	}
 	if err = col.Flush(); err != nil {

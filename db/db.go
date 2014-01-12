@@ -16,15 +16,15 @@ const (
 )
 
 type DB struct {
-	BaseDir string         // Database directory path
-	StrCol  map[string]Col // Collection name to collection mapping
+	BaseDir string          // Database directory path
+	StrCol  map[string]*Col // Collection name to collection mapping
 }
 
-func OpenDB(baseDir string) (db DB, err error) {
+func OpenDB(baseDir string) (db *DB, err error) {
 	if err = os.MkdirAll(baseDir, 0700); err != nil {
 		return
 	}
-	db = DB{BaseDir: baseDir, StrCol: make(map[string]Col)}
+	db = &DB{BaseDir: baseDir, StrCol: make(map[string]*Col)}
 	files, err := ioutil.ReadDir(baseDir)
 	if err != nil {
 		return
@@ -76,7 +76,7 @@ func (db *DB) Create(name string, numChunks uint64) (err error) {
 // Return collection reference by collection name. This function is safe for concurrent use.
 func (db *DB) Use(name string) *Col {
 	if col, ok := db.StrCol[name]; ok {
-		return &col
+		return col
 	}
 	return nil
 }
