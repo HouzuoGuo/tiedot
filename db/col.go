@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	HASHTABLE_DIRNAME_MAGIC = "ht_" // Hash table directory name prefix
-	INDEX_PATH_SEP          = ","   // Separator between index path segments
+	HASHTABLE_DIRNAME_MAGIC = "ht_"    // Hash table directory name prefix
+	CHUNK_DIRNAME_MAGIC     = "chunk_" // Chunk directory name prefix
+	INDEX_PATH_SEP          = ","      // Separator between index path segments
 )
 
 type Col struct {
@@ -71,7 +72,7 @@ func OpenCol(baseDir string, numChunks uint64) (col Col, err error) {
 		Chunks: make([]chunk.ChunkCol, numChunks), ChunkMutexes: make([]sync.RWMutex, numChunks)}
 	// Open each chunk
 	for i := uint64(0); i < numChunks; i++ {
-		col.Chunks[i], err = chunk.OpenChunk(i, path.Join(baseDir, strconv.Itoa(int(i))))
+		col.Chunks[i], err = chunk.OpenChunk(i, path.Join(baseDir, CHUNK_DIRNAME_MAGIC+strconv.Itoa(int(i))))
 		if err != nil {
 			panic(err)
 		}
@@ -335,21 +336,6 @@ func (col *Col) DeserializeAll(template interface{}, fun func() bool) {
 		dest.DeserializeAll(template, fun)
 		lock.RUnlock()
 	}
-}
-
-// Compact the collection and automatically repair any data/index damage.
-func (col *Col) Scrub() (recovered uint64) {
-	for i, dest := range col.Chunks {
-		// Do it one by one
-		lock := col.ChunkMutexes[i]
-		lock.Lock()
-		for _, index := range col.SecIndexes {
-			index[i].Clear()
-		}
-		recovered += dest.Scrub()
-		lock.Unlock()
-	}
-	return
 }
 
 // Flush collection data and index files.
