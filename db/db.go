@@ -114,10 +114,10 @@ func (db *DB) Drop(name string) (err error) {
 }
 
 // Compact and repair a collection.
-func (db *DB) Scrub(name string) (err error) {
+func (db *DB) Scrub(name string) (counter uint64, err error) {
 	target := db.Use(name)
 	if target == nil {
-		return errors.New(fmt.Sprintf("Collection %s does not exist in %s", name, db.BaseDir))
+		return 0, errors.New(fmt.Sprintf("Collection %s does not exist in %s", name, db.BaseDir))
 	}
 	// Create a temporary collection
 	numChunks := target.NumChunks
@@ -130,7 +130,9 @@ func (db *DB) Scrub(name string) (err error) {
 	}
 	// Reinsert documents
 	target.ForAll(func(id int, doc map[string]interface{}) bool {
-		if err := temp.InsertRecovery(id, doc); err != nil {
+		if err := temp.InsertRecovery(id, doc); err == nil {
+			counter += 1
+		} else {
 			tdlog.Errorf("Failed to recover document %v", doc)
 		}
 		return true
