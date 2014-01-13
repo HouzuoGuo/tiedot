@@ -2,10 +2,9 @@
 package db
 
 import (
-	"github.com/HouzuoGuo/tiedot/chunk"
-
 	"errors"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/chunk"
 	"github.com/HouzuoGuo/tiedot/chunkfile"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"github.com/HouzuoGuo/tiedot/uid"
@@ -27,7 +26,8 @@ type Col struct {
 	BaseDir      string // Collection dir path
 	Chunks       []*chunk.ChunkCol
 	ChunkMutexes []*sync.RWMutex // Synchronize access to chunks
-	NumChunks    uint64          // Total number of chunks
+	NumChunks    int             // Total number of chunks
+	NumChunksI64 uint64          // Total number of chunks (uint64)
 
 	// Secondary indexes (hashtables)
 	SecIndexes map[string][]*chunkfile.HashTable
@@ -63,15 +63,16 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 }
 
 // Open a collection (made of chunks).
-func OpenCol(baseDir string, numChunks uint64) (col *Col, err error) {
+func OpenCol(baseDir string, numChunks int) (col *Col, err error) {
 	// Create the directory if it does not yet exist
 	if err = os.MkdirAll(baseDir, 0700); err != nil {
 		return
 	}
-	col = &Col{BaseDir: baseDir, NumChunks: numChunks, SecIndexes: make(map[string][]*chunkfile.HashTable),
-		Chunks: make([]*chunk.ChunkCol, numChunks), ChunkMutexes: make([]*sync.RWMutex, numChunks)}
+	col = &Col{BaseDir: baseDir, NumChunks: numChunks, NumChunksI64: uint64(numChunks),
+		SecIndexes: make(map[string][]*chunkfile.HashTable),
+		Chunks:     make([]*chunk.ChunkCol, numChunks), ChunkMutexes: make([]*sync.RWMutex, numChunks)}
 	// Open each chunk
-	for i := uint64(0); i < numChunks; i++ {
+	for i := 0; i < numChunks; i++ {
 		col.Chunks[i], err = chunk.OpenChunk(i, path.Join(baseDir, CHUNK_DIRNAME_MAGIC+strconv.Itoa(int(i))))
 		if err != nil {
 			panic(err)
@@ -106,7 +107,7 @@ func OpenCol(baseDir string, numChunks uint64) (col *Col, err error) {
 func (col *Col) openIndex(indexPath []string, baseDir string) {
 	jointPath := strings.Join(indexPath, INDEX_PATH_SEP)
 	tables := make([]*chunkfile.HashTable, col.NumChunks)
-	for i := uint64(0); i < col.NumChunks; i++ {
+	for i := 0; i < col.NumChunks; i++ {
 		if err := os.MkdirAll(baseDir, 0700); err != nil {
 			panic(err)
 		}
@@ -131,13 +132,13 @@ func (col *Col) Index(indexPath []string) error {
 	col.openIndex(indexPath, indexBaseDir)
 	// Put all documents on the new index
 	newIndex := col.SecIndexes[jointPath]
-	col.ForAll(func(id string, doc map[string]interface{}) bool {
+	col.ForAll(func(id int, doc map[string]interface{}) bool {
 		for _, toBeIndexed := range GetIn(doc, indexPath) {
 			if toBeIndexed != nil {
 				// Figure out where to put it
 				hash := chunk.StrHash(toBeIndexed)
-				dest := hash % col.NumChunks
-				newIndex[dest].Put(hash, chunk.StrHash(id))
+				dest := hash % col.NumChunksI64
+				newIndex[dest].Put(hash, uint64(id))
 			}
 		}
 		return true
@@ -164,16 +165,16 @@ func (col *Col) Unindex(indexPath []string) (err error) {
 }
 
 // Put the document on all secondary indexes.
-func (col *Col) indexDoc(id string, doc interface{}) {
+func (col *Col) indexDoc(id uint64, doc interface{}) {
 	for _, index := range col.SecIndexes {
 		for _, toBeIndexed := range GetIn(doc, index[0].Path) {
 			if toBeIndexed != nil {
 				// Figure out where to put it
 				hashKey := chunk.StrHash(toBeIndexed)
-				num := hashKey % col.NumChunks
+				num := hashKey % col.NumChunksI64
 				ht := index[num]
 				ht.Mutex.Lock()
-				index[num].Put(hashKey, chunk.StrHash(id))
+				index[num].Put(hashKey, id)
 				ht.Mutex.Unlock()
 			}
 		}
@@ -181,16 +182,16 @@ func (col *Col) indexDoc(id string, doc interface{}) {
 }
 
 // Remove the document from all secondary indexes.
-func (col *Col) unindexDoc(id string, doc interface{}) {
+func (col *Col) unindexDoc(id uint64, doc interface{}) {
 	for _, index := range col.SecIndexes {
 		for _, toBeIndexed := range GetIn(doc, index[0].Path) {
 			if toBeIndexed != nil {
 				// Figure out where it was put
 				hashKey := chunk.StrHash(toBeIndexed)
-				num := hashKey % col.NumChunks
+				num := hashKey % col.NumChunksI64
 				ht := index[num]
 				ht.Mutex.Lock()
-				index[num].Remove(hashKey, chunk.StrHash(id))
+				index[num].Remove(hashKey, id)
 				ht.Mutex.Unlock()
 			}
 		}
@@ -198,25 +199,23 @@ func (col *Col) unindexDoc(id string, doc interface{}) {
 }
 
 // Insert a document, return its unique ID.
-func (col *Col) Insert(doc map[string]interface{}) (id string, err error) {
+func (col *Col) Insert(doc map[string]interface{}) (id int, err error) {
 	// Allocate an ID to the document
 	id = uid.NextUID()
-	idHash := chunk.StrHash(id)
-	doc[chunk.PK_NAME] = id
-	num := idHash % col.NumChunks
+	doc[uid.PK_NAME] = strconv.Itoa(id)
+	num := id % col.NumChunks
 	// Lock the chunk while inserting the document
 	lock := col.ChunkMutexes[num]
 	lock.Lock()
 	_, err = col.Chunks[num].Insert(doc)
-	col.indexDoc(id, doc)
+	col.indexDoc(uint64(id), doc)
 	lock.Unlock()
 	return
 }
 
 // Read a document given its unique ID.
-func (col *Col) Read(id string, doc interface{}) (physID uint64, err error) {
-	idHash := chunk.StrHash(id)
-	num := idHash % col.NumChunks
+func (col *Col) Read(id int, doc interface{}) (physID uint64, err error) {
+	num := id % col.NumChunks
 	// Lock the chunk while reading the document
 	lock := col.ChunkMutexes[num]
 	dest := col.Chunks[num]
@@ -232,9 +231,8 @@ func (col *Col) Read(id string, doc interface{}) (physID uint64, err error) {
 }
 
 // Read a document given its unique ID (without placing any lock).
-func (col *Col) ReadNoLock(id string, doc interface{}) (physID uint64, err error) {
-	idHash := chunk.StrHash(id)
-	num := idHash % col.NumChunks
+func (col *Col) ReadNoLock(id int, doc interface{}) (physID uint64, err error) {
+	num := id % col.NumChunks
 	// Lock the chunk while reading the document
 	dest := col.Chunks[num]
 	physID, err = dest.GetPhysicalID(id)
@@ -246,7 +244,7 @@ func (col *Col) ReadNoLock(id string, doc interface{}) (physID uint64, err error
 }
 
 func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, uint64) bool) (keys, vals []uint64) {
-	num := key % col.NumChunks
+	num := key % col.NumChunksI64
 	theIndex, exist := col.SecIndexes[htPath]
 	if !exist {
 		panic(fmt.Sprintf("Index %s does not exist", htPath))
@@ -258,12 +256,11 @@ func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, u
 }
 
 // Update a document given its unique ID.
-func (col *Col) Update(id string, newDoc map[string]interface{}) (err error) {
-	idHash := chunk.StrHash(id)
-	num := idHash % col.NumChunks
+func (col *Col) Update(id int, newDoc map[string]interface{}) (err error) {
+	num := id % col.NumChunks
 	lock := col.ChunkMutexes[num]
 	dest := col.Chunks[num]
-	newDoc[chunk.PK_NAME] = id
+	newDoc[uid.PK_NAME] = strconv.Itoa(id)
 
 	lock.Lock()
 	// Read back the original document
@@ -279,8 +276,8 @@ func (col *Col) Update(id string, newDoc map[string]interface{}) (err error) {
 		}
 	}
 	// Remove the original document from secondary indexes, and put new values into them
-	col.unindexDoc(id, oldDoc)
-	col.indexDoc(id, newDoc)
+	col.unindexDoc(uint64(id), oldDoc)
+	col.indexDoc(uint64(id), newDoc)
 	// Update document data file and return
 	_, err = dest.Update(physID, newDoc)
 	if err != nil {
@@ -292,9 +289,8 @@ func (col *Col) Update(id string, newDoc map[string]interface{}) (err error) {
 }
 
 // Delete a document given its unique ID.
-func (col *Col) Delete(id string) {
-	idHash := chunk.StrHash(id)
-	num := idHash % col.NumChunks
+func (col *Col) Delete(id int) {
+	num := id % col.NumChunks
 	lock := col.ChunkMutexes[num]
 	dest := col.Chunks[num]
 	lock.Lock()
@@ -310,7 +306,7 @@ func (col *Col) Delete(id string) {
 		}
 	}
 	// Remove the original document from secondary indexes
-	col.unindexDoc(id, oldDoc)
+	col.unindexDoc(uint64(id), oldDoc)
 	dest.Delete(physID)
 	lock.Unlock()
 	return
@@ -318,9 +314,9 @@ func (col *Col) Delete(id string) {
 
 /* Sequentially deserialize all documents and invoke the function on each document (Collection Scan).
 The function must not write to this collection. */
-func (col *Col) ForAll(fun func(id string, doc map[string]interface{}) bool) {
+func (col *Col) ForAll(fun func(id int, doc map[string]interface{}) bool) {
 	numChunks := col.NumChunks
-	for i := uint64(0); i < numChunks; i++ {
+	for i := 0; i < numChunks; i++ {
 		dest := col.Chunks[i]
 		lock := col.ChunkMutexes[i]
 		lock.RLock()
@@ -333,7 +329,7 @@ func (col *Col) ForAll(fun func(id string, doc map[string]interface{}) bool) {
 The function must not write to this collection. */
 func (col *Col) DeserializeAll(template interface{}, fun func() bool) {
 	numChunks := col.NumChunks
-	for i := uint64(0); i < numChunks; i++ {
+	for i := 0; i < numChunks; i++ {
 		dest := col.Chunks[i]
 		lock := col.ChunkMutexes[i]
 		lock.RLock()

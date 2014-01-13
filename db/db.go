@@ -49,7 +49,7 @@ func OpenDB(baseDir string) (db *DB, err error) {
 			}
 
 			// Open the directory as a collection
-			if db.StrCol[f.Name()], err = OpenCol(path.Join(baseDir, f.Name()), uint64(numchunks)); err != nil {
+			if db.StrCol[f.Name()], err = OpenCol(path.Join(baseDir, f.Name()), numchunks); err != nil {
 				tdlog.Errorf("ERROR: Failed to open collection %s, error: %v", f.Name(), err)
 			} else {
 				tdlog.Printf("Successfully opened collection %s", f.Name())
@@ -60,7 +60,7 @@ func OpenDB(baseDir string) (db *DB, err error) {
 }
 
 // Create a collection.
-func (db *DB) Create(name string, numChunks uint64) (err error) {
+func (db *DB) Create(name string, numChunks int) (err error) {
 	if _, nope := db.StrCol[name]; nope {
 		return errors.New(fmt.Sprintf("Collection %s already exists in %s", name, db.BaseDir))
 	}
@@ -83,9 +83,9 @@ func (db *DB) Use(name string) *Col {
 
 // Rename a collection.
 func (db *DB) Rename(oldName, newName string) (err error) {
-	var numChunks uint64
+	var numChunks int
 	if col, ok := db.StrCol[oldName]; ok {
-		numChunks = uint64(len(db.StrCol[oldName].Chunks))
+		numChunks = len(db.StrCol[oldName].Chunks)
 		col.Close()
 	} else {
 		return errors.New(fmt.Sprintf("Collection %s does not exists in %s", oldName, db.BaseDir))

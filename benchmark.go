@@ -38,13 +38,13 @@ func average(name string, total int, init func(), do func()) {
 
 // Benchmark document insert, read, query, update and delete.
 func benchmark(benchSize int) {
-	ids := make([]string, 0)
+	ids := make([]int, 0)
 
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := db.OpenCol(tmp, 16)
+	col, err := db.OpenCol(tmp, 32)
 	if err != nil {
 		panic(err)
 	}
@@ -68,7 +68,7 @@ func benchmark(benchSize int) {
 	// Collect all document IDs and benchmark document read
 	idsMutex := sync.Mutex{}
 	average("read", benchSize, func() {
-		col.ForAll(func(id string, _ map[string]interface{}) bool {
+		col.ForAll(func(id int, _ map[string]interface{}) bool {
 			idsMutex.Lock()
 			ids = append(ids, id)
 			idsMutex.Unlock()
