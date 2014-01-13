@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"time"
 )
 
 const (
@@ -110,6 +111,39 @@ func (db *DB) Drop(name string) (err error) {
 	} else {
 		return errors.New(fmt.Sprintf("Collection %s does not exists in %s", name, db.BaseDir))
 	}
+}
+
+// Compact and repair a collection.
+func (db *DB) Scrub(name string) (err error) {
+	target := db.Use(name)
+	if target == nil {
+		return errors.New(fmt.Sprintf("Collection %s does not exist in %s", name, db.BaseDir))
+	}
+	// Create a temporary collection
+	numChunks := target.NumChunks
+	tempName := fmt.Sprintf("temp-%s-%v", name, time.Now().Unix())
+	db.Create(tempName, numChunks)
+	temp := db.Use(tempName)
+	// Recreate secondary indexes
+	for _, index := range target.SecIndexes {
+		temp.Index(index[0].Path)
+	}
+	// Reinsert documents
+	target.ForAll(func(id int, doc map[string]interface{}) bool {
+		if err := temp.InsertRecovery(id, doc); err != nil {
+			tdlog.Errorf("Failed to recover document %v", doc)
+		}
+		return true
+	})
+	// Drop the old collection and rename the recovery collection
+	if err = db.Drop(name); err != nil {
+		tdlog.Errorf("Scrub operation failed to drop original collection %s: %v", name, err)
+		return
+	}
+	if err = db.Rename(tempName, name); err != nil {
+		tdlog.Errorf("Scrub operation failed to rename recovery collection %s: %v", tempName, err)
+	}
+	return
 }
 
 // Flush all collection data and index files.

@@ -207,8 +207,24 @@ func (col *Col) Insert(doc map[string]interface{}) (id int, err error) {
 	// Lock the chunk while inserting the document
 	lock := col.ChunkMutexes[num]
 	lock.Lock()
-	_, err = col.Chunks[num].Insert(doc)
+	if _, err = col.Chunks[num].Insert(doc); err != nil {
+		lock.Unlock()
+		return
+	}
 	col.indexDoc(uint64(id), doc)
+	lock.Unlock()
+	return
+}
+
+// Insert a document without allocating a new ID to it. Only for collection recovery operation.
+func (col *Col) InsertRecovery(knownID int, doc map[string]interface{}) (err error) {
+	doc[uid.PK_NAME] = strconv.Itoa(knownID)
+	num := knownID % col.NumChunks
+	// Lock the chunk while inserting the document
+	lock := col.ChunkMutexes[num]
+	lock.Lock()
+	_, err = col.Chunks[num].Insert(doc)
+	col.indexDoc(uint64(knownID), doc)
 	lock.Unlock()
 	return
 }
