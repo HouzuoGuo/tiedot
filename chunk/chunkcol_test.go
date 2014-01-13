@@ -30,7 +30,7 @@ func TestInsertRead(t *testing.T) {
 		return
 	}
 	defer col.Close()
-	docs := []string{`{"a": 1}`, `{"b": 2}`}
+	docs := []string{`{"_pk": "1", "a": 1}`, `{"_pk": "2", "b": 2}`}
 	var jsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
@@ -66,12 +66,12 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	}
 	defer col.Close()
 
-	docs := []string{`{"a": 1}`, `{"b": 2}`}
+	docs := []string{`{"_pk": "1", "a": 1}`, `{"_pk": "1", "b": 2}`}
 	var jsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
 
-	updatedDocs := []string{`{"a": 2}`, `{"b": "abcdefghijklmnopqrstuvwxyz"}`}
+	updatedDocs := []string{`{"_pk": "1", "a": 2}`, `{"_pk": "1", "b": "abcdefghijklmnopqrstuvwxyz"}`}
 	var updatedJsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(updatedDocs[0]), &updatedJsonDoc[0])
 	json.Unmarshal([]byte(updatedDocs[1]), &updatedJsonDoc[1])
@@ -100,7 +100,7 @@ func TestInsertUpdateReadAll(t *testing.T) {
 		t.Fatalf("Failed to read back document, got %v", doc2)
 	}
 	counter := 0
-	col.ForAll(func(_ string, _ map[string]interface{}) bool {
+	col.ForAll(func(_ int, _ map[string]interface{}) bool {
 		counter++
 		return true
 	})
@@ -124,10 +124,10 @@ func TestInsertDeserialize(t *testing.T) {
 	defer col.Close()
 
 	var docs [2]map[string]interface{}
-	if err = json.Unmarshal([]byte(`{"I": 0, "S": "a", "B": false}`), &docs[0]); err != nil {
+	if err = json.Unmarshal([]byte(`{"_pk": "1", "I": 0, "S": "a", "B": false}`), &docs[0]); err != nil {
 		panic(err)
 	}
-	if err = json.Unmarshal([]byte(`{"I": 1, "S": "b", "B": true}`), &docs[1]); err != nil {
+	if err = json.Unmarshal([]byte(`{"_pk": "1", "I": 1, "S": "b", "B": true}`), &docs[1]); err != nil {
 		panic(err)
 	}
 
@@ -166,7 +166,7 @@ func TestInsertDeleteRead(t *testing.T) {
 		return
 	}
 	defer col.Close()
-	docs := []string{`{"a": 1}`, `{"b": 2}`}
+	docs := []string{`{"_pk": "1", "a": 1}`, `{"_pk": "1", "b": 2}`}
 	var jsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
@@ -250,11 +250,11 @@ func TestIndexAndReopen(t *testing.T) {
 		return
 	}
 	docs := []string{
-		`{"_pk": 1, "a": {"b": {"c": 1}}, "d": 0}`,
-		`{"_pk": 2, "a": {"b": [{"c": 2}]}, "d": 0}`,
-		`{"_pk": 3, "a": [{"b": {"c": 3}}], "d": 0}`,
-		`{"_pk": 4, "a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`,
-		`{"_pk": 5, "a": {"b": {"c": null}}, "d": null}`}
+		`{"_pk": "1", "a": {"b": {"c": 1}}, "d": 0}`,
+		`{"_pk": "2", "a": {"b": [{"c": 2}]}, "d": 0}`,
+		`{"_pk": "3", "a": [{"b": {"c": 3}}], "d": 0}`,
+		`{"_pk": "4", "a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`,
+		`{"_pk": "5", "a": {"b": {"c": null}}, "d": null}`}
 	var jsonDoc [5]map[string]interface{}
 
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
@@ -266,7 +266,7 @@ func TestIndexAndReopen(t *testing.T) {
 	// Insert first document
 	ids[0], _ = col.Insert(jsonDoc[0])
 	// There should be one document on index - the first doc
-	if !IndexContainsAll(col.PK, map[uint64]uint64{StrHash(1): ids[0]}) {
+	if !IndexContainsAll(col.PK, map[uint64]uint64{1: ids[0]}) {
 		t.Fatal()
 	}
 	// Insert second and third document, replace third document by forth document
@@ -276,7 +276,7 @@ func TestIndexAndReopen(t *testing.T) {
 	// Then remove second document
 	col.Delete(ids[1])
 	// jsonDoc[0,3], ids[0, 3] are the ones left
-	if !IndexContainsAll(col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2]}) {
+	if !IndexContainsAll(col.PK, map[uint64]uint64{1: ids[0], 4: ids[2]}) {
 		t.Fatal()
 	}
 	// Reopen the collection and continue testing indexes
@@ -285,7 +285,7 @@ func TestIndexAndReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !IndexContainsAll(col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2]}) {
+	if !IndexContainsAll(col.PK, map[uint64]uint64{1: ids[0], 4: ids[2]}) {
 		t.Fatal()
 	}
 	// Insert a new document and try index
@@ -293,17 +293,17 @@ func TestIndexAndReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal("insert error")
 	}
-	if !IndexContainsAll(col.PK, map[uint64]uint64{StrHash(1): ids[0], StrHash(4): ids[2], StrHash(5): newID}) {
+	if !IndexContainsAll(col.PK, map[uint64]uint64{1: ids[0], 4: ids[2], 5: newID}) {
 		t.Fatal("Index failure")
 	}
 	// Try ID to physical ID conversion
-	if physID, err := col.GetPhysicalID("1"); physID != ids[0] || err != nil {
+	if physID, err := col.GetPhysicalID(1); physID != ids[0] || err != nil {
 		t.Fatal(err, physID, ids[0])
 	}
-	if physID, err := col.GetPhysicalID("4"); physID != ids[2] || err != nil {
+	if physID, err := col.GetPhysicalID(4); physID != ids[2] || err != nil {
 		t.Fatal(err, physID)
 	}
-	if physID, err := col.GetPhysicalID("5"); physID != newID || err != nil {
+	if physID, err := col.GetPhysicalID(5); physID != newID || err != nil {
 		t.Fatal(err, physID)
 	}
 	if err = col.Flush(); err != nil {

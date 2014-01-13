@@ -1,19 +1,35 @@
 package uid
 
 import (
-	"crypto/rand"
-	"encoding/hex"
+	"fmt"
+	"math/rand"
+	"strconv"
+)
+
+const (
+	PK_NAME = "_pk" // Name of UID (PK) attribute
 )
 
 // Generate and return a new UID (Unique IDentifier).
-func NextUID() string {
-	uid := make([]byte, 16)
-	// use Golang standard lib to get cryptographically secure pseudorandom numbers
-	// the generator is backed by /dev/urandom (as per Golang's implementation)
-	// be aware: this will be slow in Plan9 due to its lack of /dev/random
-	entropy, err := rand.Read(uid)
-	if err != nil || entropy != 16 {
-		panic("no enough entropy")
+func NextUID() int {
+	return rand.Int()
+}
+
+// Return value of the PK attribute in the document.
+func PKOfDoc(doc map[string]interface{}, panicOnErr bool) int {
+	docPK, ok := doc[PK_NAME].(string)
+	if !ok {
+		if panicOnErr {
+			panic(fmt.Sprintf("Doc %v does not have a valid PK", doc))
+		}
+		return -1
 	}
-	return hex.EncodeToString(uid)
+	strint, err := strconv.Atoi(docPK)
+	if err != nil {
+		if panicOnErr {
+			panic(fmt.Sprintf("Doc %v does not have a valid PK", doc))
+		}
+		return -1
+	}
+	return strint
 }

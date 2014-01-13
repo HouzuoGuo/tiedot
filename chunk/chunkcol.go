@@ -8,18 +8,19 @@ import (
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/chunkfile"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"github.com/HouzuoGuo/tiedot/uid"
 	"os"
 	"path"
+	"strconv"
 )
 
 const (
 	DAT_FILENAME_MAGIC = "_data" // Name of collection data file
 	PK_FILENAME_MAGIC  = "_pk"   // Name of PK (primary index) file
-	PK_NAME            = "_pk"   // Name of PK attribute
 )
 
 type ChunkCol struct {
-	Number  uint64               // Number of the chunk in collection
+	Number  int                  // Number of the chunk in collection
 	BaseDir string               // File system directory path of the chunk
 	Data    *chunkfile.ColFile   // Collection document data file
 	PK      *chunkfile.HashTable // PK hash table
@@ -35,7 +36,7 @@ func StrHash(thing interface{}) uint64 {
 }
 
 // Open a chunk.
-func OpenChunk(number uint64, baseDir string) (chunk *ChunkCol, err error) {
+func OpenChunk(number int, baseDir string) (chunk *ChunkCol, err error) {
 	// Create the directory if it does not yet exist
 	if err = os.MkdirAll(baseDir, 0700); err != nil {
 		return
@@ -49,7 +50,7 @@ func OpenChunk(number uint64, baseDir string) (chunk *ChunkCol, err error) {
 	}
 	// Open PK hash table
 	tdlog.Printf("Opening PK hash table file %s", PK_FILENAME_MAGIC)
-	if chunk.PK, err = chunkfile.OpenHash(path.Join(baseDir, PK_FILENAME_MAGIC), []string{PK_NAME}); err != nil {
+	if chunk.PK, err = chunkfile.OpenHash(path.Join(baseDir, PK_FILENAME_MAGIC), []string{uid.PK_NAME}); err != nil {
 		return
 	}
 	return
@@ -64,24 +65,27 @@ func (col *ChunkCol) Insert(doc map[string]interface{}) (id uint64, err error) {
 	if id, err = col.Data.Insert(data); err != nil {
 		return
 	}
-	col.PK.Put(StrHash(doc[PK_NAME]), id)
+	// Put string represented integer PK and the document ID on index
+	col.PK.Put(uint64(uid.PKOfDoc(doc, true)), id)
 	return
 }
 
 // Return the physical ID of document specified by primary key ID.
-func (col *ChunkCol) GetPhysicalID(id string) (physID uint64, err error) {
-	key := StrHash(id)
+func (col *ChunkCol) GetPhysicalID(id int) (physID uint64, err error) {
 	// This function is called so often that we better inline the hash table key scan.
-	var entry, bucket uint64 = 0, col.PK.HashKey(key)
+	var entry, bucket uint64 = 0, col.PK.HashKey(uint64(id))
 	for {
 		entryAddr := bucket*chunkfile.BUCKET_SIZE + chunkfile.BUCKET_HEADER_SIZE + entry*chunkfile.ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(col.PK.File.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Uvarint(col.PK.File.Buf[entryAddr+11 : entryAddr+21])
 		if col.PK.File.Buf[entryAddr] == chunkfile.ENTRY_VALID {
-			if entryKey == key {
+			if int(entryKey) == id {
 				var docMap map[string]interface{}
-				if col.Read(entryVal, &docMap) == nil && fmt.Sprint(docMap[PK_NAME]) == id {
-					return entryVal, nil
+				if col.Read(entryVal, &docMap) == nil {
+					strint, err := strconv.Atoi(docMap[uid.PK_NAME].(string))
+					if err == nil && strint == id {
+						return entryVal, nil
+					}
 				}
 			}
 		} else if entryKey == 0 && entryVal == 0 {
@@ -97,7 +101,7 @@ func (col *ChunkCol) GetPhysicalID(id string) (physID uint64, err error) {
 	return 0, errors.New(fmt.Sprintf("Cannot find physical ID of %s", id))
 }
 
-// Retrieve document by ID.
+// Retrieve document by physical ID.
 func (col *ChunkCol) Read(id uint64, doc interface{}) error {
 	data := col.Data.Read(id)
 	if data == nil {
@@ -111,7 +115,7 @@ func (col *ChunkCol) Read(id uint64, doc interface{}) error {
 	return nil
 }
 
-// Update a document, return its new ID.
+// Update a document by physical ID, return its new physical ID.
 func (col *ChunkCol) Update(id uint64, doc map[string]interface{}) (newID uint64, err error) {
 	data, err := json.Marshal(doc)
 	if err != nil {
@@ -126,7 +130,7 @@ func (col *ChunkCol) Update(id uint64, doc map[string]interface{}) (newID uint64
 	// Remove the original document from indexes
 	var oldDoc map[string]interface{}
 	if err = json.Unmarshal(oldData, &oldDoc); err == nil {
-		col.PK.Remove(StrHash(oldDoc[PK_NAME]), id)
+		col.PK.Remove(uint64(uid.PKOfDoc(oldDoc, false)), id)
 	} else {
 		tdlog.Errorf("ERROR: The original document %d in %s is corrupted, this update will attempt to overwrite it", id, col.BaseDir)
 	}
@@ -135,11 +139,11 @@ func (col *ChunkCol) Update(id uint64, doc map[string]interface{}) (newID uint64
 		return
 	}
 	// Index updated document
-	col.PK.Put(StrHash(doc[PK_NAME]), newID)
+	col.PK.Put(uint64(uid.PKOfDoc(doc, true)), newID)
 	return
 }
 
-// Delete a document by ID.
+// Delete a document by physical ID.
 func (col *ChunkCol) Delete(id uint64) {
 	var oldDoc map[string]interface{}
 	err := col.Read(id, &oldDoc)
@@ -147,25 +151,30 @@ func (col *ChunkCol) Delete(id uint64) {
 		return
 	}
 	col.Data.Delete(id)
-	col.PK.Remove(StrHash(oldDoc[PK_NAME]), id)
+	col.PK.Remove(uint64(uid.PKOfDoc(oldDoc, false)), id)
 }
 
 // Deserialize each document and invoke the function on the deserialized document (Collection Scan).
-func (col *ChunkCol) ForAll(fun func(id string, doc map[string]interface{}) bool) {
+func (col *ChunkCol) ForAll(fun func(id int, doc map[string]interface{}) bool) {
 	col.Data.ForAll(func(id uint64, data []byte) bool {
 		var parsed map[string]interface{}
 		if err := json.Unmarshal(data, &parsed); err != nil || parsed == nil {
 			tdlog.Errorf("Cannot parse document %d in %s to JSON", id, col.BaseDir)
 			return true
 		} else {
-			return fun(fmt.Sprint(parsed[PK_NAME]), parsed)
+			persistID := uid.PKOfDoc(parsed, false)
+			// Skip documents without valid PK
+			if persistID < 0 {
+				return true
+			}
+			return fun(persistID, parsed)
 		}
 	})
 }
 
 // Deserialize each document into template (pointer to an initialized struct), invoke the function on the deserialized document (Collection Scan).
 func (col *ChunkCol) DeserializeAll(template interface{}, fun func() bool) {
-	col.Data.ForAll(func(id uint64, data []byte) bool {
+	col.Data.ForAll(func(_ uint64, data []byte) bool {
 		if err := json.Unmarshal(data, template); err != nil {
 			return true
 		} else {
