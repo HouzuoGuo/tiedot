@@ -86,17 +86,17 @@ func benchmark(benchSize int) {
 	})
 
 	// Benchmark lookup query (two attributes)
-	//	average("lookup", benchSize, func() {}, func() {
-	//		var query interface{}
-	//		if err := json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a", "b", "c"], "limit": 1}, `+
-	//			`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
-	//			panic("json error")
-	//		}
-	//		result := make(map[uint64]struct{})
-	//		if err := db.EvalQuery(query, col, &result); err != nil {
-	//			panic("query error")
-	//		}
-	//	})
+	average("lookup", benchSize, func() {}, func() {
+		var query interface{}
+		if err := json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a", "b", "c"], "limit": 1}, `+
+			`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
+			panic("json error")
+		}
+		result := make(map[int]struct{})
+		if err := db.EvalQuery(query, col, &result); err != nil {
+			panic("query error")
+		}
+	})
 
 	// Benchmark document update
 	average("update", benchSize, func() {}, func() {
