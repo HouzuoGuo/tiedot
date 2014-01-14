@@ -89,12 +89,12 @@ func (col *ChunkCol) GetPhysicalID(id int) (physID uint64, err error) {
 				}
 			}
 		} else if entryKey == 0 && entryVal == 0 {
-			return 0, errors.New(fmt.Sprintf("Cannot find physical ID of %s", id))
+			return 0, errors.New(fmt.Sprintf("Cannot find physical ID of %d", id))
 		}
 		if entry++; entry == chunkfile.PER_BUCKET {
 			entry = 0
 			if bucket = col.PK.NextBucket(bucket); bucket == 0 {
-				return 0, errors.New(fmt.Sprintf("Cannot find physical ID of %s", id))
+				return 0, errors.New(fmt.Sprintf("Cannot find physical ID of %d", id))
 			}
 		}
 	}
