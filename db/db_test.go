@@ -148,7 +148,7 @@ func TestScrub(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Confirm that 6528 documents are successfully recovered in four ways
+	// Confirm that 6212 documents are successfully recovered in four ways
 	counter := 0
 	// first - deserialization & scan
 	var recoveredDoc interface{}
