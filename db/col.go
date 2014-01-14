@@ -283,12 +283,10 @@ func (col *Col) Update(id int, newDoc map[string]interface{}) (err error) {
 	var oldDoc interface{}
 	physID, err := col.ReadNoLock(id, &oldDoc)
 	if err != nil {
-		tdlog.Errorf("Original document %d cannot be readback, will try GetPhysicalID", id)
 		physID, err = dest.GetPhysicalID(id)
 		if err != nil {
-			tdlog.Errorf("Failed to update %s, cannot find its physical ID", id)
 			lock.Unlock()
-			return err
+			return errors.New(fmt.Sprintf("Failed to update %d, cannot find its physical ID", id))
 		}
 	}
 	// Remove the original document from secondary indexes, and put new values into them

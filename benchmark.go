@@ -9,7 +9,6 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -185,7 +184,7 @@ func benchmark2(benchSize int) {
 			defer wp.Done()
 			var doc interface{}
 			for j := 0; j < benchSize/numThreads*2; j++ {
-				col.Read(docs[uint64(rand.Intn(len(docs)))], &doc)
+				col.Read(docs[rand.Intn(len(docs))], &doc)
 			}
 			fmt.Printf("Read thread %d completed\n", i)
 		}(i)
@@ -226,12 +225,7 @@ func benchmark2(benchSize int) {
 						`"more": "abcdefghijklmnopqrstuvwxyz"}`), &updated); err != nil {
 					panic(err)
 				}
-				if err = col.Update(docs[uint64(rand.Intn(len(docs)))], updated); err != nil {
-					// "does not exist" indicates that a deleted document is being updated, it is safe to ignore
-					if !strings.Contains(fmt.Sprint(err), "does not exist") {
-						fmt.Println(err)
-					}
-				}
+				col.Update(docs[uint64(rand.Intn(len(docs)))], updated)
 			}
 			fmt.Printf("Update thread %d completed\n", i)
 		}(i)
@@ -243,7 +237,7 @@ func benchmark2(benchSize int) {
 			fmt.Printf("Delete thread %d starting\n", i)
 			defer wp.Done()
 			for j := 0; j < benchSize/numThreads; j++ {
-				col.Delete(docs[uint64(rand.Intn(len(docs)))])
+				col.Delete(docs[rand.Intn(len(docs))])
 			}
 			fmt.Printf("Delete thread %d completed\n", i)
 		}(i)
