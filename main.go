@@ -66,11 +66,11 @@ func main() {
 			tdlog.Fatal("Please specify port number, for example -port=8080")
 		}
 	case "example": // Run embedded usage examples
+		embeddedExample()
 	case "bench": // Benchmark scenarios
 		benchmark(benchSize)
 	case "bench2":
 		benchmark2(benchSize)
-	case "bench3":
 	default:
 		flag.PrintDefaults()
 		return

@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -121,5 +122,135 @@ func benchmark(benchSize int) {
 
 // Run document opearations (insert, read, query, update and delete) all at once.
 func benchmark2(benchSize int) {
+	docs := make([]int, 0, benchSize*2+1000)
+	wp := new(sync.WaitGroup)
+	numThreads := runtime.GOMAXPROCS(-1)
+	wp.Add(5 * numThreads) // There are 5 goroutines: insert, read, query, update and delete
 
+	// Prepare a collection with two indexes
+	tmp := "/tmp/tiedot_bench"
+	os.RemoveAll(tmp)
+	col, err := db.OpenCol(tmp, 32)
+	if err != nil {
+		panic(err)
+	}
+	col.Index([]string{"a", "b", "c"})
+	col.Index([]string{"c", "d"})
+
+	// Insert 1000 documents to make a start
+	var docToInsert map[string]interface{}
+	for j := 0; j < 1000; j++ {
+		if err = json.Unmarshal([]byte(
+			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(benchSize))+`}},`+
+				`"c": {"d": `+strconv.Itoa(rand.Intn(benchSize))+`},`+
+				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &docToInsert); err != nil {
+			panic(err)
+		}
+		if newID, err := col.Insert(docToInsert); err == nil {
+			docs = append(docs, newID)
+		} else {
+			panic(err)
+		}
+	}
+	start := float64(time.Now().UTC().UnixNano())
+
+	// Insert benchSize * 2 documents
+	for i := 0; i < numThreads; i++ {
+		go func(i int) {
+			fmt.Printf("Insert thread %d starting\n", i)
+			defer wp.Done()
+			var docToInsert map[string]interface{}
+			var err error
+			for j := 0; j < benchSize/numThreads*2; j++ {
+				if err = json.Unmarshal([]byte(
+					`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(benchSize))+`}},`+
+						`"c": {"d": `+strconv.Itoa(rand.Intn(benchSize))+`},`+
+						`"more": "abcdefghijklmnopqrstuvwxyz"}`), &docToInsert); err != nil {
+					panic(err)
+				}
+				if newID, err := col.Insert(docToInsert); err == nil {
+					docs = append(docs, newID)
+				} else {
+					panic(err)
+				}
+			}
+			fmt.Printf("Insert thread %d completed\n", i)
+		}(i)
+	}
+
+	// Read benchSize * 2 documents
+	for i := 0; i < numThreads; i++ {
+		go func(i int) {
+			fmt.Printf("Read thread %d starting\n", i)
+			defer wp.Done()
+			var doc interface{}
+			for j := 0; j < benchSize/numThreads*2; j++ {
+				col.Read(docs[uint64(rand.Intn(len(docs)))], &doc)
+			}
+			fmt.Printf("Read thread %d completed\n", i)
+		}(i)
+	}
+
+	// Query benchSize times (lookup on two attributes)
+	for i := 0; i < numThreads; i++ {
+		go func(i int) {
+			fmt.Printf("Query thread %d starting\n", i)
+			defer wp.Done()
+			var query interface{}
+			var err error
+			for j := 0; j < benchSize/numThreads; j++ {
+				if err = json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a", "b", "c"], "limit": 1}, `+
+					`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
+					panic("json error")
+				}
+				result := make(map[int]struct{})
+				if err = db.EvalQuery(query, col, &result); err != nil {
+					panic("query error")
+				}
+			}
+			fmt.Printf("Query thread %d completed\n", i)
+		}(i)
+	}
+
+	// Update benchSize documents
+	for i := 0; i < numThreads; i++ {
+		go func(i int) {
+			fmt.Printf("Update thread %d starting\n", i)
+			defer wp.Done()
+			var updated map[string]interface{}
+			var err error
+			for j := 0; j < benchSize/numThreads; j++ {
+				if err = json.Unmarshal([]byte(
+					`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(benchSize))+`}},`+
+						`"c": {"d": `+strconv.Itoa(rand.Intn(benchSize))+`},`+
+						`"more": "abcdefghijklmnopqrstuvwxyz"}`), &updated); err != nil {
+					panic(err)
+				}
+				if err = col.Update(docs[uint64(rand.Intn(len(docs)))], updated); err != nil {
+					// "does not exist" indicates that a deleted document is being updated, it is safe to ignore
+					if !strings.Contains(fmt.Sprint(err), "does not exist") {
+						fmt.Println(err)
+					}
+				}
+			}
+			fmt.Printf("Update thread %d completed\n", i)
+		}(i)
+	}
+
+	// Delete benchSize documents
+	for i := 0; i < numThreads; i++ {
+		go func(i int) {
+			fmt.Printf("Delete thread %d starting\n", i)
+			defer wp.Done()
+			for j := 0; j < benchSize/numThreads; j++ {
+				col.Delete(docs[uint64(rand.Intn(len(docs)))])
+			}
+			fmt.Printf("Delete thread %d completed\n", i)
+		}(i)
+	}
+
+	// Wait for all goroutines to finish, then print summary
+	wp.Wait()
+	end := float64(time.Now().UTC().UnixNano())
+	fmt.Printf("Total operations %d: %d ns/iter, %d iter/sec\n", benchSize*7, int((end-start)/float64(benchSize)/7), int(1000000000/((end-start)/float64(benchSize)/7)))
 }
