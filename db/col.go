@@ -259,14 +259,14 @@ func (col *Col) ReadNoLock(id int, doc interface{}) (physID uint64, err error) {
 	return
 }
 
-func (col *Col) HashScan(htPath string, key, limit uint64, filter func(uint64, uint64) bool) (keys, vals []uint64) {
+func (col *Col) HashScan(htPath string, key, limit uint64) (keys, vals []uint64) {
 	num := key % col.NumChunksI64
 	theIndex, exist := col.SecIndexes[htPath]
 	if !exist {
 		panic(fmt.Sprintf("Index %s does not exist", htPath))
 	}
 	theIndex[num].Mutex.RLock()
-	keys, vals = theIndex[num].Get(key, limit, filter)
+	keys, vals = theIndex[num].Get(key, limit)
 	theIndex[num].Mutex.RUnlock()
 	return
 }

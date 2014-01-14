@@ -143,7 +143,7 @@ func (ht *HashTable) Put(key, val uint64) {
 }
 
 // Get key-value pairs.
-func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (keys, vals []uint64) {
+func (ht *HashTable) Get(key, limit uint64) (keys, vals []uint64) {
 	// This function is partially inlined in chunkcol.go
 	var count, entry, bucket uint64 = 0, 0, ht.HashKey(key)
 	if limit == 0 {
@@ -158,7 +158,7 @@ func (ht *HashTable) Get(key, limit uint64, filter func(uint64, uint64) bool) (k
 		entryKey, _ := binary.Uvarint(ht.File.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Uvarint(ht.File.Buf[entryAddr+11 : entryAddr+21])
 		if ht.File.Buf[entryAddr] == ENTRY_VALID {
-			if entryKey == key && filter(entryKey, entryVal) {
+			if entryKey == key {
 				keys = append(keys, entryKey)
 				vals = append(vals, entryVal)
 				if count++; count == limit {

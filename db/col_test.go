@@ -164,9 +164,7 @@ func SecIndexContainsAll(path string, col *Col, expectedKV map[uint64][]int) boo
 	// expectedKV is a mapping between expected Hash Value VS PK values
 	for k, ids := range expectedKV {
 		fmt.Printf("Looking for key %v, id %v\n", k, ids)
-		keys, vals := col.HashScan(path, k, 0, func(_, _ uint64) bool {
-			return true
-		})
+		keys, vals := col.HashScan(path, k, 0)
 		if len(keys) == 0 || len(vals) == 0 {
 			fmt.Printf("Hash table does not have the key\n")
 			return false
