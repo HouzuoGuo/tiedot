@@ -368,7 +368,6 @@ func (col *Col) Flush() error {
 			}
 		}
 	}
-	tdlog.Printf("Collection %s has all buffers flushed", col.BaseDir)
 	return nil
 }
 

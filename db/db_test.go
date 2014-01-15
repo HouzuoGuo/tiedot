@@ -186,7 +186,7 @@ func TestScrub(t *testing.T) {
 	}
 }
 
-func TestRescale(t *testing.T) {
+func TestRepartition(t *testing.T) {
 	tmp := "/tmp/tiedot_db_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
@@ -243,7 +243,7 @@ func TestRescale(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	recoveredNum, err := reopen.Rescale("a", 2)
+	recoveredNum, err := reopen.Repartition("a", 2)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -67,7 +67,7 @@ func TestQuery(t *testing.T) {
 	col.Index([]string{"special"})
 	col.Index([]string{"e"})
 	// expand numbers
-	q, err := runQuery(`[1, 2, [3, 4], 5]`, col)
+	q, err := runQuery(`["1", "2", ["3", "4"], "5"]`, col)
 	if err != nil {
 		t.Fatal(err)
 	}

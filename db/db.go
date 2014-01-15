@@ -62,6 +62,9 @@ func OpenDB(baseDir string) (db *DB, err error) {
 
 // Create a collection.
 func (db *DB) Create(name string, numChunks int) (err error) {
+	if numChunks < 1 {
+		return errors.New(fmt.Sprintf("Number of of partitions must be above 0 - failed to open %s", numChunks, name))
+	}
 	if _, nope := db.StrCol[name]; nope {
 		return errors.New(fmt.Sprintf("Collection %s already exists in %s", name, db.BaseDir))
 	}
@@ -149,7 +152,7 @@ func (db *DB) Scrub(name string) (counter uint64, err error) {
 }
 
 // Change the number of partitions in collection
-func (db *DB) Rescale(name string, newNumber int) (counter uint64, err error) {
+func (db *DB) Repartition(name string, newNumber int) (counter uint64, err error) {
 	target := db.Use(name)
 	if target == nil {
 		return 0, errors.New(fmt.Sprintf("Collection %s does not exist in %s", name, db.BaseDir))

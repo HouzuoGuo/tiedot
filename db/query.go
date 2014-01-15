@@ -325,15 +325,18 @@ func RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *Co
 // Main entrance to query processor - evaluate a query and put result into result map (as map keys).
 func EvalQuery(q interface{}, src *Col, result *map[int]struct{}) (err error) {
 	switch expr := q.(type) {
-	case float64: // Single document number
-		(*result)[int(expr)] = struct{}{}
 	case []interface{}: // [sub query 1, sub query 2, etc]
 		return EvalUnion(expr, src, result)
 	case string:
 		if expr == "all" { // Put all IDs into result
 			return EvalAllIDs(src, result)
 		} else {
-			return errors.New(fmt.Sprintf("Do not know what %v means, did you mean 'all' (getting all document IDs)?", expr))
+			// Might be single document number
+			docID, err := strconv.Atoi(expr)
+			if err != nil {
+				return errors.New(fmt.Sprintf("%s is not a document PK ID", expr))
+			}
+			(*result)[docID] = struct{}{}
 		}
 	case map[string]interface{}:
 		if lookupValue, lookup := expr["eq"]; lookup { // eq - lookup

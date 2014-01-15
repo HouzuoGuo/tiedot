@@ -3,6 +3,8 @@ package main
 
 import (
 	"flag"
+	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/srv/v3"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"log"
 	"math/rand"
@@ -26,9 +28,9 @@ func main() {
 	var mode, dir string
 	var port, maxprocs, benchSize int
 	var profile bool
-	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|bench3|example]")
+	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|example]")
 	flag.StringVar(&dir, "dir", "", "database directory")
-	flag.IntVar(&port, "port", 0, "listening port number")
+	flag.IntVar(&port, "port", 8080, "listening port number")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
 	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
 	flag.BoolVar(&profile, "profile", false, "write profiler results to prof.out")
@@ -44,7 +46,7 @@ func main() {
 	runtime.GOMAXPROCS(maxprocs)
 	log.Printf("GOMAXPROCS is set to %d", maxprocs)
 	if maxprocs < runtime.NumCPU() {
-		log.Printf("GOMAXPROCS (%d) is less than number of CPUs (%d), this may affect performance. You can change it via environment variable GOMAXPROCS or by passing CLI parameter -gomaxprocs", maxprocs, runtime.NumCPU())
+		tdlog.Printf("GOMAXPROCS (%d) is less than number of CPUs (%d), this may affect performance. You can change it via environment variable GOMAXPROCS or by passing CLI parameter -gomaxprocs", maxprocs, runtime.NumCPU())
 	}
 
 	// Start profiler if enabled
@@ -65,6 +67,11 @@ func main() {
 		if port == 0 {
 			tdlog.Fatal("Please specify port number, for example -port=8080")
 		}
+		db, err := db.OpenDB(dir)
+		if err != nil {
+			tdlog.Fatal(err)
+		}
+		v3.Start(db, port)
 	case "example": // Run embedded usage examples
 		embeddedExample()
 	case "bench": // Benchmark scenarios
