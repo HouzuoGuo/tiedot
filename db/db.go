@@ -88,15 +88,16 @@ func (db *DB) Use(name string) *Col {
 // Rename a collection.
 func (db *DB) Rename(oldName, newName string) (err error) {
 	var numChunks int
-	if col, ok := db.StrCol[oldName]; ok {
+	col, ok := db.StrCol[oldName]
+	if ok {
 		numChunks = len(db.StrCol[oldName].Chunks)
-		col.Close()
 	} else {
 		return errors.New(fmt.Sprintf("Collection %s does not exists in %s", oldName, db.BaseDir))
 	}
 	if _, nope := db.StrCol[newName]; nope {
 		return errors.New(fmt.Sprintf("Collection name %s is already used in %s", newName, db.BaseDir))
 	}
+	col.Close()
 	delete(db.StrCol, oldName)
 	if err = os.Rename(path.Join(db.BaseDir, oldName), path.Join(db.BaseDir, newName)); err != nil {
 		return
