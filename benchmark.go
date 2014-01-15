@@ -44,7 +44,7 @@ func benchmark(benchSize int) {
 	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := db.OpenCol(tmp, 32)
+	col, err := db.OpenCol(tmp, 16)
 	if err != nil {
 		panic(err)
 	}
@@ -129,7 +129,7 @@ func benchmark2(benchSize int) {
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
-	col, err := db.OpenCol(tmp, 32)
+	col, err := db.OpenCol(tmp, 16)
 	if err != nil {
 		panic(err)
 	}
