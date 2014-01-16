@@ -56,7 +56,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	docID, err := strconv.Atoi(id)
+	docID, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
@@ -95,7 +95,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	docID, err := strconv.Atoi(id)
+	docID, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
@@ -129,7 +129,7 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	docID, err := strconv.Atoi(id)
+	docID, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return

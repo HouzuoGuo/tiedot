@@ -113,7 +113,7 @@ func embeddedExample() {
 	var query interface{}
 	json.Unmarshal([]byte(queryStr), &query)
 
-	queryResult := make(map[int]struct{}) // query result (document IDs) goes into map keys
+	queryResult := make(map[uint64]struct{}) // query result (document IDs) goes into map keys
 
 	if err := db.EvalQuery(query, feeds, &queryResult); err != nil {
 		panic(err)

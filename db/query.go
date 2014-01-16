@@ -13,7 +13,7 @@ import (
 )
 
 // Calculate union of sub-query results.
-func EvalUnion(exprs []interface{}, src *Col, result *map[int]struct{}) (err error) {
+func EvalUnion(exprs []interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	for _, subExpr := range exprs {
 		// Evaluate all sub-queries - they will put their result into the result map
 		if err = EvalQuery(subExpr, src, result); err != nil {
@@ -24,8 +24,8 @@ func EvalUnion(exprs []interface{}, src *Col, result *map[int]struct{}) (err err
 }
 
 // Put all document IDs into result.
-func EvalAllIDs(src *Col, result *map[int]struct{}) (err error) {
-	collectIDs := func(id int, _ map[string]interface{}) bool {
+func EvalAllIDs(src *Col, result *map[uint64]struct{}) (err error) {
+	collectIDs := func(id uint64, _ map[string]interface{}) bool {
 		(*result)[id] = struct{}{}
 		return true
 	}
@@ -34,7 +34,7 @@ func EvalAllIDs(src *Col, result *map[int]struct{}) (err error) {
 }
 
 // Execute value equity check ("attribute == value") using hash lookup or collection scan.
-func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, result *map[int]struct{}) (err error) {
+func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	// Figure out lookup path - JSON array "in"
 	path, hasPath := expr["in"]
 	if !hasPath {
@@ -64,7 +64,7 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 	// Is it PK index?
 	if path == uid.PK_NAME {
 		// Convert lookup string value (which is the Persistent ID) to integer and put it into result
-		strint, err := strconv.Atoi(lookupStrValue)
+		strint, err := strconv.ParseUint(lookupStrValue, 10, 64)
 		if err != nil {
 			return err
 		}
@@ -74,13 +74,13 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 
 	// It might be a secondary index
 	if secIndex, ok := src.SecIndexes[scanPath]; ok {
-		num := lookupValueHash % uint64(src.NumChunks)
+		num := lookupValueHash % src.NumChunksI64
 		ht := secIndex[num]
 		ht.Mutex.RLock()
 		_, vals := ht.Get(lookupValueHash, intLimit)
 		ht.Mutex.RUnlock()
 		for _, v := range vals {
-			(*result)[int(v)] = struct{}{}
+			(*result)[v] = struct{}{}
 		}
 		return
 	}
@@ -89,7 +89,7 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 }
 
 // Execute value existence check.
-func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, result *map[int]struct{}) (err error) {
+func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	// Figure out the path
 	vecPath := make([]string, 0)
 	if vecPathInterface, ok := hasPath.([]interface{}); ok {
@@ -117,7 +117,7 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 		for _, ht := range secIndex {
 			_, vals := ht.GetAll(uint64(intLimit - counter))
 			for _, v := range vals {
-				(*result)[int(v)] = struct{}{}
+				(*result)[v] = struct{}{}
 				counter++
 				if counter == intLimit {
 					return nil
@@ -131,12 +131,12 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 }
 
 // Calculate intersection of sub query results.
-func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err error) {
+func Intersect(subExprs interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		first := true
 		for _, subExpr := range subExprVecs {
-			subResult := make(map[int]struct{})
-			intersection := make(map[int]struct{})
+			subResult := make(map[uint64]struct{})
+			intersection := make(map[uint64]struct{})
 			if err = EvalQuery(subExpr, src, &subResult); err != nil {
 				return
 			}
@@ -159,11 +159,11 @@ func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err er
 }
 
 // Calculate complement of sub query results.
-func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err error) {
+func Complement(subExprs interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		for _, subExpr := range subExprVecs {
-			subResult := make(map[int]struct{})
-			complement := make(map[int]struct{})
+			subResult := make(map[uint64]struct{})
+			complement := make(map[uint64]struct{})
 			if err = EvalQuery(subExpr, src, &subResult); err != nil {
 				return
 			}
@@ -186,7 +186,7 @@ func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err e
 }
 
 // Scan hash table or collection documents using an integer range.
-func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result *map[int]struct{}) (err error) {
+func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	path, hasPath := expr["in"]
 	if !hasPath {
 		return errors.New("Missing path `in`")
@@ -252,7 +252,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 						break
 					}
 					counter += 1
-					(*result)[int(docID)] = struct{}{}
+					(*result)[docID] = struct{}{}
 				}
 			}
 		} else {
@@ -266,7 +266,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 						break
 					}
 					counter += 1
-					(*result)[int(docID)] = struct{}{}
+					(*result)[docID] = struct{}{}
 				}
 			}
 		}
@@ -277,7 +277,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 }
 
 // Execute value match regexp using hash lookup or collection scan.
-func RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *Col, result *map[int]struct{}) (err error) {
+func RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	// Figure out lookup path - JSON array "in"
 	path, hasPath := expr["in"]
 	if !hasPath {
@@ -304,7 +304,7 @@ func RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *Co
 	validRegexp := regexp.MustCompile(regexpStrValue)
 	// Do collection scan
 	counter := uint64(0)
-	docMatcher := func(id int, doc map[string]interface{}) bool {
+	docMatcher := func(id uint64, doc map[string]interface{}) bool {
 		// Get inside the document and find value match
 		for _, v := range GetIn(doc, vecPath) {
 			if validRegexp.MatchString(fmt.Sprint(v)) {
@@ -323,7 +323,7 @@ func RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *Co
 }
 
 // Main entrance to query processor - evaluate a query and put result into result map (as map keys).
-func EvalQuery(q interface{}, src *Col, result *map[int]struct{}) (err error) {
+func EvalQuery(q interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	switch expr := q.(type) {
 	case []interface{}: // [sub query 1, sub query 2, etc]
 		return EvalUnion(expr, src, result)
@@ -332,7 +332,7 @@ func EvalQuery(q interface{}, src *Col, result *map[int]struct{}) (err error) {
 			return EvalAllIDs(src, result)
 		} else {
 			// Might be single document number
-			docID, err := strconv.Atoi(expr)
+			docID, err := strconv.ParseUint(expr, 10, 64)
 			if err != nil {
 				return errors.New(fmt.Sprintf("%s is not a document PK ID", expr))
 			}

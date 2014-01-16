@@ -71,18 +71,18 @@ func (col *ChunkCol) Insert(doc map[string]interface{}) (id uint64, err error) {
 }
 
 // Return the physical ID of document specified by primary key ID.
-func (col *ChunkCol) GetPhysicalID(id int) (physID uint64, err error) {
+func (col *ChunkCol) GetPhysicalID(id uint64) (physID uint64, err error) {
 	// This function is called so often that we better inline the hash table key scan.
-	var entry, bucket uint64 = 0, col.PK.HashKey(uint64(id))
+	var entry, bucket uint64 = 0, col.PK.HashKey(id)
 	for {
 		entryAddr := bucket*chunkfile.BUCKET_SIZE + chunkfile.BUCKET_HEADER_SIZE + entry*chunkfile.ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(col.PK.File.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Uvarint(col.PK.File.Buf[entryAddr+11 : entryAddr+21])
 		if col.PK.File.Buf[entryAddr] == chunkfile.ENTRY_VALID {
-			if int(entryKey) == id {
+			if entryKey == id {
 				var docMap map[string]interface{}
 				if col.Read(entryVal, &docMap) == nil {
-					strint, err := strconv.Atoi(docMap[uid.PK_NAME].(string))
+					strint, err := strconv.ParseUint(docMap[uid.PK_NAME].(string), 10, 64)
 					if err == nil && strint == id {
 						return entryVal, nil
 					}
@@ -155,7 +155,7 @@ func (col *ChunkCol) Delete(id uint64) {
 }
 
 // Deserialize each document and invoke the function on the deserialized document (Collection Scan).
-func (col *ChunkCol) ForAll(fun func(id int, doc map[string]interface{}) bool) {
+func (col *ChunkCol) ForAll(fun func(id uint64, doc map[string]interface{}) bool) {
 	col.Data.ForAll(func(id uint64, data []byte) bool {
 		var parsed map[string]interface{}
 		if err := json.Unmarshal(data, &parsed); err != nil || parsed == nil {

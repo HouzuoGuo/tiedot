@@ -9,20 +9,20 @@ import (
 	"testing"
 )
 
-func ensureMapHasKeys(m map[int]struct{}, keys ...int) bool {
+func ensureMapHasKeys(m map[uint64]struct{}, keys ...uint64) bool {
 	if len(m) != len(keys) {
 		return false
 	}
 	for _, v := range keys {
-		if _, ok := m[int(v)]; !ok {
+		if _, ok := m[v]; !ok {
 			return false
 		}
 	}
 	return true
 }
 
-func runQuery(query string, col *Col) (map[int]struct{}, error) {
-	result := make(map[int]struct{})
+func runQuery(query string, col *Col) (map[uint64]struct{}, error) {
+	result := make(map[uint64]struct{})
 	var jq interface{}
 	if err := json.Unmarshal([]byte(query), &jq); err != nil {
 		fmt.Println(err)
@@ -52,7 +52,7 @@ func TestQuery(t *testing.T) {
 		`{"a": {"b": 3}, "c": [3], "d": 2, "f": 4, "g": 4, ` + PaddingAttr(chunkfile.DOC_MAX_ROOM/3) + `}`,
 		`{"a": {"b": [4]}, "c": 4, "d": 1, "f": 5, "g": 5, ` + PaddingAttr(chunkfile.DOC_MAX_ROOM/3) + `}`,
 		`{"a": [{"b": 5}, {"b": 6}], "c": 4, "d": 1, "f": 5, "g": 5, "h": 2, ` + PaddingAttr(chunkfile.DOC_MAX_ROOM/3) + `}`}
-	ids := [6]int{}
+	ids := [6]uint64{}
 	for i, doc := range docs {
 		var jsonDoc map[string]interface{}
 		json.Unmarshal([]byte(doc), &jsonDoc)
@@ -211,8 +211,7 @@ func TestQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ensureMapHasKeys(q, ids[1], ids[2]) && !ensureMapHasKeys(q, ids[2], ids[3]) && !ensureMapHasKeys(q, ids[0], ids[2]) {
-		fmt.Printf("%+v\n", q)
+	if !ensureMapHasKeys(q, ids[1], ids[2]) && !ensureMapHasKeys(q, ids[2], ids[3]) && !ensureMapHasKeys(q, ids[1], ids[3]) {
 		t.Fatal(q)
 	}
 	// all documents

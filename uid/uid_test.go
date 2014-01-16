@@ -20,11 +20,11 @@ func TestGetPKOfDoc(t *testing.T) {
 	json.Unmarshal([]byte(`{"_pk": "a"}`), &doc2)
 	json.Unmarshal([]byte(`{"_pk": "1"}`), &doc3)
 
-	if PKOfDoc(doc1, false) != -1 {
+	if PKOfDoc(doc1, false) != 18446744073709551615 {
 		t.Fatal(doc1)
 	}
 
-	if PKOfDoc(doc2, false) != -1 {
+	if PKOfDoc(doc2, false) != 18446744073709551615 {
 		t.Fatal(doc2)
 	}
 

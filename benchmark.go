@@ -38,7 +38,7 @@ func average(name string, total int, init func(), do func()) {
 
 // Benchmark document insert, read, query, update and delete.
 func benchmark(benchSize int) {
-	ids := make([]int, 0)
+	ids := make([]uint64, 0)
 
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_bench"
@@ -68,7 +68,7 @@ func benchmark(benchSize int) {
 	// Collect all document IDs and benchmark document read
 	idsMutex := sync.Mutex{}
 	average("read", benchSize, func() {
-		col.ForAll(func(id int, _ map[string]interface{}) bool {
+		col.ForAll(func(id uint64, _ map[string]interface{}) bool {
 			idsMutex.Lock()
 			ids = append(ids, id)
 			idsMutex.Unlock()
@@ -92,7 +92,7 @@ func benchmark(benchSize int) {
 			`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
 			panic("json error")
 		}
-		result := make(map[int]struct{})
+		result := make(map[uint64]struct{})
 		if err := db.EvalQuery(query, col, &result); err != nil {
 			panic("query error")
 		}
@@ -121,7 +121,7 @@ func benchmark(benchSize int) {
 
 // Run document opearations (insert, read, query, update and delete) all at once.
 func benchmark2(benchSize int) {
-	docs := make([]int, 0, benchSize*2+1000)
+	docs := make([]uint64, 0, benchSize*2+1000)
 	wp := new(sync.WaitGroup)
 	numThreads := runtime.GOMAXPROCS(-1)
 	wp.Add(5 * numThreads) // There are 5 goroutines: insert, read, query, update and delete
@@ -202,7 +202,7 @@ func benchmark2(benchSize int) {
 					`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
 					panic("json error")
 				}
-				result := make(map[int]struct{})
+				result := make(map[uint64]struct{})
 				if err = db.EvalQuery(query, col, &result); err != nil {
 					panic("query error")
 				}

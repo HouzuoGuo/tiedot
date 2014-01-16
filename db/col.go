@@ -132,13 +132,13 @@ func (col *Col) Index(indexPath []string) error {
 	col.openIndex(indexPath, indexBaseDir)
 	// Put all documents on the new index
 	newIndex := col.SecIndexes[jointPath]
-	col.ForAll(func(id int, doc map[string]interface{}) bool {
+	col.ForAll(func(id uint64, doc map[string]interface{}) bool {
 		for _, toBeIndexed := range GetIn(doc, indexPath) {
 			if toBeIndexed != nil {
 				// Figure out where to put it
 				hash := chunk.StrHash(toBeIndexed)
 				dest := hash % col.NumChunksI64
-				newIndex[dest].Put(hash, uint64(id))
+				newIndex[dest].Put(hash, id)
 			}
 		}
 		return true
@@ -199,11 +199,11 @@ func (col *Col) unindexDoc(id uint64, doc interface{}) {
 }
 
 // Insert a document, return its unique ID.
-func (col *Col) Insert(doc map[string]interface{}) (id int, err error) {
+func (col *Col) Insert(doc map[string]interface{}) (id uint64, err error) {
 	// Allocate an ID to the document
 	id = uid.NextUID()
-	doc[uid.PK_NAME] = strconv.Itoa(id)
-	num := id % col.NumChunks
+	doc[uid.PK_NAME] = strconv.FormatUint(id, 10)
+	num := id % col.NumChunksI64
 	// Lock the chunk while inserting the document
 	lock := col.ChunkMutexes[num]
 	lock.Lock()
@@ -211,27 +211,27 @@ func (col *Col) Insert(doc map[string]interface{}) (id int, err error) {
 		lock.Unlock()
 		return
 	}
-	col.indexDoc(uint64(id), doc)
+	col.indexDoc(id, doc)
 	lock.Unlock()
 	return
 }
 
 // Insert a document without allocating a new ID to it. Only for collection recovery operation.
-func (col *Col) InsertRecovery(knownID int, doc map[string]interface{}) (err error) {
-	doc[uid.PK_NAME] = strconv.Itoa(knownID)
-	num := knownID % col.NumChunks
+func (col *Col) InsertRecovery(knownID uint64, doc map[string]interface{}) (err error) {
+	doc[uid.PK_NAME] = strconv.FormatUint(knownID, 10)
+	num := knownID % col.NumChunksI64
 	// Lock the chunk while inserting the document
 	lock := col.ChunkMutexes[num]
 	lock.Lock()
 	_, err = col.Chunks[num].Insert(doc)
-	col.indexDoc(uint64(knownID), doc)
+	col.indexDoc(knownID, doc)
 	lock.Unlock()
 	return
 }
 
 // Read a document given its unique ID.
-func (col *Col) Read(id int, doc interface{}) (physID uint64, err error) {
-	num := id % col.NumChunks
+func (col *Col) Read(id uint64, doc interface{}) (physID uint64, err error) {
+	num := id % col.NumChunksI64
 	// Lock the chunk while reading the document
 	lock := col.ChunkMutexes[num]
 	dest := col.Chunks[num]
@@ -247,8 +247,8 @@ func (col *Col) Read(id int, doc interface{}) (physID uint64, err error) {
 }
 
 // Read a document given its unique ID (without placing any lock).
-func (col *Col) ReadNoLock(id int, doc interface{}) (physID uint64, err error) {
-	num := id % col.NumChunks
+func (col *Col) ReadNoLock(id uint64, doc interface{}) (physID uint64, err error) {
+	num := id % col.NumChunksI64
 	// Lock the chunk while reading the document
 	dest := col.Chunks[num]
 	physID, err = dest.GetPhysicalID(id)
@@ -272,11 +272,11 @@ func (col *Col) HashScan(htPath string, key, limit uint64) (keys, vals []uint64)
 }
 
 // Update a document given its unique ID.
-func (col *Col) Update(id int, newDoc map[string]interface{}) (err error) {
-	num := id % col.NumChunks
+func (col *Col) Update(id uint64, newDoc map[string]interface{}) (err error) {
+	num := id % col.NumChunksI64
 	lock := col.ChunkMutexes[num]
 	dest := col.Chunks[num]
-	newDoc[uid.PK_NAME] = strconv.Itoa(id)
+	newDoc[uid.PK_NAME] = strconv.FormatUint(id, 10)
 
 	lock.Lock()
 	// Read back the original document
@@ -290,8 +290,8 @@ func (col *Col) Update(id int, newDoc map[string]interface{}) (err error) {
 		}
 	}
 	// Remove the original document from secondary indexes, and put new values into them
-	col.unindexDoc(uint64(id), oldDoc)
-	col.indexDoc(uint64(id), newDoc)
+	col.unindexDoc(id, oldDoc)
+	col.indexDoc(id, newDoc)
 	// Update document data file and return
 	_, err = dest.Update(physID, newDoc)
 	if err != nil {
@@ -303,8 +303,8 @@ func (col *Col) Update(id int, newDoc map[string]interface{}) (err error) {
 }
 
 // Delete a document given its unique ID.
-func (col *Col) Delete(id int) {
-	num := id % col.NumChunks
+func (col *Col) Delete(id uint64) {
+	num := id % col.NumChunksI64
 	lock := col.ChunkMutexes[num]
 	dest := col.Chunks[num]
 	lock.Lock()
@@ -320,7 +320,7 @@ func (col *Col) Delete(id int) {
 		}
 	}
 	// Remove the original document from secondary indexes
-	col.unindexDoc(uint64(id), oldDoc)
+	col.unindexDoc(id, oldDoc)
 	dest.Delete(physID)
 	lock.Unlock()
 	return
@@ -328,7 +328,7 @@ func (col *Col) Delete(id int) {
 
 /* Sequentially deserialize all documents and invoke the function on each document (Collection Scan).
 The function must not write to this collection. */
-func (col *Col) ForAll(fun func(id int, doc map[string]interface{}) bool) {
+func (col *Col) ForAll(fun func(id uint64, doc map[string]interface{}) bool) {
 	numChunks := col.NumChunks
 	for i := 0; i < numChunks; i++ {
 		dest := col.Chunks[i]

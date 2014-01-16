@@ -100,7 +100,7 @@ func TestInsertUpdateReadAll(t *testing.T) {
 		t.Fatalf("Failed to read back document, got %v", doc2)
 	}
 	counter := 0
-	col.ForAll(func(_ int, _ map[string]interface{}) bool {
+	col.ForAll(func(_ uint64, _ map[string]interface{}) bool {
 		counter++
 		return true
 	})

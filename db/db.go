@@ -133,7 +133,7 @@ func (db *DB) Scrub(name string) (counter uint64, err error) {
 		temp.Index(index[0].Path)
 	}
 	// Reinsert documents
-	target.ForAll(func(id int, doc map[string]interface{}) bool {
+	target.ForAll(func(id uint64, doc map[string]interface{}) bool {
 		if err := temp.InsertRecovery(id, doc); err == nil {
 			counter += 1
 		} else {
@@ -170,7 +170,7 @@ func (db *DB) Repartition(name string, newNumber int) (counter uint64, err error
 		temp.Index(index[0].Path)
 	}
 	// Reinsert documents
-	target.ForAll(func(id int, doc map[string]interface{}) bool {
+	target.ForAll(func(id uint64, doc map[string]interface{}) bool {
 		if err := temp.InsertRecovery(id, doc); err == nil {
 			counter += 1
 		} else {

@@ -156,32 +156,32 @@ func TestScrub(t *testing.T) {
 		counter++
 		return true
 	})
-	if counter != 6212 {
+	if counter != 6174 {
 		t.Fatal("Did not recover enough documents", counter)
 	}
 	// second - collection scan
 	counter = 0
-	reopen.Use("a").ForAll(func(id int, doc map[string]interface{}) bool {
+	reopen.Use("a").ForAll(func(_ uint64, _ map[string]interface{}) bool {
 		counter++
 		return true
 	})
-	if counter != 6212 {
+	if counter != 6174 {
 		t.Fatal("Did not recover enough documents")
 	}
 	// third - index scan
 	keys1, vals1 := reopen.Use("a").SecIndexes["a,b,c"][0].GetAll(0)
 	keys2, vals2 := reopen.Use("a").SecIndexes["a,b,c"][1].GetAll(0)
-	if !(len(keys1)+len(keys2) == 6212*3 && len(vals1)+len(vals2) == 6212*3) {
+	if !(len(keys1)+len(keys2) == 6174*3 && len(vals1)+len(vals2) == 6174*3) {
 		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals1)+len(vals2))
 	}
 	keys3, vals3 := reopen.Use("a").SecIndexes["d"][1].GetAll(0)
 	keys4, vals4 := reopen.Use("a").SecIndexes["d"][0].GetAll(0)
-	if !(len(keys3)+len(keys4) == 6212*2 && len(vals3)+len(vals4) == 6212*2) {
+	if !(len(keys3)+len(keys4) == 6174*2 && len(vals3)+len(vals4) == 6174*2) {
 		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals1)+len(vals2))
 	}
 
 	// fourth - scrub return value
-	if recoveredNum != 6212 {
+	if recoveredNum != 6174 {
 		t.Fatal("Scrub return value is wrong")
 	}
 }
@@ -255,32 +255,32 @@ func TestRepartition(t *testing.T) {
 		counter++
 		return true
 	})
-	if counter != 8110 {
+	if counter != 8102 {
 		t.Fatal("Did not recover enough documents", counter)
 	}
 	// second - collection scan
 	counter = 0
-	reopen.Use("a").ForAll(func(id int, doc map[string]interface{}) bool {
+	reopen.Use("a").ForAll(func(_ uint64, _ map[string]interface{}) bool {
 		counter++
 		return true
 	})
-	if counter != 8110 {
+	if counter != 8102 {
 		t.Fatal("Did not recover enough documents")
 	}
 	// third - index scan
 	keys1, vals1 := reopen.Use("a").SecIndexes["a,b,c"][0].GetAll(0)
 	keys2, vals2 := reopen.Use("a").SecIndexes["a,b,c"][1].GetAll(0)
-	if !(len(keys1)+len(keys2) == 8110*3 && len(vals1)+len(vals2) == 8110*3) {
+	if !(len(keys1)+len(keys2) == 8102*3 && len(vals1)+len(vals2) == 8102*3) {
 		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals1)+len(vals2))
 	}
 	keys3, vals3 := reopen.Use("a").SecIndexes["d"][1].GetAll(0)
 	keys4, vals4 := reopen.Use("a").SecIndexes["d"][0].GetAll(0)
-	if !(len(keys3)+len(keys4) == 8110*2 && len(vals3)+len(vals4) == 8110*2) {
+	if !(len(keys3)+len(keys4) == 8102*2 && len(vals3)+len(vals4) == 8102*2) {
 		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals1)+len(vals2))
 	}
 
 	// fourth - scrub return value
-	if recoveredNum != 8110 {
+	if recoveredNum != 8102 {
 		t.Fatal("Scrub return value is wrong")
 	}
 }
