@@ -45,7 +45,7 @@ func OpenDB(baseDir string) (db *DB, err error) {
 				panic(err)
 			}
 			numchunks, err := strconv.Atoi(string(numchunksContent))
-			if err != nil {
+			if err != nil || numchunks < 1 {
 				panic(fmt.Sprintf("Cannot figure out number of chunks for collection %s, manually repair it maybe? %v", baseDir, err))
 			}
 
@@ -63,7 +63,7 @@ func OpenDB(baseDir string) (db *DB, err error) {
 // Create a collection.
 func (db *DB) Create(name string, numChunks int) (err error) {
 	if numChunks < 1 {
-		return errors.New(fmt.Sprintf("Number of of partitions must be above 0 - failed to open %s", numChunks, name))
+		return errors.New(fmt.Sprintf("Number of of partitions must be above 0"))
 	}
 	if _, nope := db.StrCol[name]; nope {
 		return errors.New(fmt.Sprintf("Collection %s already exists in %s", name, db.BaseDir))
