@@ -17,7 +17,7 @@ And thanks everyone (and You) for watching/starring/forking and evaluating tiedo
 ## License
 
 <pre>
-Copyright (c) 2013, Contributors and Howard Guo
+Copyright (c) 2014, Contributors and Howard Guo
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:

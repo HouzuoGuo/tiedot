@@ -1,3 +1,9 @@
+### 2.0 (2014-01-20)
+
+tiedot 2.0 brings to you new file structures, APIs and a much cleaner codebase. The essential new feature in 2.0 is that all collections are partitioned, hoping to show better scalability; but the mechanism is still being tweaked.
+
+Unfortunately, it is not compatible with older 1.x data files.
+
 ### 1.2 (2013-12-31)
 
 Bug fix:

@@ -1,12 +1,10 @@
 ## General info
 
-There have been three versions of HTTP APIs: V1, 2 and 3. Newer versions are compatible with older versions so far.
-
 API requests may use any of GET/PUT/POST methods.
 
 Server response always contains `Cache-Control: must-revalidate` header. Most responses use `applicaton/json` content type, but there are exceptions.
 
-To start this API server, please pass CLI parameter `-mode=v3`.
+To start HTTP service, please run tiedot with CLI parameter `-mode=httpd`.
 
 ## Generic error response
 
@@ -14,7 +12,6 @@ Server returns HTTP status 400 when:
 
 - Required parameter does not have a value (e.g. ID is required but not given).
 - Parameter does not contain correct value data type (e.g. ID should be a number, but letter S is given).
-- It is not possible to full-fill the request (e.g. inserting a new document that is not JSON).
 
 When internal error occurs, server will log a message and return HTTP status 500.
 
@@ -32,14 +29,14 @@ HTTP 4xx/5xx response will always include a text message (not JSON) to help with
   <tr>
     <td>Create a collection</td>
     <td>/create</td>
-    <td>Collection name `col`</td>
+    <td>Collection name `col` and number of partitions `numparts`</td>
     <td>HTTP 201</td>
   </tr>
   <tr>
     <td>Get all collection names</td>
     <td>/all</td>
     <td></td>
-    <td>HTTP 200 and a JSON array of all collection names</td>
+    <td>HTTP 200 and a JSON object of all collection names and configuration</td>
   </tr>
   <tr>
     <td>Rename a collection</td>
@@ -59,6 +56,12 @@ HTTP 4xx/5xx response will always include a text message (not JSON) to help with
     <td>Collection name `col`</td>
     <td>HTTP 200</td>
   </tr>
+  <tr>
+    <td>Repartition collection</td>
+    <td>/repartition</td>
+    <td>Collection name `col` and new number of partitions `numparts`</td>
+    <td>HTTP 200</td>
+  </tr>
 </table>
 
 ## Document management
@@ -74,13 +77,7 @@ HTTP 4xx/5xx response will always include a text message (not JSON) to help with
     <td>Insert a document</td>
     <td>/insert</td>
     <td>Collection name `col` and JSON document string `doc`</td>
-    <td>HTTP 201 and new document ID (text/plain)</td>
-  </tr>
-  <tr>
-    <td>Insert a document<br/>(with an auto UID)</td>
-    <td>/insertWithUID</td>
-    <td>Collection name `col` and JSON document string `doc`</td>
-    <td>HTTP 201 and JSON object of new document's ID and UID</td>
+    <td>HTTP 201 and new document ID</td>
   </tr>
   <tr>
     <td>Get a document</td>
@@ -89,39 +86,15 @@ HTTP 4xx/5xx response will always include a text message (not JSON) to help with
     <td>HTTP 200 and a JSON document</td>
   </tr>
   <tr>
-    <td>Get a document by UID</td>
-    <td>/getByUID</td>
-    <td>Collection name `col` and document UID `uid`</td>
-    <td>HTTP 200 and a JSON object of document content `doc` and ID</td>
-  </tr>
-  <tr>
     <td>Update a document</td>
     <td>/update</td>
     <td>Collection name `col`, document ID `id` and new JSON document `doc`</td>
-    <td>HTTP 200 and updated document ID (text/plain)</td>
-  </tr>
-  <tr>
-    <td>Update a document by UID</td>
-    <td>/updateByUID</td>
-    <td>Collection name `col`, document UID `uid` and new JSON document `doc`</td>
-    <td>HTTP 200 and updated document ID (text/plain)</td>
-  </tr>
-  <tr>
-    <td>(Re)assign document UID</td>
-    <td>/reassignUID</td>
-    <td>Collection name `col`, document ID `id`</td>
-    <td>HTTP 200 and JSON object of new document ID and UID</td>
+    <td>HTTP 200</td>
   </tr>
   <tr>
     <td>Delete a document</td>
     <td>/delete</td>
     <td>Collection name `col` and document ID `id`</td>
-    <td>HTTP 200</td>
-  </tr>
-  <tr>
-    <td>Delete a document by UID</td>
-    <td>/deleteByUID</td>
-    <td>Collection name `col` and document UID `uid`</td>
     <td>HTTP 200</td>
   </tr>
   <tr>
@@ -132,7 +105,7 @@ HTTP 4xx/5xx response will always include a text message (not JSON) to help with
   </tr>
 </table>
 
-Document ID is the physical location of document, it uniquely identifies document but may change during its life time. UID is another unique identifier, it is persistent and does not change over time.
+Document ID is unique and never changes til the document vanishes.
 
 ## Index management
 
@@ -150,8 +123,8 @@ Document ID is the physical location of document, it uniquely identifies documen
     <td>HTTP 201</td>
   </tr>
   <tr>
-    <td>Get details of all indexes in a collection</td>
-    <td>/indexes</td>
+    <td>Get list of all indexes in a collection</td>
+        <td>/indexes</td>
     <td>Collection name `col`</td>
     <td>HTTP 200 and a JSON array of all index information</td>
   </tr>
@@ -194,7 +167,7 @@ Document ID is the physical location of document, it uniquely identifies documen
     <td>Version number</td>
     <td>/version</td>
     <td>(nil)</td>
-    <td>HTTP 200 and "3" (text/plain)</td>
+    <td>HTTP 200 and "3"</td>
   </tr>
 </table>
 
@@ -212,19 +185,13 @@ All query responses return content type `text/plain` instead of `application/jso
     <th>Normal response</th>
   </tr>
   <tr>
-    <td>Get document content</td>
+    <td>Execute query and return documents</td>
     <td>/query</td>
     <td>Collection `col` and query string `q`</td>
     <td>HTTP 200 and result documents (one per line)</td>
   </tr>
   <tr>
-    <td>Get document IDs</td>
-    <td>/queryID</td>
-    <td>Collection `col` and query string `q`</td>
-    <td>HTTP 200 and result docment IDs (one per line)</td>
-  </tr>
-  <tr>
-    <td>Count results</td>
+    <td>Execute query and count results</td>
     <td>/count</td>
     <td>Collection `col` and query string `q`</td>
     <td>HTTP 200 and an integer number</td>
@@ -233,11 +200,11 @@ All query responses return content type `text/plain` instead of `application/jso
 
 ### Query syntax
 
-Query is a JSON structure, made of query operation, query parameters, sub-queries and bare numbers. Query processor takes a collection and query as input, and produces a set of result document IDs as output.
+Query is a JSON structure, made of query operation, query parameters, sub-queries and bare strings. Query processor takes a collection and query as input, and produces document contents or count of results, depending on HTTP endpoint.
 
-#### Bare numbers
+#### Bare strings (with number content)
 
-Bare numbers go directly into query result, this may be useful for manually injecting document IDs into a query. For example: `1, 2, 3, 4`.
+Bare strings are Document IDs that go directly into query result, this may be useful for manually injecting document IDs into a query. For example: `["23101561275236320", "2461300515680780859"]`.
 
 #### Basic operations
 
@@ -259,6 +226,8 @@ For example: `{"in": ["Publish", "Year"], "int-from": 1993, "int-to": 2013, "lim
 
 `"all"` returns all document IDs, may be useful for set operation (especially, complement).
 
+_Lookup paths must be indexed._
+
 #### Set operations
 
 Set operations take a list of queries (sub-queries) as parameter, the sub-queries may have any arbitrary complexity. 
@@ -269,7 +238,7 @@ Set operations take a list of queries (sub-queries) as parameter, the sub-querie
 
 Here is a complicated example: Find all books which were not written by John and published between 1993 and 2013, but include those written by John in 2000.
 
-	[
+    [
 		{
 			"n": [
 				{ "in": [ "Author", "Name" ], eq": "John" },
@@ -287,3 +256,8 @@ Here is a complicated example: Find all books which were not written by John and
 			]
 		}
 	]
+
+## Embedded usage
+APIs for embedded usage are demonstrated in `example.go`, you may run the example by building tiedot and run:
+
+    ./tiedot -mode=example

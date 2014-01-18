@@ -1,26 +1,44 @@
 ### Directory and file structure
 
-Database is an ordinary directory in file system, tiedot requires to have RWX permissions on the directory.
-
-Collection is a directory under Database directory, the directory is named using the collection's name. tiedot requires to have RWX permissions on the directory.
-
-Collection has the following files:
-
-- `data` documents data
-- `config` index configuration
-- `config.bak` old index configuration (may not exist)
-
-It may also have several index files - one for each index.
+<pre>
+TiedotDatabase         # Database "TiedotDatabase
+|-- CollectionA            # Collection "CollectionA"
+|   |-- chunk_0                # Partition 0
+|   |   |-- _data                  # Per-partition document data
+|   |   `-- _pk                    # Per-partition primary index
+|   |-- chunk_1                # Partiton 1
+|   |   |-- _data                  # Per-partition document data
+|   |   `-- _pk                    # Per-partition primary index
+|   |-- ht_Book,Author,Name    # Secondary index on ["Book, "Author", "Name"]
+|   |   |-- 0                      # Index partition 0
+|   |   `-- 1                      # Index partition 1
+|   `-- numchunks              # Text file - content indicates number of partitions
+`-- CollectionB
+    |-- chunk_0
+    |   |-- _data
+    |   `-- _pk
+    |-- chunk_1
+    |   |-- _data
+    |   `-- _pk
+    |-- chunk_2
+    |   |-- _data
+    |   `-- _pk
+    |-- ht_Day,Temperature,High
+    |   |-- 0
+    |   |-- 1
+    |   `-- 2
+    `-- numchunks
+</pre>
 
 ### Data file structure
 
-All documents are stored in data file. New documents are inserted to end-of-data* position, and they are left room for future updates (growth).
+Every document has a random and practically unique ID that is also the primary index value - it decides in which partition the document goes into.
 
-Updating document usually happens in-place, however if there is not enough room for the updated version, the document has to be deleted and re-inserted.
+File has a capacity and may grow beyond the capacity to fit more documents. New documents are inserted to end-of-data position, and they are left room for future updates and size growth.
 
-Deleted documents are marked as deleted.
+Updating document usually happens in-place, however if there is not enough room for the updated version, the document has to be deleted and re-inserted. Deleted documents are marked as deleted.
 
-Data file is initially 128MB. It grows automatically by 128MB when there is no place left to append more documents.
+Document partition is initially 16MB. It grows automatically by 16MB when there is no place left to append more documents.
 
 #### Document format
 
@@ -60,9 +78,7 @@ There is no padding before or after a document. Every document has:
 
 ### Index hash table file structure
 
-This is a static hash table made of buckets. All buckets have same number of entries, new buckets will be chained together should a bucket becomes full.
-
-Index file automatically grows by 64MB when there is no place left for more buckets.
+All indexes (primary and secondary) are made of static hash tables of buckets. All buckets have the same number of entries and new buckets will be chained together should a bucket grow full.
 
 #### Bucket format
 

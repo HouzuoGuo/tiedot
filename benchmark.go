@@ -41,7 +41,7 @@ func benchmark(benchSize int) {
 	ids := make([]uint64, 0)
 
 	// Prepare a collection with two indexes
-	tmp := "/tmp/tiedot_bench"
+	tmp := "/tmp/tiedot_bench2"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
 	col, err := db.OpenCol(tmp, 16)
