@@ -4,7 +4,6 @@ tiedot has three built-in benchmark cases. To invoke benchmark, compile and run 
 
     ./tiedot -mode=bench   # benchmark 1
     ./tiedot -mode=bench2  # benchmark 2
-    ./tiedot -mode=bench3  # benchmark 3
 
 The default benchmark sample size is 400,000 for all three cases; it can be changed via CLI parameter `-benchsize=<new_size>`.
 

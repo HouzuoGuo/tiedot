@@ -10,7 +10,7 @@ tiedot collection is partitioned into number of chunks; partitions function inde
 
 Secondary indexes are also partitioned - there are as many collection partitions as there are sec.index partitions. Governed by RWMutex, secondary index reads/updates can be carried out concurrently on many partitions.
 
-## Concurrency of HTTP API endpoints.
+## Concurrency of HTTP API endpoints
 
 While most HTTP endpoints support concurrency, there is a small number of operations which must "stop the world" to ensure safe operation - these operations block __all__ other HTTP endpoints until completed:
 
