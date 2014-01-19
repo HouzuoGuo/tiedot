@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 )
 
@@ -161,8 +162,11 @@ func TestScrub(t *testing.T) {
 	}
 	// second - collection scan
 	counter = 0
+	counterMutex := &sync.Mutex{}
 	reopen.Use("a").ForAll(func(_ uint64, _ map[string]interface{}) bool {
+		counterMutex.Lock()
 		counter++
+		counterMutex.Unlock()
 		return true
 	})
 	if counter != 6174 {
@@ -260,8 +264,11 @@ func TestRepartition(t *testing.T) {
 	}
 	// second - collection scan
 	counter = 0
+	counterMutex := &sync.Mutex{}
 	reopen.Use("a").ForAll(func(_ uint64, _ map[string]interface{}) bool {
+		counterMutex.Lock()
 		counter++
+		counterMutex.Unlock()
 		return true
 	})
 	if counter != 8102 {

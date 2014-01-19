@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Calculate union of sub-query results.
@@ -25,8 +26,11 @@ func EvalUnion(exprs []interface{}, src *Col, result *map[uint64]struct{}) (err 
 
 // Put all document IDs into result.
 func EvalAllIDs(src *Col, result *map[uint64]struct{}) (err error) {
+	resultMutex := &sync.Mutex{}
 	collectIDs := func(id uint64, _ map[string]interface{}) bool {
+		resultMutex.Lock()
 		(*result)[id] = struct{}{}
+		resultMutex.Unlock()
 		return true
 	}
 	src.ForAll(collectIDs)
@@ -304,6 +308,7 @@ func RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *Co
 	validRegexp := regexp.MustCompile(regexpStrValue)
 	// Do collection scan
 	counter := uint64(0)
+	resultMutex := &sync.Mutex{}
 	docMatcher := func(id uint64, doc map[string]interface{}) bool {
 		// Get inside the document and find value match
 		for _, v := range GetIn(doc, vecPath) {
@@ -311,8 +316,10 @@ func RegexpLookup(lookupRegexp interface{}, expr map[string]interface{}, src *Co
 				if intLimit > 0 && counter == intLimit {
 					return false
 				}
+				resultMutex.Lock()
 				(*result)[id] = struct{}{}
 				counter += 1
+				resultMutex.Unlock()
 			}
 		}
 		return true

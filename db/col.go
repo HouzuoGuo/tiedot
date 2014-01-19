@@ -137,8 +137,11 @@ func (col *Col) Index(indexPath []string) error {
 			if toBeIndexed != nil {
 				// Figure out where to put it
 				hash := chunk.StrHash(toBeIndexed)
-				dest := hash % col.NumChunksI64
-				newIndex[dest].Put(hash, id)
+				dest := newIndex[hash%col.NumChunksI64]
+				lock := dest.Mutex
+				lock.Lock()
+				dest.Put(hash, id)
+				lock.Unlock()
 			}
 		}
 		return true
@@ -330,13 +333,19 @@ func (col *Col) Delete(id uint64) {
 The function must not write to this collection. */
 func (col *Col) ForAll(fun func(id uint64, doc map[string]interface{}) bool) {
 	numChunks := col.NumChunks
+	wg := &sync.WaitGroup{}
+	wg.Add(numChunks)
 	for i := 0; i < numChunks; i++ {
-		dest := col.Chunks[i]
-		lock := col.ChunkMutexes[i]
-		lock.RLock()
-		dest.ForAll(fun)
-		lock.RUnlock()
+		go func(i int) {
+			dest := col.Chunks[i]
+			lock := col.ChunkMutexes[i]
+			lock.RLock()
+			dest.ForAll(fun)
+			lock.RUnlock()
+			wg.Done()
+		}(i)
 	}
+	wg.Wait()
 }
 
 /* Sequentially deserialize all documents into the template (pointer to struct) and invoke the function on each document (Collection Scan).
