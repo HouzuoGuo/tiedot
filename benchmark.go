@@ -48,16 +48,15 @@ func benchmark(benchSize int) {
 	if err != nil {
 		panic(err)
 	}
-	col.Index([]string{"a", "b", "c"})
-	col.Index([]string{"c", "d"})
+	col.Index([]string{"a"})
+	col.Index([]string{"b"})
 
 	// Benchmark document insert
 	average("insert", benchSize, func() {}, func() {
 		var doc map[string]interface{}
 		if err := json.Unmarshal([]byte(
-			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(benchSize))+`}},`+
-				`"c": {"d": `+strconv.Itoa(rand.Intn(benchSize))+`},`+
-				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &doc); err != nil {
+			`{"a": `+strconv.Itoa(rand.Intn(benchSize))+`, "b": `+strconv.Itoa(rand.Intn(benchSize))+`,
+			"more": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed mi sem, ultrices mollis nisl quis, convallis volutpat ante. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Proin interdum egestas risus, imperdiet vulputate est. Cras semper risus sit amet dolor facilisis malesuada. Nunc velit augue, accumsan id facilisis ultricies, vehicula eget massa. Ut non dui eu magna egestas aliquam. Fusce in pellentesque risus. Aliquam ornare pharetra lacus in rhoncus. In eu commodo nibh. Praesent at lacinia quam. Curabitur laoreet pellentesque mollis. Maecenas mollis bibendum neque. Pellentesque semper justo ac purus auctor cursus. In egestas sodales metus sed dictum. Vivamus at elit nunc. Phasellus sit amet augue sed augue rhoncus congue. Aenean et molestie augue. Aliquam blandit lacus eu nunc rhoncus, vitae varius mauris placerat. Quisque velit urna, pretium quis dolor et, blandit sodales libero. Nulla sollicitudin est vel dolor feugiat viverra massa nunc."}`), &doc); err != nil {
 			panic("json error")
 		}
 		if _, err := col.Insert(doc); err != nil {
@@ -88,8 +87,8 @@ func benchmark(benchSize int) {
 	// Benchmark lookup query (two attributes)
 	average("lookup", benchSize, func() {}, func() {
 		var query interface{}
-		if err := json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a", "b", "c"], "limit": 1}, `+
-			`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
+		if err := json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a"], "limit": 1}, `+
+			`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["b"], "limit": 1}]}`), &query); err != nil {
 			panic("json error")
 		}
 		result := make(map[uint64]struct{})
@@ -102,9 +101,8 @@ func benchmark(benchSize int) {
 	average("update", benchSize, func() {}, func() {
 		var doc map[string]interface{}
 		if err := json.Unmarshal([]byte(
-			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(benchSize))+`}},`+
-				`"c": {"d": `+strconv.Itoa(rand.Intn(benchSize))+`},`+
-				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &doc); err != nil {
+			`{"a": `+strconv.Itoa(rand.Intn(benchSize))+`, "b": `+strconv.Itoa(rand.Intn(benchSize))+`,
+			"more": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed mi sem, ultrices mollis nisl quis, convallis volutpat ante. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Proin interdum egestas risus, imperdiet vulputate est. Cras semper risus sit amet dolor facilisis malesuada. Nunc velit augue, accumsan id facilisis ultricies, vehicula eget massa. Ut non dui eu magna egestas aliquam. Fusce in pellentesque risus. Aliquam ornare pharetra lacus in rhoncus. In eu commodo nibh. Praesent at lacinia quam. Curabitur laoreet pellentesque mollis. Maecenas mollis bibendum neque. Pellentesque semper justo ac purus auctor cursus. In egestas sodales metus sed dictum. Vivamus at elit nunc. Phasellus sit amet augue sed augue rhoncus congue. Aenean et molestie augue. Aliquam blandit lacus eu nunc rhoncus, vitae varius mauris placerat. Quisque velit urna, pretium quis dolor et, blandit sodales libero. Nulla sollicitudin est vel dolor feugiat viverra massa nunc."}`), &doc); err != nil {
 			panic("json error")
 		}
 		if err := col.Update(ids[rand.Intn(benchSize)], doc); err != nil {
@@ -133,17 +131,16 @@ func benchmark2(benchSize int) {
 	if err != nil {
 		panic(err)
 	}
-	col.Index([]string{"a", "b", "c"})
-	col.Index([]string{"c", "d"})
+	col.Index([]string{"a"})
+	col.Index([]string{"b"})
 
 	// Insert 1000 documents to make a start
 	var docToInsert map[string]interface{}
 	for j := 0; j < 1000; j++ {
-		if err = json.Unmarshal([]byte(
-			`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(benchSize))+`}},`+
-				`"c": {"d": `+strconv.Itoa(rand.Intn(benchSize))+`},`+
-				`"more": "abcdefghijklmnopqrstuvwxyz"}`), &docToInsert); err != nil {
-			panic(err)
+		if err := json.Unmarshal([]byte(
+			`{"a": `+strconv.Itoa(rand.Intn(benchSize))+`, "b": `+strconv.Itoa(rand.Intn(benchSize))+`,
+			"more": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed mi sem, ultrices mollis nisl quis, convallis volutpat ante. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Proin interdum egestas risus, imperdiet vulputate est. Cras semper risus sit amet dolor facilisis malesuada. Nunc velit augue, accumsan id facilisis ultricies, vehicula eget massa. Ut non dui eu magna egestas aliquam. Fusce in pellentesque risus. Aliquam ornare pharetra lacus in rhoncus. In eu commodo nibh. Praesent at lacinia quam. Curabitur laoreet pellentesque mollis. Maecenas mollis bibendum neque. Pellentesque semper justo ac purus auctor cursus. In egestas sodales metus sed dictum. Vivamus at elit nunc. Phasellus sit amet augue sed augue rhoncus congue. Aenean et molestie augue. Aliquam blandit lacus eu nunc rhoncus, vitae varius mauris placerat. Quisque velit urna, pretium quis dolor et, blandit sodales libero. Nulla sollicitudin est vel dolor feugiat viverra massa nunc."}`), &docToInsert); err != nil {
+			panic("json error")
 		}
 		if newID, err := col.Insert(docToInsert); err == nil {
 			docs = append(docs, newID)
@@ -159,13 +156,11 @@ func benchmark2(benchSize int) {
 			fmt.Printf("Insert thread %d starting\n", i)
 			defer wp.Done()
 			var docToInsert map[string]interface{}
-			var err error
 			for j := 0; j < benchSize/numThreads*2; j++ {
-				if err = json.Unmarshal([]byte(
-					`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(benchSize))+`}},`+
-						`"c": {"d": `+strconv.Itoa(rand.Intn(benchSize))+`},`+
-						`"more": "abcdefghijklmnopqrstuvwxyz"}`), &docToInsert); err != nil {
-					panic(err)
+				if err := json.Unmarshal([]byte(
+					`{"a": `+strconv.Itoa(rand.Intn(benchSize))+`, "b": `+strconv.Itoa(rand.Intn(benchSize))+`,
+			"more": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed mi sem, ultrices mollis nisl quis, convallis volutpat ante. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Proin interdum egestas risus, imperdiet vulputate est. Cras semper risus sit amet dolor facilisis malesuada. Nunc velit augue, accumsan id facilisis ultricies, vehicula eget massa. Ut non dui eu magna egestas aliquam. Fusce in pellentesque risus. Aliquam ornare pharetra lacus in rhoncus. In eu commodo nibh. Praesent at lacinia quam. Curabitur laoreet pellentesque mollis. Maecenas mollis bibendum neque. Pellentesque semper justo ac purus auctor cursus. In egestas sodales metus sed dictum. Vivamus at elit nunc. Phasellus sit amet augue sed augue rhoncus congue. Aenean et molestie augue. Aliquam blandit lacus eu nunc rhoncus, vitae varius mauris placerat. Quisque velit urna, pretium quis dolor et, blandit sodales libero. Nulla sollicitudin est vel dolor feugiat viverra massa nunc."}`), &docToInsert); err != nil {
+					panic("json error")
 				}
 				if newID, err := col.Insert(docToInsert); err == nil {
 					docs = append(docs, newID)
@@ -198,8 +193,8 @@ func benchmark2(benchSize int) {
 			var query interface{}
 			var err error
 			for j := 0; j < benchSize/numThreads; j++ {
-				if err = json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a", "b", "c"], "limit": 1}, `+
-					`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["c", "d"], "limit": 1}]}`), &query); err != nil {
+				if err = json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a"], "limit": 1}, `+
+					`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["b"], "limit": 1}]}`), &query); err != nil {
 					panic("json error")
 				}
 				result := make(map[uint64]struct{})
@@ -217,13 +212,11 @@ func benchmark2(benchSize int) {
 			fmt.Printf("Update thread %d starting\n", i)
 			defer wp.Done()
 			var updated map[string]interface{}
-			var err error
 			for j := 0; j < benchSize/numThreads; j++ {
-				if err = json.Unmarshal([]byte(
-					`{"a": {"b": {"c": `+strconv.Itoa(rand.Intn(benchSize))+`}},`+
-						`"c": {"d": `+strconv.Itoa(rand.Intn(benchSize))+`},`+
-						`"more": "abcdefghijklmnopqrstuvwxyz"}`), &updated); err != nil {
-					panic(err)
+				if err := json.Unmarshal([]byte(
+					`{"a": `+strconv.Itoa(rand.Intn(benchSize))+`, "b": `+strconv.Itoa(rand.Intn(benchSize))+`,
+			"more": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed mi sem, ultrices mollis nisl quis, convallis volutpat ante. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Proin interdum egestas risus, imperdiet vulputate est. Cras semper risus sit amet dolor facilisis malesuada. Nunc velit augue, accumsan id facilisis ultricies, vehicula eget massa. Ut non dui eu magna egestas aliquam. Fusce in pellentesque risus. Aliquam ornare pharetra lacus in rhoncus. In eu commodo nibh. Praesent at lacinia quam. Curabitur laoreet pellentesque mollis. Maecenas mollis bibendum neque. Pellentesque semper justo ac purus auctor cursus. In egestas sodales metus sed dictum. Vivamus at elit nunc. Phasellus sit amet augue sed augue rhoncus congue. Aenean et molestie augue. Aliquam blandit lacus eu nunc rhoncus, vitae varius mauris placerat. Quisque velit urna, pretium quis dolor et, blandit sodales libero. Nulla sollicitudin est vel dolor feugiat viverra massa nunc."}`), &updated); err != nil {
+					panic("json error")
 				}
 				col.Update(docs[uint64(rand.Intn(len(docs)))], updated)
 			}
