@@ -297,10 +297,6 @@ func (col *Col) Update(id uint64, newDoc map[string]interface{}) (err error) {
 	col.indexDoc(id, newDoc)
 	// Update document data file and return
 	_, err = dest.Update(physID, newDoc)
-	if err != nil {
-		lock.Unlock()
-		return
-	}
 	lock.Unlock()
 	return
 }

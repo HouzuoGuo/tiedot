@@ -11,7 +11,6 @@ import (
 	"github.com/HouzuoGuo/tiedot/uid"
 	"os"
 	"path"
-	"strconv"
 )
 
 const (
@@ -82,8 +81,7 @@ func (col *ChunkCol) GetPhysicalID(id uint64) (physID uint64, err error) {
 			if entryKey == id {
 				var docMap map[string]interface{}
 				if col.Read(entryVal, &docMap) == nil {
-					strint, err := strconv.ParseUint(docMap[uid.PK_NAME].(string), 10, 64)
-					if err == nil && strint == id {
+					if err == nil && uid.PKOfDoc(docMap, false) == id {
 						return entryVal, nil
 					}
 				}
