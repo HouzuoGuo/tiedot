@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
+	"math/rand"
 	"os"
+	"time"
 )
 
 // You are encouraged to use (nearly) all tiedot public functions concurrently.
@@ -12,6 +14,9 @@ import (
 
 func embeddedExample() {
 	// ****************** Collection Management ******************
+
+	// It is very important to initialize random number generator seed!
+	rand.Seed(time.Now().UTC().UnixNano())
 	// Create and open database
 	dir := "/tmp/MyDatabase"
 	os.RemoveAll(dir)
