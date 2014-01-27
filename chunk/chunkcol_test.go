@@ -30,7 +30,7 @@ func TestInsertRead(t *testing.T) {
 		return
 	}
 	defer col.Close()
-	docs := []string{`{"_pk": "1", "a": 1}`, `{"_pk": "2", "b": 2}`}
+	docs := []string{`{"@id": "1", "a": 1}`, `{"@id": "2", "b": 2}`}
 	var jsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
@@ -66,12 +66,12 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	}
 	defer col.Close()
 
-	docs := []string{`{"_pk": "1", "a": 1}`, `{"_pk": "1", "b": 2}`}
+	docs := []string{`{"@id": "1", "a": 1}`, `{"@id": "1", "b": 2}`}
 	var jsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
 
-	updatedDocs := []string{`{"_pk": "1", "a": 2}`, `{"_pk": "1", "b": "abcdefghijklmnopqrstuvwxyz"}`}
+	updatedDocs := []string{`{"@id": "1", "a": 2}`, `{"@id": "1", "b": "abcdefghijklmnopqrstuvwxyz"}`}
 	var updatedJsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(updatedDocs[0]), &updatedJsonDoc[0])
 	json.Unmarshal([]byte(updatedDocs[1]), &updatedJsonDoc[1])
@@ -124,10 +124,10 @@ func TestInsertDeserialize(t *testing.T) {
 	defer col.Close()
 
 	var docs [2]map[string]interface{}
-	if err = json.Unmarshal([]byte(`{"_pk": "1", "I": 0, "S": "a", "B": false}`), &docs[0]); err != nil {
+	if err = json.Unmarshal([]byte(`{"@id": "1", "I": 0, "S": "a", "B": false}`), &docs[0]); err != nil {
 		panic(err)
 	}
-	if err = json.Unmarshal([]byte(`{"_pk": "1", "I": 1, "S": "b", "B": true}`), &docs[1]); err != nil {
+	if err = json.Unmarshal([]byte(`{"@id": "1", "I": 1, "S": "b", "B": true}`), &docs[1]); err != nil {
 		panic(err)
 	}
 
@@ -166,7 +166,7 @@ func TestInsertDeleteRead(t *testing.T) {
 		return
 	}
 	defer col.Close()
-	docs := []string{`{"_pk": "1", "a": 1}`, `{"_pk": "1", "b": 2}`}
+	docs := []string{`{"@id": "1", "a": 1}`, `{"@id": "1", "b": 2}`}
 	var jsonDoc [2]map[string]interface{}
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])
 	json.Unmarshal([]byte(docs[1]), &jsonDoc[1])
@@ -199,7 +199,7 @@ func TestScrubAndColScan(t *testing.T) {
 	}
 	// Insert 10000 documents
 	var doc map[string]interface{}
-	json.Unmarshal([]byte(`{"_pk": "`+strconv.Itoa(rand.Intn(10000))+`", "a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`), &doc)
+	json.Unmarshal([]byte(`{"@id": "`+strconv.Itoa(rand.Intn(10000))+`", "a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`), &doc)
 	for i := 0; i < 10000; i++ {
 		_, err := col.Insert(doc)
 		if err != nil {
@@ -250,11 +250,11 @@ func TestIndexAndReopen(t *testing.T) {
 		return
 	}
 	docs := []string{
-		`{"_pk": "1", "a": {"b": {"c": 1}}, "d": 0}`,
-		`{"_pk": "2", "a": {"b": [{"c": 2}]}, "d": 0}`,
-		`{"_pk": "3", "a": [{"b": {"c": 3}}], "d": 0}`,
-		`{"_pk": "4", "a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`,
-		`{"_pk": "5", "a": {"b": {"c": null}}, "d": null}`}
+		`{"@id": "1", "a": {"b": {"c": 1}}, "d": 0}`,
+		`{"@id": "2", "a": {"b": [{"c": 2}]}, "d": 0}`,
+		`{"@id": "3", "a": [{"b": {"c": 3}}], "d": 0}`,
+		`{"@id": "4", "a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`,
+		`{"@id": "5", "a": {"b": {"c": null}}, "d": null}`}
 	var jsonDoc [5]map[string]interface{}
 
 	json.Unmarshal([]byte(docs[0]), &jsonDoc[0])

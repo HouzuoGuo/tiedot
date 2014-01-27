@@ -16,9 +16,9 @@ func TestNextUID(t *testing.T) {
 
 func TestGetPKOfDoc(t *testing.T) {
 	var doc1, doc2, doc3 map[string]interface{}
-	json.Unmarshal([]byte(`{"_pk": 1}`), &doc1)
-	json.Unmarshal([]byte(`{"_pk": "a"}`), &doc2)
-	json.Unmarshal([]byte(`{"_pk": "1"}`), &doc3)
+	json.Unmarshal([]byte(`{"@id": 1}`), &doc1)
+	json.Unmarshal([]byte(`{"@id": "a"}`), &doc2)
+	json.Unmarshal([]byte(`{"@id": "1"}`), &doc3)
 
 	if PKOfDoc(doc1, false) != 18446744073709551615 {
 		t.Fatal(doc1)

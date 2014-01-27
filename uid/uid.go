@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	PK_NAME = "_pk" // Name of UID (PK) attribute
+	PK_NAME = "@id" // Name of UID (PK) attribute
 )
 
 // Generate and return a new UID (Unique IDentifier).

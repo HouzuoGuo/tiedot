@@ -108,7 +108,7 @@ func TestQuery(t *testing.T) {
 	if err == nil {
 		t.Fatal("Collection scan should trigger error")
 	}
-	q, err = runQuery(`{"eq": 1, "in": ["_pk"]}`, col)
+	q, err = runQuery(`{"eq": 1, "in": ["@id"]}`, col)
 	if err == nil {
 		t.Fatal("PK scan should trigger error")
 	}
@@ -141,7 +141,7 @@ func TestQuery(t *testing.T) {
 	if err == nil {
 		t.Fatal("Existence test should return error")
 	}
-	q, err = runQuery(`{"has": ["_pk"], "limit": 2}`, col)
+	q, err = runQuery(`{"has": ["@id"], "limit": 2}`, col)
 	if err == nil {
 		t.Fatal("Existence test should return error")
 	}

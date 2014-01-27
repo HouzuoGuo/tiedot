@@ -113,7 +113,7 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 		}
 	}
 	if vecPath[0] == uid.PK_NAME {
-		return errors.New("_pk is the primary index, path existence test on _pk is meaningless")
+		return errors.New("@id is the primary index, path existence test on @id is meaningless")
 	}
 	jointPath := strings.Join(vecPath, INDEX_PATH_SEP)
 	if secIndex, ok := src.SecIndexes[jointPath]; ok {
@@ -205,7 +205,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 		return errors.New(fmt.Sprintf("Expecting vector path `in`, but %v given", path))
 	}
 	if vecPath[0] == uid.PK_NAME {
-		return errors.New("_pk is the primary index, integer range scan on _pk is meaningless")
+		return errors.New("@id is the primary index, integer range scan on @id is meaningless")
 	}
 	// Figure out result number limit
 	intLimit := int(0)

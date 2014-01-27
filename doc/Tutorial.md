@@ -16,7 +16,7 @@ You will need:
 
 ## Basics
 
-tiedot server serves one database; database is made of collections; collection is partitioned (to improve performance) and has indexes to assist queries. Each document has a unique ID number called "_pk" that never change.
+tiedot server serves one database; database is made of collections; collection is partitioned (to improve performance) and has indexes to assist queries. Each document has a unique ID number called "@id" that never change.
 
 API requests (along with parameter values) may be sent using of GET, POST or PUT methods.
 
@@ -50,7 +50,7 @@ Insert document:
 Read document:
 
     > curl "http://localhost:8080/get?col=Feeds&id=11355681827558540738"
-    {"_pk":"11355681827558540738","a":1,"b":2}
+    {"@id":"11355681827558540738","a":1,"b":2}
 
 Update document:
 
@@ -93,24 +93,24 @@ Prepare some documents:
 Looking for the article "New Go Release":
 
     > curl --data-ascii q='{"eq": "New Go release", "in": ["Title"]}' "http://localhost:8080/query?col=Feeds"
-    [{"Age":3,"Source":"golang.org","Title":"New Go release","_pk":"10230803398370864725"}]
+    [{"Age":3,"Source":"golang.org","Title":"New Go release","@id":"10230803398370864725"}]
 
 Looking for article "New Go release" and "android.com" feeds:
 
     > curl --data-ascii q='[{"eq": "New Go release", "in": ["Title"]}, {"eq": "android.com", "in": ["Source"]}]' "http://localhost:8080/query?col=Feeds"
-    [{"Age":3,"Source":"golang.org","Title":"New Go release","_pk":"10230803398370864725"},{"Age":2,"Source":"android.com","Title":"Kitkat is here","_pk":"8602039814711744373"}]
+    [{"Age":3,"Source":"golang.org","Title":"New Go release","@id":"10230803398370864725"},{"Age":2,"Source":"android.com","Title":"Kitkat is here","@id":"8602039814711744373"}]
 
 Looking for all but not feeds from "golang.org":
 
     > curl --data-ascii q='{"c": [{"eq": "golang.org", "in": ["Source"]}, "all"]}' "http://localhost:8080/query?col=Feeds"
-    [{"Age":2,"Source":"android.com","Title":"Kitkat is here","_pk":"8602039814711744373"},{"Age":1,"Source":"slackware.com","Title":"Slackware Beta","_pk":"12333034197694914883"}]
+    [{"Age":2,"Source":"android.com","Title":"Kitkat is here","@id":"8602039814711744373"},{"Age":1,"Source":"slackware.com","Title":"Slackware Beta","@id":"12333034197694914883"}]
 
 Note that: `"all"` means "all documents"; `{"c": [ .. ]}` means "complement". 
 
 Looking for young feeds (age between 1 and 3) from "slackware.com":
 
     > curl --data-ascii q='{"n": [{"eq": "slackware.com", "in": ["Source"]}, {"int-from": 1, "int-to": 3, "in": ["Age"]}]}' "http://localhost:8080/query?col=Feeds"
-    [{"Age":1,"Source":"slackware.com","Title":"Slackware Beta","_pk":"12333034197694914883"}]
+    [{"Age":1,"Source":"slackware.com","Title":"Slackware Beta","@id":"12333034197694914883"}]
 
 `{"n": [ .. ]}` means "intersect"; `{"int-from": x, "int-to": y, "in": [ .. ] }` is an integer range lookup.
 
