@@ -1,9 +1,9 @@
-package chunk
+package partition
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/chunkfile"
+	"github.com/HouzuoGuo/tiedot/dsserver/ds"
 	"math/rand"
 	"os"
 	"strconv"
@@ -24,7 +24,7 @@ func TestInsertRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(0, tmp)
+	col, err := OpenPart(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -47,7 +47,12 @@ func TestInsertRead(t *testing.T) {
 		t.Fatalf("Failed to read back document, got %v", doc1)
 	}
 	var doc2 interface{}
-	if err = col.Read(ids[1], &doc2); doc2.(map[string]interface{})[string('b')].(float64) != 2.0 {
+	err = col.Read(ids[1], &doc2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(doc2, ids)
+	if doc2.(map[string]interface{})[string('b')].(float64) != 2.0 {
 		t.Fatalf("Failed to read back document, got %v", doc2)
 	}
 	if err = col.Flush(); err != nil {
@@ -59,7 +64,7 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(0, tmp)
+	col, err := OpenPart(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -116,7 +121,7 @@ func TestInsertDeserialize(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(0, tmp)
+	col, err := OpenPart(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -160,7 +165,7 @@ func TestInsertDeleteRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(0, tmp)
+	col, err := OpenPart(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -192,7 +197,7 @@ func TestScrubAndColScan(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(0, tmp)
+	col, err := OpenPart(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -225,7 +230,7 @@ func TestScrubAndColScan(t *testing.T) {
 	col.Close()
 }
 
-func IndexContainsAll(index *chunkfile.HashTable, expectedKV map[uint64]uint64) bool {
+func IndexContainsAll(index *ds.HashTable, expectedKV map[uint64]uint64) bool {
 	keys, vals := index.GetAll(0)
 	kvMap := make(map[uint64]uint64)
 	for i, key := range keys {
@@ -244,7 +249,7 @@ func TestIndexAndReopen(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenChunk(0, tmp)
+	col, err := OpenPart(0, tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -281,7 +286,7 @@ func TestIndexAndReopen(t *testing.T) {
 	}
 	// Reopen the collection and continue testing indexes
 	col.Close()
-	col, err = OpenChunk(0, tmp)
+	col, err = OpenPart(0, tmp)
 	if err != nil {
 		t.Fatal(err)
 	}

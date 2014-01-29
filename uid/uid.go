@@ -1,7 +1,6 @@
 package uid
 
 import (
-	"fmt"
 	"math/rand"
 	"strconv"
 )
@@ -16,20 +15,14 @@ func NextUID() uint64 {
 }
 
 // Return value of the PK attribute in the document.
-func PKOfDoc(doc map[string]interface{}, panicOnErr bool) uint64 {
+func PKOfDoc(doc map[string]interface{}) (uid uint64, found bool) {
 	docPK, ok := doc[PK_NAME].(string)
 	if !ok {
-		if panicOnErr {
-			panic(fmt.Sprintf("Doc %v does not have a valid PK", doc))
-		}
-		return 18446744073709551615
+		return 0, false
 	}
-	strint, err := strconv.ParseUint(docPK, 10, 64)
+	uid, err := strconv.ParseUint(docPK, 10, 64)
 	if err != nil {
-		if panicOnErr {
-			panic(fmt.Sprintf("Doc %v does not have a valid PK", doc))
-		}
-		return 18446744073709551615
+		return 0, false
 	}
-	return strint
+	return uid, true
 }

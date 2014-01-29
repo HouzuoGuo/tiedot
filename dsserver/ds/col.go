@@ -1,18 +1,15 @@
-/* Document collection file. */
-package chunkfile
+/* Document collection file and operations. */
+package ds
 
 import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/commonfile"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
 const (
-	/* Be aware that, changing the following constants will almost certainly require a number of test cases to be re-written. */
-
-	COL_FILE_SIZE   = uint64(1024 * 1024 * 16) // Size of collection data file
+	COL_FILE_SIZE   = uint64(1024 * 1024 * 16) // Initial size and growth of collection data file
 	DOC_MAX_ROOM    = uint64(1024 * 1024 * 16) // Max single document size
 	DOC_HEADER_SIZE = 1 + 10                   // Size of document header - validity (byte), document room (uint64)
 	DOC_VALID       = byte(1)                  // Document valid flag
@@ -31,12 +28,12 @@ const (
 )
 
 type ColFile struct {
-	File *commonfile.File
+	File *CommonFile
 }
 
 // Open a collection file.
 func OpenCol(name string) (*ColFile, error) {
-	file, err := commonfile.Open(name, COL_FILE_SIZE)
+	file, err := OpenFile(name, COL_FILE_SIZE)
 	return &ColFile{File: file}, err
 }
 

@@ -1,5 +1,5 @@
 /* CommonFile feature test cases. */
-package commonfile
+package ds
 
 import (
 	"os"
@@ -10,7 +10,7 @@ func TestOpenFlushClose(t *testing.T) {
 	tmp := "/tmp/tiedot_file_test"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	tmpFile, err := Open(tmp, 1000)
+	tmpFile, err := OpenFile(tmp, 1000)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -41,7 +41,7 @@ func TestFindingAppendAndClear(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	// Open
-	tmpFile, err := Open(tmp, 1000)
+	tmpFile, err := OpenFile(tmp, 1000)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -54,7 +54,7 @@ func TestFindingAppendAndClear(t *testing.T) {
 	tmpFile.Close()
 
 	// Re-open
-	tmpFile, err = Open(tmp, 1000)
+	tmpFile, err = OpenFile(tmp, 1000)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestFindingAppendAndClear(t *testing.T) {
 	tmpFile.Close()
 
 	// Re-open again
-	tmpFile, err = Open(tmp, 1000)
+	tmpFile, err = OpenFile(tmp, 1000)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestFileGrow(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	// Open and write something
-	tmpFile, err := Open(tmp, 4)
+	tmpFile, err := OpenFile(tmp, 4)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return

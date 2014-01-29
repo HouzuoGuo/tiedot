@@ -1,5 +1,5 @@
 /* Static hash table test cases. */
-package chunkfile
+package ds
 
 import (
 	"fmt"

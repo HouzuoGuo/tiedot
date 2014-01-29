@@ -1,5 +1,5 @@
 /* Document collection file test. */
-package chunkfile
+package ds
 
 import (
 	"fmt"

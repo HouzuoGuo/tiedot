@@ -1,5 +1,5 @@
 /* Common data file features. */
-package commonfile
+package ds
 
 import (
 	"errors"
@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-type File struct {
+type CommonFile struct {
 	Name           string // File path and name
 	UsedSize, Size uint64
 	Growth         uint64
@@ -28,11 +28,11 @@ func ConsecutiveTwenty0s(buf gommap.MMap) bool {
 }
 
 // Open the file, or create it if non-existing.
-func Open(name string, growth uint64) (file *File, err error) {
+func OpenFile(name string, growth uint64) (file *CommonFile, err error) {
 	if growth < 1 {
 		err = errors.New(fmt.Sprintf("File growth should be greater than one (opening %s)", growth, name))
 	}
-	file = &File{Name: name, Growth: growth}
+	file = &CommonFile{Name: name, Growth: growth}
 	// Open file (get a handle) and determine its size
 	if file.Fh, err = os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0600); err != nil {
 		return
@@ -78,12 +78,12 @@ func Open(name string, growth uint64) (file *File, err error) {
 }
 
 // Return true only if the file still has room for more data.
-func (file *File) CheckSize(more uint64) bool {
+func (file *CommonFile) CheckSize(more uint64) bool {
 	return file.UsedSize+more <= file.Size
 }
 
 // Ensure that the file has enough room for more data. Grow the file if necessary.
-func (file *File) CheckSizeAndEnsure(more uint64) {
+func (file *CommonFile) CheckSizeAndEnsure(more uint64) {
 	if file.UsedSize+more <= file.Size {
 		return
 	}
@@ -106,7 +106,7 @@ func (file *File) CheckSizeAndEnsure(more uint64) {
 }
 
 // Overwrite the file with 0s and return to its initial size.
-func (file *File) Clear() {
+func (file *CommonFile) Clear() {
 	var err error
 	if err = file.Close(); err != nil {
 		panic(err)
@@ -131,12 +131,12 @@ func (file *File) Clear() {
 }
 
 // Synchronize file buffer with underlying storage device.
-func (file *File) Flush() error {
+func (file *CommonFile) Flush() error {
 	return file.Buf.Flush()
 }
 
 // Close the file.
-func (file *File) Close() error {
+func (file *CommonFile) Close() error {
 	if err := file.Buf.Unmap(); err != nil {
 		return err
 	}
