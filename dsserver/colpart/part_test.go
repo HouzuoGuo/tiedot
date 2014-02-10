@@ -1,9 +1,9 @@
-package partition
+package colpart
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/dsserver/ds"
+	"github.com/HouzuoGuo/tiedot/dsserver/dstruct"
 	"math/rand"
 	"os"
 	"strconv"
@@ -230,7 +230,7 @@ func TestScrubAndColScan(t *testing.T) {
 	col.Close()
 }
 
-func IndexContainsAll(index *ds.HashTable, expectedKV map[uint64]uint64) bool {
+func IndexContainsAll(index *dstruct.HashTable, expectedKV map[uint64]uint64) bool {
 	keys, vals := index.GetAll(0)
 	kvMap := make(map[uint64]uint64)
 	for i, key := range keys {

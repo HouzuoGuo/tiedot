@@ -1,12 +1,12 @@
 /* Independent collection partition. */
-package partition
+package colpart
 
 import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/dsserver/ds"
+	"github.com/HouzuoGuo/tiedot/dsserver/dstruct"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"github.com/HouzuoGuo/tiedot/uid"
 	"os"
@@ -19,10 +19,10 @@ const (
 )
 
 type Partition struct {
-	Number  int           // Number of the partition in collection
-	BaseDir string        // File system directory path of the partition
-	Data    *ds.ColFile   // Collection document data file
-	PK      *ds.HashTable // PK hash table
+	Number  int                // Number of the partition in collection
+	BaseDir string             // File system directory path of the partition
+	Data    *dstruct.ColFile   // Collection document data file
+	PK      *dstruct.HashTable // PK hash table
 }
 
 // Return string hash code using sdbm algorithm.
@@ -44,12 +44,12 @@ func OpenPart(number int, baseDir string) (part *Partition, err error) {
 	part = &Partition{Number: number, BaseDir: baseDir}
 	// Open collection document data file
 	tdlog.Printf("Opening collection data file %s", DAT_FILENAME_MAGIC)
-	if part.Data, err = ds.OpenCol(path.Join(baseDir, DAT_FILENAME_MAGIC)); err != nil {
+	if part.Data, err = dstruct.OpenCol(path.Join(baseDir, DAT_FILENAME_MAGIC)); err != nil {
 		return
 	}
 	// Open PK hash table
 	tdlog.Printf("Opening PK hash table file %s", PK_FILENAME_MAGIC)
-	if part.PK, err = ds.OpenHash(path.Join(baseDir, PK_FILENAME_MAGIC), []string{uid.PK_NAME}); err != nil {
+	if part.PK, err = dstruct.OpenHash(path.Join(baseDir, PK_FILENAME_MAGIC), []string{uid.PK_NAME}); err != nil {
 		return
 	}
 	return
@@ -77,10 +77,10 @@ func (col *Partition) GetPhysicalID(id uint64) (physID uint64, err error) {
 	// This function is called so often that we better inline the hash table key scan.
 	var entry, bucket uint64 = 0, col.PK.HashKey(id)
 	for {
-		entryAddr := bucket*ds.BUCKET_SIZE + ds.BUCKET_HEADER_SIZE + entry*ds.ENTRY_SIZE
+		entryAddr := bucket*dstruct.BUCKET_SIZE + dstruct.BUCKET_HEADER_SIZE + entry*dstruct.ENTRY_SIZE
 		entryKey, _ := binary.Uvarint(col.PK.File.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Uvarint(col.PK.File.Buf[entryAddr+11 : entryAddr+21])
-		if col.PK.File.Buf[entryAddr] == ds.ENTRY_VALID {
+		if col.PK.File.Buf[entryAddr] == dstruct.ENTRY_VALID {
 			if entryKey == id {
 				var docMap map[string]interface{}
 				if col.Read(entryVal, &docMap) == nil && err == nil {
@@ -93,7 +93,7 @@ func (col *Partition) GetPhysicalID(id uint64) (physID uint64, err error) {
 		} else if entryKey == 0 && entryVal == 0 {
 			return 0, errors.New(fmt.Sprintf("Cannot find physical ID of %d", id))
 		}
-		if entry++; entry == ds.PER_BUCKET {
+		if entry++; entry == dstruct.PER_BUCKET {
 			entry = 0
 			if bucket = col.PK.NextBucket(bucket); bucket == 0 {
 				return 0, errors.New(fmt.Sprintf("Cannot find physical ID of %d", id))

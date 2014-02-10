@@ -1,5 +1,5 @@
 /* Document collection file and operations. */
-package ds
+package dstruct
 
 import (
 	"encoding/binary"

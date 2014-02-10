@@ -1,5 +1,5 @@
 /* Static hash table test cases. */
-package ds
+package dstruct
 
 import (
 	"fmt"

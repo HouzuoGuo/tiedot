@@ -1,5 +1,5 @@
 /* A static hash table made of uint64 key-value pairs. */
-package ds
+package dstruct
 
 import (
 	"encoding/binary"

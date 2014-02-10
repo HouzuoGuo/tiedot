@@ -1,5 +1,5 @@
 /* Document collection file test. */
-package ds
+package dstruct
 
 import (
 	"fmt"

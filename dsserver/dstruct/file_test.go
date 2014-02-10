@@ -1,5 +1,5 @@
 /* CommonFile feature test cases. */
-package ds
+package dstruct
 
 import (
 	"os"

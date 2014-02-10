@@ -1,5 +1,5 @@
 /* Common data file features. */
-package ds
+package dstruct
 
 import (
 	"errors"
