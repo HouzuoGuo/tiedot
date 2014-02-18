@@ -19,7 +19,6 @@ const (
 )
 
 type Partition struct {
-	Number  int                // Number of the partition in collection
 	BaseDir string             // File system directory path of the partition
 	Data    *dstruct.ColFile   // Collection document data file
 	PK      *dstruct.HashTable // PK hash table
@@ -35,13 +34,13 @@ func StrHash(thing interface{}) uint64 {
 }
 
 // Open a collection partition.
-func OpenPart(number int, baseDir string) (part *Partition, err error) {
+func OpenPart(baseDir string) (part *Partition, err error) {
 	// Create the directory if it does not yet exist
 	if err = os.MkdirAll(baseDir, 0700); err != nil {
 		return
 	}
 	tdlog.Printf("Opening partition %s", baseDir)
-	part = &Partition{Number: number, BaseDir: baseDir}
+	part = &Partition{BaseDir: baseDir}
 	// Open collection document data file
 	tdlog.Printf("Opening collection data file %s", DAT_FILENAME_MAGIC)
 	if part.Data, err = dstruct.OpenCol(path.Join(baseDir, DAT_FILENAME_MAGIC)); err != nil {

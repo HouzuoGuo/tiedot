@@ -24,7 +24,7 @@ func TestInsertRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenPart(0, tmp)
+	col, err := OpenPart(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -64,7 +64,7 @@ func TestInsertUpdateReadAll(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenPart(0, tmp)
+	col, err := OpenPart(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -121,7 +121,7 @@ func TestInsertDeserialize(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenPart(0, tmp)
+	col, err := OpenPart(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -165,7 +165,7 @@ func TestInsertDeleteRead(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenPart(0, tmp)
+	col, err := OpenPart(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -197,7 +197,7 @@ func TestScrubAndColScan(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenPart(0, tmp)
+	col, err := OpenPart(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -249,7 +249,7 @@ func TestIndexAndReopen(t *testing.T) {
 	tmp := "/tmp/tiedot_col_test"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
-	col, err := OpenPart(0, tmp)
+	col, err := OpenPart(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -286,7 +286,7 @@ func TestIndexAndReopen(t *testing.T) {
 	}
 	// Reopen the collection and continue testing indexes
 	col.Close()
-	col, err = OpenPart(0, tmp)
+	col, err = OpenPart(tmp)
 	if err != nil {
 		t.Fatal(err)
 	}
