@@ -75,6 +75,7 @@ func NewServer(rank, totalRank int, dbDir, workingDir string) (srv *Server, err 
 		return
 	}
 	srv = &Server{Rank: rank, TotalRank: totalRank,
+		WorkingDir: workingDir, DBDir: dbDir,
 		InterRank:   make([]net.Conn, totalRank),
 		ColNumParts: make(map[string]int),
 		ColParts:    make(map[string]*colpart.Partition),
@@ -87,16 +88,33 @@ func NewServer(rank, totalRank int, dbDir, workingDir string) (srv *Server, err 
 	if err != nil {
 		return
 	}
-	tdlog.Printf("Rank %d is listening on %s", rank, serverSockFile)
+	tdlog.Printf("Rank %d of %d is listening on %s", rank, totalRank, serverSockFile)
+	// Accept incoming connections
+	go func() {
+		for {
+			conn, err := srv.Listener.Accept()
+			if err != nil {
+				panic(err)
+			}
+			tdlog.Printf("Rank %d has an incoming connection", rank)
+			go func(conn *net.Conn) {
+				// TODO: Serve requests from the connection
+				(*conn).Close()
+			}(&conn)
+		}
+	}()
 	// Contact other ranks (after 2 seconds delay)
 	time.Sleep(2 * time.Second)
 	for i := 0; i < totalRank; i++ {
+		if i == rank {
+			continue
+		}
 		rankSockFile := path.Join(workingDir, strconv.Itoa(i))
 		srv.InterRank[i], err = net.Dial("unix", rankSockFile)
 		if err != nil {
 			return
 		}
-		tdlog.Printf("Rank %d is now in contact with rank %d on %s", rank, i, rankSockFile)
+		tdlog.Printf("Communication has been established between rank %d and %d on %s", rank, i, rankSockFile)
 	}
 	// Open my partition of the database
 	if err = srv.ReopenDB(); err != nil {
@@ -150,6 +168,7 @@ func (server *Server) ReopenDB() (err error) {
 				}
 				// Put the partition into server structure
 				server.ColParts[colName] = part
+				server.Htables[colName] = make(map[string]*dstruct.HashTable)
 				// Look for indexes in the collection
 				walker := func(_ string, info os.FileInfo, err2 error) error {
 					if err2 != nil {
