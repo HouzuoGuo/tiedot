@@ -8,12 +8,14 @@ import (
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
 const (
-	NUMCHUNKS_FILENAME = "numchunks"
+	NUMCHUNKS_FILENAME      = "numchunks"
 	HASHTABLE_DIRNAME_MAGIC = "ht_"    // Hash table directory name prefix
 	CHUNK_DIRNAME_MAGIC     = "chunk_" // Chunk directory name prefix
 	INDEX_PATH_SEP          = ","      // Separator between index path segments
@@ -51,6 +53,7 @@ type Task struct {
 type Server struct {
 	WorkingDir, DBDir string                                   // Working directory and DB directory
 	Rank, TotalRank   int                                      // Rank of current process; total number of processes
+	ColNumParts       map[string]int                           // Collection name -> number of partitions
 	ColParts          map[string]*colpart.Partition            // Collection name -> partition
 	Htables           map[string]map[string]*dstruct.HashTable // Collection name -> index name -> hash table
 	Listener          net.Listener                             // This server socket
@@ -72,10 +75,11 @@ func NewServer(rank, totalRank int, dbDir, workingDir string) (srv *Server, err 
 		return
 	}
 	srv = &Server{Rank: rank, TotalRank: totalRank,
-		InterRank: make([]net.Conn, totalRank),
-		ColParts:  make(map[string]*colpart.Partition),
-		Htables:   make(map[string]map[string]*dstruct.HashTable),
-		MainLoop:  make(chan *Task, 100)}
+		InterRank:   make([]net.Conn, totalRank),
+		ColNumParts: make(map[string]int),
+		ColParts:    make(map[string]*colpart.Partition),
+		Htables:     make(map[string]map[string]*dstruct.HashTable),
+		MainLoop:    make(chan *Task, 100)}
 	// Create server socket
 	serverSockFile := path.Join(workingDir, strconv.Itoa(rank))
 	os.Remove(serverSockFile)
@@ -95,7 +99,9 @@ func NewServer(rank, totalRank int, dbDir, workingDir string) (srv *Server, err 
 		tdlog.Printf("Rank %d is now in contact with rank %d on %s", rank, i, rankSockFile)
 	}
 	// Open my partition of the database
-
+	if err = srv.ReopenDB(); err != nil {
+		return
+	}
 	// Start task worker
 	go func() {
 		for {
@@ -118,7 +124,8 @@ func (server *Server) ReopenDB() (err error) {
 		if f.IsDir() {
 			// Read the "numchunks" file - its should contain a positive integer in the content
 			var numchunksFH *os.File
-			numchunksFH, err = os.OpenFile(path.Join(server.DBDir, f.Name(), NUMCHUNKS_FILENAME), os.O_CREATE|os.O_RDWR, 0600)
+			colName := f.Name()
+			numchunksFH, err = os.OpenFile(path.Join(server.DBDir, colName, NUMCHUNKS_FILENAME), os.O_CREATE|os.O_RDWR, 0600)
 			defer numchunksFH.Close()
 			if err != nil {
 				return
@@ -131,10 +138,42 @@ func (server *Server) ReopenDB() (err error) {
 			if err != nil || numchunks < 1 {
 				tdlog.Panicf("Cannot figure out number of chunks for collection %s, manually repair it maybe? %v", server.DBDir, err)
 			}
-			// If my rank is within the range of all partitions, open my partition only
+			server.ColNumParts[colName] = numchunks
+			// If my rank is within the numeric range of collection partitions, go ahead and open my part
 			if server.Rank < numchunks {
 				tdlog.Printf("My rank is %d and I am going to open my partition in %s", server.Rank, f.Name())
-				colpart.OpenPart(path.Join(server.DBDir, f.Name(), CHUNK_DIRNAME_MAGIC + strconv.Itoa(server.Rank)))
+				// Open data partition
+				colDir := path.Join(server.DBDir, colName)
+				part, err := colpart.OpenPart(path.Join(colDir, CHUNK_DIRNAME_MAGIC+strconv.Itoa(server.Rank)))
+				if err != nil {
+					return err
+				}
+				// Put the partition into server structure
+				server.ColParts[colName] = part
+				// Look for indexes in the collection
+				walker := func(_ string, info os.FileInfo, err2 error) error {
+					if err2 != nil {
+						tdlog.Error(err)
+						return nil
+					}
+					if info.IsDir() {
+						switch {
+						case strings.HasPrefix(info.Name(), HASHTABLE_DIRNAME_MAGIC):
+							tdlog.Printf("My rank is %d and I am going to open my partition in hashtable %s", server.Rank, info.Name())
+							// Figure out indexed path - including the partition number
+							indexPathStr := info.Name()[len(HASHTABLE_DIRNAME_MAGIC):]
+							indexPath := strings.Split(indexPathStr, INDEX_PATH_SEP)
+							// Open a hash table index and put it into collection structure
+							ht, err := dstruct.OpenHash(path.Join(colDir, info.Name(), strconv.Itoa(server.Rank)), indexPath)
+							if err != nil {
+								return err
+							}
+							server.Htables[colName][indexPathStr] = ht
+						}
+					}
+					return nil
+				}
+				err = filepath.Walk(colDir, walker)
 			}
 		}
 	}
