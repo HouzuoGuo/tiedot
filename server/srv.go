@@ -1,5 +1,5 @@
 /* Server structure and command loop. */
-package srv
+package server
 
 import (
 	"bufio"
@@ -7,6 +7,7 @@ import (
 	"github.com/HouzuoGuo/tiedot/colpart"
 	"github.com/HouzuoGuo/tiedot/dstruct"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"math/rand"
 	"net"
 	"os"
 	"path"
@@ -76,6 +77,8 @@ type Server struct {
 
 // Start a new server.
 func NewServer(rank, totalRank int, dbDir, workingDir string) (srv *Server, err error) {
+	// It is important to seed random number generator!
+	rand.Seed(time.Now().UnixNano())
 	if rank >= totalRank {
 		panic("rank >= totalRank - should never happen")
 	}
@@ -134,15 +137,16 @@ func NewServer(rank, totalRank int, dbDir, workingDir string) (srv *Server, err 
 	if err = srv.Reload(); err != nil {
 		return
 	}
-	// Start task worker
-	go func() {
-		defer os.Remove(srv.ServerSock)
-		for {
-			task := <-srv.MainLoop
-			(task.Ret) <- task.Fun(task.Input)
-		}
-	}()
 	return
+}
+
+// Start task worker
+func (server *Server) Start() {
+	defer os.Remove(server.ServerSock)
+	for {
+		task := <-server.MainLoop
+		(task.Ret) <- task.Fun(task.Input)
+	}
 }
 
 // Submit a task to the server and wait till its completion.
@@ -162,7 +166,7 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 	in := bufio.NewReader(*conn)
 	out := bufio.NewWriter(*conn)
 
-	// A helper function to respond acknowledgement or error message to response
+	// Helper functions for formulating server response
 	AckOrErr := func(task *Task) {
 		if err := srv.Submit(task); err == nil {
 			out.WriteString(ACK)

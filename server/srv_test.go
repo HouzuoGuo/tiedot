@@ -1,5 +1,5 @@
 /* Server structure test cases. */
-package srv
+package server
 
 import (
 	"io/ioutil"
@@ -33,6 +33,7 @@ func TestNewServerTaskSubmit(t *testing.T) {
 	serversReady.Wait()
 	for i := 0; i < 3; i++ {
 		srv := srvs[i]
+		go srv.Start()
 		if !(srv.ServerSock == "/tmp/tiedot_srv/"+strconv.Itoa(i) &&
 			srv.Rank == i && srv.TotalRank == 3 && srv.WorkingDir == wd && srv.DBDir == db &&
 			len(srv.ColNumParts) == 0 && len(srv.ColParts) == 0 && len(srv.Htables) == 0 && len(srv.MainLoop) == 0 &&
@@ -111,6 +112,7 @@ func TestNewServerOpenDB(t *testing.T) {
 			if srvs[i], err = NewServer(i, 3, db, wd); err != nil {
 				serverError = err
 			}
+			go srvs[i].Start()
 		}(i)
 	}
 	if serverError != nil {

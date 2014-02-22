@@ -1,5 +1,5 @@
 /* Server command implementations. */
-package srv
+package server
 
 import (
 	"errors"
