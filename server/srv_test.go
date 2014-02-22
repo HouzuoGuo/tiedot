@@ -1,13 +1,15 @@
+/* Server structure test cases. */
 package srv
 
 import (
 	"io/ioutil"
 	"os"
+	"strconv"
 	"sync"
 	"testing"
 )
 
-func TestNewServerNoOpen(t *testing.T) {
+func TestNewServerTaskSubmit(t *testing.T) {
 	wd := "/tmp/tiedot_srv"
 	db := "/tmp/tiedot_db"
 	os.RemoveAll(wd)
@@ -31,11 +33,20 @@ func TestNewServerNoOpen(t *testing.T) {
 	serversReady.Wait()
 	for i := 0; i < 3; i++ {
 		srv := srvs[i]
-		if !(srv.Rank == i && srv.TotalRank == 3 && srv.WorkingDir == wd && srv.DBDir == db && srv.Barrier == false &&
+		if !(srv.ServerSock == "/tmp/tiedot_srv/"+strconv.Itoa(i) &&
+			srv.Rank == i && srv.TotalRank == 3 && srv.WorkingDir == wd && srv.DBDir == db &&
 			len(srv.ColNumParts) == 0 && len(srv.ColParts) == 0 && len(srv.Htables) == 0 && len(srv.MainLoop) == 0 &&
 			len(srv.InterRank) == 3 && srv.Listener != nil) {
 			t.Fatal(srv)
 		}
+	}
+	var sideEffect bool
+	promise := make(chan interface{})
+	if srvs[0].Submit(&Task{Ret: promise, Input: true, Fun: func(input interface{}) interface{} {
+		sideEffect = input.(bool)
+		return true
+	}}).(bool) != true || !sideEffect {
+		t.Fatal("wrong result")
 	}
 	os.RemoveAll(wd)
 	os.Remove(db)
@@ -107,7 +118,7 @@ func TestNewServerOpenDB(t *testing.T) {
 	}
 	serversReady.Wait()
 	// Verify server 0
-	if !(srvs[0].Rank == 0 && srvs[0].TotalRank == 3 && srvs[0].WorkingDir == wd && srvs[0].DBDir == db && srvs[0].Barrier == false &&
+	if !(srvs[0].Rank == 0 && srvs[0].TotalRank == 3 && srvs[0].WorkingDir == wd && srvs[0].DBDir == db &&
 		len(srvs[0].ColNumParts) == 2 && len(srvs[0].ColParts) == 2 && len(srvs[0].Htables) == 2 && len(srvs[0].MainLoop) == 0 &&
 		srvs[0].ColNumParts["a"] == 2 && srvs[0].ColNumParts["b"] == 3 &&
 		srvs[0].ColParts["a"].BaseDir == "/tmp/tiedot_db/a/chunk_0" && srvs[0].ColParts["b"].BaseDir == "/tmp/tiedot_db/b/chunk_0" &&
@@ -118,7 +129,7 @@ func TestNewServerOpenDB(t *testing.T) {
 		t.Fatal(srvs[0])
 	}
 	// Verify server 1
-	if !(srvs[1].Rank == 1 && srvs[1].TotalRank == 3 && srvs[1].WorkingDir == wd && srvs[1].DBDir == db && srvs[1].Barrier == false &&
+	if !(srvs[1].Rank == 1 && srvs[1].TotalRank == 3 && srvs[1].WorkingDir == wd && srvs[1].DBDir == db &&
 		len(srvs[1].ColNumParts) == 2 && len(srvs[1].ColParts) == 2 && len(srvs[1].Htables) == 2 && len(srvs[1].MainLoop) == 0 &&
 		srvs[1].ColNumParts["a"] == 2 && srvs[1].ColNumParts["b"] == 3 &&
 		srvs[1].ColParts["a"].BaseDir == "/tmp/tiedot_db/a/chunk_1" && srvs[1].ColParts["b"].BaseDir == "/tmp/tiedot_db/b/chunk_1" &&
@@ -128,8 +139,8 @@ func TestNewServerOpenDB(t *testing.T) {
 		len(srvs[1].InterRank) == 3 && srvs[1].Listener != nil) {
 		t.Fatal(srvs[1])
 	}
-	// Verify server 2 (note that ONE LESS partition)
-	if !(srvs[2].Rank == 2 && srvs[2].TotalRank == 3 && srvs[2].WorkingDir == wd && srvs[2].DBDir == db && srvs[2].Barrier == false &&
+	// Verify server 2 (ONE LESS partition)
+	if !(srvs[2].Rank == 2 && srvs[2].TotalRank == 3 && srvs[2].WorkingDir == wd && srvs[2].DBDir == db &&
 		len(srvs[2].ColNumParts) == 2 && len(srvs[2].ColParts) == 1 && len(srvs[2].Htables) == 1 && len(srvs[2].MainLoop) == 0 &&
 		srvs[2].ColNumParts["a"] == 2 && srvs[2].ColNumParts["b"] == 3 &&
 		srvs[2].ColParts["b"].BaseDir == "/tmp/tiedot_db/b/chunk_2" &&

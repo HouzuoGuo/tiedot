@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/dsserver/dstruct"
+	"github.com/HouzuoGuo/tiedot/dstruct"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"github.com/HouzuoGuo/tiedot/uid"
 	"os"

@@ -1,9 +1,10 @@
+/* Collection partition test cases. */
 package colpart
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/dsserver/dstruct"
+	"github.com/HouzuoGuo/tiedot/dstruct"
 	"math/rand"
 	"os"
 	"strconv"
