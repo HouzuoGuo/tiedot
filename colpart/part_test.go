@@ -22,7 +22,7 @@ func TestHash(t *testing.T) {
 }
 
 func TestInsertRead(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
+	tmp := "/tmp/tiedot_test_col"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
 	col, err := OpenPart(tmp)
@@ -62,7 +62,7 @@ func TestInsertRead(t *testing.T) {
 }
 
 func TestInsertUpdateReadAll(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
+	tmp := "/tmp/tiedot_test_col"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
 	col, err := OpenPart(tmp)
@@ -119,7 +119,7 @@ func TestInsertUpdateReadAll(t *testing.T) {
 }
 
 func TestInsertDeserialize(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
+	tmp := "/tmp/tiedot_test_col"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
 	col, err := OpenPart(tmp)
@@ -163,7 +163,7 @@ func TestInsertDeserialize(t *testing.T) {
 }
 
 func TestInsertDeleteRead(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
+	tmp := "/tmp/tiedot_test_col"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
 	col, err := OpenPart(tmp)
@@ -195,7 +195,7 @@ func TestInsertDeleteRead(t *testing.T) {
 }
 
 func TestScrubAndColScan(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
+	tmp := "/tmp/tiedot_test_col"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
 	col, err := OpenPart(tmp)
@@ -247,7 +247,7 @@ func IndexContainsAll(index *dstruct.HashTable, expectedKV map[uint64]uint64) bo
 }
 
 func TestIndexAndReopen(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
+	tmp := "/tmp/tiedot_test_col"
 	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
 	col, err := OpenPart(tmp)

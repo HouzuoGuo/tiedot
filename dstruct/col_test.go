@@ -9,7 +9,7 @@ import (
 )
 
 func TestInsertRead(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
+	tmp := "/tmp/tiedot_test_col"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)
@@ -39,7 +39,7 @@ func TestInsertRead(t *testing.T) {
 }
 
 func TestInsertReadAll(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
+	tmp := "/tmp/tiedot_test_col"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)
@@ -88,7 +88,7 @@ func TestInsertReadAll(t *testing.T) {
 }
 
 func TestInsertUpdateRead(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
+	tmp := "/tmp/tiedot_test_col"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)
@@ -125,7 +125,7 @@ func TestInsertUpdateRead(t *testing.T) {
 }
 
 func TestInsertDeleteRead(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
+	tmp := "/tmp/tiedot_test_col"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)
@@ -163,7 +163,7 @@ func TestInsertDeleteRead(t *testing.T) {
 }
 
 func TestFileGrowAndOutOfBoundAccess(t *testing.T) {
-	tmp := "/tmp/tiedot_col_test"
+	tmp := "/tmp/tiedot_test_col"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCol(tmp)

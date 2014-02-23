@@ -11,8 +11,8 @@ func main() {
 	// Common flags
 	var mode, tmpDir, dbDir string
 	flag.StringVar(&mode, "mode", "", "[ipc|http|bench1|bench2|example]")
-	flag.StringVar(&tmpDir, "tmpdir", "/tmp/tiedot_tmp", "Location of temporary files directory")
-	flag.StringVar(&dbDir, "dbdir", "/tmp/tiedot_db", "Location of database directory")
+	flag.StringVar(&tmpDir, "tmpdir", "/tmp/tiedot_test_tmp", "Location of temporary files directory")
+	flag.StringVar(&dbDir, "dbdir", "/tmp/tiedot_test_db", "Location of database directory")
 	flag.BoolVar(&tdlog.VerboseLog, "verbose", true, "Turn verbose output on/off")
 
 	// IPC flags

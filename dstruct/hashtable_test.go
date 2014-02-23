@@ -8,7 +8,7 @@ import (
 )
 
 func TestPutGetReopenClear(t *testing.T) {
-	tmp := "/tmp/tiedot_hash_test"
+	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, []string{})
@@ -62,7 +62,7 @@ func TestPutGetReopenClear(t *testing.T) {
 }
 
 func TestPutGet2(t *testing.T) {
-	tmp := "/tmp/tiedot_hash_test"
+	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, []string{})
@@ -88,7 +88,7 @@ func TestPutGet2(t *testing.T) {
 }
 
 func TestPutRemove(t *testing.T) {
-	tmp := "/tmp/tiedot_hash_test"
+	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, []string{})
@@ -116,7 +116,7 @@ func TestPutRemove(t *testing.T) {
 }
 
 func TestGetAll(t *testing.T) {
-	tmp := "/tmp/tiedot_hash_test"
+	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	ht, err := OpenHash(tmp, []string{})

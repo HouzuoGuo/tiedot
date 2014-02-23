@@ -7,7 +7,7 @@ import (
 )
 
 func TestOpenFlushClose(t *testing.T) {
-	tmp := "/tmp/tiedot_file_test"
+	tmp := "/tmp/tiedot_test_file"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	tmpFile, err := OpenFile(tmp, 1000)
@@ -37,7 +37,7 @@ func TestOpenFlushClose(t *testing.T) {
 }
 
 func TestFindingAppendAndClear(t *testing.T) {
-	tmp := "/tmp/tiedot_file_test"
+	tmp := "/tmp/tiedot_test_file"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	// Open
@@ -85,7 +85,7 @@ func TestFindingAppendAndClear(t *testing.T) {
 }
 
 func TestFileGrow(t *testing.T) {
-	tmp := "/tmp/tiedot_file_test"
+	tmp := "/tmp/tiedot_test_file"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	// Open and write something
