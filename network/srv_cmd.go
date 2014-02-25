@@ -157,3 +157,17 @@ func (src *Server) ColAll(_ interface{}) (strOrErr interface{}) {
 		return string(namesJSON)
 	}
 }
+
+// Ping, Ping1, PingJS are for testing purpose, they do not manipulate any data.
+func (src *Server) Ping(_ interface{}) (strNoError interface{}) {
+	return ACK
+}
+func (src *Server) Ping1(_ interface{}) (uint64NoError interface{}) {
+	return uint64(1)
+}
+func (src *Server) PingJS(_ interface{}) (jsonNoError interface{}) {
+	return []string{ACK, ACK}
+}
+func (src *Server) PingErr(_ interface{}) (mustBErr interface{}) {
+	return errors.New("this is an error")
+}

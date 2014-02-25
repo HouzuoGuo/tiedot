@@ -56,7 +56,7 @@ case $MODE in
 	'test-colpart')
 		cleanup && go_test_dir 'colpart' ;;
 	'test-network')
-		test_server ;;
+		test_network ;;
 	'test-all')
 		for dir in uid dstruct colpart; do
 			go_test_dir $dir

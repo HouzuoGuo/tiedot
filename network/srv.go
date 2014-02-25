@@ -3,7 +3,6 @@ package network
 
 import (
 	"bufio"
-	"fmt"
 	"github.com/HouzuoGuo/tiedot/colpart"
 	"github.com/HouzuoGuo/tiedot/dstruct"
 	"github.com/HouzuoGuo/tiedot/tdlog"
@@ -47,12 +46,17 @@ const (
 	IDX_ALL    = "idx_all"    // idx_all <col_name>
 	IDX_DROP   = "idx_drop"   // idx_drop <col_name> <idx_path>
 
-	// Other (Ops without params must have suffix new-line)
+	// Other
 	RELOAD    = "reload"
 	FLUSH_ALL = "flush"
 	SHUTDOWN  = "shutdown"
-	ACK       = "OK"  // Acknowledgement
-	ERR       = "ERR" // Bad request/server error
+	PING      = "ping"    // for testing
+	PING1     = "ping1"   // for testing
+	PING_JSON = "pingjs"  // for testing
+	PING_ERR  = "pingerr" // for testing
+	// General response
+	ACK = "OK"   // Acknowledgement
+	ERR = "ERR " // Bad request/server error (mind the space)
 )
 
 // Tasks are queued on a server and executed one by one
@@ -74,6 +78,7 @@ type Server struct {
 	InterRank         []*net.Conn                              // Inter-rank communication connection
 	InterRankFeedback []chan interface{}                       // Inter-rank task feedback
 	MainLoop          chan *Task                               // Task loop
+	ConnCounter       int
 }
 
 // Start a new server.
@@ -156,44 +161,19 @@ func (server *Server) Submit(task *Task) interface{} {
 	return <-(task.Ret)
 }
 
+// Shutdown server and delete domain socket file.
 func (srv *Server) Shutdown() {
 	srv.FlushAll(nil)
 	os.Remove(srv.ServerSock)
+	tdlog.Printf("Server %s has shutdown upon client request", srv.ServerSock)
 	os.Exit(0)
 }
 
+// Process commands from the client.
 func CmdLoop(srv *Server, conn *net.Conn) {
 	resp := make(chan interface{}, 1)
 	in := bufio.NewReader(*conn)
 	out := bufio.NewWriter(*conn)
-
-	// Helper functions for formulating server response
-	AckOrErr := func(task *Task) {
-		if err := srv.Submit(task); err == nil {
-			out.WriteString(ACK)
-		} else {
-			if _, err2 := out.WriteString(fmt.Sprint(err)); err2 != nil {
-				panic(err)
-			}
-		}
-		out.WriteRune('\n')
-		if err := out.Flush(); err != nil {
-			panic(err)
-		}
-	}
-	StrOrErr := func(task *Task) {
-		ret := srv.Submit(task)
-		switch ret.(type) {
-		case string:
-			out.WriteString(ret.(string))
-		case error:
-			out.WriteString(fmt.Sprint(ret))
-		}
-		out.WriteRune('\n')
-		if err := out.Flush(); err != nil {
-			panic(err)
-		}
-	}
 
 	// Read commands from the connection, interpret them and execute them on the server loop
 	for {
@@ -206,8 +186,26 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 		tdlog.Printf("CMD: %s", cmd)
 		// Interpret commands which do not use parameters
 		switch cmd {
+		case PING:
+			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.Ping}, out); err != nil {
+				return
+			}
+		case PING1:
+			if err = srv.uint64OrErr(&Task{Ret: resp, Fun: srv.Ping1}, out); err != nil {
+				return
+			}
+		case PING_JSON:
+			if err = srv.jsonOrErr(&Task{Ret: resp, Fun: srv.PingJS}, out); err != nil {
+				return
+			}
+		case PING_ERR:
+			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.PingErr}, out); err != nil {
+				return
+			}
 		case FLUSH_ALL:
-			AckOrErr(&Task{Ret: resp, Fun: srv.FlushAll})
+			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.FlushAll}, out); err != nil {
+				return
+			}
 		case SHUTDOWN:
 			srv.Shutdown()
 		default:
@@ -215,9 +213,13 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 			params := strings.SplitN(cmd, " ", 1+4) // there are at most 4 parameters used by any command
 			switch params[0] {
 			case COL_CREATE:
-				AckOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColCreate})
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColCreate}, out); err != nil {
+					return
+				}
 			case COL_ALL:
-				StrOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColAll})
+				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColAll}, out); err != nil {
+					return
+				}
 			}
 		}
 	}
