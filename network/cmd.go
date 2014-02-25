@@ -1,7 +1,8 @@
 /* Server command implementations. */
-package server
+package network
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/colpart"
@@ -112,7 +113,7 @@ func (srv *Server) FlushAll(_ interface{}) (err interface{}) {
 	return nil
 }
 
-// Create a collection
+// Create a collection.
 func (srv *Server) ColCreate(input interface{}) (err interface{}) {
 	params := input.([]string)
 	colName := params[1]
@@ -142,7 +143,17 @@ func (srv *Server) ColCreate(input interface{}) (err interface{}) {
 	return srv.Reload()
 }
 
-// Return all collection names
+// Return all collection names in JSON.
 func (src *Server) ColAll(_ interface{}) (strOrErr interface{}) {
-	return nil
+	names := make([]string, len(src.ColNumParts))
+	i := 0
+	for name, _ := range src.ColNumParts {
+		names[i] = name
+		i++
+	}
+	if namesJSON, err := json.Marshal(names); err != nil {
+		return err
+	} else {
+		return string(namesJSON)
+	}
 }

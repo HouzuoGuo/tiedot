@@ -25,19 +25,25 @@ run_ipc_servers() {
 		./tiedot -mode=ipc -myrank=$i -totalrank=$num_servers -tmpdir=$tmp_dir -dbdir=$db_dir &
 		ipc_proc_ids[$i]=$!
 	done
-	echo ${ipc_proc_ids[*]}
+	echo "RPC server PIDs: ${ipc_proc_ids[*]}"
 }
 
-# Spawn 4 server processes then run server test cases
-test_server() {
-	run_ipc_servers 4 /tmp/tiedot_test_tmp /tmp/tiedot_test/db
+# Shutdown all IPC servers
+kill_ipc_servers() {
+	pkill -TERM -f 'tiedot.*mode=ipc'
+}
+
+# Spawn 4 server processes then run test cases that require IPC connection.
+test_network() {
 	cleanup
-	go_test_dir 'server'
+	run_ipc_servers 4 /tmp/tiedot_test_ipc_tmp /tmp/tiedot_test_ipc_db
+	go_test_dir 'network'
+	kill_ipc_servers
 }
 
 # Format and compile tiedot
-find . -name '*.go' -exec go fmt {} \;
-go build
+find . -name '*.go' -exec go fmt {} \; || exit $?
+go build || exit $?
 
 # Parse mode parameter
 MODE=$1
@@ -49,12 +55,12 @@ case $MODE in
 		cleanup && go_test_dir 'dstruct' ;;
 	'test-colpart')
 		cleanup && go_test_dir 'colpart' ;;
-	'test-server')
+	'test-network')
 		test_server ;;
 	'test-all')
 		for dir in uid dstruct colpart; do
 			go_test_dir $dir
-		done && test_server ;;
+		done && test_network ;;
 	'run-server')
 		run_ipc_servers 2 /tmp/tiedot_test_1 /tmp/tiedot_test_2
 esac

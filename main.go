@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"github.com/HouzuoGuo/tiedot/server"
+	"github.com/HouzuoGuo/tiedot/network"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"runtime"
 )
@@ -11,7 +11,7 @@ func main() {
 	// Common flags
 	var mode, tmpDir, dbDir string
 	flag.StringVar(&mode, "mode", "", "[ipc|http|bench1|bench2|example]")
-	flag.StringVar(&tmpDir, "tmpdir", "/tmp/tiedot_test_tmp", "Location of temporary files directory")
+	flag.StringVar(&tmpDir, "tmpdir", "/tmp/tiedot_test_tmp", "Location of IPC server temporary files directory")
 	flag.StringVar(&dbDir, "dbdir", "/tmp/tiedot_test_db", "Location of database directory")
 	flag.BoolVar(&tdlog.VerboseLog, "verbose", true, "Turn verbose output on/off")
 
@@ -26,7 +26,7 @@ func main() {
 		tdlog.Println("Will set GOMAXPROCS to 1 for optimal IPC performance")
 		runtime.GOMAXPROCS(1)
 		// Initialize and start IPC server
-		server, err := server.NewServer(myRank, totalRank, dbDir, tmpDir)
+		server, err := network.NewServer(myRank, totalRank, dbDir, tmpDir)
 		if err != nil {
 			panic(err)
 		}

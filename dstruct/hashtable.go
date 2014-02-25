@@ -8,17 +8,17 @@ import (
 )
 
 const (
-	HT_FILE_SIZE       = uint64(1024 * 1024 * 8) // Size of a hash table, it may grow by this size
-	ENTRY_VALID        = byte(1)                 // Entry valid flag
-	ENTRY_INVALID      = byte(0)                 // Entry invalid flag
-	ENTRY_SIZE         = uint64(1 + 10 + 10)     // Size of entry header - validity (byte), hash key (uint64) and value (uint64)
-	BUCKET_HEADER_SIZE = uint64(10)              // Size of bucket header - next bucket in chain (uint64)
+	HT_FILE_SIZE       = uint64(1024 * 1024 * 16) // Size of a hash table, it may grow by this size
+	ENTRY_VALID        = byte(1)                  // Entry valid flag
+	ENTRY_INVALID      = byte(0)                  // Entry invalid flag
+	ENTRY_SIZE         = uint64(1 + 10 + 10)      // Size of entry header - validity (byte), hash key (uint64) and value (uint64)
+	BUCKET_HEADER_SIZE = uint64(10)               // Size of bucket header - next bucket in chain (uint64)
 	// Hash table configuration
-	PER_BUCKET  = uint64(15)
+	PER_BUCKET  = uint64(20)
 	BUCKET_SIZE = uint64(PER_BUCKET*ENTRY_SIZE + BUCKET_HEADER_SIZE)
-	HASH_BITS   = uint64(14)
+	HASH_BITS   = uint64(15)
 	// INITIAL_BUCKETS = 2 to the power of HASH_BITS
-	INITIAL_BUCKETS = uint64(16384)
+	INITIAL_BUCKETS = uint64(32768)
 )
 
 type HashTable struct {

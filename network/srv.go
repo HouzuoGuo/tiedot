@@ -1,5 +1,5 @@
 /* Server structure and command loop. */
-package server
+package network
 
 import (
 	"bufio"
@@ -51,7 +51,8 @@ const (
 	RELOAD    = "reload"
 	FLUSH_ALL = "flush"
 	SHUTDOWN  = "shutdown"
-	ACK       = "0" // Acknowledgement
+	ACK       = "OK"  // Acknowledgement
+	ERR       = "ERR" // Bad request/server error
 )
 
 // Tasks are queued on a server and executed one by one
@@ -63,7 +64,7 @@ type Task struct {
 
 // Server state and structures.
 type Server struct {
-	WorkingDir, DBDir string                                   // Working directory and DB directory
+	TempDir, DBDir    string                                   // Working directory and DB directory
 	ServerSock        string                                   // Server socket file name
 	Rank, TotalRank   int                                      // Rank of current process; total number of processes
 	ColNumParts       map[string]int                           // Collection name -> number of partitions
@@ -76,7 +77,7 @@ type Server struct {
 }
 
 // Start a new server.
-func NewServer(rank, totalRank int, dbDir, workingDir string) (srv *Server, err error) {
+func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err error) {
 	// It is important to seed random number generator!
 	rand.Seed(time.Now().UnixNano())
 	if rank >= totalRank {
@@ -86,12 +87,12 @@ func NewServer(rank, totalRank int, dbDir, workingDir string) (srv *Server, err 
 	if err = os.MkdirAll(dbDir, 0700); err != nil {
 		return
 	}
-	if err = os.MkdirAll(workingDir, 0700); err != nil {
+	if err = os.MkdirAll(tempDir, 0700); err != nil {
 		return
 	}
 	srv = &Server{Rank: rank, TotalRank: totalRank,
-		ServerSock: path.Join(workingDir, strconv.Itoa(rank)),
-		WorkingDir: workingDir, DBDir: dbDir,
+		ServerSock: path.Join(tempDir, strconv.Itoa(rank)),
+		TempDir:    tempDir, DBDir: dbDir,
 		InterRank:         make([]*net.Conn, totalRank),
 		InterRankFeedback: make([]chan interface{}, totalRank),
 		ColNumParts:       make(map[string]int),
@@ -123,7 +124,7 @@ func NewServer(rank, totalRank int, dbDir, workingDir string) (srv *Server, err 
 		if i == rank {
 			continue
 		}
-		rankSockFile := path.Join(workingDir, strconv.Itoa(i))
+		rankSockFile := path.Join(tempDir, strconv.Itoa(i))
 		var conn net.Conn
 		conn, err = net.Dial("unix", rankSockFile)
 		if err != nil {
