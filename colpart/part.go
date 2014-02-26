@@ -39,15 +39,12 @@ func OpenPart(baseDir string) (part *Partition, err error) {
 	if err = os.MkdirAll(baseDir, 0700); err != nil {
 		return
 	}
-	tdlog.Printf("Opening partition %s", baseDir)
 	part = &Partition{BaseDir: baseDir}
 	// Open collection document data file
-	tdlog.Printf("Opening collection data file %s", DAT_FILENAME_MAGIC)
 	if part.Data, err = dstruct.OpenCol(path.Join(baseDir, DAT_FILENAME_MAGIC)); err != nil {
 		return
 	}
 	// Open PK hash table
-	tdlog.Printf("Opening PK hash table file %s", PK_FILENAME_MAGIC)
 	if part.PK, err = dstruct.OpenHash(path.Join(baseDir, PK_FILENAME_MAGIC), []string{uid.PK_NAME}); err != nil {
 		return
 	}

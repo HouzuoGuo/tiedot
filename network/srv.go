@@ -68,17 +68,16 @@ type Task struct {
 
 // Server state and structures.
 type Server struct {
-	TempDir, DBDir    string                                   // Working directory and DB directory
-	ServerSock        string                                   // Server socket file name
-	Rank, TotalRank   int                                      // Rank of current process; total number of processes
-	ColNumParts       map[string]int                           // Collection name -> number of partitions
-	ColParts          map[string]*colpart.Partition            // Collection name -> partition
-	Htables           map[string]map[string]*dstruct.HashTable // Collection name -> index name -> hash table
-	Listener          net.Listener                             // This server socket
-	InterRank         []*net.Conn                              // Inter-rank communication connection
-	InterRankFeedback []chan interface{}                       // Inter-rank task feedback
-	MainLoop          chan *Task                               // Task loop
-	ConnCounter       int
+	TempDir, DBDir  string                                   // Working directory and DB directory
+	ServerSock      string                                   // Server socket file name
+	Rank, TotalRank int                                      // Rank of current process; total number of processes
+	ColNumParts     map[string]int                           // Collection name -> number of partitions
+	ColParts        map[string]*colpart.Partition            // Collection name -> partition
+	Htables         map[string]map[string]*dstruct.HashTable // Collection name -> index name -> hash table
+	Listener        net.Listener                             // This server socket
+	InterRank       []*Client                                // Inter-rank communication connection
+	MainLoop        chan *Task                               // Task loop
+	ConnCounter     int
 }
 
 // Start a new server.
@@ -98,19 +97,18 @@ func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err err
 	srv = &Server{Rank: rank, TotalRank: totalRank,
 		ServerSock: path.Join(tempDir, strconv.Itoa(rank)),
 		TempDir:    tempDir, DBDir: dbDir,
-		InterRank:         make([]*net.Conn, totalRank),
-		InterRankFeedback: make([]chan interface{}, totalRank),
-		ColNumParts:       make(map[string]int),
-		ColParts:          make(map[string]*colpart.Partition),
-		Htables:           make(map[string]map[string]*dstruct.HashTable),
-		MainLoop:          make(chan *Task, 100)}
+		InterRank:   make([]*Client, totalRank),
+		ColNumParts: make(map[string]int),
+		ColParts:    make(map[string]*colpart.Partition),
+		Htables:     make(map[string]map[string]*dstruct.HashTable),
+		MainLoop:    make(chan *Task, 100)}
 	// Create server socket
 	os.Remove(srv.ServerSock)
 	srv.Listener, err = net.Listen("unix", srv.ServerSock)
 	if err != nil {
 		return
 	}
-	tdlog.Printf("Rank %d of %d is listening on %s", rank, totalRank, srv.ServerSock)
+	tdlog.Printf("Rank %d: I am listening on %s", rank, srv.ServerSock)
 	// Accept incoming connections
 	go func() {
 		for {
@@ -118,31 +116,26 @@ func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err err
 			if err != nil {
 				panic(err)
 			}
-			tdlog.Printf("Rank %d has an incoming connection", rank)
+			tdlog.Printf("Rank %d: Incoming connection", rank)
 			// Process commands from incoming connection
 			go CmdLoop(srv, &conn)
 		}
 	}()
-	// Contact other ranks (after 2 seconds delay)
+	// After 2 seconds delay, contact other ranks
 	time.Sleep(2 * time.Second)
 	for i := 0; i < totalRank; i++ {
 		if i == rank {
 			continue
 		}
-		rankSockFile := path.Join(tempDir, strconv.Itoa(i))
-		var conn net.Conn
-		conn, err = net.Dial("unix", rankSockFile)
-		if err != nil {
-			return
+		if srv.InterRank[i], err = NewClient(tempDir, i); err != nil {
+			panic(err)
 		}
-		srv.InterRank[i] = &conn
-		srv.InterRankFeedback[i] = make(chan interface{}, 1)
-		tdlog.Printf("Communication has been established between rank %d and %d on %s", rank, i, rankSockFile)
 	}
 	// Open my partition of the database
-	if err = srv.Reload(); err != nil {
-		return
+	if err2 := srv.Reload(nil); err2 != nil {
+		return nil, err2.(error)
 	}
+	tdlog.Printf("Rank %d: Initialization completed", rank)
 	return
 }
 
@@ -161,11 +154,25 @@ func (server *Server) Submit(task *Task) interface{} {
 	return <-(task.Ret)
 }
 
+// Broadcast a message to all other servers, return true on success.
+func (srv *Server) BroadcastAway(line string, consumeResp bool, onErrResume bool) bool {
+	for i, rank := range srv.InterRank {
+		if i == srv.Rank {
+			continue
+		}
+		if !rank.writeAway(line, consumeResp) && !onErrResume {
+			return false
+		}
+	}
+	return true
+}
+
 // Shutdown server and delete domain socket file.
 func (srv *Server) Shutdown() {
+	srv.BroadcastAway(SHUTDOWN, false, true)
 	srv.FlushAll(nil)
 	os.Remove(srv.ServerSock)
-	tdlog.Printf("Server %s has shutdown upon client request", srv.ServerSock)
+	tdlog.Printf("Rank %d: Shutdown upon client request", srv.Rank)
 	os.Exit(0)
 }
 
@@ -179,11 +186,10 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 	for {
 		cmd, err := in.ReadString(byte('\n'))
 		if err != nil {
-			tdlog.Printf("Connection is closed")
 			return
 		}
 		cmd = cmd[0 : len(cmd)-1] // remove new-line suffix
-		tdlog.Printf("CMD: %s", cmd)
+		tdlog.Printf("Rank %d: Received %s", srv.Rank, cmd)
 		// Interpret commands which do not use parameters
 		switch cmd {
 		case PING:
@@ -202,6 +208,10 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.PingErr}, out); err != nil {
 				return
 			}
+		case RELOAD:
+			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.Reload}, out); err != nil {
+				return
+			}
 		case FLUSH_ALL:
 			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.FlushAll}, out); err != nil {
 				return
@@ -217,7 +227,15 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 					return
 				}
 			case COL_ALL:
-				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColAll}, out); err != nil {
+				if err = srv.jsonOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColAll}, out); err != nil {
+					return
+				}
+			case COL_RENAME:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColRename}, out); err != nil {
+					return
+				}
+			case COL_DROP:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDrop}, out); err != nil {
 					return
 				}
 			}
