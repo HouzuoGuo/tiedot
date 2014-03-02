@@ -1,4 +1,4 @@
-/* tiedot command implementations - client side. */
+/* tiedot command implementations - client side, public APIs. */
 package network
 
 import "fmt"

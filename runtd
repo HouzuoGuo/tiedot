@@ -12,7 +12,7 @@ cleanup() {
 
 # Run go test cases in the directory
 go_test_dir() {
-	pushd $1 && go test && popd || exit 1
+	pushd $1 && GOMAXPROCS=4 go test && popd || exit 1
 }
 
 # Spawn N server processes at once

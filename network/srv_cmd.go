@@ -2,11 +2,13 @@
 package network
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/colpart"
 	"github.com/HouzuoGuo/tiedot/dstruct"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"github.com/HouzuoGuo/tiedot/uid"
 	"io/ioutil"
 	"os"
 	"path"
@@ -205,4 +207,186 @@ func (srv *Server) PingJS(_ []string) (jsonNoError interface{}) {
 }
 func (srv *Server) PingErr(_ []string) (mustBErr interface{}) {
 	return errors.New("this is an error")
+}
+
+// Insert a document into my partition of the collection.
+func (srv *Server) DocInsert(params []string) (err interface{}) {
+	colName := params[1]
+	jsonDoc := params[2]
+	// Check input collection name and JSON document string
+	if col, exists := srv.ColParts[colName]; !exists {
+		return errors.New(fmt.Sprintf("Sorry! Collection '%s' may exist, but my rank does not own a partition of it. Double check the name and try a lower rank.", colName))
+	} else {
+		var doc map[string]interface{}
+		if err = json.Unmarshal([]byte(jsonDoc), &doc); err != nil {
+			return errors.New(fmt.Sprintf("DocInsert input JSON is not well formed: '%s'", jsonDoc))
+		}
+		// Insert the document into my partition
+		if _, err = col.Insert(doc); err != nil {
+			return errors.New(fmt.Sprintf("Cannot insert document into %s, error: %v", colName, err))
+		}
+	}
+	return nil
+}
+
+// Get a document from my partition of the collection.
+func (srv *Server) DocGet(params []string) (strOrErr interface{}) {
+	colName := params[1]
+	id := params[2]
+	// Check input collection name and ID
+	idInt, strOrErr := strconv.ParseUint(id, 10, 64)
+	if strOrErr != nil {
+		return errors.New(fmt.Sprintf("%s is not a valid document ID", id))
+	}
+	if col, exists := srv.ColParts[colName]; !exists {
+		return errors.New(fmt.Sprintf("Sorry! Collection '%s' may exist, but my rank does not own a partition of it. Double check the name and try a lower rank.", colName))
+	} else {
+		// Read document from partition and return
+		if physID, err := col.GetPhysicalID(idInt); err != nil {
+			return err
+		} else {
+			if jsonStr, err := col.ReadStr(physID); err != nil {
+				return err
+			} else {
+				return jsonStr
+			}
+		}
+	}
+}
+
+// Update a document in my partition.
+func (srv *Server) DocUpdate(params []string) (err interface{}) {
+	colName := params[1]
+	id := params[2]
+	jsonDoc := params[3]
+	// Check input collection name, new document JSON, and UID
+	idInt, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		return errors.New(fmt.Sprintf("%s is not a valid document ID", id))
+	}
+	if col, exists := srv.ColParts[colName]; !exists {
+		return errors.New(fmt.Sprintf("Sorry! Collection '%s' may exist, but my rank does not own a partition of it. Double check the name and try a lower rank.", colName))
+	} else {
+		var doc map[string]interface{}
+		if err = json.Unmarshal([]byte(jsonDoc), &doc); err != nil {
+			return errors.New(fmt.Sprintf("DocUpdate input JSON is not well formed: '%s'", jsonDoc))
+		}
+		doc[uid.PK_NAME] = id // client is not supposed to change UID, just to make sure
+		var physID uint64
+		if physID, err = col.GetPhysicalID(idInt); err != nil {
+			return err
+		} else {
+			if _, err = col.Update(physID, doc); err != nil {
+				return
+			}
+		}
+	}
+	return nil
+}
+
+// Update a document in my partition.
+func (srv *Server) DocDelete(params []string) (err interface{}) {
+	colName := params[1]
+	id := params[2]
+	// Check input collection name, new document JSON, and UID
+	idInt, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		return errors.New(fmt.Sprintf("%s is not a valid document ID", id))
+	}
+	if col, exists := srv.ColParts[colName]; !exists {
+		return errors.New(fmt.Sprintf("Sorry! Collection '%s' may exist, but my rank does not own a partition of it. Double check the name and try a lower rank.", colName))
+	} else {
+		if physID, err := col.GetPhysicalID(idInt); err != nil {
+			return err
+		} else {
+			col.Delete(physID)
+		}
+	}
+	return nil
+}
+
+// Put a key-value pair into hash table.
+func (srv *Server) HTPut(params []string) (err interface{}) {
+	colName := params[1]
+	htName := params[2]
+	key := params[3]
+	val := params[4]
+	if col, exists := srv.Htables[colName]; !exists {
+		return errors.New(fmt.Sprintf("Sorry! Collection '%s' may exist, but my rank does not own a partition of it. Double check the name and try a lower rank.", colName))
+	} else {
+		if ht, exists := col[htName]; !exists {
+			return errors.New(fmt.Sprintf("Hash table %s does not exist in %s", htName, colName))
+		} else {
+			var keyInt, valInt uint64
+			keyInt, err = strconv.ParseUint(key, 10, 64)
+			if err != nil {
+				return
+			}
+			valInt, err = strconv.ParseUint(val, 10, 64)
+			if err != nil {
+				return
+			}
+			ht.Put(keyInt, valInt)
+		}
+	}
+	return nil
+}
+
+// Get a key's associated values.
+func (srv *Server) HTGet(params []string) (strOrRrr interface{}) {
+	colName := params[1]
+	htName := params[2]
+	key := params[3]
+	limit := params[4]
+	if col, exists := srv.Htables[colName]; !exists {
+		return errors.New(fmt.Sprintf("Sorry! Collection '%s' may exist, but my rank does not own a partition of it. Double check the name and try a lower rank.", colName))
+	} else {
+		if ht, exists := col[htName]; !exists {
+			return errors.New(fmt.Sprintf("Hash table %s does not exist in %s", htName, colName))
+		} else {
+			var keyInt, limitInt uint64
+			if keyInt, strOrRrr = strconv.ParseUint(key, 10, 64); strOrRrr != nil {
+				return
+			}
+			if limitInt, strOrRrr = strconv.ParseUint(limit, 10, 64); strOrRrr != nil {
+				return
+			}
+			// Assemble response into "key1 key2 key3 val1 val2 val3 ..."
+			keys, vals := ht.Get(keyInt, limitInt)
+			resp := make([]string, len(keys)*2)
+			for i, key := range keys {
+				resp[i] = strconv.FormatUint(key, 10)
+			}
+			for i, val := range vals {
+				resp[i+len(keys)] = strconv.FormatUint(val, 10)
+			}
+			return strings.Join(resp, " ")
+		}
+	}
+	return nil
+}
+
+// Remove a key-value pair.
+func (srv *Server) HTDelete(params []string) (err interface{}) {
+	colName := params[1]
+	htName := params[2]
+	key := params[3]
+	val := params[4]
+	if col, exists := srv.Htables[colName]; !exists {
+		return errors.New(fmt.Sprintf("Sorry! Collection '%s' may exist, but my rank does not own a partition of it. Double check the name and try a lower rank.", colName))
+	} else {
+		if ht, exists := col[htName]; !exists {
+			return errors.New(fmt.Sprintf("Hash table %s does not exist in %s", htName, colName))
+		} else {
+			var keyInt, valInt uint64
+			if keyInt, err = strconv.ParseUint(key, 10, 64); err != nil {
+				return
+			}
+			if valInt, err = strconv.ParseUint(val, 10, 64); err != nil {
+				return
+			}
+			ht.Remove(keyInt, valInt)
+		}
+	}
+	return nil
 }

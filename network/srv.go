@@ -29,7 +29,7 @@ const (
 	DOC_DELETE = "dde" // dde <col_name> <id>
 
 	// Index entry manipulation
-	HT_SET    = "hst" // hst <col_name> <idx_name> <key> <val>
+	HT_PUT    = "hpt" // hpt <col_name> <idx_name> <key> <val>
 	HT_GET    = "hgt" // hgt <col_name> <idx_name> <key> <limit>
 	HT_DELETE = "hde" // hde <col_name> <idx_name> <key> <val>
 
@@ -238,16 +238,35 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDrop}, out); err != nil {
 					return
 				}
+			case DOC_INSERT:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocInsert}, out); err != nil {
+					return
+				}
+			case DOC_GET:
+				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocGet}, out); err != nil {
+					return
+				}
+			case DOC_UPDATE:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocUpdate}, out); err != nil {
+					return
+				}
+			case DOC_DELETE:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocDelete}, out); err != nil {
+					return
+				}
+			case HT_PUT:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.HTPut}, out); err != nil {
+					return
+				}
+			case HT_GET:
+				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.HTGet}, out); err != nil {
+					return
+				}
+			case HT_DELETE:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.HTDelete}, out); err != nil {
+					return
+				}
 			}
-		case DOC_INSERT:
-
-		case DOC_GET:
-		case DOC_UPDATE:
-		case DOC_DELETE:
-		case HT_SET:
-		case HT_GET:
-		case HT_DELETE:
-
 		}
 	}
 }

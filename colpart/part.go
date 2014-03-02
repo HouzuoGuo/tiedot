@@ -113,6 +113,15 @@ func (col *Partition) Read(id uint64, doc interface{}) error {
 	return nil
 }
 
+func (col *Partition) ReadStr(id uint64) (json string, err error) {
+	data := col.Data.Read(id)
+	if data == nil {
+		err = errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.BaseDir))
+		return
+	}
+	return string(data), nil
+}
+
 // Update a document by physical ID, return its new physical ID.
 func (col *Partition) Update(id uint64, doc map[string]interface{}) (newID uint64, err error) {
 	docID, found := uid.PKOfDoc(doc)

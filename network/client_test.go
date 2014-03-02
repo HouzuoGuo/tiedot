@@ -6,6 +6,7 @@ package network
 
 import (
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/uid"
 	"strconv"
 	"testing"
 )
@@ -69,6 +70,8 @@ func TestColCreate(t *testing.T) {
 	}
 }
 
+// There are now two collections: z of 2 partitions and x of 3 partitions
+
 func TestColRename(t *testing.T) {
 	if clients[3].ColRename("z", "a") != nil { // 2 parts
 		t.Fatal()
@@ -87,6 +90,8 @@ func TestColRename(t *testing.T) {
 	}
 }
 
+// There are now two collections: a of 2 partitions, b of 3 partitions
+
 func TestColDrop(t *testing.T) {
 	var err error
 	if err = clients[3].ColDrop("b"); err != nil {
@@ -101,6 +106,66 @@ func TestColDrop(t *testing.T) {
 			t.Fatal(allCols)
 		}
 	}
+}
+
+// There is now one collection: a of 2 partitions
+
+func TestDocCRUD(t *testing.T) {
+	var err error
+	if err = clients[2].docInsert("a", map[string]interface{}{"1": "1"}); err == nil {
+		t.Fatal()
+	}
+	if err = clients[3].docInsert("a", map[string]interface{}{"1": "1"}); err == nil {
+		t.Fatal()
+	}
+	// doc insert
+	if err = clients[0].docInsert("a", map[string]interface{}{uid.PK_NAME: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err = clients[1].docInsert("a", map[string]interface{}{uid.PK_NAME: "2"}); err != nil {
+		t.Fatal(err)
+	}
+	// doc read
+	if _, err := clients[0].docGet("a", "1234"); err == nil {
+		t.Fatal()
+	}
+	if doc, err := clients[0].docGet("a", "1"); err != nil || doc == nil {
+		t.Fatal(err)
+	}
+	if doc, err := clients[1].docGet("a", "2"); err != nil || doc == nil {
+		t.Fatal(err)
+	}
+	// doc update
+	if err = clients[0].docUpdate("a", "1234", map[string]interface{}{"content": "a"}); err == nil {
+		t.Fatal()
+	}
+	if err = clients[0].docUpdate("a", "1", map[string]interface{}{"content": "a"}); err != nil {
+		t.Fatal(err)
+	}
+	if err = clients[1].docUpdate("a", "2", map[string]interface{}{"content": "b"}); err != nil {
+		t.Fatal(err)
+	}
+	if doc, err := clients[0].docGet("a", "1"); err != nil || doc.(map[string]interface{})["content"].(string) != "a" {
+		t.Fatal(err)
+	}
+	if doc, err := clients[1].docGet("a", "2"); err != nil || doc.(map[string]interface{})["content"].(string) != "b" {
+		t.Fatal(err)
+	}
+	// doc delete then read
+	if err = clients[1].docDelete("a", "1234"); err == nil {
+		t.Fatal()
+	}
+	if err = clients[1].docDelete("a", "2"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := clients[0].docGet("a", "2"); err == nil {
+		t.Fatal()
+	}
+}
+
+// There is now (still) one collection "a" with two partitions
+
+func TestHashCRUD(t *testing.T) {
 }
 
 func TestServerShutdown(t *testing.T) {
