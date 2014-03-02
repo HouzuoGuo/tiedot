@@ -61,9 +61,9 @@ const (
 
 // Tasks are queued on a server and executed one by one
 type Task struct {
-	Ret   chan interface{}              // Signal of function completion
-	Input interface{}                   // Input to the task function
-	Fun   func(interface{}) interface{} // Task (function) with a return value type
+	Ret   chan interface{}           // Signal of function completion
+	Input []string                   // Task function input parameter
+	Fun   func([]string) interface{} // Task (function) with a return value type
 }
 
 // Server state and structures.
@@ -219,7 +219,7 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 		case SHUTDOWN:
 			srv.Shutdown()
 		default:
-			// Interpret commands which Use parameters
+			// Interpret parameterised commands
 			params := strings.SplitN(cmd, " ", 1+4) // there are at most 4 parameters used by any command
 			switch params[0] {
 			case COL_CREATE:
@@ -239,6 +239,15 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 					return
 				}
 			}
+		case DOC_INSERT:
+
+		case DOC_GET:
+		case DOC_UPDATE:
+		case DOC_DELETE:
+		case HT_SET:
+		case HT_GET:
+		case HT_DELETE:
+
 		}
 	}
 }

@@ -23,7 +23,7 @@ const (
 )
 
 // Reload collection configurations.
-func (server *Server) Reload(_ interface{}) (err interface{}) {
+func (server *Server) Reload(_ []string) (err interface{}) {
 	// Save whatever I already have, and get rid of everything
 	server.FlushAll(nil)
 	server.ColNumParts = make(map[string]int)
@@ -101,7 +101,7 @@ func (server *Server) Reload(_ interface{}) (err interface{}) {
 }
 
 // Call flush on all mapped files.
-func (srv *Server) FlushAll(_ interface{}) (_ interface{}) {
+func (srv *Server) FlushAll(_ []string) (_ interface{}) {
 	for _, part := range srv.ColParts {
 		part.Flush()
 	}
@@ -114,8 +114,7 @@ func (srv *Server) FlushAll(_ interface{}) (_ interface{}) {
 }
 
 // Create a collection.
-func (srv *Server) ColCreate(input interface{}) (err interface{}) {
-	params := input.([]string)
+func (srv *Server) ColCreate(params []string) (err interface{}) {
 	colName := params[1]
 	numParts := params[2]
 	// Check input parameters
@@ -145,13 +144,12 @@ func (srv *Server) ColCreate(input interface{}) (err interface{}) {
 }
 
 // Return all collection name VS number of partitions in JSON.
-func (srv *Server) ColAll(_ interface{}) (neverErr interface{}) {
+func (srv *Server) ColAll(_ []string) (neverErr interface{}) {
 	return srv.ColNumParts
 }
 
 // Rename a collection.
-func (srv *Server) ColRename(input interface{}) (err interface{}) {
-	params := input.([]string)
+func (srv *Server) ColRename(params []string) (err interface{}) {
 	oldName := params[1]
 	newName := params[2]
 	// Check input names
@@ -177,8 +175,7 @@ func (srv *Server) ColRename(input interface{}) (err interface{}) {
 }
 
 // Drop a collection.
-func (srv *Server) ColDrop(input interface{}) (err interface{}) {
-	params := input.([]string)
+func (srv *Server) ColDrop(params []string) (err interface{}) {
 	colName := params[1]
 	// Check input name
 	if _, exists := srv.ColNumParts[colName]; !exists {
@@ -197,15 +194,15 @@ func (srv *Server) ColDrop(input interface{}) (err interface{}) {
 }
 
 // Ping, Ping1, PingJS are for testing purpose, they do not manipulate any data.
-func (srv *Server) Ping(_ interface{}) (strNoError interface{}) {
+func (srv *Server) Ping(_ []string) (strNoError interface{}) {
 	return ACK
 }
-func (srv *Server) Ping1(_ interface{}) (uint64NoError interface{}) {
+func (srv *Server) Ping1(_ []string) (uint64NoError interface{}) {
 	return uint64(1)
 }
-func (srv *Server) PingJS(_ interface{}) (jsonNoError interface{}) {
+func (srv *Server) PingJS(_ []string) (jsonNoError interface{}) {
 	return []string{ACK, ACK}
 }
-func (srv *Server) PingErr(_ interface{}) (mustBErr interface{}) {
+func (srv *Server) PingErr(_ []string) (mustBErr interface{}) {
 	return errors.New("this is an error")
 }
