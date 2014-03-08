@@ -36,3 +36,26 @@ func (tc *Client) ColRename(oldName, newName string) error {
 func (tc *Client) ColDrop(colName string) error {
 	return tc.getOK(fmt.Sprintf("%s %s", COL_DROP, colName))
 }
+
+// Create an index.
+func (tc *Client) IdxCreate(colName, idxPath string) error {
+	return tc.getOK(fmt.Sprintf("%s %s %s", IDX_CREATE, colName, idxPath))
+}
+
+// Get all indexed paths.
+func (tc *Client) IdxAll(colName string) (paths []string, err error) {
+	js, err := tc.getJSON(fmt.Sprintf("%s %s", IDX_ALL, colName))
+	if err != nil {
+		return
+	}
+	paths = make([]string, 0, 12)
+	for _, path := range js.([]interface{}) {
+		paths = append(paths, path.(string))
+	}
+	return paths, nil
+}
+
+// Drop an index
+func (tc *Client) IdxDrop(colName, idxPath string) error {
+	return tc.getOK(fmt.Sprintf("%s %s %s", IDX_DROP, colName, idxPath))
+}

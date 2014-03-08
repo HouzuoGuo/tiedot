@@ -52,13 +52,15 @@ func Pings(t *testing.T) {
 	}
 }
 
-func ColCreate(t *testing.T) {
+func ColCRUD(t *testing.T) {
+	// Create collections
 	if clients[0].ColCreate("z", 2) != nil {
 		t.Fatal()
 	}
 	if clients[3].ColCreate("x", 3) != nil {
 		t.Fatal()
 	}
+	// Get collection names
 	for i := 0; i < 4; i++ {
 		allCols, err := clients[i].ColAll()
 		if err != nil {
@@ -68,11 +70,8 @@ func ColCreate(t *testing.T) {
 			t.Fatal(allCols)
 		}
 	}
-}
-
-// There are now two collections: z of 2 partitions and x of 3 partitions
-
-func ColRename(t *testing.T) {
+	// There are now two collections: z of 2 partitions and x of 3 partitions
+	// Rename collections
 	if clients[3].ColRename("z", "a") != nil { // 2 parts
 		t.Fatal()
 	}
@@ -88,11 +87,8 @@ func ColRename(t *testing.T) {
 			t.Fatal(allCols)
 		}
 	}
-}
-
-// There are now two collections: a of 2 partitions, b of 3 partitions
-
-func ColDrop(t *testing.T) {
+	// There are now two collections: a of 2 partitions, b of 3 partitions
+	// Drop a collection
 	var err error
 	if err = clients[3].ColDrop("b"); err != nil {
 		t.Fatal(err)
@@ -167,7 +163,88 @@ func DocCRUD(t *testing.T) {
 
 // There is now (still) one collection "a" with two partitions
 
+func IndexCRUD(t *testing.T) {
+	// Create 3 indexes
+	if err := clients[0].IdxCreate("a", "a,b,c"); err != nil {
+		t.Fatal(err)
+	}
+	if err := clients[1].IdxCreate("a", "d,e,f"); err != nil {
+		t.Fatal(err)
+	}
+	if err := clients[2].IdxCreate("a", "g,h,i"); err != nil {
+		t.Fatal(err)
+	}
+	// Get indexed paths
+	paths, err := clients[2].IdxAll("a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 3 || paths[0] != "a,b,c" || paths[1] != "d,e,f" || paths[2] != "g,h,i" {
+		t.Fatal(paths)
+	}
+	// Remove an index
+	if err := clients[2].IdxDrop("a", "g,h,i"); err != nil {
+		t.Fatal(err)
+	}
+	paths, err = clients[1].IdxAll("a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 2 || paths[0] != "a,b,c" || paths[1] != "d,e,f" {
+		t.Fatal(paths)
+	}
+}
+
+// There is now one collection "a" with two partitions, and two indexes "a,b,c", "d,e,f"
+
 func HashCRUD(t *testing.T) {
+	if err := clients[0].htPut("asdf", "asdf", 1, 1); err == nil {
+		t.Fatal()
+	}
+	if err := clients[0].htPut("a", "asdf", 1, 1); err == nil {
+		t.Fatal()
+	}
+	// Put some entries
+	if err := clients[0].htPut("a", "a,b,c", 1, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := clients[0].htPut("a", "a,b,c", 1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := clients[1].htPut("a", "a,b,c", 3, 4); err != nil {
+		t.Fatal(err)
+	}
+	if err := clients[1].htPut("a", "a,b,c", 3, 5); err != nil {
+		t.Fatal(err)
+	}
+	// Get key 1 and key 3
+	vals1, err1 := clients[0].htGet("a", "a,b,c", 1, 0)
+	if !(err1 == nil && len(vals1) == 2 && vals1[0] == 1 && vals1[1] == 2) {
+		t.Fatal(vals1, err1)
+	}
+	vals3, err3 := clients[1].htGet("a", "a,b,c", 3, 1)
+	if !(err3 == nil && len(vals3) == 1 && vals3[0] == 4) {
+		t.Fatal(vals3, err3)
+	}
+	vals3, err3 = clients[1].htGet("a", "a,b,c", 3, 0)
+	if !(err3 == nil && len(vals3) == 2 && vals3[0] == 4 && vals3[1] == 5) {
+		t.Fatal(vals3, err3)
+	}
+	// Remove a value from key 1 and key 3
+	if err := clients[0].htDelete("a", "a,b,c", 1, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := clients[1].htDelete("a", "a,b,c", 3, 4); err != nil {
+		t.Fatal(err)
+	}
+	vals1, err1 = clients[0].htGet("a", "a,b,c", 1, 0)
+	if !(err1 == nil && len(vals1) == 1 && vals1[0] == 2) {
+		t.Fatal(vals1, err1)
+	}
+	vals3, err3 = clients[1].htGet("a", "a,b,c", 3, 0)
+	if !(err3 == nil && len(vals3) == 1 && vals3[0] == 5) {
+		t.Fatal(vals3, err3)
+	}
 }
 
 func ServerShutdown(t *testing.T) {
@@ -180,10 +257,9 @@ func ServerShutdown(t *testing.T) {
 func TestSequence(t *testing.T) {
 	ClientConnect(t)
 	Pings(t)
-	ColCreate(t)
-	ColRename(t)
-	ColDrop(t)
+	ColCRUD(t)
 	DocCRUD(t)
+	IndexCRUD(t)
 	HashCRUD(t)
 	ServerShutdown(t)
 }

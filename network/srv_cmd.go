@@ -340,14 +340,10 @@ func (srv *Server) HTGet(params []string) (strOrErr interface{}) {
 			if limitInt, strOrErr = strconv.ParseUint(limit, 10, 64); strOrErr != nil {
 				return
 			}
-			// Assemble response into "key1 key2 key3 val1 val2 val3 ..."
-			keys, vals := ht.Get(keyInt, limitInt)
-			resp := make([]string, len(keys)*2)
-			for i, key := range keys {
-				resp[i] = strconv.FormatUint(key, 10)
-			}
+			vals := ht.Get(keyInt, limitInt)
+			resp := make([]string, len(vals))
 			for i, val := range vals {
-				resp[i+len(keys)] = strconv.FormatUint(val, 10)
+				resp[i] = strconv.FormatUint(val, 10)
 			}
 			return strings.Join(resp, " ")
 		}
@@ -382,15 +378,73 @@ func (srv *Server) HTDelete(params []string) (err interface{}) {
 
 // Create an index.
 func (srv *Server) IdxCreate(params []string) (err interface{}) {
+	colName := params[1]
+	idxPath := params[2]
+	// Verify that the collection exists
+	if _, exists := srv.ColNumParts[colName]; !exists {
+		return errors.New(fmt.Sprintf("Collection %s does not exist", colName))
+	}
+	// Create hash table directory
+	if err = os.MkdirAll(path.Join(srv.DBDir, colName, HASHTABLE_DIRNAME_MAGIC+idxPath), 0700); err != nil {
+		return
+	}
+	// Reload my config
+	if err = srv.Reload(nil); err != nil {
+		return
+	}
+	// Inform other ranks to reload their config
+	if !srv.BroadcastAway(RELOAD, true, false) {
+		return errors.New("Failed to reload configuration, check server logs for clue please")
+	}
 	return nil
 }
 
 // Return list of all indexes
 func (srv *Server) IdxAll(params []string) (jsonOrErr interface{}) {
-	return nil
+	colName := params[1]
+	if _, exists := srv.ColNumParts[colName]; !exists {
+		return errors.New(fmt.Sprintf("Collection %s does not exist", colName))
+	}
+	var paths []string
+	// Rank 0 always knows everything
+	if srv.Rank == 0 {
+		htables := srv.Htables[colName]
+		paths = make([]string, len(htables))
+		counter := 0
+		for htName, _ := range htables {
+			paths[counter] = htName
+			counter++
+		}
+		return paths
+	} else {
+		// If this server is not ranked 0, it may not know about the index, so contact rank 0
+		paths, err := srv.InterRank[0].IdxAll(colName)
+		if err != nil {
+			return err
+		}
+		return paths
+	}
 }
 
 // Drop an index
 func (srv *Server) IdxDrop(params []string) (err interface{}) {
+	colName := params[1]
+	idxPath := params[2]
+	// Verify that the collection exists
+	if _, exists := srv.ColNumParts[colName]; !exists {
+		return errors.New(fmt.Sprintf("Collection %s does not exist", colName))
+	}
+	// rm -rf index_directory
+	if err = os.RemoveAll(path.Join(srv.DBDir, colName, HASHTABLE_DIRNAME_MAGIC+idxPath)); err != nil {
+		return
+	}
+	// Reload my config
+	if err = srv.Reload(nil); err != nil {
+		return
+	}
+	// Inform other ranks to reload their config
+	if !srv.BroadcastAway(RELOAD, true, false) {
+		return errors.New("Failed to reload configuration, check server logs for clue please")
+	}
 	return nil
 }
