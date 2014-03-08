@@ -10,31 +10,31 @@ import (
 )
 
 // Insert a document. (Use ColInsert as the public API).
-func (tc *Client) docInsert(colName string, doc map[string]interface{}) error {
+func (tc *Client) docInsert(colName string, doc map[string]interface{}) (uint64, error) {
 	if js, err := json.Marshal(doc); err != nil {
-		return errors.New(fmt.Sprintf("Client cannot serialize structure %v, error: %v", doc, err))
+		return 0, errors.New(fmt.Sprintf("Client cannot serialize structure %v, error: %v", doc, err))
 	} else {
-		return tc.getOK(fmt.Sprintf("%s %s %s", DOC_INSERT, colName, string(js)))
+		return tc.getUint64(fmt.Sprintf("%s %s %s", DOC_INSERT, colName, string(js)))
 	}
 }
 
 // Get a document by ID. (Use ColGet as the public API).
-func (tc *Client) docGet(colName string, uid string) (interface{}, error) {
-	return tc.getJSON(fmt.Sprintf("%s %s %s", DOC_GET, colName, uid))
+func (tc *Client) docGet(colName string, id uint64) (interface{}, error) {
+	return tc.getJSON(fmt.Sprintf("%s %s %d", DOC_GET, colName, id))
 }
 
 // Update a document by ID. (Use ColUpdate as the public API).
-func (tc *Client) docUpdate(colName string, uid string, newDoc map[string]interface{}) error {
+func (tc *Client) docUpdate(colName string, id uint64, newDoc map[string]interface{}) (uint64, error) {
 	if js, err := json.Marshal(newDoc); err != nil {
-		return errors.New(fmt.Sprintf("Client cannot serialize structure %v, error: %v", newDoc, err))
+		return 0, errors.New(fmt.Sprintf("Client cannot serialize structure %v, error: %v", newDoc, err))
 	} else {
-		return tc.getOK(fmt.Sprintf("%s %s %s %s", DOC_UPDATE, colName, uid, js))
+		return tc.getUint64(fmt.Sprintf("%s %s %d %s", DOC_UPDATE, colName, id, js))
 	}
 }
 
 // Delete a document by ID. (Use ColDelete as the public API).
-func (tc *Client) docDelete(colName string, uid string) error {
-	return tc.getOK(fmt.Sprintf("%s %s %s %s", DOC_DELETE, colName, uid))
+func (tc *Client) docDelete(colName string, id uint64) error {
+	return tc.getOK(fmt.Sprintf("%s %s %d %s", DOC_DELETE, colName, id))
 }
 
 // Put a key-value pair into hash table (no corresponding public API).

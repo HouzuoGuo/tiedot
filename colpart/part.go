@@ -11,6 +11,7 @@ import (
 	"github.com/HouzuoGuo/tiedot/uid"
 	"os"
 	"path"
+	"strings"
 )
 
 const (
@@ -55,7 +56,7 @@ func OpenPart(baseDir string) (part *Partition, err error) {
 func (col *Partition) Insert(doc map[string]interface{}) (physicalID uint64, err error) {
 	docID, found := uid.PKOfDoc(doc)
 	if !found {
-		return 0, errors.New(fmt.Sprint("Document %v does not have ID", doc))
+		return 0, errors.New(fmt.Sprintf("Document %v does not have ID", doc))
 	}
 	data, err := json.Marshal(doc)
 	if err != nil {
@@ -119,7 +120,7 @@ func (col *Partition) ReadStr(id uint64) (json string, err error) {
 		err = errors.New(fmt.Sprintf("Document %d does not exist in %s", id, col.BaseDir))
 		return
 	}
-	return string(data), nil
+	return strings.TrimSpace(string(data)), nil
 }
 
 // Update a document by physical ID, return its new physical ID.

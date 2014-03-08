@@ -4,6 +4,7 @@ package network
 import (
 	"encoding/json"
 	"errors"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"strconv"
 	"strings"
 )
@@ -54,6 +55,7 @@ func (tc *Client) getResp() string {
 		// The error occurs if server closes the connection, the client may simply abort (panic)
 		panic(err)
 	}
+	tdlog.Printf("Client received: %s", line)
 	return line[0 : len(line)-1]
 }
 
@@ -67,16 +69,6 @@ func (tc *Client) getOK(req string) error {
 	return nil
 }
 
-// Send a request and expect a uint64 response or error.
-func (tc *Client) getUint64(req string) (uint64, error) {
-	tc.writeReq(req)
-	resp := tc.getResp()
-	if strings.HasPrefix(resp, ERR) {
-		return 0, errors.New(resp)
-	}
-	return strconv.ParseUint(resp, 10, 64)
-}
-
 // Send a request and expect a string response or error.
 func (tc *Client) getStr(req string) (string, error) {
 	tc.writeReq(req)
@@ -85,6 +77,15 @@ func (tc *Client) getStr(req string) (string, error) {
 		return "", errors.New(resp)
 	}
 	return resp, nil
+}
+
+// Send a request and expect a uint64 response or error.
+func (tc *Client) getUint64(req string) (uint64, error) {
+	intStr, err := tc.getStr(req)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseUint(intStr, 10, 64)
 }
 
 // Send a request and expect a JSON response or error.

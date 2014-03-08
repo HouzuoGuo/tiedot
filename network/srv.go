@@ -17,8 +17,22 @@ import (
 
 // Command operations
 const (
+	// Collection management
+	COL_CREATE = "col_create" // col_create <col_name> <num_parts>
+	COL_ALL    = "col_all"    // col_all
+	COL_RENAME = "col_rename" // col_rename <old_name> <new_name>
+	COL_DROP   = "col_drop"   // col_drop <col_name>
+	COL_SCRUB  = "col_scrub"  // col_scrub <col_name>
+	COL_REPART = "col_repart" // col_repart <col_name> <new_num_parts>
+
+	// Index management
+	IDX_CREATE = "idx_create" // idx_create <col_name> <idx_path>
+	IDX_ALL    = "idx_all"    // idx_all <col_name>
+	IDX_DROP   = "idx_drop"   // idx_drop <col_name> <idx_path>
+
 	// Collection document manipulation with index updates
 	COL_INSERT = "cin" // cin <col_name> <json_str>
+	COL_GET    = "cgt" // cgt <col_name> <id>
 	COL_UPDATE = "cup" // cup <col_name> <id> <json_str>
 	COL_DELETE = "cde" // cde <col_name> <id>
 
@@ -32,19 +46,6 @@ const (
 	HT_PUT    = "hpt" // hpt <col_name> <idx_name> <key> <val>
 	HT_GET    = "hgt" // hgt <col_name> <idx_name> <key> <limit>
 	HT_DELETE = "hde" // hde <col_name> <idx_name> <key> <val>
-
-	// Collection management
-	COL_CREATE = "col_create" // col_create <col_name> <num_parts>
-	COL_ALL    = "col_all"    // col_all
-	COL_RENAME = "col_rename" // col_rename <old_name> <new_name>
-	COL_DROP   = "col_drop"   // col_drop <col_name>
-	COL_SCRUB  = "col_scrub"  // col_scrub <col_name>
-	COL_REPART = "col_repart" // col_repart <col_name> <new_num_parts>
-
-	// Index management
-	IDX_CREATE = "idx_create" // idx_create <col_name> <idx_path>
-	IDX_ALL    = "idx_all"    // idx_all <col_name>
-	IDX_DROP   = "idx_drop"   // idx_drop <col_name> <idx_path>
 
 	// Other
 	RELOAD    = "reload"
@@ -222,6 +223,7 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 			// Interpret parameterised commands
 			params := strings.SplitN(cmd, " ", 1+4) // there are at most 4 parameters used by any command
 			switch params[0] {
+			// Collection management
 			case COL_CREATE:
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColCreate}, out); err != nil {
 					return
@@ -238,8 +240,27 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDrop}, out); err != nil {
 					return
 				}
+			// Index management
+			case IDX_CREATE:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.IdxCreate}, out); err != nil {
+					return
+				}
+			case IDX_ALL:
+				if err = srv.jsonOrErr(&Task{Ret: resp, Input: params, Fun: srv.IdxAll}, out); err != nil {
+					return
+				}
+			case IDX_DROP:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.IdxDrop}, out); err != nil {
+					return
+				}
+			// Document manipulation including index updates
+			case COL_INSERT:
+			case COL_GET:
+			case COL_UPDATE:
+			case COL_DELETE:
+			// Document CRUD (no index update)
 			case DOC_INSERT:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocInsert}, out); err != nil {
+				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocInsert}, out); err != nil {
 					return
 				}
 			case DOC_GET:
@@ -247,13 +268,14 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 					return
 				}
 			case DOC_UPDATE:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocUpdate}, out); err != nil {
+				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocUpdate}, out); err != nil {
 					return
 				}
 			case DOC_DELETE:
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocDelete}, out); err != nil {
 					return
 				}
+			// Index entry (hash table) manipulation
 			case HT_PUT:
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.HTPut}, out); err != nil {
 					return

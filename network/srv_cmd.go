@@ -210,7 +210,7 @@ func (srv *Server) PingErr(_ []string) (mustBErr interface{}) {
 }
 
 // Insert a document into my partition of the collection.
-func (srv *Server) DocInsert(params []string) (err interface{}) {
+func (srv *Server) DocInsert(params []string) (strOrErr interface{}) {
 	colName := params[1]
 	jsonDoc := params[2]
 	// Check input collection name and JSON document string
@@ -218,15 +218,16 @@ func (srv *Server) DocInsert(params []string) (err interface{}) {
 		return errors.New(fmt.Sprintf("Sorry! Collection '%s' may exist, but my rank does not own a partition of it. Double check the name and try a lower rank.", colName))
 	} else {
 		var doc map[string]interface{}
-		if err = json.Unmarshal([]byte(jsonDoc), &doc); err != nil {
+		if strOrErr = json.Unmarshal([]byte(jsonDoc), &doc); strOrErr != nil {
 			return errors.New(fmt.Sprintf("DocInsert input JSON is not well formed: '%s'", jsonDoc))
 		}
 		// Insert the document into my partition
-		if _, err = col.Insert(doc); err != nil {
-			return errors.New(fmt.Sprintf("Cannot insert document into %s, error: %v", colName, err))
+		var newDocID uint64
+		if newDocID, strOrErr = col.Insert(doc); strOrErr != nil {
+			return errors.New(fmt.Sprintf("Cannot insert document into %s, error: %v", colName, strOrErr))
 		}
+		return strconv.FormatUint(newDocID, 10)
 	}
-	return nil
 }
 
 // Get a document from my partition of the collection.
@@ -242,46 +243,38 @@ func (srv *Server) DocGet(params []string) (strOrErr interface{}) {
 		return errors.New(fmt.Sprintf("Sorry! Collection '%s' may exist, but my rank does not own a partition of it. Double check the name and try a lower rank.", colName))
 	} else {
 		// Read document from partition and return
-		if physID, err := col.GetPhysicalID(idInt); err != nil {
+		if jsonStr, err := col.ReadStr(idInt); err != nil {
 			return err
 		} else {
-			if jsonStr, err := col.ReadStr(physID); err != nil {
-				return err
-			} else {
-				return jsonStr
-			}
+			return jsonStr
 		}
 	}
 }
 
 // Update a document in my partition.
-func (srv *Server) DocUpdate(params []string) (err interface{}) {
+func (srv *Server) DocUpdate(params []string) (strOrErr interface{}) {
 	colName := params[1]
 	id := params[2]
 	jsonDoc := params[3]
 	// Check input collection name, new document JSON, and UID
-	idInt, err := strconv.ParseUint(id, 10, 64)
-	if err != nil {
+	idInt, strOrErr := strconv.ParseUint(id, 10, 64)
+	if strOrErr != nil {
 		return errors.New(fmt.Sprintf("%s is not a valid document ID", id))
 	}
 	if col, exists := srv.ColParts[colName]; !exists {
 		return errors.New(fmt.Sprintf("Sorry! Collection '%s' may exist, but my rank does not own a partition of it. Double check the name and try a lower rank.", colName))
 	} else {
 		var doc map[string]interface{}
-		if err = json.Unmarshal([]byte(jsonDoc), &doc); err != nil {
+		if strOrErr = json.Unmarshal([]byte(jsonDoc), &doc); strOrErr != nil {
 			return errors.New(fmt.Sprintf("DocUpdate input JSON is not well formed: '%s'", jsonDoc))
 		}
 		doc[uid.PK_NAME] = id // client is not supposed to change UID, just to make sure
-		var physID uint64
-		if physID, err = col.GetPhysicalID(idInt); err != nil {
-			return err
-		} else {
-			if _, err = col.Update(physID, doc); err != nil {
-				return
-			}
+		var newDocID uint64
+		if newDocID, strOrErr = col.Update(idInt, doc); strOrErr != nil {
+			return
 		}
+		return strconv.FormatUint(newDocID, 10)
 	}
-	return nil
 }
 
 // Update a document in my partition.
@@ -296,11 +289,7 @@ func (srv *Server) DocDelete(params []string) (err interface{}) {
 	if col, exists := srv.ColParts[colName]; !exists {
 		return errors.New(fmt.Sprintf("Sorry! Collection '%s' may exist, but my rank does not own a partition of it. Double check the name and try a lower rank.", colName))
 	} else {
-		if physID, err := col.GetPhysicalID(idInt); err != nil {
-			return err
-		} else {
-			col.Delete(physID)
-		}
+		col.Delete(idInt)
 	}
 	return nil
 }
@@ -333,7 +322,7 @@ func (srv *Server) HTPut(params []string) (err interface{}) {
 }
 
 // Get a key's associated values.
-func (srv *Server) HTGet(params []string) (strOrRrr interface{}) {
+func (srv *Server) HTGet(params []string) (strOrErr interface{}) {
 	colName := params[1]
 	htName := params[2]
 	key := params[3]
@@ -345,10 +334,10 @@ func (srv *Server) HTGet(params []string) (strOrRrr interface{}) {
 			return errors.New(fmt.Sprintf("Hash table %s does not exist in %s", htName, colName))
 		} else {
 			var keyInt, limitInt uint64
-			if keyInt, strOrRrr = strconv.ParseUint(key, 10, 64); strOrRrr != nil {
+			if keyInt, strOrErr = strconv.ParseUint(key, 10, 64); strOrErr != nil {
 				return
 			}
-			if limitInt, strOrRrr = strconv.ParseUint(limit, 10, 64); strOrRrr != nil {
+			if limitInt, strOrErr = strconv.ParseUint(limit, 10, 64); strOrErr != nil {
 				return
 			}
 			// Assemble response into "key1 key2 key3 val1 val2 val3 ..."
@@ -388,5 +377,20 @@ func (srv *Server) HTDelete(params []string) (err interface{}) {
 			ht.Remove(keyInt, valInt)
 		}
 	}
+	return nil
+}
+
+// Create an index.
+func (srv *Server) IdxCreate(params []string) (err interface{}) {
+	return nil
+}
+
+// Return list of all indexes
+func (srv *Server) IdxAll(params []string) (jsonOrErr interface{}) {
+	return nil
+}
+
+// Drop an index
+func (srv *Server) IdxDrop(params []string) (err interface{}) {
 	return nil
 }
