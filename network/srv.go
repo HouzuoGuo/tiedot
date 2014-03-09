@@ -255,9 +255,21 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 				}
 			// Document manipulation including index updates
 			case COL_INSERT:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColInsert}, out); err != nil {
+					return
+				}
 			case COL_GET:
+				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColGet}, out); err != nil {
+					return
+				}
 			case COL_UPDATE:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColUpdate}, out); err != nil {
+					return
+				}
 			case COL_DELETE:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDelete}, out); err != nil {
+					return
+				}
 			// Document CRUD (no index update)
 			case DOC_INSERT:
 				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocInsert}, out); err != nil {

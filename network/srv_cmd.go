@@ -426,7 +426,7 @@ func (srv *Server) IdxAll(params []string) (jsonOrErr interface{}) {
 	}
 }
 
-// Drop an index
+// Drop an index.
 func (srv *Server) IdxDrop(params []string) (err interface{}) {
 	colName := params[1]
 	idxPath := params[2]
@@ -446,5 +446,22 @@ func (srv *Server) IdxDrop(params []string) (err interface{}) {
 	if !srv.BroadcastAway(RELOAD, true, false) {
 		return errors.New("Failed to reload configuration, check server logs for clue please")
 	}
+	return nil
+}
+
+// Insert a document; contact other ranks if necessary; maintain hash index.
+func (srv *Server) ColInsert(params []string) (err interface{}) {
+	return nil
+}
+
+func (srv *Server) ColUpdate(params []string) (err interface{}) {
+	return nil
+}
+
+func (srv *Server) ColGet(params []string) (strOrErr interface{}) {
+	return nil
+}
+
+func (srv *Server) ColDelete(params []string) (err interface{}) {
 	return nil
 }
