@@ -31,6 +31,7 @@ run_ipc_servers() {
 # Shutdown all IPC servers
 kill_ipc_servers() {
 	pkill -TERM -f 'tiedot.*mode=ipc'
+	return 0
 }
 
 # Spawn 4 server processes then run test cases that require IPC connection.
@@ -61,6 +62,4 @@ case $MODE in
 		for dir in uid dstruct colpart; do
 			go_test_dir $dir
 		done && test_network ;;
-	'run-server')
-		run_ipc_servers 2 /tmp/tiedot_test_1 /tmp/tiedot_test_2
 esac

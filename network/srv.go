@@ -69,16 +69,20 @@ type Task struct {
 
 // Server state and structures.
 type Server struct {
-	TempDir, DBDir  string                                   // Working directory and DB directory
-	ServerSock      string                                   // Server socket file name
-	Rank, TotalRank int                                      // Rank of current process; total number of processes
-	ColNumParts     map[string]int                           // Collection name -> number of partitions
-	ColParts        map[string]*colpart.Partition            // Collection name -> partition
-	Htables         map[string]map[string]*dstruct.HashTable // Collection name -> index name -> hash table
-	Listener        net.Listener                             // This server socket
-	InterRank       []*Client                                // Inter-rank communication connection
-	MainLoop        chan *Task                               // Task loop
-	ConnCounter     int
+	TempDir, DBDir  string // Working directory and DB directory
+	ServerSock      string // Server socket file name
+	Rank, TotalRank int    // Rank of current process; total number of processes
+	// Schema information
+	ColNumParts     map[string]int        // Collection name -> number of partitions
+	ColIndexPathStr map[string][]string   // Collection name -> indexed paths
+	ColIndexPath    map[string][][]string // Collection name -> indexed path segments
+	// My partition
+	ColParts    map[string]*colpart.Partition            // Collection name -> partition
+	Htables     map[string]map[string]*dstruct.HashTable // Collection name -> index name -> hash table
+	Listener    net.Listener                             // This server socket
+	InterRank   []*Client                                // Inter-rank communication connection
+	MainLoop    chan *Task                               // Task loop
+	ConnCounter int
 }
 
 // Start a new server.

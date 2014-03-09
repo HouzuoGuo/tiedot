@@ -29,6 +29,8 @@ func (server *Server) Reload(_ []string) (err interface{}) {
 	// Save whatever I already have, and get rid of everything
 	server.FlushAll(nil)
 	server.ColNumParts = make(map[string]int)
+	server.ColIndexPath = make(map[string][][]string)
+	server.ColIndexPathStr = make(map[string][]string)
 	server.ColParts = make(map[string]*colpart.Partition)
 	server.Htables = make(map[string]map[string]*dstruct.HashTable)
 	// Read the DB directory
@@ -56,15 +58,16 @@ func (server *Server) Reload(_ []string) (err interface{}) {
 				tdlog.Panicf("Rank %d: Cannot figure out number of chunks for collection %s, manually repair it maybe? %v", server.Rank, server.DBDir, err)
 			}
 			server.ColNumParts[colName] = numchunks
+			server.ColIndexPath[colName] = make([][]string, 0, 0)
+			server.ColIndexPathStr[colName] = make([]string, 0, 0)
 			// Abort the program if total number of processes is not enough for a collection
 			if server.TotalRank < numchunks {
 				panic(fmt.Sprintf("Please start at least %d processes, because collection %s has %d partitions", numchunks, colName, numchunks))
 			}
-			// If my rank is within the numeric range of collection partitions, go ahead and open my part
+			colDir := path.Join(server.DBDir, colName)
 			if server.Rank < numchunks {
 				tdlog.Printf("Rank %d: I am going to open my partition in %s", server.Rank, f.Name())
 				// Open data partition
-				colDir := path.Join(server.DBDir, colName)
 				part, err := colpart.OpenPart(path.Join(colDir, CHUNK_DIRNAME_MAGIC+strconv.Itoa(server.Rank)))
 				if err != nil {
 					return err
@@ -72,20 +75,24 @@ func (server *Server) Reload(_ []string) (err interface{}) {
 				// Put the partition into server structure
 				server.ColParts[colName] = part
 				server.Htables[colName] = make(map[string]*dstruct.HashTable)
-				// Look for indexes in the collection
-				walker := func(_ string, info os.FileInfo, err2 error) error {
-					if err2 != nil {
-						tdlog.Error(err)
-						return nil
-					}
-					if info.IsDir() {
-						switch {
-						case strings.HasPrefix(info.Name(), HASHTABLE_DIRNAME_MAGIC):
+			}
+			// Look for indexes in the collection
+			walker := func(_ string, info os.FileInfo, err2 error) error {
+				if err2 != nil {
+					tdlog.Error(err)
+					return nil
+				}
+				if info.IsDir() {
+					switch {
+					case strings.HasPrefix(info.Name(), HASHTABLE_DIRNAME_MAGIC):
+						// Figure out indexed path - including the partition number
+						indexPathStr := info.Name()[len(HASHTABLE_DIRNAME_MAGIC):]
+						indexPath := strings.Split(indexPathStr, INDEX_PATH_SEP)
+						// Put the schema into server structures
+						server.ColIndexPathStr[colName] = append(server.ColIndexPathStr[colName], indexPathStr)
+						server.ColIndexPath[colName] = append(server.ColIndexPath[colName], indexPath)
+						if server.Rank < numchunks {
 							tdlog.Printf("Rank %d: I am going to open my partition in hashtable %s", server.Rank, info.Name())
-							// Figure out indexed path - including the partition number
-							indexPathStr := info.Name()[len(HASHTABLE_DIRNAME_MAGIC):]
-							indexPath := strings.Split(indexPathStr, INDEX_PATH_SEP)
-							// Open a hash table index and put it into collection structure
 							ht, err := dstruct.OpenHash(path.Join(colDir, info.Name(), strconv.Itoa(server.Rank)), indexPath)
 							if err != nil {
 								return err
@@ -93,10 +100,10 @@ func (server *Server) Reload(_ []string) (err interface{}) {
 							server.Htables[colName][indexPathStr] = ht
 						}
 					}
-					return nil
 				}
-				err = filepath.Walk(colDir, walker)
+				return nil
 			}
+			err = filepath.Walk(colDir, walker)
 		}
 	}
 	return nil
@@ -402,27 +409,10 @@ func (srv *Server) IdxCreate(params []string) (err interface{}) {
 // Return list of all indexes
 func (srv *Server) IdxAll(params []string) (jsonOrErr interface{}) {
 	colName := params[1]
-	if _, exists := srv.ColNumParts[colName]; !exists {
-		return errors.New(fmt.Sprintf("Collection %s does not exist", colName))
-	}
-	var paths []string
-	// Rank 0 always knows everything
-	if srv.Rank == 0 {
-		htables := srv.Htables[colName]
-		paths = make([]string, len(htables))
-		counter := 0
-		for htName, _ := range htables {
-			paths[counter] = htName
-			counter++
-		}
+	if paths, exists := srv.ColIndexPathStr[colName]; exists {
 		return paths
 	} else {
-		// If this server is not ranked 0, it may not know about the index, so contact rank 0
-		paths, err := srv.InterRank[0].IdxAll(colName)
-		if err != nil {
-			return err
-		}
-		return paths
+		return errors.New(fmt.Sprintf("Collection %s does not exist", colName))
 	}
 }
 
@@ -449,19 +439,41 @@ func (srv *Server) IdxDrop(params []string) (err interface{}) {
 	return nil
 }
 
-// Insert a document; contact other ranks if necessary; maintain hash index.
+// Contact all ranks who own the collection to put the document on all indexes.
+func (srv *Server) IndexDoc(colName string, docID uint64, doc interface{}) (err error) {
+	return nil
+}
+
+// Contact all ranks who own the collection to remove the document from all indexes.
+func (srv *Server) UnindexDoc(colName string, docID uint64, doc interface{}) (err error) {
+	return nil
+}
+
+// Insert a document and maintain hash index.
 func (srv *Server) ColInsert(params []string) (err interface{}) {
+	//	colName := params[1]
+	//	jsDoc := params[2]
 	return nil
 }
 
+// Update a document and maintain hash index.
 func (srv *Server) ColUpdate(params []string) (err interface{}) {
+	//	colName := params[1]
+	//	id := params[2]
+	//	jsDoc := params[3]
 	return nil
 }
 
+// Get a document by its unique ID (Not physical ID).
 func (srv *Server) ColGet(params []string) (strOrErr interface{}) {
+	//	colName := params[1]
+	//	id := params[2]
 	return nil
 }
 
+// Delete a document by its unique ID (Not physical ID).
 func (srv *Server) ColDelete(params []string) (err interface{}) {
+	//	colName := params[1]
+	//	id := params[2]
 	return nil
 }
