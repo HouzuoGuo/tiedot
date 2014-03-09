@@ -441,39 +441,195 @@ func (srv *Server) IdxDrop(params []string) (err interface{}) {
 
 // Contact all ranks who own the collection to put the document on all indexes.
 func (srv *Server) IndexDoc(colName string, docID uint64, doc interface{}) (err error) {
+	for i, indexPath := range srv.ColIndexPath[colName] {
+		for _, toBeIndexed := range colpart.GetIn(doc, indexPath) {
+			if toBeIndexed != nil {
+				indexPathStr := srv.ColIndexPathStr[colName][i]
+				// Figure out where to put it
+				hashKey := colpart.StrHash(toBeIndexed)
+				partNum := int(hashKey % uint64(srv.TotalRank))
+				if partNum == srv.Rank {
+					// It belongs to my rank
+					srv.Htables[colName][indexPathStr].Put(hashKey, docID)
+				} else {
+					// Go inter-rank: tell other rank to do the job
+					if err = srv.InterRank[partNum].htPut(colName, indexPathStr, hashKey, docID); err != nil {
+						return
+					}
+				}
+			}
+		}
+	}
 	return nil
 }
 
 // Contact all ranks who own the collection to remove the document from all indexes.
 func (srv *Server) UnindexDoc(colName string, docID uint64, doc interface{}) (err error) {
+	// Similar to IndexDoc
+	for i, indexPath := range srv.ColIndexPath[colName] {
+		for _, toBeIndexed := range colpart.GetIn(doc, indexPath) {
+			if toBeIndexed != nil {
+				indexPathStr := srv.ColIndexPathStr[colName][i]
+				hashKey := colpart.StrHash(toBeIndexed)
+				partNum := int(hashKey % uint64(srv.TotalRank))
+				if partNum == srv.Rank {
+					srv.Htables[colName][indexPathStr].Remove(hashKey, docID)
+				} else {
+					if err = srv.InterRank[partNum].htDelete(colName, indexPathStr, hashKey, docID); err != nil {
+						return
+					}
+				}
+			}
+		}
+	}
 	return nil
 }
 
 // Insert a document and maintain hash index.
-func (srv *Server) ColInsert(params []string) (err interface{}) {
-	//	colName := params[1]
-	//	jsDoc := params[2]
-	return nil
+func (srv *Server) ColInsert(params []string) (strOrErr interface{}) {
+	colName := params[1]
+	doc := params[2]
+	// Validate parameters
+	if _, exists := srv.ColNumParts[colName]; !exists {
+		return errors.New(fmt.Sprintf("Collection %s does not exist", colName))
+	}
+	var jsDoc map[string]interface{}
+	if strOrErr = json.Unmarshal([]byte(doc), &jsDoc); strOrErr != nil {
+		return errors.New(fmt.Sprintf("Client sent malformed JSON document"))
+	}
+	// Allocate an ID for the document
+	docID := uid.NextUID()
+	// See where the document goes
+	partNum := int(docID % uint64(srv.TotalRank))
+	var physicalID uint64
+	if partNum == srv.Rank {
+		// Oh I have it!
+		if physicalID, strOrErr = srv.ColParts[colName].Insert(jsDoc); strOrErr != nil {
+			return
+		}
+	} else {
+		// Tell other rank to do it
+		if physicalID, strOrErr = srv.InterRank[partNum].docInsert(colName, jsDoc); strOrErr != nil {
+			return
+		}
+	}
+	return srv.IndexDoc(colName, physicalID, jsDoc)
+}
+
+// Get a document by its unique ID (Not physical ID).
+func (srv *Server) ColGet(params []string) (jsonOrErr interface{}) {
+	colName := params[1]
+	docID := params[2]
+	if _, exists := srv.ColNumParts[colName]; !exists {
+		return errors.New(fmt.Sprintf("Collection %s does not exist", colName))
+	}
+	idInt, err := strconv.ParseUint(docID, 10, 64)
+	if err != nil {
+		return errors.New(fmt.Sprintf("Client sent malformed document ID"))
+	}
+	var doc interface{}
+	partNum := int(idInt % uint64(srv.TotalRank))
+	if partNum == srv.Rank {
+		physID, err := srv.ColParts[colName].GetPhysicalID(idInt)
+		if err != nil {
+			return errors.New(fmt.Sprintf("Document %d does not exist in %s", idInt, colName))
+		}
+		if err = srv.ColParts[colName].Read(physID, &doc); err != nil {
+			return err
+		}
+		return doc
+	} else {
+		doc, err := srv.InterRank[partNum].ColGet(colName, idInt)
+		if err != nil {
+			return err
+		}
+		return doc
+	}
 }
 
 // Update a document and maintain hash index.
 func (srv *Server) ColUpdate(params []string) (err interface{}) {
-	//	colName := params[1]
-	//	id := params[2]
-	//	jsDoc := params[3]
-	return nil
-}
-
-// Get a document by its unique ID (Not physical ID).
-func (srv *Server) ColGet(params []string) (strOrErr interface{}) {
-	//	colName := params[1]
-	//	id := params[2]
-	return nil
+	colName := params[1]
+	docID := params[2]
+	doc := params[3]
+	// Validate parameters
+	if _, exists := srv.ColNumParts[colName]; !exists {
+		return errors.New(fmt.Sprintf("Collection %s does not exist", colName))
+	}
+	idInt, err := strconv.ParseUint(docID, 10, 64)
+	if err != nil {
+		return errors.New(fmt.Sprintf("Client sent malformed document ID"))
+	}
+	var newDoc map[string]interface{}
+	if err = json.Unmarshal([]byte(doc), &newDoc); err != nil {
+		return errors.New(fmt.Sprintf("Client sent malformed JSON document"))
+	}
+	// Update is a three-step process...
+	// first, read back the original document
+	var originalDoc interface{}
+	partNum := int(idInt % uint64(srv.TotalRank))
+	if partNum == srv.Rank {
+		physID, err := srv.ColParts[colName].GetPhysicalID(idInt)
+		if err == nil {
+			srv.ColParts[colName].Read(physID, &originalDoc)
+		}
+	} else {
+		originalDoc, _ = srv.InterRank[partNum].ColGet(colName, idInt)
+	}
+	// second, overwrite the document
+	var newPhysicalID uint64
+	if partNum == srv.Rank {
+		// I have it..
+		if newPhysicalID, err = srv.ColParts[colName].Update(idInt, newDoc); err != nil {
+			return
+		}
+	} else {
+		if newPhysicalID, err = srv.InterRank[partNum].docUpdate(colName, idInt, newDoc); err != nil {
+			return
+		}
+	}
+	// third, update indexes
+	if originalDoc == nil {
+		tdlog.Printf("Trying to update document %d in %s: will not attempt to unindex the old document, as it cannot be read back", idInt, colName)
+	} else if err = srv.UnindexDoc(colName, idInt, originalDoc); err != nil {
+		return
+	}
+	return srv.IndexDoc(colName, newPhysicalID, newDoc)
 }
 
 // Delete a document by its unique ID (Not physical ID).
 func (srv *Server) ColDelete(params []string) (err interface{}) {
-	//	colName := params[1]
-	//	id := params[2]
-	return nil
+	colName := params[1]
+	docID := params[2]
+	// Validate parameters
+	if _, exists := srv.ColNumParts[colName]; !exists {
+		return errors.New(fmt.Sprintf("Collection %s does not exist", colName))
+	}
+	idInt, err := strconv.ParseUint(docID, 10, 64)
+	if err != nil {
+		return errors.New(fmt.Sprintf("Client sent malformed document ID"))
+	}
+	// Update is a three-step process...
+	// first, read back the original document
+	var originalDoc interface{}
+	partNum := int(idInt % uint64(srv.TotalRank))
+	if partNum == srv.Rank {
+		physID, err := srv.ColParts[colName].GetPhysicalID(idInt)
+		if err == nil {
+			srv.ColParts[colName].Read(physID, &originalDoc)
+		}
+	} else {
+		originalDoc, _ = srv.InterRank[partNum].ColGet(colName, idInt)
+	}
+	// second, delete the document
+	if partNum == srv.Rank {
+		// I have it..
+		srv.ColParts[colName].Delete(idInt)
+	} else {
+		if err = srv.InterRank[partNum].docDelete(colName, idInt); err != nil {
+			return
+		}
+	}
+	// third, update index
+	return srv.UnindexDoc(colName, idInt, originalDoc)
 }

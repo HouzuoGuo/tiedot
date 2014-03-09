@@ -1,7 +1,10 @@
 /* tiedot command implementations - client side, public APIs. */
 package network
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Tell server to shutdown, and shutdown myself (client) as well.
 func (tc *Client) ShutdownServer() {
@@ -55,7 +58,35 @@ func (tc *Client) IdxAll(colName string) (paths []string, err error) {
 	return paths, nil
 }
 
-// Drop an index
+// Drop an index.
 func (tc *Client) IdxDrop(colName, idxPath string) error {
 	return tc.getOK(fmt.Sprintf("%s %s %s", IDX_DROP, colName, idxPath))
+}
+
+// Insert a document, return its ID.
+func (tc *Client) ColInsert(colName string, js map[string]interface{}) (uint64, error) {
+	if serialized, err := json.Marshal(js); err != nil {
+		return 0, err
+	} else {
+		return tc.getUint64(fmt.Sprintf("%s %s %s", COL_INSERT, colName, string(serialized)))
+	}
+}
+
+// Get a document by ID.
+func (tc *Client) ColGet(colName string, id uint64) (doc interface{}, err error) {
+	return tc.getJSON(fmt.Sprintf("%s %s %d", COL_GET, colName, id))
+}
+
+// Update a document by ID.
+func (tc *Client) ColUpdate(colName string, id uint64, js map[string]interface{}) (err error) {
+	if serialized, err := json.Marshal(js); err != nil {
+		return err
+	} else {
+		return tc.getOK(fmt.Sprintf("%s %s %d %s", COL_UPDATE, colName, id, string(serialized)))
+	}
+}
+
+// Delete a document by ID.
+func (tc *Client) ColDelete(colName string, id uint64) (err error) {
+	return tc.getOK(fmt.Sprintf("%s %s %d", COL_DELETE, colName, id))
 }

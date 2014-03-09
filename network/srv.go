@@ -129,9 +129,7 @@ func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err err
 	// After 2 seconds delay, contact other ranks
 	time.Sleep(2 * time.Second)
 	for i := 0; i < totalRank; i++ {
-		if i == rank {
-			continue
-		}
+		// InterRank has a connection to myself
 		if srv.InterRank[i], err = NewClient(tempDir, i); err != nil {
 			panic(err)
 		}
@@ -259,11 +257,11 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 				}
 			// Document manipulation including index updates
 			case COL_INSERT:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColInsert}, out); err != nil {
+				if err = srv.uint64OrErr(&Task{Ret: resp, Input: params, Fun: srv.ColInsert}, out); err != nil {
 					return
 				}
 			case COL_GET:
-				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColGet}, out); err != nil {
+				if err = srv.jsonOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColGet}, out); err != nil {
 					return
 				}
 			case COL_UPDATE:
