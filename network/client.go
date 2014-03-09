@@ -4,10 +4,12 @@ package network
 import (
 	"bufio"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"math/rand"
 	"net"
 	"path"
 	"strconv"
 	"sync"
+	"time"
 )
 
 // A connection to tiedot RPC server
@@ -22,6 +24,8 @@ type Client struct {
 
 // Create a connection to a tiedot IPC server.
 func NewClient(ipcSrvTmpDir string, rank int) (tc *Client, err error) {
+	// It is very important for both client and server to initialize random seed
+	rand.Seed(time.Now().UnixNano())
 	addr := path.Join(ipcSrvTmpDir, strconv.Itoa(rank))
 	conn, err := net.Dial("unix", addr)
 	if err != nil {

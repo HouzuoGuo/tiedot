@@ -3,7 +3,6 @@ package colpart
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/HouzuoGuo/tiedot/dstruct"
 	"math/rand"
 	"os"
@@ -113,7 +112,6 @@ func TestInsertRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(doc2, ids)
 	if doc2.(map[string]interface{})[string('b')].(float64) != 2.0 {
 		t.Fatalf("Failed to read back document, got %v", doc2)
 	}
@@ -298,7 +296,6 @@ func IndexContainsAll(index *dstruct.HashTable, expectedKV map[uint64]uint64) bo
 	for i, key := range keys {
 		kvMap[key] = vals[i]
 	}
-	fmt.Printf("Comparing %v with %v\n", kvMap, expectedKV)
 	for key, val := range expectedKV {
 		if kvMap[key] != val {
 			return false

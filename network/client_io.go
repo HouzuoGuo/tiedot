@@ -46,6 +46,7 @@ func (tc *Client) writeReq(line string) {
 	if err = tc.Out.Flush(); err != nil {
 		panic(err)
 	}
+	tdlog.Printf("Client send %s", line)
 }
 
 // Return a server response line without suffix new-line. Will wait for it if necessary.

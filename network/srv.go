@@ -60,6 +60,11 @@ const (
 	ERR = "ERR " // Bad request/server error (mind the space)
 )
 
+const (
+	INTER_RANK_CONN_RETRY = 20
+	RETRY_EVERY           = 100 // milliseconds
+)
+
 // Tasks are queued on a server and executed one by one
 type Task struct {
 	Ret   chan interface{}           // Signal of function completion
@@ -73,9 +78,10 @@ type Server struct {
 	ServerSock      string // Server socket file name
 	Rank, TotalRank int    // Rank of current process; total number of processes
 	// Schema information
-	ColNumParts     map[string]int        // Collection name -> number of partitions
-	ColIndexPathStr map[string][]string   // Collection name -> indexed paths
-	ColIndexPath    map[string][][]string // Collection name -> indexed path segments
+	SchemaUpdateInProgress bool                  // Whether schema change is happening
+	ColNumParts            map[string]int        // Collection name -> number of partitions
+	ColIndexPathStr        map[string][]string   // Collection name -> indexed paths
+	ColIndexPath           map[string][][]string // Collection name -> indexed path segments
 	// My partition
 	ColParts    map[string]*colpart.Partition            // Collection name -> partition
 	Htables     map[string]map[string]*dstruct.HashTable // Collection name -> index name -> hash table
@@ -87,7 +93,7 @@ type Server struct {
 
 // Start a new server.
 func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err error) {
-	// It is important to seed random number generator!
+	// It is very important for both client and server to initialize random seed
 	rand.Seed(time.Now().UnixNano())
 	if rank >= totalRank {
 		panic("rank >= totalRank - should never happen")
@@ -102,43 +108,41 @@ func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err err
 	srv = &Server{Rank: rank, TotalRank: totalRank,
 		ServerSock: path.Join(tempDir, strconv.Itoa(rank)),
 		TempDir:    tempDir, DBDir: dbDir,
-		InterRank:   make([]*Client, totalRank),
-		ColNumParts: make(map[string]int),
-		ColParts:    make(map[string]*colpart.Partition),
-		Htables:     make(map[string]map[string]*dstruct.HashTable),
-		MainLoop:    make(chan *Task, 100)}
+		InterRank:              make([]*Client, totalRank),
+		SchemaUpdateInProgress: true,
+		MainLoop:               make(chan *Task, 100)}
 	// Create server socket
 	os.Remove(srv.ServerSock)
 	srv.Listener, err = net.Listen("unix", srv.ServerSock)
 	if err != nil {
 		return
 	}
-	tdlog.Printf("Rank %d: I am listening on %s", rank, srv.ServerSock)
-	// Accept incoming connections
+	// Start accepting incoming connections
 	go func() {
 		for {
 			conn, err := srv.Listener.Accept()
 			if err != nil {
 				panic(err)
 			}
-			tdlog.Printf("Rank %d: Incoming connection", rank)
 			// Process commands from incoming connection
 			go CmdLoop(srv, &conn)
 		}
 	}()
-	// After 2 seconds delay, contact other ranks
-	time.Sleep(2 * time.Second)
+	// Establish inter-rank communications (including a connection to myself)
 	for i := 0; i < totalRank; i++ {
-		// InterRank has a connection to myself
-		if srv.InterRank[i], err = NewClient(tempDir, i); err != nil {
-			panic(err)
+		for retry := 0; retry < INTER_RANK_CONN_RETRY; retry++ {
+			if srv.InterRank[i], err = NewClient(tempDir, i); err == nil {
+				break
+			} else {
+				time.Sleep(RETRY_EVERY * time.Millisecond)
+			}
 		}
 	}
 	// Open my partition of the database
 	if err2 := srv.Reload(nil); err2 != nil {
 		return nil, err2.(error)
 	}
-	tdlog.Printf("Rank %d: Initialization completed", rank)
+	tdlog.Printf("Rank %d: Initialization completed, listening on %s", rank, srv.ServerSock)
 	return
 }
 
@@ -147,6 +151,9 @@ func (server *Server) Start() {
 	defer os.Remove(server.ServerSock)
 	for {
 		task := <-server.MainLoop
+		for server.SchemaUpdateInProgress {
+			time.Sleep(RETRY_EVERY * time.Millisecond)
+		}
 		(task.Ret) <- task.Fun(task.Input)
 	}
 }

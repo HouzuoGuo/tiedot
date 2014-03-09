@@ -12,10 +12,13 @@ import (
 )
 
 /*
- Many of the following conditions are coded in runtd script:
+ The following test conditions are coded in runtd script:
  - there are 4 IPC test servers and 4 clients
  - servers create socket files in /tmp/tiedot_test_ipc_tmp
+ - client runs 4 GOMAXPROCS
 */
+const NUM_SERVERS = 4
+
 var clients []*Client
 
 func ClientConnect(t *testing.T) {
@@ -245,6 +248,70 @@ func HashCRUD(t *testing.T) {
 	if !(err3 == nil && len(vals3) == 1 && vals3[0] == 5) {
 		t.Fatal(vals3, err3)
 	}
+	if err := clients[1].IdxDrop("a", "a,b,c"); err != nil {
+		t.Fatal(err)
+	}
+	if err := clients[1].IdxDrop("a", "d,e,f"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// There is now one collection "a" with two partitions, without any index
+
+func DocCRUD2(t *testing.T) {
+	// Insert wrong stuff
+	if _, err := clients[0].ColInsert("asdf", nil); err == nil {
+		t.Fatal()
+	}
+	if _, err := clients[1].ColInsert("a", nil); err == nil {
+		t.Fatal()
+	}
+	var err error
+	numDocs := 2000
+	docIDs := make([]uint64, numDocs)
+	// Insert some documents
+	for i := 0; i < numDocs; i++ {
+		if docIDs[i], err = clients[i%NUM_SERVERS].ColInsert("a", map[string]interface{}{"attr": i}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Read them back
+	for i := 0; i < numDocs; i++ {
+		doc, err := clients[i%NUM_SERVERS].ColGet("a", docIDs[i])
+		if err != nil || doc.(map[string]interface{})["attr"].(float64) != float64(i) {
+			t.Fatal(err, doc)
+		}
+	}
+	// Update each of them
+	for i := 0; i < numDocs; i++ {
+		if err = clients[i%NUM_SERVERS].ColUpdate("a", docIDs[i], map[string]interface{}{"attr": i * 2}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Read them back - again
+	for i := 0; i < numDocs; i++ {
+		doc, err := clients[i%NUM_SERVERS].ColGet("a", docIDs[i])
+		if err != nil || doc.(map[string]interface{})["attr"].(float64) != float64(i*2) {
+			t.Fatal(err, doc)
+		}
+	}
+	// Delete half of them
+	for i := 0; i < numDocs/2; i++ {
+		if err = clients[i%NUM_SERVERS].ColDelete("a", docIDs[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Read them back - again
+	for i := 0; i < numDocs; i++ {
+		doc, err := clients[i%NUM_SERVERS].ColGet("a", docIDs[i])
+		if i < numDocs/2 && err == nil {
+			// deleted half
+			t.Fatal("did not delete", i)
+		} else if i >= numDocs/2 && (err != nil || doc.(map[string]interface{})["attr"].(float64) != float64(i*2)) {
+			// untouched half
+			t.Fatal(err, doc)
+		}
+	}
 }
 
 func ServerShutdown(t *testing.T) {
@@ -261,5 +328,7 @@ func TestSequence(t *testing.T) {
 	DocCRUD(t)
 	IndexCRUD(t)
 	HashCRUD(t)
+	DocCRUD2(t)
+	DocIndexing(t)
 	ServerShutdown(t)
 }
