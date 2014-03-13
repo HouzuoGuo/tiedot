@@ -6,6 +6,7 @@ package network
 
 import (
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/colpart"
 	"github.com/HouzuoGuo/tiedot/uid"
 	"strconv"
 	"testing"
@@ -267,7 +268,7 @@ func DocCRUD2(t *testing.T) {
 		t.Fatal()
 	}
 	var err error
-	numDocs := 2000
+	numDocs := 1000
 	docIDs := make([]uint64, numDocs)
 	// Insert some documents
 	for i := 0; i < numDocs; i++ {
@@ -310,6 +311,52 @@ func DocCRUD2(t *testing.T) {
 		} else if i >= numDocs/2 && (err != nil || doc.(map[string]interface{})["attr"].(float64) != float64(i*2)) {
 			// untouched half
 			t.Fatal(err, doc)
+		}
+	}
+}
+
+func DocIndexing(t *testing.T) {
+	var err error
+	numDocs := 10
+	numDocsPerIter := 7
+	numParts := 2
+	docIDs := make([]uint64, numDocs*numDocsPerIter)
+	if err = clients[0].ColCreate("index", numParts); err != nil {
+		t.Fatal(err)
+	}
+	// Prepare numDocs * numDocsPerIter documents
+	clients[0].IdxCreate("index", "a,b")
+	for i := 0; i < numDocs; i++ {
+		docs := []map[string]interface{}{
+			map[string]interface{}{"a": map[string]interface{}{"b": i * 1}, "extra": "abc"},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": i * 2, "extra": "abc"}, "bcd"}, "extra": "cde"},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{i * 3}, "extra": "abc"}, "bcd"}, "extra": "cde"},
+			map[string]interface{}{"a": nil, "extra": "abc"},
+			map[string]interface{}{"a": map[string]interface{}{"b": nil, "extra": "bcd"}},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": nil, "extra": "abc"}, "bcd"}, "extra": "cde"},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{nil}, "extra": "abc"}, "bcd"}, "extra": "cde"}}
+		for j, doc := range docs {
+			if docIDs[i*numDocsPerIter+j], err = clients[i%NUM_SERVERS].ColInsert("index", doc); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	// Test each indexed entry
+	for i := 0; i < numDocs; i++ {
+		for j := 0; j < 3; j++ {
+			// Figure out where the index value went
+			theDocID := docIDs[i*numDocsPerIter+j]
+			hashKey := colpart.StrHash(fmt.Sprint(i * (j + 1)))
+			partNum := hashKey % NUM_SERVERS
+			// Fetch index value by key
+			vals, err := clients[partNum].htGet("index", "a,b", hashKey, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !(len(vals) == 1 && vals[0] == theDocID) {
+				t.Fatal(theDocID, hashKey, partNum, vals)
+			}
+
 		}
 	}
 }

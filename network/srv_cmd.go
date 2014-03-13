@@ -310,7 +310,7 @@ func (srv *Server) HTPut(params []string) (err interface{}) {
 	key := params[3]
 	val := params[4]
 	if col, exists := srv.Htables[colName]; !exists {
-		return errors.New(fmt.Sprintf("(HTPut %s) My rank does not own a partition of the hash table", colName))
+		return errors.New(fmt.Sprintf("(HTPut %s) My rank %d does not own a partition of the hash table", colName, srv.Rank))
 	} else {
 		if ht, exists := col[htName]; !exists {
 			return errors.New(fmt.Sprintf("(HTPut %s) Hash table %s does not exist", colName, htName))
@@ -443,13 +443,14 @@ func (srv *Server) IdxDrop(params []string) (err interface{}) {
 
 // Contact all ranks who own the collection to put the document on all indexes.
 func (srv *Server) IndexDoc(colName string, docID uint64, doc interface{}) (err error) {
+	numParts := uint64(srv.ColNumParts[colName])
 	for i, indexPath := range srv.ColIndexPath[colName] {
 		for _, toBeIndexed := range colpart.GetIn(doc, indexPath) {
 			if toBeIndexed != nil {
 				indexPathStr := srv.ColIndexPathStr[colName][i]
 				// Figure out where to put it
 				hashKey := colpart.StrHash(toBeIndexed)
-				partNum := int(hashKey % uint64(srv.TotalRank))
+				partNum := int(hashKey % numParts)
 				if partNum == srv.Rank {
 					// It belongs to my rank
 					srv.Htables[colName][indexPathStr].Put(hashKey, docID)
@@ -467,13 +468,14 @@ func (srv *Server) IndexDoc(colName string, docID uint64, doc interface{}) (err 
 
 // Contact all ranks who own the collection to remove the document from all indexes.
 func (srv *Server) UnindexDoc(colName string, docID uint64, doc interface{}) (err error) {
+	numParts := uint64(srv.ColNumParts[colName])
 	// Similar to IndexDoc
 	for i, indexPath := range srv.ColIndexPath[colName] {
 		for _, toBeIndexed := range colpart.GetIn(doc, indexPath) {
 			if toBeIndexed != nil {
 				indexPathStr := srv.ColIndexPathStr[colName][i]
 				hashKey := colpart.StrHash(toBeIndexed)
-				partNum := int(hashKey % uint64(srv.TotalRank))
+				partNum := int(hashKey % numParts)
 				if partNum == srv.Rank {
 					srv.Htables[colName][indexPathStr].Remove(hashKey, docID)
 				} else {
