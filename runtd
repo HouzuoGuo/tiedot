@@ -63,3 +63,4 @@ case $MODE in
 			go_test_dir $dir
 		done && test_network ;;
 esac
+
