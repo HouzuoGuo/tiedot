@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/colpart"
 	"github.com/HouzuoGuo/tiedot/uid"
+	"math/rand"
 	"strconv"
 	"testing"
+	"time"
 )
 
 /*
@@ -260,6 +262,7 @@ func HashCRUD(t *testing.T) {
 // There is now one collection "a" with two partitions, without any index
 
 func DocCRUD2(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
 	// Insert wrong stuff
 	if _, err := clients[0].ColInsert("asdf", nil); err == nil {
 		t.Fatal()
@@ -268,43 +271,43 @@ func DocCRUD2(t *testing.T) {
 		t.Fatal()
 	}
 	var err error
-	numDocs := 1000
+	numDocs := 10
 	docIDs := make([]uint64, numDocs)
 	// Insert some documents
 	for i := 0; i < numDocs; i++ {
-		if docIDs[i], err = clients[i%NUM_SERVERS].ColInsert("a", map[string]interface{}{"attr": i}); err != nil {
+		if docIDs[i], err = clients[rand.Intn(NUM_SERVERS)].ColInsert("a", map[string]interface{}{"attr": i}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// Read them back
 	for i := 0; i < numDocs; i++ {
-		doc, err := clients[i%NUM_SERVERS].ColGet("a", docIDs[i])
+		doc, err := clients[rand.Intn(NUM_SERVERS)].ColGet("a", docIDs[i])
 		if err != nil || doc.(map[string]interface{})["attr"].(float64) != float64(i) {
 			t.Fatal(err, doc)
 		}
 	}
 	// Update each of them
 	for i := 0; i < numDocs; i++ {
-		if err = clients[i%NUM_SERVERS].ColUpdate("a", docIDs[i], map[string]interface{}{"attr": i * 2}); err != nil {
+		if err = clients[rand.Intn(NUM_SERVERS)].ColUpdate("a", docIDs[i], map[string]interface{}{"attr": i * 2}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// Read them back - again
 	for i := 0; i < numDocs; i++ {
-		doc, err := clients[i%NUM_SERVERS].ColGet("a", docIDs[i])
+		doc, err := clients[rand.Intn(NUM_SERVERS)].ColGet("a", docIDs[i])
 		if err != nil || doc.(map[string]interface{})["attr"].(float64) != float64(i*2) {
 			t.Fatal(err, doc)
 		}
 	}
 	// Delete half of them
 	for i := 0; i < numDocs/2; i++ {
-		if err = clients[i%NUM_SERVERS].ColDelete("a", docIDs[i]); err != nil {
+		if err = clients[rand.Intn(NUM_SERVERS)].ColDelete("a", docIDs[i]); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// Read them back - again
 	for i := 0; i < numDocs; i++ {
-		doc, err := clients[i%NUM_SERVERS].ColGet("a", docIDs[i])
+		doc, err := clients[rand.Intn(NUM_SERVERS)].ColGet("a", docIDs[i])
 		if i < numDocs/2 && err == nil {
 			// deleted half
 			t.Fatal("did not delete", i)
@@ -316,9 +319,10 @@ func DocCRUD2(t *testing.T) {
 }
 
 func DocIndexing(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
 	var err error
 	numDocs := 10
-	numDocsPerIter := 7
+	numDocsPerIter := 7 // do not change
 	numParts := 2
 	docIDs := make([]uint64, numDocs*numDocsPerIter)
 	if err = clients[0].ColCreate("index", numParts); err != nil {
@@ -328,35 +332,91 @@ func DocIndexing(t *testing.T) {
 	clients[0].IdxCreate("index", "a,b")
 	for i := 0; i < numDocs; i++ {
 		docs := []map[string]interface{}{
-			map[string]interface{}{"a": map[string]interface{}{"b": i * 1}, "extra": "abc"},
-			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": i * 2, "extra": "abc"}, "bcd"}, "extra": "cde"},
-			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{i * 3}, "extra": "abc"}, "bcd"}, "extra": "cde"},
+			map[string]interface{}{"a": map[string]interface{}{"b": (0 * numDocs) + (i + 1)}, "extra": "abc"},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": (1 * numDocs) + (i + 1), "extra": "abc"}, "bcd"}, "extra": "cde"},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{(2 * numDocs) + (i + 1)}, "extra": "abc"}, "bcd"}, "extra": "cde"},
 			map[string]interface{}{"a": nil, "extra": "abc"},
 			map[string]interface{}{"a": map[string]interface{}{"b": nil, "extra": "bcd"}},
 			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": nil, "extra": "abc"}, "bcd"}, "extra": "cde"},
 			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{nil}, "extra": "abc"}, "bcd"}, "extra": "cde"}}
 		for j, doc := range docs {
-			if docIDs[i*numDocsPerIter+j], err = clients[i%NUM_SERVERS].ColInsert("index", doc); err != nil {
+			if docIDs[i*numDocsPerIter+j], err = clients[rand.Intn(NUM_SERVERS)].ColInsert("index", doc); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
-	// Test each indexed entry
+	// Test every indexed entry
 	for i := 0; i < numDocs; i++ {
 		for j := 0; j < 3; j++ {
 			// Figure out where the index value went
 			theDocID := docIDs[i*numDocsPerIter+j]
-			hashKey := colpart.StrHash(fmt.Sprint(i * (j + 1)))
-			partNum := hashKey % NUM_SERVERS
+			hashKey := colpart.StrHash(fmt.Sprint((j * numDocs) + (i + 1)))
+			partNum := int(hashKey % uint64(numParts))
 			// Fetch index value by key
 			vals, err := clients[partNum].htGet("index", "a,b", hashKey, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if !(len(vals) == 1 && vals[0] == theDocID) {
-				t.Fatal(theDocID, hashKey, partNum, vals)
+				t.Fatal(i, j, theDocID, hashKey, partNum, vals)
 			}
-
+		}
+	}
+	// Update every indexed entry
+	for i := 0; i < numDocs; i++ {
+		docs := []map[string]interface{}{
+			map[string]interface{}{"a": map[string]interface{}{"b": (0 * numDocs) + (i + 2)}, "extra": "abc"},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": (1 * numDocs) + (i + 2), "extra": "abc"}, "bcd"}, "extra": "cde"},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{(2 * numDocs) + (i + 2)}, "extra": "abc"}, "bcd"}, "extra": "cde"},
+			map[string]interface{}{"a": nil, "extra": "abc"},
+			map[string]interface{}{"a": map[string]interface{}{"b": nil, "extra": "bcd"}},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": nil, "extra": "abc"}, "bcd"}, "extra": "cde"},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{nil}, "extra": "abc"}, "bcd"}, "extra": "cde"}}
+		for j, doc := range docs {
+			fmt.Println(i, j)
+			if err = clients[rand.Intn(NUM_SERVERS)].ColUpdate("index", docIDs[i*numDocsPerIter+j], doc); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	// Test every indexed entry
+	for i := 0; i < numDocs; i++ {
+		for j := 0; j < 3; j++ {
+			// Figure out where the index value went
+			theDocID := docIDs[i*numDocsPerIter+j]
+			hashKey := colpart.StrHash(fmt.Sprint((j * numDocs) + (i + 2)))
+			partNum := int(hashKey % uint64(numParts))
+			// Fetch index value by key
+			vals, err := clients[partNum].htGet("index", "a,b", hashKey, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !(len(vals) == 1 && vals[0] == theDocID) {
+				t.Fatal(i, j, theDocID, hashKey, partNum, vals)
+			}
+		}
+	}
+	// Delete every indexed entry
+	for _, id := range docIDs {
+		if err = clients[rand.Intn(NUM_SERVERS)].ColDelete("index", id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Test every indexed entry
+	for i := 0; i < numDocs; i++ {
+		for j := 0; j < 3; j++ {
+			// Figure out where the index value went
+			theDocID := docIDs[i*numDocsPerIter+j]
+			hashKey := colpart.StrHash(fmt.Sprint((j * numDocs) + (i + 2)))
+			partNum := int(hashKey % uint64(numParts))
+			// Fetch index value by key
+			vals, err := clients[partNum].htGet("index", "a,b", hashKey, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(vals) != 0 {
+				t.Fatal(i, j, theDocID, hashKey, partNum, vals)
+			}
 		}
 	}
 }

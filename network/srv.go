@@ -31,10 +31,12 @@ const (
 	IDX_DROP   = "idx_drop"   // idx_drop <col_name> <idx_path>
 
 	// Collection document manipulation with index updates
-	COL_INSERT = "cin" // cin <col_name> <json_str>
-	COL_GET    = "cgt" // cgt <col_name> <id>
-	COL_UPDATE = "cup" // cup <col_name> <id> <json_str>
-	COL_DELETE = "cde" // cde <col_name> <id>
+	COL_INSERT        = "cin"   // cin <col_name> <json_str>
+	COL_GET           = "cgt"   // cgt <col_name> <id>
+	COL_UPDATE        = "cup"   // cup <col_name> <id> <json_str>
+	COL_UPDATE_NO_IDX = "cupni" // cupni <col_name> <id> <json_str>
+	COL_DELETE        = "cde"   // cde <col_name> <id>
+	COL_DELETE_NO_IDX = "cdeni" // cdeni <col_name> <id>
 
 	// Document CRUD (no index update)
 	DOC_INSERT = "din" // din <col_name> <json_str>
@@ -275,8 +277,16 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColUpdate}, out); err != nil {
 					return
 				}
+			case COL_UPDATE_NO_IDX:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColUpdateNoIdx}, out); err != nil {
+					return
+				}
 			case COL_DELETE:
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDelete}, out); err != nil {
+					return
+				}
+			case COL_DELETE_NO_IDX:
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDeleteNoIdx}, out); err != nil {
 					return
 				}
 			// Document CRUD (no index update)

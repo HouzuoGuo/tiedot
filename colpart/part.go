@@ -38,7 +38,6 @@ func StrHash(thing interface{}) uint64 {
 func GetIn(doc interface{}, path []string) (ret []interface{}) {
 	docMap, ok := doc.(map[string]interface{})
 	if !ok {
-		tdlog.Printf("%v cannot be indexed because type conversation to map[string]interface{} failed", doc)
 		return
 	}
 	var thing interface{} = docMap
@@ -137,7 +136,7 @@ func (col *Partition) Read(id uint64, doc interface{}) error {
 	}
 	if err := json.Unmarshal(data, &doc); err != nil {
 		msg := fmt.Sprintf("Cannot parse document %d in %s to JSON", id, col.BaseDir)
-		tdlog.Println(msg)
+		tdlog.Errorf("There may be a data corruption: %s", msg)
 		return errors.New(msg)
 	}
 	return nil
