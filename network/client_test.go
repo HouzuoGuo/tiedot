@@ -15,10 +15,10 @@ import (
 )
 
 /*
- The following test conditions are coded in runtd script:
- - there are 4 IPC test servers and 4 clients
- - servers create socket files in /tmp/tiedot_test_ipc_tmp
- - client runs 4 GOMAXPROCS
+The following test conditions are coded in runtd script:
+- there are 4 IPC test servers and 4 clients
+- servers create socket files in /tmp/tiedot_test_ipc_tmp
+- client runs 4 GOMAXPROCS
 */
 const NUM_SERVERS = 4
 
@@ -96,6 +96,7 @@ func ColCRUD(t *testing.T) {
 	// There are now two collections: a of 2 partitions, b of 3 partitions
 	// Drop a collection
 	var err error
+
 	if err = clients[3].ColDrop("b"); err != nil {
 		t.Fatal(err)
 	}
@@ -139,13 +140,13 @@ func DocCRUD(t *testing.T) {
 		t.Fatal(err)
 	}
 	// doc update
-	if _, err = clients[0].docUpdate("a", 12345, map[string]interface{}{"content": "a"}); err == nil {
+	if _, err = clients[0].docUpdate("a", 12345, map[string]interface{}{uid.PK_NAME: "765", "content": "a"}); err == nil {
 		t.Fatal()
 	}
-	if docIDs[0], err = clients[0].docUpdate("a", docIDs[0], map[string]interface{}{"content": "a"}); err != nil {
+	if docIDs[0], err = clients[0].docUpdate("a", docIDs[0], map[string]interface{}{uid.PK_NAME: "765", "content": "a"}); err != nil {
 		t.Fatal(err)
 	}
-	if docIDs[1], err = clients[1].docUpdate("a", docIDs[1], map[string]interface{}{"content": "b"}); err != nil {
+	if docIDs[1], err = clients[1].docUpdate("a", docIDs[1], map[string]interface{}{uid.PK_NAME: "987", "content": "b"}); err != nil {
 		t.Fatal(err)
 	}
 	if doc, err := clients[0].docGet("a", docIDs[0]); err != nil || doc.(map[string]interface{})["content"].(string) != "a" {
@@ -271,11 +272,11 @@ func DocCRUD2(t *testing.T) {
 		t.Fatal()
 	}
 	var err error
-	numDocs := 10
+	numDocs := 100
 	docIDs := make([]uint64, numDocs)
 	// Insert some documents
 	for i := 0; i < numDocs; i++ {
-		if docIDs[i], err = clients[rand.Intn(NUM_SERVERS)].ColInsert("a", map[string]interface{}{"attr": i}); err != nil {
+		if docIDs[i], err = clients[rand.Intn(NUM_SERVERS)].ColInsert("a", map[string]interface{}{"attr": i, "extra": "abcd"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -288,7 +289,7 @@ func DocCRUD2(t *testing.T) {
 	}
 	// Update each of them
 	for i := 0; i < numDocs; i++ {
-		if err = clients[rand.Intn(NUM_SERVERS)].ColUpdate("a", docIDs[i], map[string]interface{}{"attr": i * 2}); err != nil {
+		if err = clients[rand.Intn(NUM_SERVERS)].ColUpdate("a", docIDs[i], map[string]interface{}{"attr": i * 2, "extra": nil}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -321,9 +322,9 @@ func DocCRUD2(t *testing.T) {
 func DocIndexing(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	var err error
-	numDocs := 10
+	numDocs := 100
 	numDocsPerIter := 7 // do not change
-	numParts := 2
+	numParts := 3
 	docIDs := make([]uint64, numDocs*numDocsPerIter)
 	if err = clients[0].ColCreate("index", numParts); err != nil {
 		t.Fatal(err)
@@ -373,7 +374,6 @@ func DocIndexing(t *testing.T) {
 			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": nil, "extra": "abc"}, "bcd"}, "extra": "cde"},
 			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{nil}, "extra": "abc"}, "bcd"}, "extra": "cde"}}
 		for j, doc := range docs {
-			fmt.Println(i, j)
 			if err = clients[rand.Intn(NUM_SERVERS)].ColUpdate("index", docIDs[i*numDocsPerIter+j], doc); err != nil {
 				t.Fatal(err)
 			}
@@ -381,6 +381,7 @@ func DocIndexing(t *testing.T) {
 	}
 	// Test every indexed entry
 	for i := 0; i < numDocs; i++ {
+		// Test new values
 		for j := 0; j < 3; j++ {
 			// Figure out where the index value went
 			theDocID := docIDs[i*numDocsPerIter+j]
@@ -393,6 +394,23 @@ func DocIndexing(t *testing.T) {
 			}
 			if !(len(vals) == 1 && vals[0] == theDocID) {
 				t.Fatal(i, j, theDocID, hashKey, partNum, vals)
+			}
+		}
+		// Old values are gone
+		for j := 0; j < 3; j++ {
+			// Figure out where the index value went
+			theDocID := docIDs[i*numDocsPerIter+j]
+			hashKey := colpart.StrHash(fmt.Sprint((j * numDocs) + (i + 1)))
+			partNum := int(hashKey % uint64(numParts))
+			// Fetch index value by key
+			vals, err := clients[partNum].htGet("index", "a,b", hashKey, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, val := range vals {
+				if val == theDocID {
+					t.Fatal(i, j, theDocID, hashKey, partNum, vals)
+				}
 			}
 		}
 	}

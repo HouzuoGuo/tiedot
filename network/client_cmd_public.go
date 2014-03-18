@@ -77,6 +77,11 @@ func (tc *Client) ColGet(colName string, id uint64) (doc interface{}, err error)
 	return tc.getJSON(fmt.Sprintf("%s %s %d", COL_GET, colName, id))
 }
 
+// Get a document by ID.
+func (tc *Client) ColGetJS(colName string, id uint64) (doc string, err error) {
+	return tc.getStr(fmt.Sprintf("%s %s %d", COL_GET, colName, id))
+}
+
 // Update a document by ID.
 func (tc *Client) ColUpdate(colName string, id uint64, js map[string]interface{}) (err error) {
 	if serialized, err := json.Marshal(js); err != nil {

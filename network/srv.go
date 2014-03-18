@@ -270,7 +270,7 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 					return
 				}
 			case COL_GET:
-				if err = srv.jsonOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColGet}, out); err != nil {
+				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColGet}, out); err != nil {
 					return
 				}
 			case COL_UPDATE:
