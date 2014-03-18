@@ -8,7 +8,6 @@ import (
 	"net"
 	"path"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -19,7 +18,6 @@ type Client struct {
 	In                    *bufio.Reader
 	Out                   *bufio.Writer
 	Conn                  *net.Conn
-	Mutex                 *sync.Mutex
 }
 
 // Create a connection to a tiedot IPC server.
@@ -32,8 +30,7 @@ func NewClient(ipcSrvTmpDir string, rank int) (tc *Client, err error) {
 		return
 	}
 	tc = &Client{SrvAddr: addr, IPCSrvTmpDir: ipcSrvTmpDir, SrvRank: rank,
-		In: bufio.NewReader(conn), Out: bufio.NewWriter(conn), Conn: &conn,
-		Mutex: new(sync.Mutex)}
+		In: bufio.NewReader(conn), Out: bufio.NewWriter(conn), Conn: &conn}
 	return
 }
 

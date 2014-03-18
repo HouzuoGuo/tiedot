@@ -4,7 +4,6 @@ package network
 import (
 	"encoding/json"
 	"errors"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"strconv"
 	"strings"
 )
@@ -12,8 +11,6 @@ import (
 // Send an unimportant message to server, do not panic on error. Return true on success.
 func (tc *Client) writeAway(line string, consumeResp bool) bool {
 	var err error
-	tc.Mutex.Lock()
-	defer tc.Mutex.Unlock()
 	if _, err = tc.Out.WriteString(line); err != nil {
 		return false
 	}
@@ -31,39 +28,38 @@ func (tc *Client) writeAway(line string, consumeResp bool) bool {
 }
 
 // Send a request to IPC server, suffix new-line is automatically added.
-func (tc *Client) writeReq(line string) {
-	var err error
-	tc.Mutex.Lock()
-	defer tc.Mutex.Unlock()
-	// The following errors may occur only if server unexpectedly closed the connection
-	// Therefore the client may simply abort (panic)
+func (tc *Client) writeReq(line string) (err error) {
 	if _, err = tc.Out.WriteString(line); err != nil {
-		panic(err)
+		return
 	}
 	if err = tc.Out.WriteByte(byte('\n')); err != nil {
-		panic(err)
+		return
 	}
 	if err = tc.Out.Flush(); err != nil {
-		panic(err)
+		return
 	}
-	tdlog.Printf("Client send %s", line)
+	return
 }
 
 // Return a server response line without suffix new-line. Will wait for it if necessary.
-func (tc *Client) getResp() string {
-	line, err := tc.In.ReadString(byte('\n'))
+func (tc *Client) getResp() (line string, err error) {
+	line, err = tc.In.ReadString(byte('\n'))
 	if err != nil {
-		// The error occurs if server closes the connection, the client may simply abort (panic)
-		panic(err)
+		// The error may happen when server closes the connection
+		return
 	}
-	tdlog.Printf("Client received: %s", line)
-	return line[0 : len(line)-1]
+	return line[0 : len(line)-1], nil
 }
 
 // Send a request and expect an OK response or error.
-func (tc *Client) getOK(req string) error {
-	tc.writeReq(req)
-	resp := tc.getResp()
+func (tc *Client) getOK(req string) (err error) {
+	if err = tc.writeReq(req); err != nil {
+		return
+	}
+	resp, err := tc.getResp()
+	if err != nil {
+		return
+	}
 	if resp != ACK {
 		return errors.New(resp)
 	}
@@ -71,9 +67,13 @@ func (tc *Client) getOK(req string) error {
 }
 
 // Send a request and expect a string response or error.
-func (tc *Client) getStr(req string) (string, error) {
-	tc.writeReq(req)
-	resp := tc.getResp()
+func (tc *Client) getStr(req string) (resp string, err error) {
+	if err = tc.writeReq(req); err != nil {
+		return
+	}
+	if resp, err = tc.getResp(); err != nil {
+		return
+	}
 	if strings.HasPrefix(resp, ERR) {
 		return "", errors.New(resp)
 	}

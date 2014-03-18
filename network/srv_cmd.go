@@ -731,5 +731,6 @@ func (srv *Server) ColDelete(params []string) (err interface{}) {
 		}
 	}
 	// No matter where the document is physically located at, my rank always coordinates index maintenance
+	fmt.Println("Going to unindex", colName, idInt, originalDoc)
 	return srv.unindexDoc(colName, idInt, originalDoc)
 }

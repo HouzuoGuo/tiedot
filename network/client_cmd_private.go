@@ -50,7 +50,7 @@ func (tc *Client) htGet(colName, indexName string, key, limit uint64) (vals []ui
 	}
 	// The response looks like "val1 val2 val3 ..." so let us disassemble it
 	parts := strings.Split(resp, " ")
-	vals = make([]uint64, len(parts))
+	vals = make([]uint64, 0, len(parts))
 	for i := 0; i < len(parts); i++ {
 		if parts[i] == "" {
 			continue
@@ -58,7 +58,7 @@ func (tc *Client) htGet(colName, indexName string, key, limit uint64) (vals []ui
 		if num, err := strconv.ParseUint(parts[i], 10, 64); err != nil {
 			return nil, errors.New(fmt.Sprintf("HTGet client received malformed response from server: %d, %v", len(parts), parts))
 		} else {
-			vals[i] = num
+			vals = append(vals, num)
 		}
 	}
 	return

@@ -237,6 +237,10 @@ func HashCRUD(t *testing.T) {
 	if !(err3 == nil && len(vals3) == 2 && vals3[0] == 4 && vals3[1] == 5) {
 		t.Fatal(vals3, err3)
 	}
+	vals4, err4 := clients[1].htGet("a", "a,b,c", 4, 0)
+	if !(err3 == nil && len(vals4) == 0) {
+		t.Fatal(vals4, err4)
+	}
 	// Remove a value from key 1 and key 3
 	if err := clients[0].htDelete("a", "a,b,c", 1, 1); err != nil {
 		t.Fatal(err)
@@ -272,7 +276,7 @@ func DocCRUD2(t *testing.T) {
 		t.Fatal()
 	}
 	var err error
-	numDocs := 100
+	numDocs := 111
 	docIDs := make([]uint64, numDocs)
 	// Insert some documents
 	for i := 0; i < numDocs; i++ {
@@ -322,7 +326,7 @@ func DocCRUD2(t *testing.T) {
 func DocIndexing(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	var err error
-	numDocs := 100
+	numDocs := 111
 	numDocsPerIter := 7 // do not change
 	numParts := 3
 	docIDs := make([]uint64, numDocs*numDocsPerIter)
@@ -422,6 +426,7 @@ func DocIndexing(t *testing.T) {
 	}
 	// Test every indexed entry
 	for i := 0; i < numDocs; i++ {
+		// Test new values
 		for j := 0; j < 3; j++ {
 			// Figure out where the index value went
 			theDocID := docIDs[i*numDocsPerIter+j]
@@ -432,8 +437,8 @@ func DocIndexing(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(vals) != 0 {
-				t.Fatal(i, j, theDocID, hashKey, partNum, vals)
+			if len(vals) > 0 {
+				t.Fatal(i, j, theDocID, hashKey, vals)
 			}
 		}
 	}
