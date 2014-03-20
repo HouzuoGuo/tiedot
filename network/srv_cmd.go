@@ -6,13 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/colpart"
-	"github.com/HouzuoGuo/tiedot/dstruct"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"github.com/HouzuoGuo/tiedot/uid"
 	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -23,106 +21,6 @@ const (
 	CHUNK_DIRNAME_MAGIC     = "chunk_" // Chunk directory name prefix
 	INDEX_PATH_SEP          = ","      // Separator between index path segments
 )
-
-// Reload collection configurations.
-func (server *Server) Reload(_ []string) (err interface{}) {
-	server.SchemaUpdateInProgress = true
-	// Save whatever I already have, and get rid of everything
-	server.FlushAll(nil)
-	server.ColNumParts = make(map[string]int)
-	server.ColIndexPath = make(map[string][][]string)
-	server.ColIndexPathStr = make(map[string][]string)
-	server.ColParts = make(map[string]*colpart.Partition)
-	server.Htables = make(map[string]map[string]*dstruct.HashTable)
-	// Read the DB directory
-	files, err := ioutil.ReadDir(server.DBDir)
-	if err != nil {
-		return
-	}
-	for _, f := range files {
-		// Sub-directories are collections
-		if f.IsDir() {
-			// Read the "numchunks" file - its should contain a positive integer in the content
-			var numchunksFH *os.File
-			colName := f.Name()
-			numchunksFH, err = os.OpenFile(path.Join(server.DBDir, colName, NUMCHUNKS_FILENAME), os.O_CREATE|os.O_RDWR, 0600)
-			defer numchunksFH.Close()
-			if err != nil {
-				return
-			}
-			numchunksContent, err := ioutil.ReadAll(numchunksFH)
-			if err != nil {
-				panic(err)
-			}
-			numchunks, err := strconv.Atoi(string(numchunksContent))
-			if err != nil || numchunks < 1 {
-				tdlog.Panicf("Rank %d: Cannot figure out number of chunks for collection %s, manually repair it maybe? %v", server.Rank, server.DBDir, err)
-			}
-			server.ColNumParts[colName] = numchunks
-			server.ColIndexPath[colName] = make([][]string, 0, 0)
-			server.ColIndexPathStr[colName] = make([]string, 0, 0)
-			// Abort the program if total number of processes is not enough for a collection
-			if server.TotalRank < numchunks {
-				panic(fmt.Sprintf("Please start at least %d processes, because collection %s has %d partitions", numchunks, colName, numchunks))
-			}
-			colDir := path.Join(server.DBDir, colName)
-			if server.Rank < numchunks {
-				tdlog.Printf("Rank %d: I am going to open my partition in %s", server.Rank, f.Name())
-				// Open data partition
-				part, err := colpart.OpenPart(path.Join(colDir, CHUNK_DIRNAME_MAGIC+strconv.Itoa(server.Rank)))
-				if err != nil {
-					return err
-				}
-				// Put the partition into server structure
-				server.ColParts[colName] = part
-				server.Htables[colName] = make(map[string]*dstruct.HashTable)
-			}
-			// Look for indexes in the collection
-			walker := func(_ string, info os.FileInfo, err2 error) error {
-				if err2 != nil {
-					tdlog.Error(err)
-					return nil
-				}
-				if info.IsDir() {
-					switch {
-					case strings.HasPrefix(info.Name(), HASHTABLE_DIRNAME_MAGIC):
-						// Figure out indexed path - including the partition number
-						indexPathStr := info.Name()[len(HASHTABLE_DIRNAME_MAGIC):]
-						indexPath := strings.Split(indexPathStr, INDEX_PATH_SEP)
-						// Put the schema into server structures
-						server.ColIndexPathStr[colName] = append(server.ColIndexPathStr[colName], indexPathStr)
-						server.ColIndexPath[colName] = append(server.ColIndexPath[colName], indexPath)
-						if server.Rank < numchunks {
-							tdlog.Printf("Rank %d: I am going to open my partition in hashtable %s", server.Rank, info.Name())
-							ht, err := dstruct.OpenHash(path.Join(colDir, info.Name(), strconv.Itoa(server.Rank)), indexPath)
-							if err != nil {
-								return err
-							}
-							server.Htables[colName][indexPathStr] = ht
-						}
-					}
-				}
-				return nil
-			}
-			err = filepath.Walk(colDir, walker)
-		}
-	}
-	server.SchemaUpdateInProgress = false
-	return nil
-}
-
-// Call flush on all mapped files.
-func (srv *Server) FlushAll(_ []string) (_ interface{}) {
-	for _, part := range srv.ColParts {
-		part.Flush()
-	}
-	for _, htMap := range srv.Htables {
-		for _, ht := range htMap {
-			ht.File.Flush()
-		}
-	}
-	return nil
-}
 
 // Create a collection.
 func (srv *Server) ColCreate(params []string) (err interface{}) {
@@ -144,12 +42,12 @@ func (srv *Server) ColCreate(params []string) (err interface{}) {
 		return
 	}
 	// Reload my config
-	if err = srv.Reload(nil); err != nil {
+	if err = srv.reload(nil); err != nil {
 		return
 	}
 	// Inform other ranks to reload their config
-	if !srv.BroadcastAway(RELOAD, true, false) {
-		return errors.New(fmt.Sprintf("(ColCreate %s) Failed to reload configuration", colName))
+	if err = srv.broadcast(RELOAD, false); err != nil {
+		return errors.New(fmt.Sprintf("(ColCreate %s) Failed to reload configuration: %v", colName, err))
 	}
 	return nil
 }
@@ -178,9 +76,11 @@ func (srv *Server) ColRename(params []string) (err interface{}) {
 		return
 	}
 	// Reload myself and inform other ranks to reload their config
-	srv.Reload(nil)
-	if !srv.BroadcastAway(RELOAD, true, false) {
-		return errors.New(fmt.Sprintf("(ColRename %s %s) Failed to reload configuration", oldName, newName))
+	if err = srv.reload(nil); err != nil {
+		return
+	}
+	if err = srv.broadcast(RELOAD, false); err != nil {
+		return errors.New(fmt.Sprintf("(ColRename %s %s) Failed to reload configuration: %v", oldName, newName, err))
 	}
 	return nil
 }
@@ -197,9 +97,11 @@ func (srv *Server) ColDrop(params []string) (err interface{}) {
 		return
 	}
 	// Reload myself and inform other ranks to reload their config
-	srv.Reload(nil)
-	if !srv.BroadcastAway(RELOAD, true, false) {
-		return errors.New(fmt.Sprintf("(ColDrop %s) Failed to reload configuration", colName))
+	if err = srv.reload(nil); err != nil {
+		return
+	}
+	if err = srv.broadcast(RELOAD, false); err != nil {
+		return errors.New(fmt.Sprintf("(ColDrop %s) Failed to reload configuration: %v", colName, err))
 	}
 	return nil
 }
@@ -398,12 +300,12 @@ func (srv *Server) IdxCreate(params []string) (err interface{}) {
 		return
 	}
 	// Reload my config
-	if err = srv.Reload(nil); err != nil {
+	if err = srv.reload(nil); err != nil {
 		return
 	}
 	// Inform other ranks to reload their config
-	if !srv.BroadcastAway(RELOAD, true, false) {
-		return errors.New(fmt.Sprintf("(IdxCreate %s) Failed to reload configuration", colName))
+	if err = srv.broadcast(RELOAD, false); err != nil {
+		return errors.New(fmt.Sprintf("(IdxCreate %s) Failed to reload configuration: %v", colName, err))
 	}
 	return nil
 }
@@ -431,12 +333,12 @@ func (srv *Server) IdxDrop(params []string) (err interface{}) {
 		return
 	}
 	// Reload my config
-	if err = srv.Reload(nil); err != nil {
+	if err = srv.reload(nil); err != nil {
 		return
 	}
 	// Inform other ranks to reload their config
-	if !srv.BroadcastAway(RELOAD, true, false) {
-		return errors.New(fmt.Sprintf("(IdxDrop %s) Failed to reload configuration", colName))
+	if err = srv.broadcast(RELOAD, false); err != nil {
+		return errors.New(fmt.Sprintf("(IdxDrop %s) Failed to reload configuration: %v", colName, err))
 	}
 	return nil
 }

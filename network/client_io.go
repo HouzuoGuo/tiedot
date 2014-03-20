@@ -8,25 +8,6 @@ import (
 	"strings"
 )
 
-// Send an unimportant message to server, do not panic on error. Return true on success.
-func (tc *Client) writeAway(line string, consumeResp bool) bool {
-	var err error
-	if _, err = tc.Out.WriteString(line); err != nil {
-		return false
-	}
-	if err = tc.Out.WriteByte(byte('\n')); err != nil {
-		return false
-	}
-	if err = tc.Out.Flush(); err != nil {
-		return false
-	}
-	if consumeResp {
-		_, err = tc.In.ReadString(byte('\n'))
-		return err == nil
-	}
-	return true
-}
-
 // Send a request to IPC server, suffix new-line is automatically added.
 func (tc *Client) writeReq(line string) (err error) {
 	if _, err = tc.Out.WriteString(line); err != nil {

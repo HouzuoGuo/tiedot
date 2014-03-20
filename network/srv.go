@@ -3,13 +3,16 @@ package network
 
 import (
 	"bufio"
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/colpart"
 	"github.com/HouzuoGuo/tiedot/dstruct"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -63,8 +66,9 @@ const (
 )
 
 const (
-	INTER_RANK_CONN_RETRY = 20
-	RETRY_EVERY           = 100 // milliseconds
+	INTER_RANK_CONN_RETRY          = 50
+	INTER_RANK_CONN_RETRY_INTERVAL = 100 // milliseconds
+	WAIT_ON_SCHEMA_UPDATE_INTERVAL = 100 // milliseconds
 )
 
 // Tasks are queued on a server and executed one by one
@@ -85,12 +89,12 @@ type Server struct {
 	ColIndexPathStr        map[string][]string   // Collection name -> indexed paths
 	ColIndexPath           map[string][][]string // Collection name -> indexed path segments
 	// My partition
-	ColParts    map[string]*colpart.Partition            // Collection name -> partition
-	Htables     map[string]map[string]*dstruct.HashTable // Collection name -> index name -> hash table
-	Listener    net.Listener                             // This server socket
-	InterRank   []*Client                                // Inter-rank communication connection
-	MainLoop    chan *Task                               // Task loop
-	ConnCounter int
+	ColParts  map[string]*colpart.Partition            // Collection name -> partition
+	Htables   map[string]map[string]*dstruct.HashTable // Collection name -> index name -> hash table
+	Listener  net.Listener                             // This server socket
+	InterRank []*Client                                // Inter-rank communication connection
+	MainLoop  chan *Task                               // Task loop
+	BgLoop    chan func() error                        // Background task loop
 }
 
 // Start a new server.
@@ -127,7 +131,7 @@ func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err err
 				panic(err)
 			}
 			// Process commands from incoming connection
-			go CmdLoop(srv, &conn)
+			go cmdLoop(srv, &conn)
 		}
 	}()
 	// Establish inter-rank communications (including a connection to myself)
@@ -136,12 +140,12 @@ func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err err
 			if srv.InterRank[i], err = NewClient(tempDir, i); err == nil {
 				break
 			} else {
-				time.Sleep(RETRY_EVERY * time.Millisecond)
+				time.Sleep(INTER_RANK_CONN_RETRY_INTERVAL * time.Millisecond)
 			}
 		}
 	}
 	// Open my partition of the database
-	if err2 := srv.Reload(nil); err2 != nil {
+	if err2 := srv.reload(nil); err2 != nil {
 		return nil, err2.(error)
 	}
 	tdlog.Printf("Rank %d: Initialization completed, listening on %s", rank, srv.ServerSock)
@@ -154,42 +158,142 @@ func (server *Server) Start() {
 	for {
 		task := <-server.MainLoop
 		for server.SchemaUpdateInProgress {
-			time.Sleep(RETRY_EVERY * time.Millisecond)
+			time.Sleep(WAIT_ON_SCHEMA_UPDATE_INTERVAL * time.Millisecond)
 		}
 		(task.Ret) <- task.Fun(task.Input)
 	}
 }
 
-// Submit a task to the server and wait till its completion.
-func (server *Server) Submit(task *Task) interface{} {
-	server.MainLoop <- task
-	return <-(task.Ret)
-}
-
-// Broadcast a message to all other servers, return true on success.
-func (srv *Server) BroadcastAway(line string, consumeResp bool, onErrResume bool) bool {
-	for i, rank := range srv.InterRank {
-		if i == srv.Rank {
-			continue
-		}
-		if !rank.writeAway(line, consumeResp) && !onErrResume {
-			return false
-		}
-	}
-	return true
-}
-
 // Shutdown server and delete domain socket file.
 func (srv *Server) Shutdown() {
-	srv.BroadcastAway(SHUTDOWN, false, true)
-	srv.FlushAll(nil)
+	srv.broadcast(SHUTDOWN, true)
+	srv.flushAll(nil)
 	os.Remove(srv.ServerSock)
 	tdlog.Printf("Rank %d: Shutdown upon client request", srv.Rank)
 	os.Exit(0)
 }
 
+// Submit a task to the server and wait till its completion.
+func (server *Server) submit(task *Task) interface{} {
+	server.MainLoop <- task
+	return <-(task.Ret)
+}
+
+// Send the message to all other servers.
+func (srv *Server) broadcast(line string, onErrResume bool) (err error) {
+	for i, rank := range srv.InterRank {
+		if i == srv.Rank {
+			continue
+		}
+		if err = rank.getOK(line); err != nil && !onErrResume {
+			return
+		}
+	}
+	return nil
+}
+
+// Reload collection configurations.
+func (server *Server) reload(_ []string) (err interface{}) {
+	server.SchemaUpdateInProgress = true
+	// Save whatever I already have, and get rid of everything
+	server.flushAll(nil)
+	server.ColNumParts = make(map[string]int)
+	server.ColIndexPath = make(map[string][][]string)
+	server.ColIndexPathStr = make(map[string][]string)
+	server.ColParts = make(map[string]*colpart.Partition)
+	server.Htables = make(map[string]map[string]*dstruct.HashTable)
+	// Read the DB directory
+	files, err := ioutil.ReadDir(server.DBDir)
+	if err != nil {
+		return
+	}
+	for _, f := range files {
+		// Sub-directories are collections
+		if f.IsDir() {
+			// Read the "numchunks" file - its should contain a positive integer in the content
+			var numchunksFH *os.File
+			colName := f.Name()
+			numchunksFH, err = os.OpenFile(path.Join(server.DBDir, colName, NUMCHUNKS_FILENAME), os.O_CREATE|os.O_RDWR, 0600)
+			defer numchunksFH.Close()
+			if err != nil {
+				return
+			}
+			numchunksContent, err := ioutil.ReadAll(numchunksFH)
+			if err != nil {
+				panic(err)
+			}
+			numchunks, err := strconv.Atoi(string(numchunksContent))
+			if err != nil || numchunks < 1 {
+				tdlog.Panicf("Rank %d: Cannot figure out number of chunks for collection %s, manually repair it maybe? %v", server.Rank, server.DBDir, err)
+			}
+			server.ColNumParts[colName] = numchunks
+			server.ColIndexPath[colName] = make([][]string, 0, 0)
+			server.ColIndexPathStr[colName] = make([]string, 0, 0)
+			// Abort the program if total number of processes is not enough for a collection
+			if server.TotalRank < numchunks {
+				panic(fmt.Sprintf("Please start at least %d processes, because collection %s has %d partitions", numchunks, colName, numchunks))
+			}
+			colDir := path.Join(server.DBDir, colName)
+			if server.Rank < numchunks {
+				tdlog.Printf("Rank %d: I am going to open my partition in %s", server.Rank, f.Name())
+				// Open data partition
+				part, err := colpart.OpenPart(path.Join(colDir, CHUNK_DIRNAME_MAGIC+strconv.Itoa(server.Rank)))
+				if err != nil {
+					return err
+				}
+				// Put the partition into server structure
+				server.ColParts[colName] = part
+				server.Htables[colName] = make(map[string]*dstruct.HashTable)
+			}
+			// Look for indexes in the collection
+			walker := func(_ string, info os.FileInfo, err2 error) error {
+				if err2 != nil {
+					tdlog.Error(err)
+					return nil
+				}
+				if info.IsDir() {
+					switch {
+					case strings.HasPrefix(info.Name(), HASHTABLE_DIRNAME_MAGIC):
+						// Figure out indexed path - including the partition number
+						indexPathStr := info.Name()[len(HASHTABLE_DIRNAME_MAGIC):]
+						indexPath := strings.Split(indexPathStr, INDEX_PATH_SEP)
+						// Put the schema into server structures
+						server.ColIndexPathStr[colName] = append(server.ColIndexPathStr[colName], indexPathStr)
+						server.ColIndexPath[colName] = append(server.ColIndexPath[colName], indexPath)
+						if server.Rank < numchunks {
+							tdlog.Printf("Rank %d: I am going to open my partition in hashtable %s", server.Rank, info.Name())
+							ht, err := dstruct.OpenHash(path.Join(colDir, info.Name(), strconv.Itoa(server.Rank)), indexPath)
+							if err != nil {
+								return err
+							}
+							server.Htables[colName][indexPathStr] = ht
+						}
+					}
+				}
+				return nil
+			}
+			err = filepath.Walk(colDir, walker)
+		}
+	}
+	server.SchemaUpdateInProgress = false
+	return nil
+}
+
+// Call flush on all mapped files.
+func (srv *Server) flushAll(_ []string) (_ interface{}) {
+	for _, part := range srv.ColParts {
+		part.Flush()
+	}
+	for _, htMap := range srv.Htables {
+		for _, ht := range htMap {
+			ht.File.Flush()
+		}
+	}
+	return nil
+}
+
 // Process commands from the client.
-func CmdLoop(srv *Server, conn *net.Conn) {
+func cmdLoop(srv *Server, conn *net.Conn) {
 	resp := make(chan interface{}, 1)
 	in := bufio.NewReader(*conn)
 	out := bufio.NewWriter(*conn)
@@ -221,11 +325,11 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 				return
 			}
 		case RELOAD:
-			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.Reload}, out); err != nil {
+			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.reload}, out); err != nil {
 				return
 			}
 		case FLUSH_ALL:
-			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.FlushAll}, out); err != nil {
+			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.flushAll}, out); err != nil {
 				return
 			}
 		case SHUTDOWN:
@@ -251,7 +355,7 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDrop}, out); err != nil {
 					return
 				}
-			// Index management
+				// Index management
 			case IDX_CREATE:
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.IdxCreate}, out); err != nil {
 					return
@@ -264,7 +368,7 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.IdxDrop}, out); err != nil {
 					return
 				}
-			// Document manipulation including index updates
+				// Document manipulation including index updates
 			case COL_INSERT:
 				if err = srv.uint64OrErr(&Task{Ret: resp, Input: params, Fun: srv.ColInsert}, out); err != nil {
 					return
@@ -289,7 +393,7 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDeleteNoIdx}, out); err != nil {
 					return
 				}
-			// Document CRUD (no index update)
+				// Document CRUD (no index update)
 			case DOC_INSERT:
 				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocInsert}, out); err != nil {
 					return
@@ -306,7 +410,7 @@ func CmdLoop(srv *Server, conn *net.Conn) {
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocDelete}, out); err != nil {
 					return
 				}
-			// Index entry (hash table) manipulation
+				// Index entry (hash table) manipulation
 			case HT_PUT:
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.HTPut}, out); err != nil {
 					return
