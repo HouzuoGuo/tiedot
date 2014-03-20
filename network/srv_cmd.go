@@ -179,7 +179,6 @@ func (srv *Server) DocUpdate(params []string) (strOrErr interface{}) {
 		if strOrErr = json.Unmarshal([]byte(jsonDoc), &doc); strOrErr != nil {
 			return errors.New(fmt.Sprintf("(DocUpdate %s) Input JSON is malformed", colName))
 		}
-		doc[uid.PK_NAME] = id // client is not supposed to change UID, just to make sure
 		var newDocID uint64
 		if newDocID, strOrErr = col.Update(idInt, doc); strOrErr != nil {
 			return

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestNewServerTaskSubmit(t *testing.T) {
@@ -36,17 +37,28 @@ func TestNewServerTaskSubmit(t *testing.T) {
 		go srv.Start()
 		if !(srv.ServerSock == "/tmp/tiedot_test_srv/"+strconv.Itoa(i) &&
 			srv.Rank == i && srv.TotalRank == 3 && srv.TempDir == wd && srv.DBDir == db &&
-			len(srv.ColNumParts) == 0 && len(srv.ColParts) == 0 && len(srv.Htables) == 0 && len(srv.MainLoop) == 0 &&
+			len(srv.ColNumParts) == 0 && len(srv.ColParts) == 0 && len(srv.Htables) == 0 && len(srv.mainLoop) == 0 && len(srv.bgLoop) == 0 &&
 			len(srv.InterRank) == 3 && srv.Listener != nil) {
 			t.Fatal(srv)
 		}
 	}
+	// Foreground task
 	var sideEffect bool
 	promise := make(chan interface{})
 	if srvs[0].submit(&Task{Ret: promise, Input: []string{"true"}, Fun: func(input []string) interface{} {
 		sideEffect = input[0] == "true"
 		return true
 	}}).(bool) != true || !sideEffect {
+		t.Fatal("wrong result")
+	}
+	// Background task
+	var sideEffect2 bool
+	srvs[1].bgLoop <- func() error {
+		sideEffect2 = true
+		return nil
+	}
+	time.Sleep(100 * time.Millisecond)
+	if !sideEffect2 {
 		t.Fatal("wrong result")
 	}
 	os.RemoveAll(wd)
@@ -121,7 +133,7 @@ func TestNewServerOpenDB(t *testing.T) {
 	serversReady.Wait()
 	// Verify server 0
 	if !(srvs[0].Rank == 0 && srvs[0].TotalRank == 3 && srvs[0].TempDir == wd && srvs[0].DBDir == db &&
-		len(srvs[0].ColNumParts) == 2 && len(srvs[0].ColParts) == 2 && len(srvs[0].Htables) == 2 && len(srvs[0].MainLoop) == 0 &&
+		len(srvs[0].ColNumParts) == 2 && len(srvs[0].ColParts) == 2 && len(srvs[0].Htables) == 2 && len(srvs[0].mainLoop) == 0 &&
 		srvs[0].ColNumParts["a"] == 2 && srvs[0].ColNumParts["b"] == 3 &&
 		srvs[0].ColParts["a"].BaseDir == "/tmp/tiedot_test_db/a/chunk_0" && srvs[0].ColParts["b"].BaseDir == "/tmp/tiedot_test_db/b/chunk_0" &&
 		len(srvs[0].Htables["a"]) == 2 && len(srvs[0].Htables["b"]) == 1 &&
@@ -132,7 +144,7 @@ func TestNewServerOpenDB(t *testing.T) {
 	}
 	// Verify server 1
 	if !(srvs[1].Rank == 1 && srvs[1].TotalRank == 3 && srvs[1].TempDir == wd && srvs[1].DBDir == db &&
-		len(srvs[1].ColNumParts) == 2 && len(srvs[1].ColParts) == 2 && len(srvs[1].Htables) == 2 && len(srvs[1].MainLoop) == 0 &&
+		len(srvs[1].ColNumParts) == 2 && len(srvs[1].ColParts) == 2 && len(srvs[1].Htables) == 2 && len(srvs[1].mainLoop) == 0 &&
 		srvs[1].ColNumParts["a"] == 2 && srvs[1].ColNumParts["b"] == 3 &&
 		srvs[1].ColParts["a"].BaseDir == "/tmp/tiedot_test_db/a/chunk_1" && srvs[1].ColParts["b"].BaseDir == "/tmp/tiedot_test_db/b/chunk_1" &&
 		len(srvs[1].Htables["a"]) == 2 && len(srvs[1].Htables["b"]) == 1 &&
@@ -143,7 +155,7 @@ func TestNewServerOpenDB(t *testing.T) {
 	}
 	// Verify server 2 (ONE LESS partition)
 	if !(srvs[2].Rank == 2 && srvs[2].TotalRank == 3 && srvs[2].TempDir == wd && srvs[2].DBDir == db &&
-		len(srvs[2].ColNumParts) == 2 && len(srvs[2].ColParts) == 1 && len(srvs[2].Htables) == 1 && len(srvs[2].MainLoop) == 0 &&
+		len(srvs[2].ColNumParts) == 2 && len(srvs[2].ColParts) == 1 && len(srvs[2].Htables) == 1 && len(srvs[2].mainLoop) == 0 &&
 		srvs[2].ColNumParts["a"] == 2 && srvs[2].ColNumParts["b"] == 3 &&
 		srvs[2].ColParts["b"].BaseDir == "/tmp/tiedot_test_db/b/chunk_2" &&
 		len(srvs[2].Htables["b"]) == 1 &&

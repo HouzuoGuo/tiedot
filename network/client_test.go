@@ -115,10 +115,10 @@ func ColCRUD(t *testing.T) {
 
 func DocCRUD(t *testing.T) {
 	var err error
-	if _, err = clients[2].docInsert("a", map[string]interface{}{"1": "1"}); err == nil {
+	if _, err = clients[2].docInsert("a", map[string]interface{}{uid.PK_NAME: "1", "1": "1"}); err == nil {
 		t.Fatal()
 	}
-	if _, err = clients[3].docInsert("a", map[string]interface{}{"1": "1"}); err == nil {
+	if _, err = clients[3].docInsert("a", map[string]interface{}{uid.PK_NAME: "2", "1": "1"}); err == nil {
 		t.Fatal()
 	}
 	// doc insert
@@ -300,7 +300,8 @@ func DocCRUD2(t *testing.T) {
 	// Read them back - again
 	for i := 0; i < numDocs; i++ {
 		doc, err := clients[rand.Intn(NUM_SERVERS)].ColGet("a", docIDs[i])
-		if err != nil || doc.(map[string]interface{})["attr"].(float64) != float64(i*2) {
+		if err != nil || doc.(map[string]interface{})["attr"].(float64) != float64(i*2) ||
+			doc.(map[string]interface{})[uid.PK_NAME].(string) != strconv.FormatUint(docIDs[i], 10) {
 			t.Fatal(err, doc)
 		}
 	}

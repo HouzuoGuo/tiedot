@@ -94,8 +94,8 @@ type Server struct {
 	Htables   map[string]map[string]*dstruct.HashTable // Collection name -> index name -> hash table
 	Listener  net.Listener                             // This server socket
 	InterRank []*Client                                // Inter-rank communication connection
-	MainLoop  chan *Task                               // Task loop
-	BgLoop    chan func() error                        // Background task loop
+	mainLoop  chan *Task                               // Task loop
+	bgLoop    chan func() error                        // Background task loop
 }
 
 // Start a new server.
@@ -117,7 +117,8 @@ func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err err
 		TempDir:    tempDir, DBDir: dbDir,
 		InterRank:              make([]*Client, totalRank),
 		SchemaUpdateInProgress: true,
-		MainLoop:               make(chan *Task, 100)}
+		mainLoop:               make(chan *Task, 100),
+		bgLoop:                 make(chan func() error, 100)}
 	// Create server socket
 	os.Remove(srv.ServerSock)
 	srv.Listener, err = net.Listen("unix", srv.ServerSock)
@@ -153,12 +154,25 @@ func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err err
 	return
 }
 
-// Start task worker
-func (server *Server) Start() {
-	defer os.Remove(server.ServerSock)
+// Start both foreground and background task workers.
+func (srv *Server) Start() {
+	// The background worker
+	go func() {
+		defer os.Remove(srv.ServerSock)
+		for {
+			fun := <-srv.bgLoop
+			for srv.SchemaUpdateInProgress {
+				time.Sleep(WAIT_ON_SCHEMA_UPDATE_INTERVAL * time.Millisecond)
+			}
+			if err := fun(); err != nil {
+				tdlog.Errorf("(BgLoop) %v", err)
+			}
+		}
+	}()
+	// The main (foreground) task worker
 	for {
-		task := <-server.MainLoop
-		for server.SchemaUpdateInProgress {
+		task := <-srv.mainLoop
+		for srv.SchemaUpdateInProgress {
 			time.Sleep(WAIT_ON_SCHEMA_UPDATE_INTERVAL * time.Millisecond)
 		}
 		(task.Ret) <- task.Fun(task.Input)
@@ -185,8 +199,8 @@ func (srv *Server) shutdownMe(_ []string) (_ interface{}) {
 }
 
 // Submit a task to the server and wait till its completion.
-func (server *Server) submit(task *Task) interface{} {
-	server.MainLoop <- task
+func (srv *Server) submit(task *Task) interface{} {
+	srv.mainLoop <- task
 	return <-(task.Ret)
 }
 
