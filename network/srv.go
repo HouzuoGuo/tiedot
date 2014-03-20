@@ -53,13 +53,14 @@ const (
 	HT_DELETE = "hde" // hde <col_name> <idx_name> <key> <val>
 
 	// Other
-	RELOAD    = "reload"
-	FLUSH_ALL = "flush"
-	SHUTDOWN  = "shutdown"
-	PING      = "ping"    // for testing
-	PING1     = "ping1"   // for testing
-	PING_JSON = "pingjs"  // for testing
-	PING_ERR  = "pingerr" // for testing
+	RELOAD       = "reload"
+	FLUSH_ALL    = "flush"
+	SHUTDOWN_ALL = "shutdownall"
+	SHUTDOWN_ME  = "shutdownme"
+	PING         = "ping"    // for testing
+	PING1        = "ping1"   // for testing
+	PING_JSON    = "pingjs"  // for testing
+	PING_ERR     = "pingerr" // for testing
 	// General response
 	ACK = "OK"   // Acknowledgement
 	ERR = "ERR " // Bad request/server error (mind the space)
@@ -164,13 +165,23 @@ func (server *Server) Start() {
 	}
 }
 
-// Shutdown server and delete domain socket file.
-func (srv *Server) Shutdown() {
-	srv.broadcast(SHUTDOWN, true)
+// Shutdown all other servers, then shutdown myself
+func (srv *Server) shutdownAll(_ []string) (_ interface{}) {
+	srv.broadcast(SHUTDOWN_ME, true)
 	srv.flushAll(nil)
 	os.Remove(srv.ServerSock)
 	tdlog.Printf("Rank %d: Shutdown upon client request", srv.Rank)
 	os.Exit(0)
+	return
+}
+
+// Shutdown my server.
+func (srv *Server) shutdownMe(_ []string) (_ interface{}) {
+	srv.flushAll(nil)
+	os.Remove(srv.ServerSock)
+	tdlog.Printf("Rank %d: Shutdown upon client request", srv.Rank)
+	os.Exit(0)
+	return
 }
 
 // Submit a task to the server and wait till its completion.
@@ -179,13 +190,13 @@ func (server *Server) submit(task *Task) interface{} {
 	return <-(task.Ret)
 }
 
-// Send the message to all other servers.
-func (srv *Server) broadcast(line string, onErrResume bool) (err error) {
+// Send the message to all other servers. Watch out for possible recursive broadcasts!
+func (srv *Server) broadcast(msg string, onErrResume bool) (err error) {
 	for i, rank := range srv.InterRank {
 		if i == srv.Rank {
 			continue
 		}
-		if err = rank.getOK(line); err != nil && !onErrResume {
+		if err = rank.getOK(msg); err != nil && !onErrResume {
 			return
 		}
 	}
@@ -332,8 +343,14 @@ func cmdLoop(srv *Server, conn *net.Conn) {
 			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.flushAll}, out); err != nil {
 				return
 			}
-		case SHUTDOWN:
-			srv.Shutdown()
+		case SHUTDOWN_ME:
+			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.shutdownMe}, out); err != nil {
+				return
+			}
+		case SHUTDOWN_ALL:
+			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.shutdownAll}, out); err != nil {
+				return
+			}
 		default:
 			// Interpret parameterised commands
 			params := strings.SplitN(cmd, " ", 1+4) // there are at most 4 parameters used by any command

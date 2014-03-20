@@ -6,9 +6,9 @@ import (
 	"fmt"
 )
 
-// Tell server to shutdown, and shutdown myself (client) as well.
+// Tell server to shutdown (all ranks), then shutdown this client.
 func (tc *Client) ShutdownServer() {
-	tc.writeReq(SHUTDOWN)
+	tc.getOK(SHUTDOWN_ALL)
 	tc.ShutdownClient()
 }
 
