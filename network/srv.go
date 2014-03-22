@@ -365,94 +365,101 @@ func cmdLoop(srv *Server, conn *net.Conn) {
 			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.shutdownAll}, out); err != nil {
 				return
 			}
+		case COL_ALL:
+			if err = srv.jsonOrErr(&Task{Ret: resp, Fun: srv.ColAll}, out); err != nil {
+				return
+			}
 		default:
 			// Interpret parameterised commands
-			params := strings.SplitN(cmd, " ", 1+4) // there are at most 4 parameters used by any command
-			switch params[0] {
-			// Collection management
-			case COL_CREATE:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColCreate}, out); err != nil {
-					return
-				}
-			case COL_ALL:
-				if err = srv.jsonOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColAll}, out); err != nil {
-					return
-				}
-			case COL_RENAME:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColRename}, out); err != nil {
-					return
-				}
-			case COL_DROP:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDrop}, out); err != nil {
-					return
-				}
-				// Index management
-			case IDX_CREATE:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.IdxCreate}, out); err != nil {
-					return
-				}
-			case IDX_ALL:
-				if err = srv.jsonOrErr(&Task{Ret: resp, Input: params, Fun: srv.IdxAll}, out); err != nil {
-					return
-				}
-			case IDX_DROP:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.IdxDrop}, out); err != nil {
-					return
-				}
-				// Document manipulation including index updates
+			action := cmd[0:strings.IndexRune(cmd, ' ')]
+			switch action {
+			// These commands all involve JSON
 			case COL_INSERT:
-				if err = srv.uint64OrErr(&Task{Ret: resp, Input: params, Fun: srv.ColInsert}, out); err != nil {
-					return
-				}
-			case COL_GET:
-				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColGet}, out); err != nil {
+				if err = srv.uint64OrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+2), Fun: srv.ColInsert}, out); err != nil {
 					return
 				}
 			case COL_UPDATE:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColUpdate}, out); err != nil {
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+3), Fun: srv.ColUpdate}, out); err != nil {
 					return
 				}
 			case COL_UPDATE_NO_IDX:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColUpdateNoIdx}, out); err != nil {
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+3), Fun: srv.ColUpdateNoIdx}, out); err != nil {
 					return
 				}
-			case COL_DELETE:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDelete}, out); err != nil {
-					return
-				}
-			case COL_DELETE_NO_IDX:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDeleteNoIdx}, out); err != nil {
-					return
-				}
-				// Document CRUD (no index update)
 			case DOC_INSERT:
-				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocInsert}, out); err != nil {
-					return
-				}
-			case DOC_GET:
-				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocGet}, out); err != nil {
+				if err = srv.strOrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+2), Fun: srv.DocInsert}, out); err != nil {
 					return
 				}
 			case DOC_UPDATE:
-				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocUpdate}, out); err != nil {
+				if err = srv.strOrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+3), Fun: srv.DocUpdate}, out); err != nil {
 					return
 				}
-			case DOC_DELETE:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocDelete}, out); err != nil {
-					return
-				}
-				// Index entry (hash table) manipulation
-			case HT_PUT:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.HTPut}, out); err != nil {
-					return
-				}
-			case HT_GET:
-				if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.HTGet}, out); err != nil {
-					return
-				}
-			case HT_DELETE:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.HTDelete}, out); err != nil {
-					return
+			default:
+				// These commands do not involve JSON
+				// And there are at most 4 parameters used by any command
+				params := strings.SplitN(cmd, " ", 1+4)
+				switch action {
+				// Collection management
+				case COL_CREATE:
+					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColCreate}, out); err != nil {
+						return
+					}
+				case COL_RENAME:
+					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColRename}, out); err != nil {
+						return
+					}
+				case COL_DROP:
+					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDrop}, out); err != nil {
+						return
+					}
+					// Index management
+				case IDX_CREATE:
+					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.IdxCreate}, out); err != nil {
+						return
+					}
+				case IDX_ALL:
+					if err = srv.jsonOrErr(&Task{Ret: resp, Input: params, Fun: srv.IdxAll}, out); err != nil {
+						return
+					}
+				case IDX_DROP:
+					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.IdxDrop}, out); err != nil {
+						return
+					}
+					// Document manipulation including index updates
+				case COL_GET:
+					if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColGet}, out); err != nil {
+						return
+					}
+				case COL_DELETE:
+					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDelete}, out); err != nil {
+						return
+					}
+				case COL_DELETE_NO_IDX:
+					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDeleteNoIdx}, out); err != nil {
+						return
+					}
+					// Document CRUD (no index update)
+				case DOC_GET:
+					if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocGet}, out); err != nil {
+						return
+					}
+				case DOC_DELETE:
+					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocDelete}, out); err != nil {
+						return
+					}
+					// Index entry (hash table) manipulation
+				case HT_PUT:
+					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.HTPut}, out); err != nil {
+						return
+					}
+				case HT_GET:
+					if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.HTGet}, out); err != nil {
+						return
+					}
+				case HT_DELETE:
+					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.HTDelete}, out); err != nil {
+						return
+					}
 				}
 			}
 		}

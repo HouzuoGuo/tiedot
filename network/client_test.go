@@ -280,7 +280,7 @@ func DocCRUD2(t *testing.T) {
 	docIDs := make([]uint64, numDocs)
 	// Insert some documents
 	for i := 0; i < numDocs; i++ {
-		if docIDs[i], err = clients[rand.Intn(NUM_SERVERS)].ColInsert("a", map[string]interface{}{"attr": i, "extra": "abcd"}); err != nil {
+		if docIDs[i], err = clients[rand.Intn(NUM_SERVERS)].ColInsert("a", map[string]interface{}{"attr": i, "extr a": " abcd "}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -293,7 +293,7 @@ func DocCRUD2(t *testing.T) {
 	}
 	// Update each of them
 	for i := 0; i < numDocs; i++ {
-		if err = clients[rand.Intn(NUM_SERVERS)].ColUpdate("a", docIDs[i], map[string]interface{}{"attr": i * 2, "extra": nil}); err != nil {
+		if err = clients[rand.Intn(NUM_SERVERS)].ColUpdate("a", docIDs[i], map[string]interface{}{"attr": i * 2, " !extra ": nil}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -338,13 +338,13 @@ func DocIndexing(t *testing.T) {
 	clients[0].IdxCreate("index", "a,b")
 	for i := 0; i < numDocs; i++ {
 		docs := []map[string]interface{}{
-			map[string]interface{}{"a": map[string]interface{}{"b": (0 * numDocs) + (i + 1)}, "extra": "abc"},
-			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": (1 * numDocs) + (i + 1), "extra": "abc"}, "bcd"}, "extra": "cde"},
-			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{(2 * numDocs) + (i + 1)}, "extra": "abc"}, "bcd"}, "extra": "cde"},
-			map[string]interface{}{"a": nil, "extra": "abc"},
-			map[string]interface{}{"a": map[string]interface{}{"b": nil, "extra": "bcd"}},
-			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": nil, "extra": "abc"}, "bcd"}, "extra": "cde"},
-			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{nil}, "extra": "abc"}, "bcd"}, "extra": "cde"}}
+			map[string]interface{}{"a": map[string]interface{}{"b": (0 * numDocs) + (i + 1)}, "ext ra": "ab '!@#c"},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": (1 * numDocs) + (i + 1), "ext ra": "ab '!@#c"}, "bcd"}, "extra": "cde"},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{(2 * numDocs) + (i + 1)}, "ex tra": "ab '!@#c"}, "bcd"}, "extra ": "ab '!@#c"},
+			map[string]interface{}{"a": nil, "extr !a": "!abc"},
+			map[string]interface{}{"a": map[string]interface{}{"b": nil, "e xtra": "bc d "}},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": nil, "extra": "abc"}, "bcd"}, " extra": "ab '!@#c"},
+			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{nil}, "e xtra": "ab '!@#c"}, "bcd"}, "extr a": "ab '!@#c"}}
 		for j, doc := range docs {
 			if docIDs[i*numDocsPerIter+j], err = clients[rand.Intn(NUM_SERVERS)].ColInsert("index", doc); err != nil {
 				t.Fatal(err)
