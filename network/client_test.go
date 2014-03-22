@@ -286,20 +286,20 @@ func DocCRUD2(t *testing.T) {
 	}
 	// Read them back
 	for i := 0; i < numDocs; i++ {
-		doc, err := clients[rand.Intn(NUM_SERVERS)].ColGet("a", docIDs[i])
+		doc, err := clients[docIDs[i]%2].ColGet("a", docIDs[i])
 		if err != nil || doc.(map[string]interface{})["attr"].(float64) != float64(i) {
 			t.Fatal(err, doc)
 		}
 	}
 	// Update each of them
 	for i := 0; i < numDocs; i++ {
-		if err = clients[rand.Intn(NUM_SERVERS)].ColUpdate("a", docIDs[i], map[string]interface{}{"attr": i * 2, " !extra ": nil}); err != nil {
+		if err = clients[docIDs[i]%2].ColUpdate("a", docIDs[i], map[string]interface{}{"attr": i * 2, " !extra ": nil}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// Read them back - again
 	for i := 0; i < numDocs; i++ {
-		doc, err := clients[rand.Intn(NUM_SERVERS)].ColGet("a", docIDs[i])
+		doc, err := clients[docIDs[i]%2].ColGet("a", docIDs[i])
 		if err != nil || doc.(map[string]interface{})["attr"].(float64) != float64(i*2) ||
 			doc.(map[string]interface{})[uid.PK_NAME].(string) != strconv.FormatUint(docIDs[i], 10) {
 			t.Fatal(err, doc)
@@ -307,13 +307,13 @@ func DocCRUD2(t *testing.T) {
 	}
 	// Delete half of them
 	for i := 0; i < numDocs/2; i++ {
-		if err = clients[rand.Intn(NUM_SERVERS)].ColDelete("a", docIDs[i]); err != nil {
+		if err = clients[docIDs[i]%2].ColDelete("a", docIDs[i]); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// Read them back - again
 	for i := 0; i < numDocs; i++ {
-		doc, err := clients[rand.Intn(NUM_SERVERS)].ColGet("a", docIDs[i])
+		doc, err := clients[docIDs[i]%2].ColGet("a", docIDs[i])
 		if i < numDocs/2 && err == nil {
 			// deleted half
 			t.Fatal("did not delete", i)
@@ -379,7 +379,7 @@ func DocIndexing(t *testing.T) {
 			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": nil, "extra": "abc"}, "bcd"}, "extra": "cde"},
 			map[string]interface{}{"a": []interface{}{map[string]interface{}{"b": []interface{}{nil}, "extra": "abc"}, "bcd"}, "extra": "cde"}}
 		for j, doc := range docs {
-			if err = clients[rand.Intn(NUM_SERVERS)].ColUpdate("index", docIDs[i*numDocsPerIter+j], doc); err != nil {
+			if err = clients[int(docIDs[i*numDocsPerIter+j]%uint64(numParts))].ColUpdate("index", docIDs[i*numDocsPerIter+j], doc); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -421,7 +421,7 @@ func DocIndexing(t *testing.T) {
 	}
 	// Delete every indexed entry
 	for _, id := range docIDs {
-		if err = clients[rand.Intn(NUM_SERVERS)].ColDelete("index", id); err != nil {
+		if err = clients[int(id%uint64(numParts))].ColDelete("index", id); err != nil {
 			t.Fatal(err)
 		}
 	}

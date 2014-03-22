@@ -68,17 +68,3 @@ func (tc *Client) htGet(colName, indexName string, key, limit uint64) (vals []ui
 func (tc *Client) htDelete(colName, indexName string, key, val uint64) error {
 	return tc.getOK(fmt.Sprintf("%s %s %s %d %d", HT_DELETE, colName, indexName, key, val))
 }
-
-// Update a document by ID, without maintaining index.
-func (tc *Client) colUpdateNoIdx(colName string, id uint64, js map[string]interface{}) (err error) {
-	if serialized, err := json.Marshal(js); err != nil {
-		return err
-	} else {
-		return tc.getOK(fmt.Sprintf("%s %s %d %s", COL_UPDATE_NO_IDX, colName, id, string(serialized)))
-	}
-}
-
-// Delete a document by ID, without maintaining index.
-func (tc *Client) colDeleteNoIdx(colName string, id uint64) (err error) {
-	return tc.getOK(fmt.Sprintf("%s %s %d", COL_DELETE_NO_IDX, colName, id))
-}

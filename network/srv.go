@@ -382,10 +382,6 @@ func cmdLoop(srv *Server, conn *net.Conn) {
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+3), Fun: srv.ColUpdate}, out); err != nil {
 					return
 				}
-			case COL_UPDATE_NO_IDX:
-				if err = srv.ackOrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+3), Fun: srv.ColUpdateNoIdx}, out); err != nil {
-					return
-				}
 			case DOC_INSERT:
 				if err = srv.strOrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+2), Fun: srv.DocInsert}, out); err != nil {
 					return
@@ -432,10 +428,6 @@ func cmdLoop(srv *Server, conn *net.Conn) {
 					}
 				case COL_DELETE:
 					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDelete}, out); err != nil {
-						return
-					}
-				case COL_DELETE_NO_IDX:
-					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDeleteNoIdx}, out); err != nil {
 						return
 					}
 					// Document CRUD (no index update)
