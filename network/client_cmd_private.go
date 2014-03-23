@@ -11,6 +11,8 @@ import (
 
 // Insert a document. (Use ColInsert as the public API).
 func (tc *Client) docInsert(colName string, doc map[string]interface{}) (uint64, error) {
+	tc.mutex.Lock()
+	defer tc.mutex.Unlock()
 	if js, err := json.Marshal(doc); err != nil {
 		return 0, errors.New(fmt.Sprintf("Client cannot serialize structure %v, error: %v", doc, err))
 	} else {
@@ -20,11 +22,15 @@ func (tc *Client) docInsert(colName string, doc map[string]interface{}) (uint64,
 
 // Get a document by ID. (Use ColGet as the public API).
 func (tc *Client) docGet(colName string, id uint64) (interface{}, error) {
+	tc.mutex.Lock()
+	defer tc.mutex.Unlock()
 	return tc.getJSON(fmt.Sprintf("%s %s %d", DOC_GET, colName, id))
 }
 
 // Update a document by ID. (Use ColUpdate as the public API).
 func (tc *Client) docUpdate(colName string, id uint64, newDoc map[string]interface{}) (uint64, error) {
+	tc.mutex.Lock()
+	defer tc.mutex.Unlock()
 	if js, err := json.Marshal(newDoc); err != nil {
 		return 0, errors.New(fmt.Sprintf("Client cannot serialize structure %v, error: %v", newDoc, err))
 	} else {
@@ -34,16 +40,22 @@ func (tc *Client) docUpdate(colName string, id uint64, newDoc map[string]interfa
 
 // Delete a document by ID. (Use ColDelete as the public API).
 func (tc *Client) docDelete(colName string, id uint64) error {
+	tc.mutex.Lock()
+	defer tc.mutex.Unlock()
 	return tc.getOK(fmt.Sprintf("%s %s %d %s", DOC_DELETE, colName, id))
 }
 
 // Put a key-value pair into hash table (no corresponding public API).
 func (tc *Client) htPut(colName, indexName string, key, val uint64) error {
+	tc.mutex.Lock()
+	defer tc.mutex.Unlock()
 	return tc.getOK(fmt.Sprintf("%s %s %s %d %d", HT_PUT, colName, indexName, key, val))
 }
 
 // Put a key-value pair into hash table (no corresponding public API).
 func (tc *Client) htGet(colName, indexName string, key, limit uint64) (vals []uint64, err error) {
+	tc.mutex.Lock()
+	defer tc.mutex.Unlock()
 	resp, err := tc.getStr(fmt.Sprintf("%s %s %s %d %d", HT_GET, colName, indexName, key, limit))
 	if err != nil {
 		return
@@ -66,5 +78,7 @@ func (tc *Client) htGet(colName, indexName string, key, limit uint64) (vals []ui
 
 // Put a key-value pair into hash table (no corresponding public API).
 func (tc *Client) htDelete(colName, indexName string, key, val uint64) error {
+	tc.mutex.Lock()
+	defer tc.mutex.Unlock()
 	return tc.getOK(fmt.Sprintf("%s %s %s %d %d", HT_DELETE, colName, indexName, key, val))
 }

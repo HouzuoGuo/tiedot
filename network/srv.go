@@ -118,7 +118,7 @@ func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err err
 		InterRank:              make([]*Client, totalRank),
 		SchemaUpdateInProgress: true,
 		mainLoop:               make(chan *Task, 100),
-		bgLoop:                 make(chan func() error, 100)}
+		bgLoop:                 make(chan func() error, 10000)}
 	// Create server socket
 	os.Remove(srv.ServerSock)
 	srv.Listener, err = net.Listen("unix", srv.ServerSock)
@@ -161,11 +161,13 @@ func (srv *Server) Start() {
 		defer os.Remove(srv.ServerSock)
 		for {
 			fun := <-srv.bgLoop
+			tdlog.Tracef("(BgLoop %d) Run function %v", srv.Rank, fun)
 			for srv.SchemaUpdateInProgress {
+				tdlog.Tracef("(BgLoop %d) Waiting on schema update", srv.Rank)
 				time.Sleep(WAIT_ON_SCHEMA_UPDATE_INTERVAL * time.Millisecond)
 			}
 			if err := fun(); err != nil {
-				tdlog.Errorf("(BgLoop) %v", err)
+				tdlog.Errorf("(BgLoop %d) %v", srv.Rank, err)
 			}
 		}
 	}()
@@ -375,7 +377,7 @@ func cmdLoop(srv *Server, conn *net.Conn) {
 			switch action {
 			// These commands all involve JSON
 			case COL_INSERT:
-				if err = srv.uint64OrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+2), Fun: srv.ColInsert}, out); err != nil {
+				if err = srv.ackOrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+2), Fun: srv.ColInsert}, out); err != nil {
 					return
 				}
 			case COL_UPDATE:

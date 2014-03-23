@@ -2,11 +2,13 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/HouzuoGuo/tiedot/network"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math/rand"
+	"os"
+	"os/signal"
 	"runtime"
+	"runtime/pprof"
 )
 
 const (
@@ -14,6 +16,16 @@ const (
 )
 
 func main() {
+	// Print all goroutine stacktraces on interrupt
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill)
+	go func() {
+		for {
+			<-c
+			pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+		}
+	}()
+
 	// Common flags
 	var mode, tmpDir, dbDir string
 	flag.StringVar(&mode, "mode", "", "[ipc|bench-setup|bench-client|example]")
@@ -63,7 +75,7 @@ func main() {
 			panic(err)
 		}
 		for i := 0; i < benchSize; i++ {
-			fmt.Println(i)
+			//			fmt.Println(i)
 			if _, err = client.ColInsert(BENCH_COL_NAME, map[string]interface{}{"a": map[string]interface{}{"b": rand.Intn(benchSize)}}); err != nil {
 				panic(err)
 			}

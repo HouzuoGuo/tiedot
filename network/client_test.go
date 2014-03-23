@@ -267,9 +267,8 @@ func HashCRUD(t *testing.T) {
 // There is now one collection "a" with two partitions, without any index
 
 func DocCRUD2(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
 	// Insert wrong stuff
-	if _, err := clients[0].ColInsert("asdf", nil); err == nil {
+	if _, err := clients[0].ColInsert("asdf", map[string]interface{}{}); err == nil {
 		t.Fatal()
 	}
 	if _, err := clients[1].ColInsert("a", nil); err == nil {
@@ -280,7 +279,7 @@ func DocCRUD2(t *testing.T) {
 	docIDs := make([]uint64, numDocs)
 	// Insert some documents
 	for i := 0; i < numDocs; i++ {
-		if docIDs[i], err = clients[rand.Intn(NUM_SERVERS)].ColInsert("a", map[string]interface{}{"attr": i, "extr a": " abcd "}); err != nil {
+		if docIDs[i], err = clients[].ColInsert("a", map[string]interface{}{"attr": i, "extr a": " abcd "}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -325,7 +324,6 @@ func DocCRUD2(t *testing.T) {
 }
 
 func DocIndexing(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
 	var err error
 	numDocs := 111
 	numDocsPerIter := 7 // do not change

@@ -400,36 +400,30 @@ func (srv *Server) unindexDoc(colName string, docID uint64, doc interface{}) (er
 }
 
 // Insert a document and maintain hash index.
-func (srv *Server) ColInsert(params []string) (uint64OrErr interface{}) {
-	var err error
+func (srv *Server) ColInsert(params []string) (err interface{}) {
 	colName := params[1]
 	doc := params[2]
 	// Validate parameters
-	if _, exists := srv.ColNumParts[colName]; !exists {
+	var numParts int
+	var exists bool
+	if numParts, exists = srv.ColNumParts[colName]; !exists {
 		return errors.New(fmt.Sprintf("(ColInsert %s) Collection does not exist", colName))
 	}
 	var jsDoc map[string]interface{}
 	if err = json.Unmarshal([]byte(doc), &jsDoc); err != nil || jsDoc == nil {
 		return errors.New(fmt.Sprintf("(ColInsert %s) Client sent malformed JSON document", colName))
 	}
-	// Allocate an ID for the document
-	docID := uid.NextUID()
-	jsDoc[uid.PK_NAME] = strconv.FormatUint(docID, 10)
 	// See where the document goes
-	partNum := int(docID % uint64(srv.ColNumParts[colName]))
-	if partNum == srv.Rank {
-		// Oh I have it!
-		if _, err = srv.ColParts[colName].Insert(jsDoc); err != nil {
-			return err
-		}
-	} else {
-		// Tell other rank to do it
-		srv.bgLoop <- func() error {
-			if _, err := srv.InterRank[partNum].docInsert(colName, jsDoc); err != nil {
-				return err
-			}
-			return nil
-		}
+	docID, err := strconv.ParseUint(jsDoc[uid.PK_NAME].(string), 10, 64)
+	if err != nil {
+		return errors.New(fmt.Sprintf("(ColInsert %s) Client sent malformed document ID", colName))
+	}
+	partNum := int(docID % uint64(numParts))
+	if partNum != srv.Rank {
+		return errors.New(fmt.Sprintf("(ColInsert %s) Contact rank %d to insert document %d", colName, partNum))
+	}
+	if _, err = srv.ColParts[colName].Insert(jsDoc); err != nil {
+		return err
 	}
 	if err = srv.indexDoc(colName, docID, jsDoc); err != nil {
 		return
