@@ -47,6 +47,6 @@ func Trace(params ...interface{}) {
 // Write a trace message, for debugging purpose.
 func Tracef(template string, params ...interface{}) {
 	if TraceLog {
-		log.Printf(template, params)
+		log.Printf(template, params...)
 	}
 }

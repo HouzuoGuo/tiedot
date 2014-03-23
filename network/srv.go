@@ -330,7 +330,7 @@ func cmdLoop(srv *Server, conn *net.Conn) {
 			return
 		}
 		cmd = cmd[0 : len(cmd)-1] // remove new-line suffix
-		tdlog.Printf("Rank %d: Received %s", srv.Rank, cmd)
+		tdlog.Tracef("Rank %d: Received %s", srv.Rank, cmd)
 		// Interpret commands which do not use parameters
 		switch cmd {
 		case PING:
