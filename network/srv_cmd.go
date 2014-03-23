@@ -25,20 +25,11 @@ const (
 // Create a collection.
 func (srv *Server) ColCreate(params []string) (err interface{}) {
 	colName := params[1]
-	numParts := params[2]
-	// Check input parameters
-	numPartsI, err := strconv.Atoi(numParts)
-	if err != nil {
-		return
-	}
-	if numPartsI > srv.TotalRank {
-		return errors.New(fmt.Sprintf("(ColCreate %s) There are not enough processes running", colName))
-	}
 	// Make new files and directories for the collection
 	if err = os.MkdirAll(path.Join(srv.DBDir, colName), 0700); err != nil {
 		return
 	}
-	if err = ioutil.WriteFile(path.Join(srv.DBDir, colName, NUMCHUNKS_FILENAME), []byte(numParts), 0600); err != nil {
+	if err = ioutil.WriteFile(path.Join(srv.DBDir, colName, NUMCHUNKS_FILENAME), []byte(strconv.Itoa(srv.TotalRank)), 0600); err != nil {
 		return
 	}
 	// Reload my config
@@ -358,7 +349,7 @@ func (srv *Server) indexDoc(colName string, docID uint64, doc interface{}) (err 
 				} else {
 					// Go inter-rank: tell other rank to do the job
 					srv.bgLoop <- func() error {
-						if err := srv.InterRank[partNum].htPut(colName, indexPathStr, hashKey, docID); err != nil {
+						if err := srv.InterRank.htPut(colName, indexPathStr, hashKey, docID); err != nil {
 							return err
 						}
 						return nil
@@ -386,7 +377,7 @@ func (srv *Server) unindexDoc(colName string, docID uint64, doc interface{}) (er
 				} else {
 					// Go inter-rank: tell other rank to do the job
 					srv.bgLoop <- func() error {
-						if err := srv.InterRank[partNum].htDelete(colName, indexPathStr, hashKey, docID); err != nil {
+						if err := srv.InterRank.htDelete(colName, indexPathStr, hashKey, docID); err != nil {
 							return err
 						}
 						return nil

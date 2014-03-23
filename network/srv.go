@@ -21,7 +21,7 @@ import (
 // Command operations
 const (
 	// Collection management
-	COL_CREATE = "col_create" // col_create <col_name> <num_parts>
+	COL_CREATE = "col_create" // col_create <col_name>
 	COL_ALL    = "col_all"    // col_all
 	COL_RENAME = "col_rename" // col_rename <old_name> <new_name>
 	COL_DROP   = "col_drop"   // col_drop <col_name>
@@ -41,35 +41,26 @@ const (
 	COL_DELETE        = "cde"   // cde <col_name> <id>
 	COL_DELETE_NO_IDX = "cdeni" // cdeni <col_name> <id>
 
-	// Document CRUD (no index update)
-	DOC_INSERT = "din" // din <col_name> <json_str>
-	DOC_GET    = "dgt" // dgt <col_name> <id>
-	DOC_UPDATE = "dup" // dup <col_name> <id> <json_str>
-	DOC_DELETE = "dde" // dde <col_name> <id>
-
 	// Index entry manipulation
 	HT_PUT    = "hpt" // hpt <col_name> <idx_name> <key> <val>
 	HT_GET    = "hgt" // hgt <col_name> <idx_name> <key> <limit>
 	HT_DELETE = "hde" // hde <col_name> <idx_name> <key> <val>
 
 	// Other
-	RELOAD       = "reload"
-	FLUSH_ALL    = "flush"
-	SHUTDOWN_ALL = "shutdownall"
-	SHUTDOWN_ME  = "shutdownme"
-	PING         = "ping"    // for testing
-	PING1        = "ping1"   // for testing
-	PING_JSON    = "pingjs"  // for testing
-	PING_ERR     = "pingerr" // for testing
+	RELOAD    = "reload"
+	FLUSH_ALL = "flush"
+	SHUTDOWN  = "shutdown"
+	PING      = "ping"    // for testing
+	PING1     = "ping1"   // for testing
+	PING_JSON = "pingjs"  // for testing
+	PING_ERR  = "pingerr" // for testing
 	// General response
 	ACK = "OK"   // Acknowledgement
 	ERR = "ERR " // Bad request/server error (mind the space)
 )
 
 const (
-	INTER_RANK_CONN_RETRY          = 50
-	INTER_RANK_CONN_RETRY_INTERVAL = 100 // milliseconds
-	WAIT_ON_SCHEMA_UPDATE_INTERVAL = 100 // milliseconds
+	WAIT_ON_SCHEMA_UPDATE_INTERVAL = 1000 // milliseconds
 )
 
 // Tasks are queued on a server and executed one by one
@@ -93,7 +84,7 @@ type Server struct {
 	ColParts  map[string]*colpart.Partition            // Collection name -> partition
 	Htables   map[string]map[string]*dstruct.HashTable // Collection name -> index name -> hash table
 	Listener  net.Listener                             // This server socket
-	InterRank []*Client                                // Inter-rank communication connection
+	InterRank *Client                                  // Inter-rank communication connection
 	mainLoop  chan *Task                               // Task loop
 	bgLoop    chan func() error                        // Background task loop
 }
@@ -115,10 +106,9 @@ func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err err
 	srv = &Server{Rank: rank, TotalRank: totalRank,
 		ServerSock: path.Join(tempDir, strconv.Itoa(rank)),
 		TempDir:    tempDir, DBDir: dbDir,
-		InterRank:              make([]*Client, totalRank),
 		SchemaUpdateInProgress: true,
 		mainLoop:               make(chan *Task, 100),
-		bgLoop:                 make(chan func() error, 10000)}
+		bgLoop:                 make(chan func() error, 100)}
 	// Create server socket
 	os.Remove(srv.ServerSock)
 	srv.Listener, err = net.Listen("unix", srv.ServerSock)
@@ -136,15 +126,9 @@ func NewServer(rank, totalRank int, dbDir, tempDir string) (srv *Server, err err
 			go cmdLoop(srv, &conn)
 		}
 	}()
-	// Establish inter-rank communications (including a connection to myself)
-	for i := 0; i < totalRank; i++ {
-		for retry := 0; retry < INTER_RANK_CONN_RETRY; retry++ {
-			if srv.InterRank[i], err = NewClient(tempDir, i); err == nil {
-				break
-			} else {
-				time.Sleep(INTER_RANK_CONN_RETRY_INTERVAL * time.Millisecond)
-			}
-		}
+	// Establish inter-rank communications (Client includes a connection to my own rank)
+	if srv.InterRank, err = NewClient(totalRank, tempDir); err != nil {
+		return
 	}
 	// Open my partition of the database
 	if err2 := srv.reload(nil); err2 != nil {
@@ -181,18 +165,8 @@ func (srv *Server) Start() {
 	}
 }
 
-// Shutdown all other servers, then shutdown myself
-func (srv *Server) shutdownAll(_ []string) (_ interface{}) {
-	srv.broadcast(SHUTDOWN_ME, true)
-	srv.flushAll(nil)
-	os.Remove(srv.ServerSock)
-	tdlog.Printf("Rank %d: Shutdown upon client request", srv.Rank)
-	os.Exit(0)
-	return
-}
-
-// Shutdown my server.
-func (srv *Server) shutdownMe(_ []string) (_ interface{}) {
+// Shutdown server (my rank).
+func (srv *Server) shutdown(_ []string) (_ interface{}) {
 	srv.flushAll(nil)
 	os.Remove(srv.ServerSock)
 	tdlog.Printf("Rank %d: Shutdown upon client request", srv.Rank)
@@ -208,11 +182,11 @@ func (srv *Server) submit(task *Task) interface{} {
 
 // Send the message to all other servers. Watch out for possible recursive broadcasts!
 func (srv *Server) broadcast(msg string, onErrResume bool) (err error) {
-	for i, rank := range srv.InterRank {
+	for i := 0; i < srv.TotalRank; i++ {
 		if i == srv.Rank {
 			continue
 		}
-		if err = rank.getOK(msg); err != nil && !onErrResume {
+		if err = srv.InterRank.getOK(i, msg); err != nil && !onErrResume {
 			return
 		}
 	}
@@ -359,12 +333,8 @@ func cmdLoop(srv *Server, conn *net.Conn) {
 			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.flushAll}, out); err != nil {
 				return
 			}
-		case SHUTDOWN_ME:
-			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.shutdownMe}, out); err != nil {
-				return
-			}
-		case SHUTDOWN_ALL:
-			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.shutdownAll}, out); err != nil {
+		case SHUTDOWN:
+			if err = srv.ackOrErr(&Task{Ret: resp, Fun: srv.shutdown}, out); err != nil {
 				return
 			}
 		case COL_ALL:
@@ -382,14 +352,6 @@ func cmdLoop(srv *Server, conn *net.Conn) {
 				}
 			case COL_UPDATE:
 				if err = srv.ackOrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+3), Fun: srv.ColUpdate}, out); err != nil {
-					return
-				}
-			case DOC_INSERT:
-				if err = srv.strOrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+2), Fun: srv.DocInsert}, out); err != nil {
-					return
-				}
-			case DOC_UPDATE:
-				if err = srv.strOrErr(&Task{Ret: resp, Input: strings.SplitN(cmd, " ", 1+3), Fun: srv.DocUpdate}, out); err != nil {
 					return
 				}
 			default:
@@ -430,15 +392,6 @@ func cmdLoop(srv *Server, conn *net.Conn) {
 					}
 				case COL_DELETE:
 					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.ColDelete}, out); err != nil {
-						return
-					}
-					// Document CRUD (no index update)
-				case DOC_GET:
-					if err = srv.strOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocGet}, out); err != nil {
-						return
-					}
-				case DOC_DELETE:
-					if err = srv.ackOrErr(&Task{Ret: resp, Input: params, Fun: srv.DocDelete}, out); err != nil {
 						return
 					}
 					// Index entry (hash table) manipulation

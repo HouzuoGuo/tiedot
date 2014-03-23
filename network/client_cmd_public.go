@@ -11,25 +11,34 @@ import (
 
 // Tell server to shutdown (all ranks), then shutdown this client.
 func (tc *Client) ShutdownServer() {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-	tc.getOK(SHUTDOWN_ALL)
+	for i := 0; i < tc.TotalRank; i++ {
+		tc.getOK(i, SHUTDOWN)
+	}
 	tc.ShutdownClient()
 }
 
 // Create a collection.
-func (tc *Client) ColCreate(name string, numParts int) error {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-	return tc.getOK(fmt.Sprintf("%s %s %d", COL_CREATE, name, numParts))
+func (tc *Client) ColCreate(name string) (err error) {
+	for _, mutex := range tc.mutex {
+		mutex.Lock()
+	}
+	err = tc.getOK(0, fmt.Sprintf("%s %s", COL_CREATE, name))
+	for _, mutex := range tc.mutex {
+		mutex.Unlock()
+	}
+	return
 }
 
 // Get all collection information (collection name VS number of partitions).
 func (tc *Client) ColAll() (all map[string]int, err error) {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
 	all = make(map[string]int)
-	js, err := tc.getJSON(COL_ALL)
+	for _, mutex := range tc.mutex {
+		mutex.Lock()
+	}
+	js, err := tc.getJSON(0, COL_ALL)
+	for _, mutex := range tc.mutex {
+		mutex.Unlock()
+	}
 	if err != nil {
 		return
 	}
@@ -40,31 +49,50 @@ func (tc *Client) ColAll() (all map[string]int, err error) {
 }
 
 // Rename a collection.
-func (tc *Client) ColRename(oldName, newName string) error {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-	return tc.getOK(fmt.Sprintf("%s %s %s", COL_RENAME, oldName, newName))
+func (tc *Client) ColRename(oldName, newName string) (err error) {
+	for _, mutex := range tc.mutex {
+		mutex.Lock()
+	}
+	err = tc.getOK(0, fmt.Sprintf("%s %s %s", COL_RENAME, oldName, newName))
+	for _, mutex := range tc.mutex {
+		mutex.Unlock()
+	}
+	return
 }
 
 // Drop a collection.
-func (tc *Client) ColDrop(colName string) error {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-	return tc.getOK(fmt.Sprintf("%s %s", COL_DROP, colName))
+func (tc *Client) ColDrop(colName string) (err error) {
+	for _, mutex := range tc.mutex {
+		mutex.Lock()
+	}
+	err = tc.getOK(0, fmt.Sprintf("%s %s", COL_DROP, colName))
+	for _, mutex := range tc.mutex {
+		mutex.Unlock()
+	}
+	return
 }
 
 // Create an index.
-func (tc *Client) IdxCreate(colName, idxPath string) error {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-	return tc.getOK(fmt.Sprintf("%s %s %s", IDX_CREATE, colName, idxPath))
+func (tc *Client) IdxCreate(colName, idxPath string) (err error) {
+	for _, mutex := range tc.mutex {
+		mutex.Lock()
+	}
+	err = tc.getOK(0, fmt.Sprintf("%s %s %s", IDX_CREATE, colName, idxPath))
+	for _, mutex := range tc.mutex {
+		mutex.Unlock()
+	}
+	return
 }
 
 // Get all indexed paths.
 func (tc *Client) IdxAll(colName string) (paths []string, err error) {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-	js, err := tc.getJSON(fmt.Sprintf("%s %s", IDX_ALL, colName))
+	for _, mutex := range tc.mutex {
+		mutex.Lock()
+	}
+	js, err := tc.getJSON(0, fmt.Sprintf("%s %s", IDX_ALL, colName))
+	for _, mutex := range tc.mutex {
+		mutex.Unlock()
+	}
 	if err != nil {
 		return
 	}
@@ -76,10 +104,15 @@ func (tc *Client) IdxAll(colName string) (paths []string, err error) {
 }
 
 // Drop an index.
-func (tc *Client) IdxDrop(colName, idxPath string) error {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-	return tc.getOK(fmt.Sprintf("%s %s %s", IDX_DROP, colName, idxPath))
+func (tc *Client) IdxDrop(colName, idxPath string) (err error) {
+	for _, mutex := range tc.mutex {
+		mutex.Lock()
+	}
+	err = tc.getOK(0, fmt.Sprintf("%s %s %s", IDX_DROP, colName, idxPath))
+	for _, mutex := range tc.mutex {
+		mutex.Unlock()
+	}
+	return
 }
 
 // Insert a document, return its ID.
@@ -87,45 +120,60 @@ func (tc *Client) ColInsert(colName string, js map[string]interface{}) (uint64, 
 	if js == nil {
 		return 0, errors.New("Document is nil")
 	}
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-	docID := uid.NextUID()
-	js[uid.PK_NAME] = strconv.FormatUint(docID, 10)
+	id := uid.NextUID()
+	js[uid.PK_NAME] = strconv.FormatUint(id, 10)
+	rank := int(id % uint64(tc.TotalRank))
+	mutex := tc.mutex[rank]
+	mutex.Lock()
 	if serialized, err := json.Marshal(js); err != nil {
+		mutex.Unlock()
 		return 0, err
 	} else {
-		return docID, tc.getOK(fmt.Sprintf("%s %s %s", COL_INSERT, colName, string(serialized)))
+		mutex.Unlock()
+		return id, tc.getOK(rank, fmt.Sprintf("%s %s %s", COL_INSERT, colName, string(serialized)))
 	}
 }
 
 // Get a document by ID.
 func (tc *Client) ColGet(colName string, id uint64) (doc interface{}, err error) {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-	return tc.getJSON(fmt.Sprintf("%s %s %d", COL_GET, colName, id))
+	rank := int(id % uint64(tc.TotalRank))
+	mutex := tc.mutex[rank]
+	mutex.Lock()
+	doc, err = tc.getJSON(rank, fmt.Sprintf("%s %s %d", COL_GET, colName, id))
+	mutex.Unlock()
+	return
 }
 
 // Get a document by ID.
 func (tc *Client) ColGetJS(colName string, id uint64) (doc string, err error) {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-	return tc.getStr(fmt.Sprintf("%s %s %d", COL_GET, colName, id))
+	rank := int(id % uint64(tc.TotalRank))
+	mutex := tc.mutex[rank]
+	mutex.Lock()
+	doc, err = tc.getStr(rank, fmt.Sprintf("%s %s %d", COL_GET, colName, id))
+	mutex.Unlock()
+	return
 }
 
 // Update a document by ID.
 func (tc *Client) ColUpdate(colName string, id uint64, js map[string]interface{}) (err error) {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
+	rank := int(id % uint64(tc.TotalRank))
+	mutex := tc.mutex[rank]
+	mutex.Lock()
 	if serialized, err := json.Marshal(js); err != nil {
+		mutex.Unlock()
 		return err
 	} else {
-		return tc.getOK(fmt.Sprintf("%s %s %d %s", COL_UPDATE, colName, id, string(serialized)))
+		mutex.Unlock()
+		return tc.getOK(rank, fmt.Sprintf("%s %s %d %s", COL_UPDATE, colName, id, string(serialized)))
 	}
 }
 
 // Delete a document by ID.
 func (tc *Client) ColDelete(colName string, id uint64) (err error) {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-	return tc.getOK(fmt.Sprintf("%s %s %d", COL_DELETE, colName, id))
+	rank := int(id % uint64(tc.TotalRank))
+	mutex := tc.mutex[rank]
+	mutex.Lock()
+	err = tc.getOK(rank, fmt.Sprintf("%s %s %d", COL_DELETE, colName, id))
+	mutex.Unlock()
+	return
 }

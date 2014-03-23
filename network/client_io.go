@@ -9,22 +9,22 @@ import (
 )
 
 // Send a request to IPC server, suffix new-line is automatically added.
-func (tc *Client) writeReq(line string) (err error) {
-	if _, err = tc.Out.WriteString(line); err != nil {
+func (tc *Client) writeReq(rank int, line string) (err error) {
+	if _, err = tc.Out[rank].WriteString(line); err != nil {
 		return
 	}
-	if err = tc.Out.WriteByte(byte('\n')); err != nil {
+	if err = tc.Out[rank].WriteByte(byte('\n')); err != nil {
 		return
 	}
-	if err = tc.Out.Flush(); err != nil {
+	if err = tc.Out[rank].Flush(); err != nil {
 		return
 	}
 	return
 }
 
 // Return a server response line without suffix new-line. Will wait for it if necessary.
-func (tc *Client) getResp() (line string, err error) {
-	line, err = tc.In.ReadString(byte('\n'))
+func (tc *Client) getResp(rank int) (line string, err error) {
+	line, err = tc.In[rank].ReadString(byte('\n'))
 	if err != nil {
 		// The error may happen when server closes the connection
 		return
@@ -33,11 +33,11 @@ func (tc *Client) getResp() (line string, err error) {
 }
 
 // Send a request and expect an OK response or error.
-func (tc *Client) getOK(req string) (err error) {
-	if err = tc.writeReq(req); err != nil {
+func (tc *Client) getOK(rank int, req string) (err error) {
+	if err = tc.writeReq(rank, req); err != nil {
 		return
 	}
-	resp, err := tc.getResp()
+	resp, err := tc.getResp(rank)
 	if err != nil {
 		return
 	}
@@ -48,11 +48,11 @@ func (tc *Client) getOK(req string) (err error) {
 }
 
 // Send a request and expect a string response or error.
-func (tc *Client) getStr(req string) (resp string, err error) {
-	if err = tc.writeReq(req); err != nil {
+func (tc *Client) getStr(rank int, req string) (resp string, err error) {
+	if err = tc.writeReq(rank, req); err != nil {
 		return
 	}
-	if resp, err = tc.getResp(); err != nil {
+	if resp, err = tc.getResp(rank); err != nil {
 		return
 	}
 	if strings.HasPrefix(resp, ERR) {
@@ -62,8 +62,8 @@ func (tc *Client) getStr(req string) (resp string, err error) {
 }
 
 // Send a request and expect a uint64 response or error.
-func (tc *Client) getUint64(req string) (uint64, error) {
-	intStr, err := tc.getStr(req)
+func (tc *Client) getUint64(rank int, req string) (uint64, error) {
+	intStr, err := tc.getStr(rank, req)
 	if err != nil {
 		return 0, err
 	}
@@ -71,8 +71,8 @@ func (tc *Client) getUint64(req string) (uint64, error) {
 }
 
 // Send a request and expect a JSON response or error.
-func (tc *Client) getJSON(req string) (ret interface{}, err error) {
-	strResp, err := tc.getStr(req)
+func (tc *Client) getJSON(rank int, req string) (ret interface{}, err error) {
+	strResp, err := tc.getStr(rank, req)
 	if err != nil {
 		return
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/network"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math/rand"
@@ -9,6 +10,7 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
+	"time"
 )
 
 const (
@@ -56,11 +58,11 @@ func main() {
 		server.Start()
 	case "bench-setup":
 		// Connect to server rank 0 to setup everything for benchmark
-		client, err := network.NewClient(tmpDir, 0)
+		client, err := network.NewClient(totalRank, tmpDir)
 		if err != nil {
 			panic(err)
 		}
-		if err = client.ColCreate(BENCH_COL_NAME, totalRank); err != nil {
+		if err = client.ColCreate(BENCH_COL_NAME); err != nil {
 			panic(err)
 		}
 		if err = client.IdxCreate(BENCH_COL_NAME, "a,b"); err != nil {
@@ -70,16 +72,18 @@ func main() {
 		// Run a client for benchmarking the server rank, benchmark begins immediately
 		tdlog.Println("Will set GOMAXPROCS to 1 for optimal IPC performance")
 		runtime.GOMAXPROCS(1)
-		client, err := network.NewClient(tmpDir, myRank)
+		client, err := network.NewClient(totalRank, tmpDir)
 		if err != nil {
 			panic(err)
 		}
+		start := float64(time.Now().UnixNano())
 		for i := 0; i < benchSize; i++ {
-			//			fmt.Println(i)
 			if _, err = client.ColInsert(BENCH_COL_NAME, map[string]interface{}{"a": map[string]interface{}{"b": rand.Intn(benchSize)}}); err != nil {
 				panic(err)
 			}
 		}
+		end := float64(time.Now().UnixNano())
+		fmt.Println((end - start) / 1000000000.0)
 	default:
 		flag.PrintDefaults()
 	}

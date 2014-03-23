@@ -6,11 +6,14 @@ cleanup_files() {
 	rm -rf /tmp/tiedot*test*
 	rm -rf /tmp/tiedot*bench*
 }
-cleanup() {
+cleanup_procs() {
 	if [ ${#all_pids[@]} != 0 ]; then
 		kill -TERM ${all_pids[*]} > /dev/null 2> /dev/null
 		[ $? == 0 ] && sleep 3 && kill -KILL ${all_pids[*]} > /dev/null 2> /dev/null
 	fi
+}
+cleanup() {
+	cleanup_procs
 	cleanup_files
 }
 trap cleanup SIGINT SIGTERM SIGHUP
@@ -24,7 +27,13 @@ cd $CODEBASE
 # Run go test cases in the directory
 go_test_dir() {
 	cleanup_files
-	pushd $1 && GOMAXPROCS=4 go test && popd || exit 1
+	pushd $1
+	GOMAXPROCS=4 go test
+	if [ $? != 0 ]; then
+		cleanup_procs
+		exit 1
+	fi
+	popd
 }
 
 # Spawn N server processes at once
