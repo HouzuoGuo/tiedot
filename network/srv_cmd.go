@@ -450,7 +450,7 @@ func (srv *Server) ColGet(params []string) (jsonOrErr interface{}) {
 	}
 	partNum := int(idInt % uint64(srv.ColNumParts[colName]))
 	if partNum != srv.Rank {
-		return errors.New(fmt.Sprintf("(ColGet %s) My rank %d does not own the document %d", colName, srv.Rank, idInt))
+		return errors.New(fmt.Sprintf("(ColGet %s) Contact rank %d to get document %d", colName, partNum, idInt))
 	}
 	physID, err := srv.ColParts[colName].GetPhysicalID(idInt)
 	if err != nil {
@@ -486,7 +486,7 @@ func (srv *Server) ColUpdate(params []string) (err interface{}) {
 	newDoc[uid.PK_NAME] = strconv.FormatUint(idInt, 10)
 	var originalDoc interface{}
 	if partNum != srv.Rank {
-		return errors.New(fmt.Sprintf("(ColUpdate %s) My rank %d does not own the document %d", colName, srv.Rank, idInt))
+		return errors.New(fmt.Sprintf("(ColUpdate %s) Contact rank %d to update document %d", colName, partNum, idInt))
 	}
 	// Now my rank owns the document and go ahead to update the document
 	// Make sure that client is not overwriting document ID
@@ -531,7 +531,7 @@ func (srv *Server) ColDelete(params []string) (err interface{}) {
 	partNum := int(idInt % uint64(srv.ColNumParts[colName]))
 	var originalDoc interface{}
 	if partNum != srv.Rank {
-		return errors.New(fmt.Sprintf("(ColDelete %s) My rank %d does not own the document %d", colName, srv.Rank, idInt))
+		return errors.New(fmt.Sprintf("(ColDelete %s) Contact rank %d to delete document %d", colName, partNum, idInt))
 	}
 	// Now my rank owns the document and go ahead to delete the document
 	// Read back the original document
