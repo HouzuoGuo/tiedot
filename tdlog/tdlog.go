@@ -5,6 +5,7 @@ import (
 )
 
 var VerboseLog bool = true
+var TraceLog bool = true
 
 // Write a non-fatal advisory log message
 func Printf(template string, params ...interface{}) {
@@ -12,15 +13,15 @@ func Printf(template string, params ...interface{}) {
 		log.Printf(template, params...)
 	}
 }
-func Println(line ...interface{}) {
+func Println(params ...interface{}) {
 	if VerboseLog {
-		log.Println(line...)
+		log.Println(params...)
 	}
 }
 
 // Write an error log message, but continue program execution
-func Error(line ...interface{}) {
-	log.Println(line...)
+func Error(params ...interface{}) {
+	log.Println(params...)
 }
 func Errorf(template string, params ...interface{}) {
 	log.Printf(template, params...)
@@ -34,4 +35,18 @@ func Fatal(reason interface{}) {
 // Write a log message then panic.
 func Panicf(template string, params ...interface{}) {
 	log.Panicf(template, params...)
+}
+
+// Write a trace message, for debugging purpose.
+func Trace(params ...interface{}) {
+	if TraceLog {
+		log.Println(params)
+	}
+}
+
+// Write a trace message, for debugging purpose.
+func Tracef(template string, params ...interface{}) {
+	if TraceLog {
+		log.Printf(template, params)
+	}
 }
