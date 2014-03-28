@@ -66,9 +66,9 @@ benchmark() {
 	cleanup
 	run_ipc_servers $total_ranks $tmp_dir $db_dir
 	# Wait for servers to come up, then run benchmark setup
-	sleep 2
+	sleep `echo "2+$total_ranks/4" | bc`
 	./tiedot -mode=bench-setup -totalrank $total_ranks -tmpdir=$tmp_dir -dbdir=$db_dir
-	sleep 2
+	sleep `echo "2+$total_ranks/4" | bc`
 	# Spawn clients
 	for (( i = 0; i < $total_ranks; i++ )); do
 		./tiedot -mode=bench-client -myrank=$i -totalrank=$total_ranks -tmpdir=$tmp_dir -dbdir=$db_dir &
