@@ -48,8 +48,9 @@ func main() {
 	switch mode {
 	case "ipc":
 		// Run IPC server (only my rank)
-		tdlog.Println("Will set GOMAXPROCS to 1 for optimal IPC performance")
-		runtime.GOMAXPROCS(1)
+		maxprocs := 1 + (totalRank-1)/2
+		tdlog.Printf("Setting GOMAXPROCS to %d for optimal IPC server performance", maxprocs)
+		runtime.GOMAXPROCS(maxprocs)
 		// Initialize and start IPC server
 		server, err := network.NewServer(myRank, totalRank, dbDir, tmpDir)
 		if err != nil {
@@ -70,8 +71,6 @@ func main() {
 		}
 	case "bench-client":
 		// Run a client for benchmarking the server rank, benchmark begins immediately
-		tdlog.Println("Will set GOMAXPROCS to 1 for optimal IPC performance")
-		runtime.GOMAXPROCS(1)
 		client, err := network.NewClient(totalRank, tmpDir)
 		if err != nil {
 			panic(err)

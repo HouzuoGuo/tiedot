@@ -60,7 +60,7 @@ const (
 )
 
 const (
-	WAIT_ON_SCHEMA_UPDATE_INTERVAL = 1000 // milliseconds
+	WAIT_ON_SCHEMA_UPDATE_INTERVAL = 200 // milliseconds
 )
 
 // Tasks are queued on a server and executed one by one

@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	CONN_RETRY_INTERVAL = 1000 // milliseconds
-	CONN_RETRY          = 10   // times
+	CONN_RETRY_INTERVAL = 200 // milliseconds
+	CONN_RETRY          = 50  // times
 )
 
 // A connection to tiedot RPC server
