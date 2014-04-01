@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/network"
@@ -10,6 +11,7 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
 	"time"
 )
 
@@ -66,7 +68,10 @@ func main() {
 		if err = client.ColCreate(BENCH_COL_NAME); err != nil {
 			panic(err)
 		}
-		if err = client.IdxCreate(BENCH_COL_NAME, "a,b"); err != nil {
+		if err = client.IdxCreate(BENCH_COL_NAME, "a"); err != nil {
+			panic(err)
+		}
+		if err = client.IdxCreate(BENCH_COL_NAME, "b"); err != nil {
 			panic(err)
 		}
 	case "bench-client":
@@ -77,7 +82,13 @@ func main() {
 		}
 		start := float64(time.Now().UnixNano())
 		for i := 0; i < benchSize; i++ {
-			if _, err = client.ColInsert(BENCH_COL_NAME, map[string]interface{}{"a": map[string]interface{}{"b": rand.Intn(benchSize)}}); err != nil {
+			var doc map[string]interface{}
+			if err := json.Unmarshal([]byte(
+				`{"a": `+strconv.Itoa(rand.Intn(benchSize))+`, "b": `+strconv.Itoa(rand.Intn(benchSize))+`,
+			"more": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed mi sem, ultrices mollis nisl quis, convallis volutpat ante. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Proin interdum egestas risus, imperdiet vulputate est. Cras semper risus sit amet dolor facilisis malesuada. Nunc velit augue, accumsan id facilisis ultricies, vehicula eget massa. Ut non dui eu magna egestas aliquam. Fusce in pellentesque risus. Aliquam ornare pharetra lacus in rhoncus. In eu commodo nibh. Praesent at lacinia quam. Curabitur laoreet pellentesque mollis. Maecenas mollis bibendum neque. Pellentesque semper justo ac purus auctor cursus. In egestas sodales metus sed dictum. Vivamus at elit nunc. Phasellus sit amet augue sed augue rhoncus congue. Aenean et molestie augue. Aliquam blandit lacus eu nunc rhoncus, vitae varius mauris placerat. Quisque velit urna, pretium quis dolor et, blandit sodales libero. Nulla sollicitudin est vel dolor feugiat viverra massa nunc."}`), &doc); err != nil {
+				panic("json error")
+			}
+			if _, err := client.ColInsert(BENCH_COL_NAME, doc); err != nil {
 				panic(err)
 			}
 		}
