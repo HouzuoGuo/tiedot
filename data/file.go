@@ -7,7 +7,7 @@ import (
 
 type DataFile struct {
 	Path               string
-	Size, Used, Growth int64
+	Size, Used, Growth int
 	Fh                 *os.File
 	Buf                gommap.MMap
 }
@@ -23,54 +23,48 @@ func Twenty0s(buf []byte) bool {
 	return true
 }
 
-func OpenDataFile(path string, growth int64) (file *DataFile, err error) {
+func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 	file = &DataFile{Path: path, Growth: growth}
 	if file.Fh, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600); err != nil {
 		return
-	} else if file.Size, err = file.Fh.Seek(0, os.SEEK_END); err != nil {
+	}
+	var size int64
+	if size, err = file.Fh.Seek(0, os.SEEK_END); err != nil {
 		return
-	} else if file.Size < file.Growth {
+	}
+	if file.Size = int(size); file.Size < file.Growth {
 		if err = file.EnsureSize(growth); err != nil {
 			return
 		}
-	} else if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
+	}
+	if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
 		return
 	}
-	file.CalculateUsedSize()
+	for i := file.Size - 1; i >= 0; i-- {
+		if file.Buf[i] != 0 {
+			file.Used = i + 1
+			break
+		}
+	}
 	return
 }
 
-func (file *DataFile) EnsureSize(more int64) (err error) {
+func (file *DataFile) EnsureSize(more int) (err error) {
 	if file.Used+more <= file.Size {
 		return
-	} else if file.Buf != nil {
+	}
+	if file.Buf != nil {
 		if err = file.Buf.Unmap(); err != nil {
 			return
 		}
-	} else if err = os.Truncate(file.Path, file.Size+file.Growth); err != nil {
+	}
+	if err = os.Truncate(file.Path, int64(file.Size+file.Growth)); err != nil {
 		return
 	} else if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
 		return
 	}
 	file.Size += file.Growth
 	return file.EnsureSize(more)
-}
-
-func (file *DataFile) CalculateUsedSize() {
-	for low, mid, high := int64(0), file.Size/2, file.Size; ; {
-		if high-mid == 1 {
-			if Twenty0s(file.Buf[mid:]) {
-				file.Used = mid
-			} else {
-				file.Used = high
-			}
-			return
-		} else if Twenty0s(file.Buf[mid:]) {
-			high, mid = mid, (low+mid)/2
-		} else {
-			low, mid = mid, (high+mid)/2
-		}
-	}
 }
 
 func (file *DataFile) Sync() (err error) {
@@ -89,7 +83,7 @@ func (file *DataFile) Clear() (err error) {
 		return
 	} else if err = os.Truncate(file.Path, 0); err != nil {
 		return
-	} else if err = os.Truncate(file.Path, file.Growth); err != nil {
+	} else if err = os.Truncate(file.Path, int64(file.Growth)); err != nil {
 		return
 	} else if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
 		return
