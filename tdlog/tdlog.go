@@ -4,8 +4,8 @@ import (
 	"log"
 )
 
-var VerboseLog bool = false
-var TraceLog bool = false
+var VerboseLog bool = true
+var TraceLog bool = true
 
 // Write a non-fatal advisory log message
 func Printf(template string, params ...interface{}) {
