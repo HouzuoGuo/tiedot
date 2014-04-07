@@ -20,15 +20,9 @@ func TestPutGetReopenClear(t *testing.T) {
 	}
 	fmt.Println("Please be patient, this may take a minute.")
 	for i := int(0); i < 1024*1024*4; i++ {
-		if i%1000 == 0 {
-			fmt.Println(i)
-		}
 		ht.Put(i, i)
 	}
 	for i := int(0); i < 1024*1024*4; i++ {
-		if i%1000 == 0 {
-			fmt.Println(i)
-		}
 		vals := ht.Get(i, 0)
 		if !(len(vals) == 1 && vals[0] == i) {
 			t.Fatalf("Get failed on key %d, got %v", i, vals)
@@ -50,9 +44,6 @@ func TestPutGetReopenClear(t *testing.T) {
 		t.Fatalf("Wrong UsedSize")
 	}
 	for i := int(0); i < 1024*1024*4; i++ {
-		if i%1000 == 0 {
-			fmt.Println(i)
-		}
 		vals := reopened.Get(i, 0)
 		if !(len(vals) == 1 && vals[0] == i) {
 			t.Fatalf("Get failed on key %d, got %v", i, vals)

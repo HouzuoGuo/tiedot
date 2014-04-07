@@ -7,13 +7,13 @@ import (
 )
 
 const (
-	HT_FILE_GROWTH  = 16 * 1048576
-	ENTRY_SIZE      = 1 + 10 + 10
-	BUCKET_HEADER   = 10
-	PER_BUCKET      = 20
-	HASH_BITS       = 15
-	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE
-	INITIAL_BUCKETS = 32768
+	HT_FILE_GROWTH  = 16 * 1048576                          // Initial hash table file size; file growth
+	ENTRY_SIZE      = 1 + 10 + 10                           // Hash entry: validity, key, value
+	BUCKET_HEADER   = 10                                    // Bucker header: next chained bucket number
+	PER_BUCKET      = 20                                    // Entries per bucket
+	HASH_BITS       = 15                                    // Number of hash key bits
+	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE // Size of a bucket
+	INITIAL_BUCKETS = 32768                                 // Initial number of buckets
 )
 
 type HashTable struct {
@@ -73,7 +73,7 @@ func (ht *HashTable) lastBucket(bucket int) int {
 		if next == 0 {
 			return curr
 		}
-		next = curr
+		curr = next
 	}
 }
 
@@ -92,8 +92,7 @@ func (ht *HashTable) Clear() {
 
 // Put a new key-value pair.
 func (ht *HashTable) Put(key, val int) {
-	var bucket, entry int = HashKey(key), 0
-	for {
+	for bucket, entry := HashKey(key), 0; ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
 		if ht.Buf[entryAddr] != 1 {
 			ht.Buf[entryAddr] = 1
@@ -114,14 +113,12 @@ func (ht *HashTable) Put(key, val int) {
 
 // Get key-value pairs.
 func (ht *HashTable) Get(key, limit int) (vals []int) {
-	// This function is partially inlined in chunkcol.go
-	var count, entry, bucket int = 0, 0, HashKey(key)
 	if limit == 0 {
 		vals = make([]int, 0, 10)
 	} else {
 		vals = make([]int, 0, limit)
 	}
-	for {
+	for count, entry, bucket := 0, 0, HashKey(key); ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
 		entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
@@ -146,8 +143,7 @@ func (ht *HashTable) Get(key, limit int) (vals []int) {
 
 // Remove specific key-value pair.
 func (ht *HashTable) Remove(key, val int) {
-	var entry, bucket int = 0, HashKey(key)
-	for {
+	for entry, bucket := 0, HashKey(key); ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
 		entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
