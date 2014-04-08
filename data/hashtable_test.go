@@ -54,7 +54,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	if !(reopened.numBuckets == INITIAL_BUCKETS && reopened.Used == INITIAL_BUCKETS*BUCKET_SIZE) {
 		t.Fatal("Did not clear the hash table")
 	}
-	keys, vals := reopened.GetAll(0)
+	keys, vals := reopened.AllEntries(0)
 	if len(keys) != 0 || len(vals) != 0 {
 		t.Fatal("Did not clear the hash table")
 	}
@@ -114,7 +114,7 @@ func TestPutRemove(t *testing.T) {
 	}
 }
 
-func TestGetAll(t *testing.T) {
+func TestAllEntries(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
@@ -140,11 +140,11 @@ func TestGetAll(t *testing.T) {
 	ht.Put(2, 3)
 	ht.Put(2, 3)
 	ht.Put(2, 3)
-	keys, vals := ht.GetAll(0)
+	keys, vals := ht.AllEntries(0)
 	if !(len(keys) == 16 && len(vals) == 16) {
 		t.Fatalf("Did not get everything, got only %v, %v", keys, vals)
 	}
-	keys, vals = ht.GetAll(3)
+	keys, vals = ht.AllEntries(3)
 	if !(len(keys) == 3 && len(vals) == 3) {
 		t.Fatalf("Did not get three values, got %v, %v", keys, vals)
 	}

@@ -1,3 +1,4 @@
+// Collection file.
 package data
 
 import (
@@ -28,8 +29,7 @@ func OpenCollection(path string) (col *Collection, err error) {
 func (col *Collection) Read(id int) []byte {
 	if id < 0 || id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
 		return nil
-	}
-	if room, _ := binary.Varint(col.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
+	} else if room, _ := binary.Varint(col.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
 		return nil
 	} else if docEnd := id + DOC_HEADER + int(room); docEnd >= col.Size {
 		return nil
@@ -51,6 +51,7 @@ func (col *Collection) Insert(data []byte) (id int, err error) {
 		return
 	}
 	col.Used += docSize
+	// Write validity, room, document data and padding
 	col.Buf[id] = 1
 	binary.PutVarint(col.Buf[id+1:id+11], int64(room))
 	copy(col.Buf[id+DOC_HEADER:col.Used], data)
@@ -86,6 +87,7 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 		}
 		return id, nil
 	} else {
+		// No enough room - re-insert the document
 		col.Delete(id)
 		return col.Insert(data)
 	}
@@ -110,6 +112,7 @@ func (col *Collection) ForEachDoc(fun func(id int, doc []byte) bool) {
 			}
 			id = docEnd
 		} else {
+			// Corrupted document - move on
 			id++
 		}
 	}

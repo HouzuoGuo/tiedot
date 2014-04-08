@@ -1,3 +1,4 @@
+// Hash table file.
 package data
 
 import (
@@ -32,6 +33,7 @@ func OpenHashTable(path string) (ht *HashTable, err error) {
 	return
 }
 
+// Follow the longest bucket chain to calculate total number of buckets.
 func (ht *HashTable) calculateNumBuckets() {
 	ht.numBuckets = ht.Size / BUCKET_SIZE
 	largestBucketNum := INITIAL_BUCKETS - 1
@@ -90,7 +92,6 @@ func (ht *HashTable) Clear() {
 	ht.calculateNumBuckets()
 }
 
-// Put a new key-value pair.
 func (ht *HashTable) Put(key, val int) {
 	for bucket, entry := HashKey(key), 0; ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
@@ -111,7 +112,6 @@ func (ht *HashTable) Put(key, val int) {
 	}
 }
 
-// Get key-value pairs.
 func (ht *HashTable) Get(key, limit int) (vals []int) {
 	if limit == 0 {
 		vals = make([]int, 0, 10)
@@ -141,7 +141,6 @@ func (ht *HashTable) Get(key, limit int) (vals []int) {
 	}
 }
 
-// Remove specific key-value pair.
 func (ht *HashTable) Remove(key, val int) {
 	for entry, bucket := 0, HashKey(key); ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
@@ -164,8 +163,7 @@ func (ht *HashTable) Remove(key, val int) {
 	}
 }
 
-// Return all entries in the hash table.
-func (ht *HashTable) GetAll(limit int) (keys, vals []int) {
+func (ht *HashTable) AllEntries(limit int) (keys, vals []int) {
 	prealloc := limit
 	if prealloc == 0 {
 		prealloc = INITIAL_BUCKETS * PER_BUCKET / 2

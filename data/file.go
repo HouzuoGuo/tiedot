@@ -1,3 +1,4 @@
+// Common data file features.
 package data
 
 import (
@@ -11,17 +12,6 @@ type DataFile struct {
 	Size, Used, Growth int
 	Fh                 *os.File
 	Buf                gommap.MMap
-}
-
-func Twenty0s(buf []byte) bool {
-	for i, b := range buf {
-		if i >= 20 {
-			return true
-		} else if b != 0 {
-			return false
-		}
-	}
-	return true
 }
 
 func OpenDataFile(path string, growth int) (file *DataFile, err error) {
