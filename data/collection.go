@@ -16,16 +16,19 @@ const (
 	LEN_PADDING = len(PADDING)
 )
 
+// Collection is an ordinary data file.
 type Collection struct {
 	*DataFile
 }
 
+// Open a collection file.
 func OpenCollection(path string) (col *Collection, err error) {
 	col = new(Collection)
 	col.DataFile, err = OpenDataFile(path, COL_FILE_GROWTH)
 	return
 }
 
+// Read a document by ID, return a copy of the read document.
 func (col *Collection) Read(id int) []byte {
 	if id < 0 || id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
 		return nil
@@ -40,6 +43,7 @@ func (col *Collection) Read(id int) []byte {
 	}
 }
 
+// Insert a new document, return the new document ID.
 func (col *Collection) Insert(data []byte) (id int, err error) {
 	room := len(data) << 1
 	if room > DOC_MAX_ROOM {
@@ -65,6 +69,7 @@ func (col *Collection) Insert(data []byte) (id int, err error) {
 	return
 }
 
+// Overwrite or re-insert a document, return the new document ID if re-inserted.
 func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 	if len(data) > DOC_MAX_ROOM {
 		return 0, errors.New("Document is too large")
@@ -77,6 +82,7 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 	} else if len(data) <= int(room) {
 		padding := id + DOC_HEADER + len(data)
 		paddingEnd := id + DOC_HEADER + int(room)
+		// Overwrite data and then overwrite padding
 		copy(col.Buf[id+DOC_HEADER:padding], data)
 		for ; padding < paddingEnd; padding += LEN_PADDING {
 			copySize := LEN_PADDING
@@ -93,6 +99,7 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 	}
 }
 
+// Delete a document by ID.
 func (col *Collection) Delete(id int) {
 	if id < 0 || id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
 		return
@@ -101,6 +108,7 @@ func (col *Collection) Delete(id int) {
 	}
 }
 
+// Run the function on every document; stop when the function returns false.
 func (col *Collection) ForEachDoc(fun func(id int, doc []byte) bool) {
 	for id := 0; id < col.Used-DOC_HEADER && id >= 0; {
 		validity := col.Buf[id]

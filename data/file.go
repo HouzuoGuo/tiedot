@@ -7,6 +7,7 @@ import (
 	"os"
 )
 
+// Data file keeps track of the amount of total and used space.
 type DataFile struct {
 	Path               string
 	Size, Used, Growth int
@@ -14,6 +15,7 @@ type DataFile struct {
 	Buf                gommap.MMap
 }
 
+// Open a data file that grows by the specified size.
 func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 	file = &DataFile{Path: path, Growth: growth}
 	if file.Fh, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600); err != nil {
@@ -23,6 +25,7 @@ func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 	if size, err = file.Fh.Seek(0, os.SEEK_END); err != nil {
 		return
 	}
+	// Ensure the file is not smaller than file growth
 	if file.Size = int(size); file.Size < file.Growth {
 		if err = file.EnsureSize(growth); err != nil {
 			return
@@ -41,6 +44,7 @@ func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 	return
 }
 
+// Ensure there is enough room for that many bytes of data.
 func (file *DataFile) EnsureSize(more int) (err error) {
 	if file.Used+more <= file.Size {
 		return
@@ -60,10 +64,12 @@ func (file *DataFile) EnsureSize(more int) (err error) {
 	return file.EnsureSize(more)
 }
 
+// Synchronize file buffer onto underlying storage device.
 func (file *DataFile) Sync() (err error) {
 	return file.Buf.Flush()
 }
 
+// Unmap the file buffer and close the file handle.
 func (file *DataFile) Close() (err error) {
 	if err = file.Buf.Unmap(); err != nil {
 		return
@@ -71,6 +77,7 @@ func (file *DataFile) Close() (err error) {
 	return file.Fh.Close()
 }
 
+// Clear the entire file and resize it to initial size.
 func (file *DataFile) Clear() (err error) {
 	if err = file.Buf.Unmap(); err != nil {
 		return

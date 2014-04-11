@@ -17,15 +17,18 @@ const (
 	INITIAL_BUCKETS = 32768                                 // Initial number of buckets
 )
 
+// Hash table is an ordinary data file; it also tracks total number of buckets.
 type HashTable struct {
 	*DataFile
 	numBuckets int
 }
 
+// Calculate the hash key of an entry's key.
 func HashKey(key int) int {
 	return key & ((1 << HASH_BITS) - 1)
 }
 
+// Open a hash table file.
 func OpenHashTable(path string) (ht *HashTable, err error) {
 	ht = new(HashTable)
 	ht.DataFile, err = OpenDataFile(path, HT_FILE_GROWTH)
@@ -52,6 +55,7 @@ func (ht *HashTable) calculateNumBuckets() {
 	ht.Used = usedSize
 }
 
+// Return number of the next chained bucket.
 func (ht *HashTable) nextBucket(bucket int) int {
 	if bucket >= ht.numBuckets {
 		return 0
@@ -69,6 +73,7 @@ func (ht *HashTable) nextBucket(bucket int) int {
 	}
 }
 
+// Return number of the last bucket in chain.
 func (ht *HashTable) lastBucket(bucket int) int {
 	for curr := bucket; ; {
 		next := ht.nextBucket(curr)
@@ -79,6 +84,7 @@ func (ht *HashTable) lastBucket(bucket int) int {
 	}
 }
 
+// Chain a new bucket.
 func (ht *HashTable) growBucket(bucket int) {
 	ht.EnsureSize(BUCKET_SIZE)
 	lastBucketAddr := ht.lastBucket(bucket) * BUCKET_SIZE
@@ -87,11 +93,13 @@ func (ht *HashTable) growBucket(bucket int) {
 	ht.numBuckets++
 }
 
+// Clear the entire hash table.
 func (ht *HashTable) Clear() {
 	ht.DataFile.Clear()
 	ht.calculateNumBuckets()
 }
 
+// Store a key-value pair into a vacant entry.
 func (ht *HashTable) Put(key, val int) {
 	for bucket, entry := HashKey(key), 0; ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
@@ -112,6 +120,7 @@ func (ht *HashTable) Put(key, val int) {
 	}
 }
 
+// Look up values by key.
 func (ht *HashTable) Get(key, limit int) (vals []int) {
 	if limit == 0 {
 		vals = make([]int, 0, 10)
@@ -141,6 +150,7 @@ func (ht *HashTable) Get(key, limit int) (vals []int) {
 	}
 }
 
+// Flag a key-value pair as invalid.
 func (ht *HashTable) Remove(key, val int) {
 	for entry, bucket := 0, HashKey(key); ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
@@ -163,6 +173,7 @@ func (ht *HashTable) Remove(key, val int) {
 	}
 }
 
+// Return all entries in the hash table.
 func (ht *HashTable) AllEntries(limit int) (keys, vals []int) {
 	prealloc := limit
 	if prealloc == 0 {
