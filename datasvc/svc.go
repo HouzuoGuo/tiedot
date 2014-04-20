@@ -2,6 +2,8 @@
 package datasvc
 
 import (
+	"errors"
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"net"
@@ -9,39 +11,74 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 )
 
-// Data server is reponsible for some hash tables and collections, the server communicates via Unix domain socket.
+// Data server is responsible for some hash tables and collections, the server communicates via Unix domain socket.
 type DataSvc struct {
 	ht                   map[string]*data.HashTable
 	col                  map[string]*data.Collection
-	dataLock, schemaLock *sync.RWMutex
+	dataLock             *sync.RWMutex
 	rank                 int
-	sockPath             string
+	workingDir, sockPath string
+	listener             net.Listener
+	clients              []net.Conn
+	clientsLock          *sync.Mutex
 }
 
 // Create a new and blank data server.
-func NewDataSvc(rank int) *DataSvc {
+func NewDataSvc(workingDir string, rank int) *DataSvc {
 	return &DataSvc{ht: make(map[string]*data.HashTable), col: make(map[string]*data.Collection),
-		dataLock: new(sync.RWMutex), schemaLock: new(sync.RWMutex),
-		rank: rank, sockPath: path.Join(os.TempDir(), strconv.Itoa(rank))}
+		dataLock: new(sync.RWMutex), rank: rank, clients: make([]net.Conn, 0, 10), clientsLock: new(sync.Mutex),
+		workingDir: workingDir, sockPath: path.Join(workingDir, strconv.Itoa(rank))}
 }
 
 // Begin serving incoming connections. This function blocks until server is instructed by client to shutdown.
 func (ds *DataSvc) Serve() (err error) {
-	os.Remove(ds.sockPath)
-	listener, err := net.Listen("unix", ds.sockPath)
+	os.MkdirAll(ds.workingDir, 0700)
+	ds.listener, err = net.Listen("unix", ds.sockPath)
 	if err != nil {
 		return
 	}
 	rpc.Register(ds)
 	for {
-		incoming, err := listener.Accept()
+		incoming, err := ds.listener.Accept()
 		if err != nil {
-			tdlog.Errorf("Server %d: Client did not successfully establish connection: %v", ds.rank, err)
+			if strings.Contains(fmt.Sprint(err), "closed network connection") {
+				break
+			} else {
+				tdlog.Errorf("Server %d: Client did not successfully establish connection: %v", ds.rank, err)
+				continue
+			}
 		}
+		ds.clientsLock.Lock()
+		ds.clients = append(ds.clients, incoming)
+		ds.clientsLock.Unlock()
 		go rpc.ServeConn(incoming)
 	}
 	return
+}
+
+// Test the server RPC connection - return nil.
+func (ds *DataSvc) Ping(_ bool, _ *bool) error {
+	return nil
+}
+
+// Shutdown server network routine and all client connections.
+func (ds *DataSvc) Shutdown(_ bool, _ *bool) (err error) {
+	errs := make([]string, 0, 1)
+	if err = ds.listener.Close(); err != nil {
+		errs = append(errs, fmt.Sprint(err))
+	}
+	for _, client := range ds.clients {
+		if err = client.Close(); err != nil {
+			errs = append(errs, fmt.Sprint(err))
+		}
+	}
+	if len(errs) > 0 {
+		tdlog.Errorf("Server %d: Shutdown did not fully complete, but best effort has been made: %v", ds.rank, errs)
+		return errors.New(strings.Join(errs, "; "))
+	}
+	return nil
 }

@@ -100,12 +100,13 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 }
 
 // Delete a document by ID.
-func (col *Collection) Delete(id int) {
+func (col *Collection) Delete(id int) (err error) {
 	if id < 0 || id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
-		return
+		err = errors.New("Document does not exist")
 	} else if col.Buf[id] == 1 {
 		col.Buf[id] = 0
 	}
+	return
 }
 
 // Run the function on every document; stop when the function returns false.

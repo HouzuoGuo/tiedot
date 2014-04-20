@@ -100,7 +100,9 @@ func TestInsertDeleteRead(t *testing.T) {
 	if doc0 := col.Read(ids[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != string(docs[0]) {
 		t.Fatalf("Failed to read")
 	}
-	col.Delete(ids[1])
+	if err = col.Delete(ids[1]); err != nil {
+		t.Fatal(err)
+	}
 	if doc1 := col.Read(ids[1]); doc1 != nil {
 		t.Fatalf("Did not delete")
 	}
@@ -108,7 +110,9 @@ func TestInsertDeleteRead(t *testing.T) {
 		t.Fatalf("Failed to read")
 	}
 	// it shall not panic
-	col.Delete(col.Size)
+	if err = col.Delete(col.Size); err == nil {
+		t.Fatal("did not error")
+	}
 }
 
 func TestInsertReadAll(t *testing.T) {
@@ -220,10 +224,18 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 		t.Fatalf("Update invalid location")
 	}
 	// Delete invalid location
-	col.Delete(1)
-	col.Delete(col.Used)
-	col.Delete(col.Size)
-	col.Delete(999999999)
+	if err = col.Delete(1); err == nil {
+		t.Fatal("did not error")
+	}
+	if err = col.Delete(col.Used); err == nil {
+		t.Fatal("did not error")
+	}
+	if err = col.Delete(col.Size); err == nil {
+		t.Fatal("did not error")
+	}
+	if err = col.Delete(999999999); err == nil {
+		t.Fatal("did not error")
+	}
 	// Insert - not enough room (assuming COL_FILE_SIZE == DOC_MAX_ROOM * 2)
 	if _, err := col.Insert(make([]byte, DOC_MAX_ROOM/2)); err != nil {
 		panic(err)

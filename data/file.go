@@ -69,7 +69,7 @@ func (file *DataFile) Sync() (err error) {
 	return file.Buf.Flush()
 }
 
-// Unmap the file buffer and close the file handle.
+// Un-map the file buffer and close the file handle.
 func (file *DataFile) Close() (err error) {
 	if err = file.Buf.Unmap(); err != nil {
 		return
