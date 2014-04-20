@@ -103,7 +103,7 @@ type HTAllEntriesInput struct {
 	Limit int
 }
 type HTAllEntriesOutput struct {
-	keys, vals []int
+	Keys, Vals []int
 }
 
 func (ds *DataSvc) HTAllEntries(in HTGetInput, out *HTAllEntriesOutput) (err error) {
@@ -111,7 +111,8 @@ func (ds *DataSvc) HTAllEntries(in HTGetInput, out *HTAllEntriesOutput) (err err
 	defer ds.dataLock.Unlock()
 	if ht, exists := ds.ht[in.Name]; exists {
 		keys, vals := ht.AllEntries(in.Limit)
-		out = &HTAllEntriesOutput{keys, vals}
+		out.Keys = keys
+		out.Vals = vals
 	} else {
 		err = errors.New(fmt.Sprintf("Hash table %s does not exist", in.Name))
 	}
