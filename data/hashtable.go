@@ -8,13 +8,13 @@ import (
 )
 
 const (
-	HT_FILE_GROWTH  = 16 * 1048576                          // Initial hash table file size; file growth
+	HT_FILE_GROWTH  = 64 * 1048576                          // Initial hash table file size; file growth
 	ENTRY_SIZE      = 1 + 10 + 10                           // Hash entry: validity, key, value
 	BUCKET_HEADER   = 10                                    // Bucker header: next chained bucket number
-	PER_BUCKET      = 20                                    // Entries per bucket
-	HASH_BITS       = 15                                    // Number of hash key bits
+	PER_BUCKET      = 30                                    // Entries per bucket
+	HASH_BITS       = 16                                    // Number of hash key bits
 	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE // Size of a bucket
-	INITIAL_BUCKETS = 32768                                 // Initial number of buckets
+	INITIAL_BUCKETS = 65536                                 // Initial number of buckets
 )
 
 // Hash table is an ordinary data file; it also tracks total number of buckets.

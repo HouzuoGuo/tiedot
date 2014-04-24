@@ -1,6 +1,7 @@
 package data
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -236,18 +237,23 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 	if err = col.Delete(999999999); err == nil {
 		t.Fatal("did not error")
 	}
-	// Insert - not enough room (assuming COL_FILE_SIZE == DOC_MAX_ROOM * 2)
-	if _, err := col.Insert(make([]byte, DOC_MAX_ROOM/2)); err != nil {
-		panic(err)
+	// Insert - not enough room
+	count := 0
+	for i := 0; i < COL_FILE_GROWTH; i += DOC_MAX_ROOM {
+		if _, err := col.Insert(make([]byte, DOC_MAX_ROOM/2)); err != nil {
+			t.Fatal(err)
+		}
+		count++
 	}
 	if _, err := col.Insert(make([]byte, DOC_MAX_ROOM/2)); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
-	calculatedUsedSize += 2 * (DOC_HEADER + DOC_MAX_ROOM)
+	count++
+	calculatedUsedSize += count * (DOC_HEADER + DOC_MAX_ROOM)
 	if col.Used != calculatedUsedSize {
 		t.Fatalf("Wrong UsedSize %d %d", col.Used, calculatedUsedSize)
 	}
 	if col.Size != COL_FILE_GROWTH+col.Growth {
-		t.Fatalf("Size changed?!")
+		t.Fatalf("Size changed?! %d %d %d", col.Size, COL_FILE_GROWTH, col.Growth)
 	}
 }
