@@ -1,4 +1,4 @@
-// Collection file.
+// Collection data file.
 package data
 
 import (

@@ -6,13 +6,14 @@ import (
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
+// Collection partition consists of a document data file and a lookup table for locating document using unique IDs.
 type Partition struct {
 	col      *Collection
 	lookup   *HashTable // For finding document physical location by ID
 	updating map[int]struct{}
 }
 
-// Open a collection partition: consists of a document data file and an ID lookup table.
+// Open a collection partition.
 func OpenPartition(colPath, lookupPath string) (part *Partition, err error) {
 	part = &Partition{updating: make(map[int]struct{})}
 	if part.col, err = OpenCollection(colPath); err != nil {

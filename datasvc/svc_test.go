@@ -32,7 +32,7 @@ func TestSequence(t *testing.T) {
 	// Run test sequence
 	PingTest(t)
 	HTTest(t)
-	ColTest(t)
+	PartitionTest(t)
 	// Shutdown test server/client
 	if err = client.Call("DataSvc.Shutdown", false, discard); err == nil || !strings.Contains(fmt.Sprint(err), "unexpected EOF") {
 		t.Fatal("Server did not close connection", err)
@@ -43,7 +43,7 @@ func TestSequence(t *testing.T) {
 }
 
 func PingTest(t *testing.T) {
-	if !(len(svc.ht) == 0 && len(svc.col) == 0 && svc.dataLock != nil && svc.rank == 1 && svc.clientsLock != nil && svc.clients != nil) {
+	if !(len(svc.ht) == 0 && len(svc.part) == 0 && svc.dataLock != nil && svc.rank == 1 && svc.clientsLock != nil && svc.clients != nil) {
 		t.Fatal(svc)
 	}
 	time.Sleep(100 * time.Millisecond)

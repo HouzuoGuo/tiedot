@@ -18,7 +18,7 @@ import (
 // Data server is responsible for some hash tables and collections, the server communicates via Unix domain socket.
 type DataSvc struct {
 	ht                   map[string]*data.HashTable
-	col                  map[string]*data.Collection
+	part                 map[string]*data.Partition
 	dataLock             *sync.RWMutex
 	rank                 int
 	workingDir, sockPath string
@@ -29,7 +29,7 @@ type DataSvc struct {
 
 // Create a new and blank data server.
 func NewDataSvc(workingDir string, rank int) *DataSvc {
-	return &DataSvc{ht: make(map[string]*data.HashTable), col: make(map[string]*data.Collection),
+	return &DataSvc{ht: make(map[string]*data.HashTable), part: make(map[string]*data.Partition),
 		dataLock: new(sync.RWMutex), rank: rank, clients: make([]net.Conn, 0, 10), clientsLock: new(sync.Mutex),
 		workingDir: workingDir, sockPath: path.Join(workingDir, strconv.Itoa(rank))}
 }
