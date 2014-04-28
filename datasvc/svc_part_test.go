@@ -38,6 +38,15 @@ func PartitionTest(t *testing.T) {
 	if err = client.Call("DataSvc.DocRead", DocReadInput{"col1", 2}, &readback); err != nil || strings.TrimSpace(readback) != "01234567890123456789" {
 		t.Fatal(err, readback)
 	}
+	if err = client.Call("DataSvc.DocLockUpdate", DocLockUpdateInput{"col1", 2}, discard); err != nil {
+		t.Fatal(err)
+	}
+	if err = client.Call("DataSvc.DocLockUpdate", DocLockUpdateInput{"col1", 2}, discard); err == nil {
+		t.Fatal("Did not error")
+	}
+	if err = client.Call("DataSvc.DocUnlockUpdate", DocUnlockUpdateInput{"col1", 2}, discard); err != nil {
+		t.Fatal(err)
+	}
 	if err = client.Call("DataSvc.DocDelete", DocDeleteInput{"col1", 2}, discard); err != nil {
 		t.Fatal(err, readback)
 	}

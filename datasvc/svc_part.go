@@ -117,3 +117,37 @@ func (ds *DataSvc) DocDelete(in DocUpdateInput, _ *bool) (err error) {
 	}
 	return
 }
+
+// Lock a document for exclusive update.
+type DocLockUpdateInput struct {
+	Name string
+	ID   int
+}
+
+func (ds *DataSvc) DocLockUpdate(in DocLockUpdateInput, _ *bool) (err error) {
+	ds.dataLock.Lock()
+	defer ds.dataLock.Unlock()
+	if part, exists := ds.part[in.Name]; exists {
+		err = part.LockUpdate(in.ID)
+	} else {
+		err = errors.New(fmt.Sprintf("Partition %s does not exist", in.Name))
+	}
+	return
+}
+
+// Unlock a document to make it ready for the next update.
+type DocUnlockUpdateInput struct {
+	Name string
+	ID   int
+}
+
+func (ds *DataSvc) DocUnlockUpdate(in DocUnlockUpdateInput, _ *bool) (err error) {
+	ds.dataLock.Lock()
+	defer ds.dataLock.Unlock()
+	if part, exists := ds.part[in.Name]; exists {
+		part.UnlockUpdate(in.ID)
+	} else {
+		err = errors.New(fmt.Sprintf("Partition %s does not exist", in.Name))
+	}
+	return
+}
