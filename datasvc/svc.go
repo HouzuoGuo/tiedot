@@ -15,7 +15,7 @@ import (
 	"sync"
 )
 
-// Data server is responsible for some hash tables and collections, the server communicates via Unix domain socket.
+// Data server is responsible for doing work on hash tables and collection partitions; the server communicates via Unix domain socket.
 type DataSvc struct {
 	ht                   map[string]*data.HashTable
 	part                 map[string]*data.Partition
