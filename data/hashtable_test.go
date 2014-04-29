@@ -16,7 +16,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	}
 	// Test initial size information
 	if !(ht.numBuckets == INITIAL_BUCKETS && ht.Used == INITIAL_BUCKETS*BUCKET_SIZE && ht.Size == HT_FILE_GROWTH) {
-		t.Fatal("Wrong size")
+		t.Fatal("Wrong size", ht.numBuckets, INITIAL_BUCKETS, ht.Used, INITIAL_BUCKETS*BUCKET_SIZE, ht.Size, HT_FILE_GROWTH)
 	}
 	fmt.Println("Please be patient, this may take a minute.")
 	for i := int(0); i < 1024*1024*4; i++ {
