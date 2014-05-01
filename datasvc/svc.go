@@ -29,8 +29,8 @@ type DataSvc struct {
 
 // Create a new and blank data server.
 func NewDataSvc(workingDir string, rank int) *DataSvc {
-	return &DataSvc{ht: make(map[string]*data.HashTable), part: make(map[string]*data.Partition),
-		dataLock: new(sync.RWMutex), rank: rank, clients: make([]net.Conn, 0, 10), clientsLock: new(sync.Mutex),
+	return &DataSvc{ht: make(map[string]*data.HashTable), part: make(map[string]*data.Partition), dataLock: new(sync.RWMutex),
+		rank: rank, clients: make([]net.Conn, 0, 10), clientsLock: new(sync.Mutex),
 		workingDir: workingDir, sockPath: path.Join(workingDir, strconv.Itoa(rank))}
 }
 
@@ -41,7 +41,8 @@ func (ds *DataSvc) Serve() (err error) {
 	if err != nil {
 		return
 	}
-	rpc.Register(ds)
+	rpcServer := rpc.NewServer()
+	rpcServer.Register(ds)
 	for {
 		incoming, err := ds.listener.Accept()
 		if err != nil {
@@ -55,7 +56,7 @@ func (ds *DataSvc) Serve() (err error) {
 		ds.clientsLock.Lock()
 		ds.clients = append(ds.clients, incoming)
 		ds.clientsLock.Unlock()
-		go rpc.ServeConn(incoming)
+		go rpcServer.ServeConn(incoming)
 	}
 	return
 }
@@ -77,8 +78,8 @@ func (ds *DataSvc) Shutdown(_ bool, _ *bool) (err error) {
 		}
 	}
 	if len(errs) > 0 {
-		tdlog.Errorf("Server %d: Shutdown did not fully complete, but best effort has been made: %v", ds.rank, errs)
-		return errors.New(strings.Join(errs, "; "))
+		err = errors.New(strings.Join(errs, "; "))
+		tdlog.Errorf("Server %d: Shutdown did not fully complete, but best effort has been made: %v", ds.rank, err)
 	}
-	return nil
+	return
 }
