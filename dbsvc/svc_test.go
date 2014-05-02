@@ -1,4 +1,4 @@
-package dataclient
+package dbsvc
 
 import (
 	"github.com/HouzuoGuo/tiedot/datasvc"
@@ -9,7 +9,7 @@ import (
 
 var err error
 var srv []*datasvc.DataSvc = make([]*datasvc.DataSvc, NUM_SRVS)
-var client *Client
+var db *DBSvc
 
 const (
 	TEST_SRV_DIR = "/tmp/tiedot_dc_test"
@@ -30,12 +30,12 @@ func TestSequence(t *testing.T) {
 		}(i)
 	}
 	time.Sleep(100 * time.Millisecond)
-	if client, err = NewClient(NUM_SRVS, TEST_SRV_DIR); err != nil {
+	if db, err = NewDBSvc(NUM_SRVS, TEST_SRV_DIR); err != nil {
 		t.Fatal(err)
 	}
 	// Run test sequence
 	// Shutdown and cleanup
-	if err = client.Shutdown(); err != nil {
+	if err = db.Shutdown(); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -1,4 +1,4 @@
-package dataclient
+package dbsvc
 
 import (
 	"errors"
@@ -10,28 +10,28 @@ import (
 	"strings"
 )
 
-type Client struct {
+type DBSvc struct {
 	srvWorkingDir string
 	totalRank     int
-	srvs          []*rpc.Client
+	data          []*rpc.Client // Connections to data partitions
 }
 
 // Create a new Client, connect to all server ranks.
-func NewClient(totalRank int, srvWorkingDir string) (client *Client, err error) {
-	client = &Client{srvWorkingDir, totalRank, make([]*rpc.Client, totalRank)}
+func NewDBSvc(totalRank int, srvWorkingDir string) (db *DBSvc, err error) {
+	db = &DBSvc{srvWorkingDir, totalRank, make([]*rpc.Client, totalRank)}
 	for i := 0; i < totalRank; i++ {
-		if client.srvs[i], err = rpc.Dial("unix", path.Join(srvWorkingDir, strconv.Itoa(i))); err != nil {
+		if db.data[i], err = rpc.Dial("unix", path.Join(srvWorkingDir, strconv.Itoa(i))); err != nil {
 			return
 		}
 	}
 	return
 }
 
-// Shutdown all servers.
-func (client *Client) Shutdown() (err error) {
+// Shutdown all data partitions.
+func (db *DBSvc) Shutdown() (err error) {
 	discard := new(bool)
 	errs := make([]string, 0, 1)
-	for i, srv := range client.srvs {
+	for i, srv := range db.data {
 		if err := srv.Call("DataSvc.Shutdown", false, discard); err == nil || !strings.Contains(fmt.Sprint(err), "unexpected EOF") {
 			errs = append(errs, fmt.Sprintf("Could not shutdown server rank %d", i))
 		}
