@@ -1,3 +1,4 @@
+// Database logic.
 package dbsvc
 
 import (
@@ -12,13 +13,14 @@ import (
 
 type DBSvc struct {
 	srvWorkingDir string
+	dataDir       string
 	totalRank     int
 	data          []*rpc.Client // Connections to data partitions
 }
 
 // Create a new Client, connect to all server ranks.
-func NewDBSvc(totalRank int, srvWorkingDir string) (db *DBSvc, err error) {
-	db = &DBSvc{srvWorkingDir, totalRank, make([]*rpc.Client, totalRank)}
+func NewDBSvc(totalRank int, srvWorkingDir string, dataDir string) (db *DBSvc, err error) {
+	db = &DBSvc{srvWorkingDir, dataDir, totalRank, make([]*rpc.Client, totalRank)}
 	for i := 0; i < totalRank; i++ {
 		if db.data[i], err = rpc.Dial("unix", path.Join(srvWorkingDir, strconv.Itoa(i))); err != nil {
 			return
