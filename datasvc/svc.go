@@ -13,12 +13,18 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+)
+
+const (
+	SCHEMA_VERSION_LOW = "SCHEMA_VERSION_LOW" // Inform client that he should reload schema definition
 )
 
 // Data server is responsible for doing work on hash tables and collection partitions; the server communicates via Unix domain socket.
 type DataSvc struct {
 	ht                   map[string]*data.HashTable
 	part                 map[string]*data.Partition
+	schemaVersion        int64 // Unix timestamp in nanoseconds
 	dataLock             *sync.RWMutex
 	rank                 int
 	workingDir, sockPath string
@@ -30,7 +36,8 @@ type DataSvc struct {
 // Create a new and blank data server.
 func NewDataSvc(workingDir string, rank int) *DataSvc {
 	return &DataSvc{ht: make(map[string]*data.HashTable), part: make(map[string]*data.Partition), dataLock: new(sync.RWMutex),
-		rank: rank, clients: make([]net.Conn, 0, 10), clientsLock: new(sync.Mutex),
+		schemaVersion: time.Now().UnixNano(),
+		rank:          rank, clients: make([]net.Conn, 0, 10), clientsLock: new(sync.Mutex),
 		workingDir: workingDir, sockPath: path.Join(workingDir, strconv.Itoa(rank))}
 }
 
@@ -63,6 +70,12 @@ func (ds *DataSvc) Serve() (err error) {
 
 // Test the server RPC connection - return nil.
 func (ds *DataSvc) Ping(_ bool, _ *bool) error {
+	return nil
+}
+
+// Return server schema version number.
+func (ds *DataSvc) SchemaVersion(_ bool, out *int64) error {
+	*out = ds.schemaVersion
 	return nil
 }
 

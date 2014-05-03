@@ -18,8 +18,10 @@ const (
 )
 
 func TestSequence(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
 	os.RemoveAll(TEST_SRV_DIR)
 	defer os.RemoveAll(TEST_SRV_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	os.MkdirAll(TEST_SRV_DIR, 0700)
 	// Prepare 4 data servers
 	for i := 0; i < NUM_SRVS; i++ {
@@ -35,6 +37,7 @@ func TestSequence(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Run test sequence
+	SchemaTest(t)
 	// Shutdown and cleanup
 	if err = db.Shutdown(); err != nil {
 		t.Fatal(err)
