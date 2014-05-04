@@ -14,8 +14,6 @@ type HTOpenInput struct {
 }
 
 func (ds *DataSvc) HTOpen(in HTOpenInput, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if _, alreadyOpened := ds.ht[in.Name]; alreadyOpened {
 		return errors.New("Hash table is already opened")
 	}
@@ -27,8 +25,6 @@ func (ds *DataSvc) HTOpen(in HTOpenInput, _ *bool) (err error) {
 
 // Synchronize a hash table file.
 func (ds *DataSvc) HTSync(name string, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if ht, exists := ds.ht[name]; exists {
 		err = ht.Sync()
 	} else {
@@ -39,8 +35,6 @@ func (ds *DataSvc) HTSync(name string, _ *bool) (err error) {
 
 // Close a hash table file.
 func (ds *DataSvc) HTClose(name string, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if ht, exists := ds.ht[name]; exists {
 		err = ht.Close()
 		ds.schemaVersion = time.Now().UnixNano()
@@ -58,8 +52,6 @@ type HTPutInput struct {
 }
 
 func (ds *DataSvc) HTPut(in HTPutInput, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if ht, exists := ds.ht[in.Name]; !exists {
 		err = errors.New(fmt.Sprintf("Hash table %s does not exist", in.Name))
 	} else if in.MySchemaVersion < ds.schemaVersion {
@@ -78,8 +70,6 @@ type HTGetInput struct {
 }
 
 func (ds *DataSvc) HTGet(in HTGetInput, out *[]int) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if ht, exists := ds.ht[in.Name]; !exists {
 		err = errors.New(fmt.Sprintf("Hash table %s does not exist", in.Name))
 	} else if in.MySchemaVersion < ds.schemaVersion {
@@ -98,8 +88,6 @@ type HTRemoveInput struct {
 }
 
 func (ds *DataSvc) HTRemove(in HTRemoveInput, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if ht, exists := ds.ht[in.Name]; !exists {
 		err = errors.New(fmt.Sprintf("Hash table %s does not exist", in.Name))
 	} else if in.MySchemaVersion < ds.schemaVersion {
@@ -121,8 +109,6 @@ type HTAllEntriesOutput struct {
 }
 
 func (ds *DataSvc) HTAllEntries(in HTGetInput, out *HTAllEntriesOutput) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if ht, exists := ds.ht[in.Name]; !exists {
 		err = errors.New(fmt.Sprintf("Hash table %s does not exist", in.Name))
 	} else if in.MySchemaVersion < ds.schemaVersion {

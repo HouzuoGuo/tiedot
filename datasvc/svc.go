@@ -25,7 +25,7 @@ type DataSvc struct {
 	ht                   map[string]*data.HashTable
 	part                 map[string]*data.Partition
 	schemaVersion        int64 // Unix timestamp in nanoseconds
-	dataLock             *sync.RWMutex
+	accessLock           *sync.RWMutex
 	rank                 int
 	workingDir, sockPath string
 	listener             net.Listener
@@ -35,7 +35,8 @@ type DataSvc struct {
 
 // Create a new and blank data server.
 func NewDataSvc(workingDir string, rank int) *DataSvc {
-	return &DataSvc{ht: make(map[string]*data.HashTable), part: make(map[string]*data.Partition), dataLock: new(sync.RWMutex),
+	return &DataSvc{ht: make(map[string]*data.HashTable), part: make(map[string]*data.Partition),
+		accessLock:    new(sync.RWMutex),
 		schemaVersion: time.Now().UnixNano(),
 		rank:          rank, clients: make([]net.Conn, 0, 10), clientsLock: new(sync.Mutex),
 		workingDir: workingDir, sockPath: path.Join(workingDir, strconv.Itoa(rank))}
@@ -76,6 +77,18 @@ func (ds *DataSvc) Ping(_ bool, _ *bool) error {
 // Return server schema version number.
 func (ds *DataSvc) SchemaVersion(_ bool, out *int64) error {
 	*out = ds.schemaVersion
+	return nil
+}
+
+// Lock the data server for exclusive access.
+func (ds *DataSvc) Lock(_ bool, _ *bool) error {
+	ds.accessLock.Lock()
+	return nil
+}
+
+// Unlock from exclusive access.
+func (ds *DataSvc) Unlock(_ bool, _ *bool) error {
+	ds.accessLock.Unlock()
 	return nil
 }
 

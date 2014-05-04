@@ -14,8 +14,6 @@ type PartOpenInput struct {
 }
 
 func (ds *DataSvc) PartOpen(in PartOpenInput, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if _, alreadyOpened := ds.part[in.Name]; alreadyOpened {
 		return errors.New("Partition is already opened")
 	}
@@ -27,8 +25,6 @@ func (ds *DataSvc) PartOpen(in PartOpenInput, _ *bool) (err error) {
 
 // Synchronize a collection partition.
 func (ds *DataSvc) PartSync(name string, _ *bool) error {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if part, exists := ds.part[name]; exists {
 		return part.Sync()
 	} else {
@@ -38,8 +34,6 @@ func (ds *DataSvc) PartSync(name string, _ *bool) error {
 
 // Close a collection partition.
 func (ds *DataSvc) PartClose(name string, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if part, exists := ds.part[name]; exists {
 		err = part.Close()
 		delete(ds.part, name)
@@ -58,8 +52,6 @@ type DocReadInput struct {
 }
 
 func (ds *DataSvc) DocRead(in DocReadInput, doc *string) (err error) {
-	ds.dataLock.RLock()
-	defer ds.dataLock.RUnlock()
 	if part, exists := ds.part[in.Name]; !exists {
 		err = fmt.Errorf("Partition %s does not exist", in.Name)
 	} else if in.MySchemaVersion < ds.schemaVersion {
@@ -81,8 +73,6 @@ type DocInsertInput struct {
 }
 
 func (ds *DataSvc) DocInsert(in DocInsertInput, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if part, exists := ds.part[in.Name]; !exists {
 		err = fmt.Errorf("Partition %s does not exist", in.Name)
 	} else if in.MySchemaVersion < ds.schemaVersion {
@@ -101,8 +91,6 @@ type DocUpdateInput struct {
 }
 
 func (ds *DataSvc) DocUpdate(in DocUpdateInput, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if part, exists := ds.part[in.Name]; !exists {
 		err = fmt.Errorf("Partition %s does not exist", in.Name)
 	} else if in.MySchemaVersion < ds.schemaVersion {
@@ -121,8 +109,6 @@ type DocDeleteInput struct {
 }
 
 func (ds *DataSvc) DocDelete(in DocUpdateInput, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if part, exists := ds.part[in.Name]; !exists {
 		err = errors.New(fmt.Sprintf("Partition %s does not exist", in.Name))
 	} else if in.MySchemaVersion < ds.schemaVersion {
@@ -141,8 +127,6 @@ type DocLockUpdateInput struct {
 }
 
 func (ds *DataSvc) DocLockUpdate(in DocLockUpdateInput, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if part, exists := ds.part[in.Name]; !exists {
 		err = errors.New(fmt.Sprintf("Partition %s does not exist", in.Name))
 	} else if in.MySchemaVersion < ds.schemaVersion {
@@ -161,8 +145,6 @@ type DocUnlockUpdateInput struct {
 }
 
 func (ds *DataSvc) DocUnlockUpdate(in DocUnlockUpdateInput, _ *bool) (err error) {
-	ds.dataLock.Lock()
-	defer ds.dataLock.Unlock()
 	if part, exists := ds.part[in.Name]; !exists {
 		err = errors.New(fmt.Sprintf("Partition %s does not exist", in.Name))
 	} else if in.MySchemaVersion < ds.schemaVersion {
