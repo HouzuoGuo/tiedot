@@ -25,7 +25,7 @@ type DataSvc struct {
 	ht                   map[string]*data.HashTable
 	part                 map[string]*data.Partition
 	schemaVersion        int64 // Unix timestamp in nanoseconds
-	accessLock           *sync.RWMutex
+	accessLock           *sync.Mutex
 	rank                 int
 	workingDir, sockPath string
 	listener             net.Listener
@@ -36,7 +36,7 @@ type DataSvc struct {
 // Create a new and blank data server.
 func NewDataSvc(workingDir string, rank int) *DataSvc {
 	return &DataSvc{ht: make(map[string]*data.HashTable), part: make(map[string]*data.Partition),
-		accessLock:    new(sync.RWMutex),
+		accessLock:    new(sync.Mutex),
 		schemaVersion: time.Now().UnixNano(),
 		rank:          rank, clients: make([]net.Conn, 0, 10), clientsLock: new(sync.Mutex),
 		workingDir: workingDir, sockPath: path.Join(workingDir, strconv.Itoa(rank))}

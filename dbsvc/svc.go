@@ -9,6 +9,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,11 +20,14 @@ type DBSvc struct {
 	data            []*rpc.Client                  // Connections to data partitions
 	schema          map[string]map[string][]string // Collection => Index name => Index path ^^
 	mySchemaVersion int64
+	lock            *sync.Mutex
 }
 
 // Create a new Client, connect to all server ranks.
 func NewDBSvc(totalRank int, srvWorkingDir string, dataDir string) (db *DBSvc, err error) {
-	db = &DBSvc{srvWorkingDir, dataDir, totalRank, make([]*rpc.Client, totalRank), make(map[string]map[string][]string), time.Now().UnixNano()}
+	db = &DBSvc{srvWorkingDir, dataDir, totalRank,
+		make([]*rpc.Client, totalRank), make(map[string]map[string][]string), time.Now().UnixNano(),
+		new(sync.Mutex)}
 	for i := 0; i < totalRank; i++ {
 		if db.data[i], err = rpc.Dial("unix", path.Join(srvWorkingDir, strconv.Itoa(i))); err != nil {
 			return
@@ -34,6 +38,8 @@ func NewDBSvc(totalRank int, srvWorkingDir string, dataDir string) (db *DBSvc, e
 
 // Shutdown all data partitions.
 func (db *DBSvc) Shutdown() (err error) {
+	db.lock.Lock()
+	defer db.lock.Unlock()
 	discard := new(bool)
 	errs := make([]string, 0, 1)
 	for i, srv := range db.data {

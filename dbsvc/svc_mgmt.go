@@ -36,13 +36,36 @@ func destructIndexUID(indexUID string) (colName string, idxPath []string) {
 	return splitted[0], splitted[1:]
 }
 
+// Lock down all data servers. Remember to call UnlockAllData afterwards!
+func (db *DBSvc) lockAllData() {
+	for _, srv := range db.data {
+		if err := srv.Call("DataSvc.Lock", true, discard); err != nil {
+			panic(err)
+		}
+	}
+}
+func (db *DBSvc) unlockAllData() {
+	for _, srv := range db.data {
+		if err := srv.Call("DataSvc.Unlock", true, discard); err != nil {
+			panic(err)
+		}
+	}
+}
+
 // Load DB schema into memory. Optionally load DB data files/index files into data servers.
 func (db *DBSvc) LoadSchema(loadIntoServers bool) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
 	dirContent, err := ioutil.ReadDir(db.dataDir)
 	if err != nil {
 		return err
 	}
 	db.schema = make(map[string]map[string][]string)
+	// Data server schema change requires lock down of all servers
+	if loadIntoServers {
+		db.lockAllData()
+		defer db.unlockAllData()
+	}
 	for _, colDir := range dirContent {
 		if !colDir.IsDir() {
 			continue

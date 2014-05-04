@@ -14,7 +14,7 @@ var db *DBSvc
 const (
 	TEST_SRV_DIR  = "/tmp/tiedot_dc_test"
 	TEST_DATA_DIR = "/tmp/tiedot_dc_test_data"
-	NUM_SRVS      = 4
+	NUM_SRVS      = 2
 )
 
 func TestSequence(t *testing.T) {
@@ -32,7 +32,7 @@ func TestSequence(t *testing.T) {
 			}
 		}(i)
 	}
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	if db, err = NewDBSvc(NUM_SRVS, TEST_SRV_DIR, TEST_DATA_DIR); err != nil {
 		t.Fatal(err)
 	}

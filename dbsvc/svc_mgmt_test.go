@@ -32,18 +32,12 @@ func SchemaTest(t *testing.T) {
 	}
 	os.RemoveAll(TEST_DATA_DIR + "/ColA_1")
 
-	touchFile(TEST_DATA_DIR+"/ColA_4", "dat_0")
-	touchFile(TEST_DATA_DIR+"/ColA_4", "id_0")
-	touchFile(TEST_DATA_DIR+"/ColA_4", "dat_1")
-	touchFile(TEST_DATA_DIR+"/ColA_4", "id_1")
-	touchFile(TEST_DATA_DIR+"/ColA_4", "dat_2")
-	touchFile(TEST_DATA_DIR+"/ColA_4", "id_2")
-	touchFile(TEST_DATA_DIR+"/ColA_4", "dat_3")
-	touchFile(TEST_DATA_DIR+"/ColA_4", "id_3")
-	touchFile(TEST_DATA_DIR+"/ColA_4/ht_a!b_c", "0")
-	touchFile(TEST_DATA_DIR+"/ColA_4/ht_a!b_c", "1")
-	touchFile(TEST_DATA_DIR+"/ColA_4/ht_a!b_c", "2")
-	touchFile(TEST_DATA_DIR+"/ColA_4/ht_a!b_c", "3")
+	touchFile(TEST_DATA_DIR+"/ColA_2", "dat_0")
+	touchFile(TEST_DATA_DIR+"/ColA_2", "id_0")
+	touchFile(TEST_DATA_DIR+"/ColA_2", "dat_1")
+	touchFile(TEST_DATA_DIR+"/ColA_2", "id_1")
+	touchFile(TEST_DATA_DIR+"/ColA_2/ht_a!b_c", "0")
+	touchFile(TEST_DATA_DIR+"/ColA_2/ht_a!b_c", "1")
 	var schemaVer1, schemaVer2, schemaVer3 int64
 	schemaVer1 = db.mySchemaVersion
 	if err := db.LoadSchema(false); err != nil {
