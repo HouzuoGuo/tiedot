@@ -20,6 +20,8 @@ const (
 	SCHEMA_VERSION_LOW = "SCHEMA_VERSION_LOW" // Inform client that he should reload schema definition
 )
 
+var discard *bool = new(bool)
+
 // Data server is responsible for doing work on hash tables and collection partitions; the server communicates via Unix domain socket.
 type DataSvc struct {
 	ht                   map[string]*data.HashTable
@@ -92,16 +94,44 @@ func (ds *DataSvc) Unlock(_ bool, _ *bool) error {
 	return nil
 }
 
+// Synchronize all buffers, and close all partitions and hash tables.
+func (ds *DataSvc) Unload(_ bool, _ *bool) (err error) {
+	errs := make([]string, 0, 1)
+	for _, ht := range ds.ht {
+		if err = ht.Close(); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	for _, part := range ds.part {
+		if err = part.Close(); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	ds.ht = make(map[string]*data.HashTable)
+	ds.part = make(map[string]*data.Partition)
+	if len(errs) > 0 {
+		err = errors.New(strings.Join(errs, "; "))
+		tdlog.Errorf("Server %d: Unload did not fully complete, but best effort has been made: %v", ds.rank, err)
+	}
+	return
+}
+
 // Shutdown server network routine and all client connections.
 func (ds *DataSvc) Shutdown(_ bool, _ *bool) (err error) {
 	errs := make([]string, 0, 1)
+	// Close all network connections
 	if err = ds.listener.Close(); err != nil {
-		errs = append(errs, fmt.Sprint(err))
+		errs = append(errs, err.Error())
 	}
 	for _, client := range ds.clients {
 		if err = client.Close(); err != nil {
-			errs = append(errs, fmt.Sprint(err))
+			errs = append(errs, err.Error())
 		}
+	}
+	// Close all files
+	if err = ds.Unload(true, discard); err != nil {
+		errs = append(errs, err.Error())
+
 	}
 	if len(errs) > 0 {
 		err = errors.New(strings.Join(errs, "; "))

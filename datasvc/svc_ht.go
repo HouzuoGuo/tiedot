@@ -33,10 +33,21 @@ func (ds *DataSvc) HTSync(name string, _ *bool) (err error) {
 	return
 }
 
+// Clear a hash table.
+func (ds *DataSvc) HTClear(name string, _ *bool) (err error) {
+	if ht, exists := ds.ht[name]; exists {
+		err = ht.Clear()
+	} else {
+		err = errors.New(fmt.Sprintf("Hash table %s does not exist", name))
+	}
+	return
+}
+
 // Close a hash table file.
 func (ds *DataSvc) HTClose(name string, _ *bool) (err error) {
 	if ht, exists := ds.ht[name]; exists {
 		err = ht.Close()
+		delete(ds.ht, name)
 		ds.schemaVersion = time.Now().UnixNano()
 	} else {
 		err = errors.New(fmt.Sprintf("Hash table %s does not exist", name))

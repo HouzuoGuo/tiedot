@@ -10,7 +10,6 @@ import (
 )
 
 var err error
-var discard *bool = new(bool)
 
 // Discard unused RPC output
 var svc *DataSvc = NewDataSvc("/tmp/tiedot_svc_test", 1)
@@ -18,6 +17,7 @@ var client *rpc.Client
 
 // Run data server test cases orderly
 func TestSequence(t *testing.T) {
+	defer os.RemoveAll("/tmp/tiedot_svc_test")
 	// Initialize test server/client
 	os.Remove(svc.sockPath)
 	go func() {
@@ -35,6 +35,9 @@ func TestSequence(t *testing.T) {
 	HTTest(t)
 	PartitionTest(t)
 	// Shutdown test server/client
+	if err = client.Call("DataSvc.Unload", false, discard); err != nil {
+		t.Fatal(err)
+	}
 	if err = client.Call("DataSvc.Shutdown", false, discard); err == nil || !strings.Contains(fmt.Sprint(err), "unexpected EOF") {
 		t.Fatal("Server did not close connection", err)
 	}

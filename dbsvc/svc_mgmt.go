@@ -1,4 +1,4 @@
-// Database logic - schema management.
+// Database logic - data file/schema management.
 package dbsvc
 
 import (
@@ -22,20 +22,6 @@ const (
 
 var discard *bool = new(bool)
 
-// Construct a unique ID for an index. The name may be used as the FS directory name for the index.
-func mkIndexUID(colName string, idxPath []string) string {
-	together := make([]string, len(idxPath)+1)
-	together[0] = colName
-	copy(together[1:], idxPath)
-	return strings.Join(together, IDX_ID_SPLIT)
-}
-
-// Get collection name and indexed path from an index unique ID.
-func destructIndexUID(indexUID string) (colName string, idxPath []string) {
-	splitted := strings.Split(indexUID, IDX_ID_SPLIT)
-	return splitted[0], splitted[1:]
-}
-
 // Lock down all data servers. Remember to call UnlockAllData afterwards!
 func (db *DBSvc) lockAllData() {
 	for _, srv := range db.data {
@@ -52,38 +38,37 @@ func (db *DBSvc) unlockAllData() {
 	}
 }
 
+// Unload schema from all data servers
+func (db *DBSvc) unloadAll() {
+	for _, srv := range db.data {
+		if err := srv.Call("DataSvc.Unload", true, discard); err != nil {
+			panic(err)
+		}
+	}
+}
+
 // Load DB schema into memory. Optionally load DB data files/index files into data servers.
-func (db *DBSvc) LoadSchema(loadIntoServers bool) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+func (db *DBSvc) loadSchema(loadIntoServers bool) error {
 	dirContent, err := ioutil.ReadDir(db.dataDir)
 	if err != nil {
 		return err
 	}
 	db.schema = make(map[string]map[string][]string)
-	// Data server schema change requires lock down of all servers
-	if loadIntoServers {
-		db.lockAllData()
-		defer db.unlockAllData()
-	}
 	for _, colDir := range dirContent {
 		if !colDir.IsDir() {
 			continue
 		}
-		// Collection directory name looks like: "WonderfulStuff_8"
-		nameComps := strings.Split(colDir.Name(), COL_NAME_SPLIT)
-		if len(nameComps) < 2 {
-			continue
-		} else if numParts, err := strconv.Atoi(nameComps[1]); err != nil {
+		if colName, numParts, err := db.destructColDirName(colDir.Name()); err != nil {
+			tdlog.Printf("loadSchema: skipping %s", colDir.Name())
 			continue
 		} else {
 			// Load the collection
-			colName := nameComps[0]
 			if numParts != db.totalRank {
+				println(colDir.Name())
 				return fmt.Errorf("Number mismatch: there are %d servers, but collection %s has %d partitions", db.totalRank, colName, numParts)
 			}
 			db.schema[colName] = make(map[string][]string)
-			// Data partitions
+			// Open data partitions on data server
 			if loadIntoServers {
 				for i, srv := range db.data {
 					if err := srv.Call("DataSvc.PartOpen", datasvc.PartOpenInput{
@@ -91,11 +76,11 @@ func (db *DBSvc) LoadSchema(loadIntoServers bool) error {
 						path.Join(db.dataDir, colDir.Name(), LOOKUP_FILE_MAGIC+strconv.Itoa(i)),
 						colName,
 					}, discard); err != nil {
-						return err
+						panic(err)
 					}
 				}
 			}
-			// Indexes
+			// Load collection indexes
 			dirContent, err := ioutil.ReadDir(path.Join(db.dataDir, colDir.Name()))
 			if err != nil {
 				return err
@@ -107,13 +92,14 @@ func (db *DBSvc) LoadSchema(loadIntoServers bool) error {
 				idxPath := strings.Split(htDir.Name()[len(HT_DIR_MAGIC):], IDX_ID_SPLIT)
 				idxUID := mkIndexUID(colName, idxPath)
 				db.schema[colName][idxUID] = idxPath
+				// Open index partitions on data server
 				if loadIntoServers {
 					for i, srv := range db.data {
 						if err := srv.Call("DataSvc.HTOpen", datasvc.HTOpenInput{
 							path.Join(db.dataDir, colDir.Name(), htDir.Name(), strconv.Itoa(i)),
 							idxUID,
 						}, discard); err != nil {
-							return err
+							panic(err)
 						}
 					}
 				}
@@ -123,4 +109,9 @@ func (db *DBSvc) LoadSchema(loadIntoServers bool) error {
 	db.mySchemaVersion = time.Now().UnixNano()
 	tdlog.Printf("Schema reloaded: version number is now %d", db.mySchemaVersion)
 	return nil
+}
+
+// Return total number of data server ranks (data partitions).
+func (db *DBSvc) TotalRank() int {
+	return db.totalRank
 }

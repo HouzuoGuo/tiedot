@@ -50,13 +50,21 @@ func TestPutGetReopenClear(t *testing.T) {
 		}
 	}
 	// Clear the hash table
-	reopened.Clear()
+	if err = reopened.Clear(); err != nil {
+		t.Fatal(err)
+	}
 	if !(reopened.numBuckets == INITIAL_BUCKETS && reopened.Used == INITIAL_BUCKETS*BUCKET_SIZE) {
 		t.Fatal("Did not clear the hash table")
 	}
 	keys, vals := reopened.AllEntries(0)
 	if len(keys) != 0 || len(vals) != 0 {
 		t.Fatal("Did not clear the hash table")
+	}
+	if err = reopened.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	if err = reopened.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -123,7 +131,6 @@ func TestAllEntries(t *testing.T) {
 		t.Fatalf("Failed to open: %v", err)
 		return
 	}
-	defer ht.Close()
 	ht.Put(1, 1)
 	ht.Put(1, 2)
 	ht.Put(1, 3)

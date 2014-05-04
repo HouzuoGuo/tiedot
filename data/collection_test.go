@@ -255,4 +255,10 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 	if col.Size != COL_FILE_GROWTH+col.Growth {
 		t.Fatalf("Size changed?! %d %d %d", col.Size, COL_FILE_GROWTH, col.Growth)
 	}
+	if err = col.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	if err = col.Close(); err != nil {
+		t.Fatal(err)
+	}
 }

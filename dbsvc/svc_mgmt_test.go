@@ -16,22 +16,16 @@ func touchFile(dir, filename string) {
 	}
 }
 
-func SchemaTest(t *testing.T) {
-	if mkIndexUID("a", []string{"b", "c"}) != "a!b!c" {
-		t.Fatal()
-	}
-	if colName, idxPath := destructIndexUID("a!b!c_d"); colName != "a" || idxPath[0] != "b" || idxPath[1] != "c_d" {
-		t.Fatal(colName, idxPath)
-	}
-
+func MgmtTest(t *testing.T) {
 	touchFile(TEST_DATA_DIR+"/ColA_1", "dat_0")
 	touchFile(TEST_DATA_DIR+"/ColA_1", "id_0")
 	touchFile(TEST_DATA_DIR+"/ColA_1/ht_a!b_c", "0")
-	if err := db.LoadSchema(false); err == nil {
+	if err := db.loadSchema(false); err == nil {
 		t.Fatal("Should have thrown error") // partition number mismatch
 	}
-	os.RemoveAll(TEST_DATA_DIR + "/ColA_1")
-
+	if err := os.RemoveAll(TEST_DATA_DIR + "/ColA_1"); err != nil {
+		t.Fatal(err)
+	}
 	touchFile(TEST_DATA_DIR+"/ColA_2", "dat_0")
 	touchFile(TEST_DATA_DIR+"/ColA_2", "id_0")
 	touchFile(TEST_DATA_DIR+"/ColA_2", "dat_1")
@@ -40,14 +34,14 @@ func SchemaTest(t *testing.T) {
 	touchFile(TEST_DATA_DIR+"/ColA_2/ht_a!b_c", "1")
 	var schemaVer1, schemaVer2, schemaVer3 int64
 	schemaVer1 = db.mySchemaVersion
-	if err := db.LoadSchema(false); err != nil {
+	if err := db.loadSchema(false); err != nil {
 		t.Fatal(err)
 	}
 	schemaVer2 = db.mySchemaVersion
 	if schemaVer2 < schemaVer1 {
 		t.Fatal(schemaVer2, schemaVer1)
 	}
-	if err := db.LoadSchema(true); err != nil {
+	if err := db.loadSchema(true); err != nil {
 		t.Fatal(err)
 	}
 	schemaVer3 = db.mySchemaVersion
@@ -61,5 +55,8 @@ func SchemaTest(t *testing.T) {
 		db.schema["ColA"]["ColA!a!b_c"][0] != "a" ||
 		db.schema["ColA"]["ColA!a!b_c"][1] != "b_c" {
 		t.Fatal(db.schema)
+	}
+	if err := os.RemoveAll(TEST_DATA_DIR + "/ColA_2"); err != nil {
+		t.Fatal(err)
 	}
 }

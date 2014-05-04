@@ -37,9 +37,38 @@ func TestSequence(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Run test sequence
-	SchemaTest(t)
+	IDTest(t)
+	MgmtTest(t)
+	ColCrudTest(t)
 	// Shutdown and cleanup
 	if err = db.Shutdown(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func IDTest(t *testing.T) {
+	if mkIndexUID("a", []string{"b", "c"}) != "a!b!c" {
+		t.Fatal()
+	}
+	if colName, idxPath := destructIndexUID("a!b!c_d"); colName != "a" || idxPath[0] != "b" || idxPath[1] != "c_d" {
+		t.Fatal(colName, idxPath)
+	}
+	if db.mkColDirName("My_Stuff_1") != "My_Stuff_1_2" {
+		t.Fatal("Wrong name")
+	}
+	if _, _, err := db.destructColDirName("_2"); err == nil {
+		t.Fatal("Did not error")
+	}
+	if _, _, err := db.destructColDirName("My_Stuff_"); err == nil {
+		t.Fatal("Did not error")
+	}
+	if _, _, err := db.destructColDirName("My_Stuff_A"); err == nil {
+		t.Fatal("Did not error")
+	}
+	if name, parts, err := db.destructColDirName("abc_2"); err != nil || name != "abc" || parts != 2 {
+		t.Fatal(name, parts, err)
+	}
+	if name, parts, err := db.destructColDirName("My_Collection_2"); err != nil || name != "My_Collection" || parts != 2 {
+		t.Fatal(name, parts, err)
 	}
 }

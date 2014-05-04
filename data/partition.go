@@ -101,6 +101,23 @@ func (part *Partition) ForEachDoc(fun func(id int, doc []byte) bool) {
 	}
 }
 
+// Clear data file and lookup hash table.
+func (part *Partition) Clear() (err error) {
+	var failure bool
+	if err = part.col.Clear(); err != nil {
+		tdlog.Errorf("Failed to clear %s: %v", part.col.Path, err)
+		failure = true
+	}
+	if err = part.lookup.Clear(); err != nil {
+		tdlog.Errorf("Failed to clear %s: %v", part.lookup.Path, err)
+		failure = true
+	}
+	if failure {
+		err = errors.New("Operation did not complete successfully")
+	}
+	return
+}
+
 // Synchronize all file buffers.
 func (part *Partition) Sync() (err error) {
 	var failure bool

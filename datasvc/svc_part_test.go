@@ -78,6 +78,9 @@ func PartitionTest(t *testing.T) {
 	if err = client.Call("DataSvc.DocDelete", DocDeleteInput{"col1", 2, schemaVersion2}, discard); err == nil {
 		t.Fatal("Did not error")
 	}
+	if err = client.Call("DataSvc.PartClear", "col1", discard); err != nil {
+		t.Fatal(err)
+	}
 	if err = client.Call("DataSvc.PartClose", "col1", discard); err != nil {
 		t.Fatal(err)
 	}

@@ -95,9 +95,12 @@ func (ht *HashTable) growBucket(bucket int) {
 }
 
 // Clear the entire hash table.
-func (ht *HashTable) Clear() {
-	ht.DataFile.Clear()
+func (ht *HashTable) Clear() (err error) {
+	if err = ht.DataFile.Clear(); err != nil {
+		return
+	}
 	ht.calculateNumBuckets()
+	return
 }
 
 // Store a key-value pair into a vacant entry.

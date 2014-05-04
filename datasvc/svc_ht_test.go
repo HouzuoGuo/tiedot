@@ -59,6 +59,9 @@ func HTTest(t *testing.T) {
 	if !(len(vals) == 1 && vals[0] == 200) {
 		t.Fatal(vals)
 	}
+	if err = client.Call("DataSvc.HTClear", "ht1", discard); err != nil {
+		t.Fatal(err)
+	}
 	if err = client.Call("DataSvc.HTClose", "ht1", discard); err != nil {
 		t.Fatal(err)
 	}

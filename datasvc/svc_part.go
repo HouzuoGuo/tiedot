@@ -32,6 +32,15 @@ func (ds *DataSvc) PartSync(name string, _ *bool) error {
 	}
 }
 
+// Clear a collection partition.
+func (ds *DataSvc) PartClear(name string, _ *bool) error {
+	if part, exists := ds.part[name]; exists {
+		return part.Clear()
+	} else {
+		return fmt.Errorf("Partition %s does not exist", name)
+	}
+}
+
 // Close a collection partition.
 func (ds *DataSvc) PartClose(name string, _ *bool) (err error) {
 	if part, exists := ds.part[name]; exists {
