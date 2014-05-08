@@ -79,11 +79,11 @@ func mkIndexUID(colName string, idxPath []string) string {
 	together := make([]string, len(idxPath)+1)
 	together[0] = colName
 	copy(together[1:], idxPath)
-	return strings.Join(together, IDX_ID_SPLIT)
+	return strings.Join(together, IDX_PATH_SPLIT)
 }
 
 // Get collection name and indexed path from an index ID.
 func destructIndexUID(indexUID string) (colName string, idxPath []string) {
-	splitted := strings.Split(indexUID, IDX_ID_SPLIT)
+	splitted := strings.Split(indexUID, IDX_PATH_SPLIT)
 	return splitted[0], splitted[1:]
 }

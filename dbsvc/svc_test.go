@@ -40,6 +40,7 @@ func TestSequence(t *testing.T) {
 	IDTest(t)
 	MgmtTest(t)
 	ColCrudTest(t)
+	IdxCrudTest(t)
 	// Shutdown and cleanup
 	if err = db.Shutdown(); err != nil {
 		t.Fatal(err)

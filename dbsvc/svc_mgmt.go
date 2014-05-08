@@ -14,7 +14,7 @@ import (
 
 const (
 	COL_NAME_SPLIT    = "_"
-	IDX_ID_SPLIT      = "!"
+	IDX_PATH_SPLIT    = "!"
 	LOOKUP_FILE_MAGIC = "id_"
 	DAT_FILE_MAGIC    = "dat_"
 	HT_DIR_MAGIC      = "ht_"
@@ -64,7 +64,6 @@ func (db *DBSvc) loadSchema(loadIntoServers bool) error {
 		} else {
 			// Load the collection
 			if numParts != db.totalRank {
-				println(colDir.Name())
 				return fmt.Errorf("Number mismatch: there are %d servers, but collection %s has %d partitions", db.totalRank, colName, numParts)
 			}
 			db.schema[colName] = make(map[string][]string)
@@ -89,7 +88,11 @@ func (db *DBSvc) loadSchema(loadIntoServers bool) error {
 				if !(htDir.IsDir() && strings.HasPrefix(htDir.Name(), HT_DIR_MAGIC)) {
 					continue
 				}
-				idxPath := strings.Split(htDir.Name()[len(HT_DIR_MAGIC):], IDX_ID_SPLIT)
+				idxPath := strings.Split(htDir.Name()[len(HT_DIR_MAGIC):], IDX_PATH_SPLIT)
+				if len(idxPath) < 2 {
+					return fmt.Errorf("%s appears to be an index, however the dir name is malformed", htDir.Name())
+				}
+				idxPath = idxPath[1:]
 				idxUID := mkIndexUID(colName, idxPath)
 				db.schema[colName][idxUID] = idxPath
 				// Open index partitions on data server

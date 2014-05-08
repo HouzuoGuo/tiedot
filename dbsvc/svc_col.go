@@ -57,8 +57,7 @@ func (db *DBSvc) ColRename(oldName string, newName string) error {
 	defer db.unlockAllData()
 	if err := db.loadSchema(false); err != nil {
 		return err
-	}
-	if _, exists := db.schema[oldName]; !exists {
+	} else if _, exists := db.schema[oldName]; !exists {
 		return fmt.Errorf("Collection %s does not exist", oldName)
 	} else if _, exists := db.schema[newName]; exists {
 		return fmt.Errorf("Collection %s already exists", newName)
@@ -82,8 +81,7 @@ func (db *DBSvc) ColTruncate(name string) error {
 	defer db.unlockAllData()
 	if err := db.loadSchema(false); err != nil {
 		return err
-	}
-	if _, exists := db.schema[name]; !exists {
+	} else if _, exists := db.schema[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	}
 	for _, srv := range db.data {
@@ -107,8 +105,7 @@ func (db *DBSvc) ColDrop(name string) error {
 	defer db.unlockAllData()
 	if err := db.loadSchema(false); err != nil {
 		return err
-	}
-	if _, exists := db.schema[name]; !exists {
+	} else if _, exists := db.schema[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	}
 	db.unloadAll()
