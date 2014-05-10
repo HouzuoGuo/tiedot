@@ -76,3 +76,104 @@ func GetInTest(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func DocCrudTest(t *testing.T) {
+	var err error
+	if err = db.ColCreate("DocCrudTest"); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.IdxCreate("DocCrudTest", []string{"a", "b"}); err != nil {
+		t.Fatal(err)
+	}
+	numDocs := 100
+	docIDs := make([]int, numDocs)
+	// Insert documents
+	if docIDs[0], err = db.DocInsert("reioavd", map[string]interface{}{}); err == nil {
+		t.Fatal("Did not error")
+	}
+	for i := 0; i < numDocs; i++ {
+		if i%10 == 0 {
+			if err = db.Sync(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if docIDs[i], err = db.DocInsert("DocCrudTest", map[string]interface{}{"a": map[string]interface{}{"b": i}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Read documents
+	if _, err := db.DocRead("awefd", docIDs[0]); err == nil {
+		t.Fatal("Did not error")
+	}
+	if _, err := db.DocRead("DocCrudTest", 912345); err == nil {
+		t.Fatal("Did not error")
+	}
+	for i := 0; i < numDocs; i++ {
+		if i%10 == 0 {
+			if err = db.Sync(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if doc, err := db.DocRead("DocCrudTest", docIDs[i]); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i) {
+			t.Fatal(doc, err)
+		}
+	}
+	// Update documents
+	if err = db.DocUpdate("awnboin", docIDs[0], map[string]interface{}{}); err == nil {
+		t.Fatal("Did not error")
+	}
+	if err = db.DocUpdate("awnboin", 987324, map[string]interface{}{}); err == nil {
+		t.Fatal("Did not error")
+	}
+	for i := 0; i < numDocs; i++ {
+		if i%10 == 0 {
+			if err = db.Sync(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// i -> i * 2
+		if err = db.DocUpdate("DocCrudTest", docIDs[i], map[string]interface{}{"a": map[string]interface{}{"b": i * 2}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Update - verify read back
+	for i := 0; i < numDocs; i++ {
+		if doc, err := db.DocRead("DocCrudTest", docIDs[i]); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i*2) {
+			t.Fatal(doc, err)
+		}
+	}
+	// Delete document
+	if err := db.DocDelete("aoebnionof", docIDs[1]); err == nil {
+		t.Fatal("Did not error")
+	}
+	if err := db.DocDelete("aoebnionof", 9287347); err == nil {
+		t.Fatal("Did not error")
+	}
+	for i := 0; i < numDocs/2+1; i++ {
+		if i%10 == 0 {
+			if err = db.Sync(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := db.DocDelete("DocCrudTest", docIDs[i]); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.DocDelete("DocCrudTest", docIDs[i]); err == nil {
+			t.Fatal("Did not error")
+		}
+	}
+	// Delete - verify read back
+	for i := 0; i < numDocs/2+1; i++ {
+		if i%10 == 0 {
+			if err = db.Sync(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err = db.DocRead("DocCrudTest", docIDs[i]); err == nil {
+			t.Fatal("Did not error")
+		}
+	}
+	if err = db.ColDrop("DocCrudTest"); err != nil {
+		t.Fatal(err)
+	}
+}

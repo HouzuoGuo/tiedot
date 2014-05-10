@@ -37,13 +37,21 @@ func TestSequence(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Run test sequence
+	GetInTest(t)
+	StrHashTest(t)
 	IDTest(t)
 	MgmtTest(t)
 	ColCrudTest(t)
 	IdxCrudTest(t)
-	GetInTest(t)
+	DocCrudTest(t)
+	// Sync test
+	version1 := db.mySchemaVersion
 	if err = db.Sync(); err != nil {
 		t.Fatal(err)
+	}
+	version2 := db.mySchemaVersion
+	if version2 <= version1 {
+		t.Fatal("wrong version")
 	}
 	// Shutdown and cleanup
 	if err = db.Shutdown(); err != nil {

@@ -31,7 +31,6 @@ func TestSequence(t *testing.T) {
 	}
 	// Run test sequence
 	PingTest(t)
-	StrHashTest(t)
 	LockTest(t)
 	HTTest(t)
 	PartitionTest(t)

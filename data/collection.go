@@ -86,8 +86,8 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 		copy(col.Buf[id+DOC_HEADER:padding], data)
 		for ; padding < paddingEnd; padding += LEN_PADDING {
 			copySize := LEN_PADDING
-			if padding+LEN_PADDING >= col.Used {
-				copySize = col.Used - padding
+			if padding+LEN_PADDING >= paddingEnd {
+				copySize = paddingEnd - padding
 			}
 			copy(col.Buf[padding:padding+copySize], PADDING)
 		}

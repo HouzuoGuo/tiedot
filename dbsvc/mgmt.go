@@ -60,35 +60,20 @@ func (db *DBSvc) unlockPart(part *rpc.Client) {
 	}
 }
 
-// Make an RPC call to a data partition and deal with possible "schema version low" errors.
-func (db *DBSvc) callPartition(part *rpc.Client, call string, in interface{}, out interface{}) error {
-	db.lockPart(part)
-	if err := part.Call(call, in, out); err != nil {
+// Make an RPC call to the data partition and reload my schema if necessary.
+func (db *DBSvc) callPartHandleReload(part *rpc.Client, fun string, in interface{}, out interface{}) error {
+	if err := part.Call(fun, in, out); err != nil {
 		if err.Error() == datasvc.SCHEMA_VERSION_LOW {
-			if err2 := db.loadSchema(false); err != nil {
-				db.unlockPart(part)
+			if err2 := db.loadSchema(false); err2 == nil {
+				return db.callPartHandleReload(part, fun, in, out)
+			} else {
 				return err2
 			}
-			db.unlockPart(part)
-			return db.callPartition(part, call, in, out)
-		}
-		db.unlockPart(part)
-		return err
-	}
-	db.unlockPart(part)
-	return nil
-}
-
-// Reload my schema when server error indicates "schema version too low". Otherwise return the original error.
-func (db *DBSvc) reactToSchemaUpdate(src error) error {
-	if src.Error() == datasvc.SCHEMA_VERSION_LOW {
-		if err := db.loadSchema(false); err == nil {
-			return nil
 		} else {
 			return err
 		}
 	}
-	return src
+	return nil
 }
 
 // Load DB schema into memory. Optionally load DB data files/index files into data servers.

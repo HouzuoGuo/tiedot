@@ -54,6 +54,9 @@ func PartitionTest(t *testing.T) {
 	if err = client.Call("DataSvc.DocRead", DocReadInput{"col1", 2, schemaVersion2}, &readback); err != nil || strings.TrimSpace(readback) != "01234567890123456789" {
 		t.Fatal(err, readback)
 	}
+	if err = client.Call("DataSvc.DocRead", DocReadInput{"col1", 1, schemaVersion2}, &readback); err != nil || strings.TrimSpace(readback) != "doc123" {
+		t.Fatal(err, readback)
+	}
 	if err = client.Call("DataSvc.DocLockUpdate", DocLockUpdateInput{"col1", 2, 123}, discard); err == nil || err.Error() != SCHEMA_VERSION_LOW {
 		t.Fatal("Did not error")
 	}
