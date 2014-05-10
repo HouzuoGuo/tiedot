@@ -97,6 +97,21 @@ func (db *DBSvc) ColTruncate(name string) error {
 	return nil
 }
 
+// Repair and compress a collection.
+func (db *DBSvc) ColScrub(name string) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+	db.lockAllData()
+	defer db.unlockAllData()
+	if err := db.loadSchema(false); err != nil {
+		return err
+	} else if _, exists := db.schema[name]; !exists {
+		return fmt.Errorf("Collection %s does not exist", name)
+	}
+	// TODO: re-create the collection and its documents
+	return nil
+}
+
 // Drop a collection.
 func (db *DBSvc) ColDrop(name string) error {
 	db.lock.Lock()

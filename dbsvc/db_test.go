@@ -41,6 +41,10 @@ func TestSequence(t *testing.T) {
 	MgmtTest(t)
 	ColCrudTest(t)
 	IdxCrudTest(t)
+	GetInTest(t)
+	if err = db.Sync(); err != nil {
+		t.Fatal(err)
+	}
 	// Shutdown and cleanup
 	if err = db.Shutdown(); err != nil {
 		t.Fatal(err)

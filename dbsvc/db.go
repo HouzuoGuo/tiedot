@@ -36,6 +36,16 @@ func NewDBSvc(totalRank int, srvWorkingDir string, dataDir string) (db *DBSvc, e
 	return
 }
 
+// Sync & close all data partitions, then reopen everything.
+func (db *DBSvc) Sync() error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+	db.lockAllData()
+	defer db.unlockAllData()
+	db.unloadAll()
+	return db.loadSchema(true)
+}
+
 // Shutdown all data partitions.
 func (db *DBSvc) Shutdown() (err error) {
 	db.lock.Lock()
