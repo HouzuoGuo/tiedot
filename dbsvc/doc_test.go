@@ -2,6 +2,8 @@ package dbsvc
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/HouzuoGuo/tiedot/datasvc"
 	"testing"
 )
 
@@ -77,6 +79,34 @@ func GetInTest(t *testing.T) {
 	}
 }
 
+func idxHas(t *testing.T, colName string, path []string, idxVal interface{}, docID int) error {
+	idxName := mkIndexUID(colName, path)
+	var out []int
+	hashKey := StrHash(fmt.Sprint(idxVal))
+	if err := db.data[hashKey%db.totalRank].Call("DataSvc.HTGet", datasvc.HTGetInput{idxName, hashKey, 0, db.mySchemaVersion}, &out); err != nil {
+		panic(err)
+	}
+	if len(out) != 1 || out[0] != docID {
+		return fmt.Errorf("Looking for %v %v %v in %v, but got result %v", idxVal, hashKey, docID, path, out)
+	}
+	return nil
+}
+
+func idxHasNot(t *testing.T, colName string, path []string, idxVal, docID int) error {
+	idxName := mkIndexUID(colName, path)
+	var out []int
+	hashKey := StrHash(fmt.Sprint(idxVal))
+	if err := db.data[hashKey%db.totalRank].Call("DataSvc.HTGet", datasvc.HTGetInput{idxName, hashKey, 0, db.mySchemaVersion}, &out); err != nil {
+		panic(err)
+	}
+	for _, v := range out {
+		if v == docID {
+			return fmt.Errorf("Looking for %v %v %v in %v (should not return any), but got result %v", idxVal, hashKey, docID, path, out)
+		}
+	}
+	return nil
+}
+
 func DocCrudTest(t *testing.T) {
 	var err error
 	if err = db.ColCreate("DocCrudTest"); err != nil {
@@ -92,7 +122,7 @@ func DocCrudTest(t *testing.T) {
 		t.Fatal("Did not error")
 	}
 	for i := 0; i < numDocs; i++ {
-		if i%10 == 0 {
+		if i%40 == 0 {
 			if err = db.Sync(); err != nil {
 				t.Fatal(err)
 			}
@@ -109,13 +139,16 @@ func DocCrudTest(t *testing.T) {
 		t.Fatal("Did not error")
 	}
 	for i := 0; i < numDocs; i++ {
-		if i%10 == 0 {
+		if i%40 == 0 {
 			if err = db.Sync(); err != nil {
 				t.Fatal(err)
 			}
 		}
 		if doc, err := db.DocRead("DocCrudTest", docIDs[i]); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i) {
 			t.Fatal(doc, err)
+		}
+		if err = idxHas(t, "DocCrudTest", []string{"a", "b"}, i, docIDs[i]); err != nil {
+			t.Fatal(err)
 		}
 	}
 	// Update documents
@@ -126,7 +159,7 @@ func DocCrudTest(t *testing.T) {
 		t.Fatal("Did not error")
 	}
 	for i := 0; i < numDocs; i++ {
-		if i%10 == 0 {
+		if i%40 == 0 {
 			if err = db.Sync(); err != nil {
 				t.Fatal(err)
 			}
@@ -141,6 +174,18 @@ func DocCrudTest(t *testing.T) {
 		if doc, err := db.DocRead("DocCrudTest", docIDs[i]); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i*2) {
 			t.Fatal(doc, err)
 		}
+		if i == 0 {
+			if err = idxHas(t, "DocCrudTest", []string{"a", "b"}, 0, docIDs[i]); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			if err = idxHasNot(t, "DocCrudTest", []string{"a", "b"}, i, docIDs[i]); err != nil {
+				t.Fatal(err)
+			}
+			if err = idxHas(t, "DocCrudTest", []string{"a", "b"}, i*2, docIDs[i]); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 	// Delete document
 	if err := db.DocDelete("aoebnionof", docIDs[1]); err == nil {
@@ -150,7 +195,7 @@ func DocCrudTest(t *testing.T) {
 		t.Fatal("Did not error")
 	}
 	for i := 0; i < numDocs/2+1; i++ {
-		if i%10 == 0 {
+		if i%40 == 0 {
 			if err = db.Sync(); err != nil {
 				t.Fatal(err)
 			}
@@ -164,13 +209,25 @@ func DocCrudTest(t *testing.T) {
 	}
 	// Delete - verify read back
 	for i := 0; i < numDocs/2+1; i++ {
-		if i%10 == 0 {
+		if i%40 == 0 {
 			if err = db.Sync(); err != nil {
 				t.Fatal(err)
 			}
 		}
 		if _, err = db.DocRead("DocCrudTest", docIDs[i]); err == nil {
 			t.Fatal("Did not error")
+		}
+		if err = idxHasNot(t, "DocCrudTest", []string{"a", "b"}, i*2, docIDs[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Delete - verify unaffected docs
+	for i := numDocs/2 + 1; i < numDocs; i++ {
+		if doc, err := db.DocRead("DocCrudTest", docIDs[i]); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i*2) {
+			t.Fatal(doc, err)
+		}
+		if err = idxHas(t, "DocCrudTest", []string{"a", "b"}, i*2, docIDs[i]); err != nil {
+			t.Fatal(err)
 		}
 	}
 	if err = db.ColDrop("DocCrudTest"); err != nil {

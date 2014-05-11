@@ -6,7 +6,6 @@ import (
 	"github.com/HouzuoGuo/tiedot/datasvc"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math/rand"
-	"net/rpc"
 )
 
 // Resolve the attribute(s) in the document structure along the given path.
@@ -48,11 +47,23 @@ func StrHash(thing interface{}) int {
 }
 
 // Put a document on all indexes.
-func (db *DBSvc) indexDoc(colName string, part *rpc.Client, id int, doc map[string]interface{}) error {
+func (db *DBSvc) indexDoc(colName string, docPartNum, id int, doc map[string]interface{}) error {
 	for idxName, idxPath := range db.schema[colName] {
 		for _, idxVal := range GetIn(doc, idxPath) {
-			if err := part.Call("DataSvc.HTPut", datasvc.HTPutInput{idxName, StrHash(fmt.Sprint(idxVal)), id, db.mySchemaVersion}, discard); err != nil {
+			hashKey := StrHash(fmt.Sprint(idxVal))
+			hashPartNum := hashKey % db.totalRank
+			hashPart := db.data[hashPartNum]
+			if hashPartNum != docPartNum {
+				db.lockPart(hashPart)
+			}
+			if err := hashPart.Call("DataSvc.HTPut", datasvc.HTPutInput{idxName, hashKey, id, db.mySchemaVersion}, discard); err != nil {
+				if hashPartNum != docPartNum {
+					db.unlockPart(hashPart)
+				}
 				return err
+			}
+			if hashPartNum != docPartNum {
+				db.unlockPart(hashPart)
 			}
 		}
 	}
@@ -60,11 +71,23 @@ func (db *DBSvc) indexDoc(colName string, part *rpc.Client, id int, doc map[stri
 }
 
 // Remove a document from all indexes.
-func (db *DBSvc) unindexDoc(colName string, part *rpc.Client, id int, doc map[string]interface{}) error {
+func (db *DBSvc) unindexDoc(colName string, docPartNum, id int, doc map[string]interface{}) error {
 	for idxName, idxPath := range db.schema[colName] {
 		for _, idxVal := range GetIn(doc, idxPath) {
-			if err := part.Call("DataSvc.HTRemove", datasvc.HTRemoveInput{idxName, StrHash(fmt.Sprint(idxVal)), id, db.mySchemaVersion}, discard); err != nil {
+			hashKey := StrHash(fmt.Sprint(idxVal))
+			hashPartNum := hashKey % db.totalRank
+			hashPart := db.data[hashPartNum]
+			if hashPartNum != docPartNum {
+				db.lockPart(hashPart)
+			}
+			if err := hashPart.Call("DataSvc.HTRemove", datasvc.HTRemoveInput{idxName, hashKey, id, db.mySchemaVersion}, discard); err != nil {
+				if hashPartNum != docPartNum {
+					db.unlockPart(hashPart)
+				}
 				return err
+			}
+			if hashPartNum != docPartNum {
+				db.unlockPart(hashPart)
 			}
 		}
 	}
@@ -90,7 +113,7 @@ func (db *DBSvc) DocInsert(colName string, doc map[string]interface{}) (id int, 
 	if err = db.callPartHandleReload(part, "DataSvc.DocInsert", &datasvc.DocInsertInput{colName, string(docJS), id, db.mySchemaVersion}, discard); err != nil {
 		return
 	}
-	err = db.indexDoc(colName, part, id, doc)
+	err = db.indexDoc(colName, partNum, id, doc)
 	return
 }
 
@@ -137,12 +160,12 @@ func (db *DBSvc) DocUpdate(colName string, id int, newDoc map[string]interface{}
 		return err
 	} else if err := json.Unmarshal([]byte(docStr), &oldDoc); err != nil {
 		return err
-	} else if err := db.unindexDoc(colName, part, id, oldDoc); err != nil {
+	} else if err := db.unindexDoc(colName, partNum, id, oldDoc); err != nil {
 		return err
 		// Then update the document and put it on all indexes
 	} else if err := part.Call("DataSvc.DocUpdate", datasvc.DocUpdateInput{colName, string(docJS), id, db.mySchemaVersion}, discard); err != nil {
 		return err
-	} else if err := db.indexDoc(colName, part, id, newDoc); err != nil {
+	} else if err := db.indexDoc(colName, partNum, id, newDoc); err != nil {
 		return err
 	}
 	return nil
@@ -167,7 +190,7 @@ func (db *DBSvc) DocDelete(colName string, id int) error {
 	} else if err := json.Unmarshal([]byte(docStr), &oldDoc); err != nil {
 		println(docStr)
 		return err
-	} else if err := db.unindexDoc(colName, part, id, oldDoc); err != nil {
+	} else if err := db.unindexDoc(colName, partNum, id, oldDoc); err != nil {
 		return err
 		// Then delete the document
 	} else if err := part.Call("DataSvc.DocDelete", datasvc.DocDeleteInput{colName, id, db.mySchemaVersion}, discard); err != nil {

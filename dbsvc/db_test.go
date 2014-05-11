@@ -23,6 +23,7 @@ func TestSequence(t *testing.T) {
 	defer os.RemoveAll(TEST_SRV_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
 	os.MkdirAll(TEST_SRV_DIR, 0700)
+	os.MkdirAll(TEST_DATA_DIR, 0700)
 	// Prepare 4 data servers
 	for i := 0; i < NUM_SRVS; i++ {
 		srv[i] = datasvc.NewDataSvc(TEST_SRV_DIR, i)
