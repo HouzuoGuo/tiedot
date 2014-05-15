@@ -61,7 +61,7 @@ func TestPartitionDocCRUD(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Foreach
-	part.ForEachDoc(func(id int, doc []byte) bool {
+	part.ForEachDoc(0, 1, func(id int, doc []byte) bool {
 		if id != 2 || string(doc) != "2 " {
 			t.Fatal("ID 2 should be the only remaining document")
 		}

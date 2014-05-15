@@ -4,7 +4,6 @@ package data
 import (
 	"encoding/binary"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"math"
 )
 
 const (
@@ -177,28 +176,32 @@ func (ht *HashTable) Remove(key, val int) {
 	}
 }
 
-// Return all entries in the hash table.
-func (ht *HashTable) AllEntries(limit int) (keys, vals []int) {
-	prealloc := limit
-	if prealloc == 0 {
-		prealloc = INITIAL_BUCKETS * PER_BUCKET / 2
+// Return hash key range start (inclusive) and range end(exclusive) after hash table is divided into (almost) equally sized partitions.
+func GetPartitionRange(partNum, totalParts int) (start int, end int) {
+	partSize := INITIAL_BUCKETS / totalParts
+	start = partNum * partSize
+	end = start + partSize
+	if end > INITIAL_BUCKETS {
+		end = INITIAL_BUCKETS
 	}
+	return
+}
+
+// Partition all entries into equally sized portions, and return all entries in the specified portion.
+func (ht *HashTable) GetPartition(partitionNum, partitionSize int) (keys, vals []int) {
+	prealloc := INITIAL_BUCKETS * PER_BUCKET / partitionSize / 2
 	keys = make([]int, 0, prealloc)
 	vals = make([]int, 0, prealloc)
-	counter := int(0)
-	for head := int(0); head < int(math.Pow(2, float64(HASH_BITS))); head++ {
+	rangeStart, rangeEnd := GetPartitionRange(partitionNum, partitionSize)
+	for head := rangeStart; head < rangeEnd; head++ {
 		var entry, bucket int = 0, head
 		for {
 			entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
 			entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
 			entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
 			if ht.Buf[entryAddr] == 1 {
-				counter++
 				keys = append(keys, int(entryKey))
 				vals = append(vals, int(entryVal))
-				if counter == limit {
-					return
-				}
 			} else if entryKey == 0 && entryVal == 0 {
 				break
 			}

@@ -110,22 +110,24 @@ func (ds *DataSvc) HTRemove(in HTRemoveInput, _ *bool) (err error) {
 }
 
 // Return all entries in hash table
-type HTAllEntriesInput struct {
-	Name            string
-	Limit           int
-	MySchemaVersion int64
+type HTGetPartitionInput struct {
+	Name                string
+	PartNum, TotalParts int
+	MySchemaVersion     int64
 }
-type HTAllEntriesOutput struct {
+type HTGetPartitionOutput struct {
 	Keys, Vals []int
 }
 
-func (ds *DataSvc) HTAllEntries(in HTGetInput, out *HTAllEntriesOutput) (err error) {
+func (ds *DataSvc) HTGetPartition(in HTGetPartitionInput, out *HTGetPartitionOutput) (err error) {
 	if ht, exists := ds.ht[in.Name]; !exists {
 		err = errors.New(fmt.Sprintf("Hash table %s does not exist", in.Name))
 	} else if in.MySchemaVersion < ds.schemaVersion {
 		err = errors.New(SCHEMA_VERSION_LOW)
+	} else if in.PartNum < 0 || in.TotalParts < 1 || in.PartNum >= in.TotalParts {
+		err = fmt.Errorf("Both partition number and total number should be positive, and partition number should be less than total")
 	} else {
-		keys, vals := ht.AllEntries(in.Limit)
+		keys, vals := ht.GetPartition(in.PartNum, in.TotalParts)
 		out.Keys = keys
 		out.Vals = vals
 	}

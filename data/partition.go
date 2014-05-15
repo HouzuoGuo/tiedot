@@ -88,9 +88,9 @@ func (part *Partition) Delete(id int) (err error) {
 	return
 }
 
-// Runt he function on every document.
-func (part *Partition) ForEachDoc(fun func(id int, doc []byte) bool) {
-	ids, physIDs := part.lookup.AllEntries(0)
+// Partition documents into roughly equally sized portions in undetermined order, and run the function on every document in the portion.
+func (part *Partition) ForEachDoc(partNum, totalPart int, fun func(id int, doc []byte) bool) {
+	ids, physIDs := part.lookup.GetPartition(partNum, totalPart)
 	for i, id := range ids {
 		data := part.col.Read(physIDs[i])
 		if data != nil {

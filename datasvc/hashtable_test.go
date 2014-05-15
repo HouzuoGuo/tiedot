@@ -39,15 +39,21 @@ func HTTest(t *testing.T) {
 	if err = client.Call("DataSvc.HTRemove", HTRemoveInput{"ht1", 300, 400, schemaVersion2}, discard); err != nil {
 		t.Fatal(err)
 	}
-	allEntries := new(HTAllEntriesOutput)
-	if err = client.Call("DataSvc.HTAllEntries", HTAllEntriesInput{"ht1", 0, 123}, allEntries); err == nil || err.Error() != SCHEMA_VERSION_LOW {
+	entries := new(HTGetPartitionOutput)
+	if err = client.Call("DataSvc.HTGetPartition", HTGetPartitionInput{"ht1", 0, 10, 123}, entries); err == nil || err.Error() != SCHEMA_VERSION_LOW {
+		t.Fatal("Did not error", err)
+	}
+	if err = client.Call("DataSvc.HTGetPartition", HTGetPartitionInput{"ht1", 1, 0, 123}, entries); err == nil {
 		t.Fatal("Did not error")
 	}
-	if err = client.Call("DataSvc.HTAllEntries", HTAllEntriesInput{"ht1", 0, schemaVersion2}, allEntries); err != nil {
+	if err = client.Call("DataSvc.HTGetPartition", HTGetPartitionInput{"ht1", -1, -1, 123}, entries); err == nil {
+		t.Fatal("Did not error")
+	}
+	if err = client.Call("DataSvc.HTGetPartition", HTGetPartitionInput{"ht1", 0, 10, schemaVersion2}, entries); err != nil {
 		t.Fatal(err)
 	}
-	if !(len(allEntries.Keys) == 1 && len(allEntries.Vals) == 1 && allEntries.Keys[0] == 100 && allEntries.Vals[0] == 200) {
-		t.Fatal(allEntries)
+	if !(len(entries.Keys) == 1 && len(entries.Vals) == 1 && entries.Keys[0] == 100 && entries.Vals[0] == 200) {
+		t.Fatal(entries)
 	}
 	var vals []int
 	if err = client.Call("DataSvc.HTGet", HTGetInput{"ht1", 100, 0, 123}, &vals); err == nil || err.Error() != SCHEMA_VERSION_LOW {
