@@ -24,6 +24,9 @@ type HashTable struct {
 
 // Calculate the hash key of an entry's key.
 func HashKey(key int) int {
+	key = key ^ (key >> 4)
+	key = (key ^ 0xdeadbeef) + (key << 5)
+	key = key ^ (key >> 11)
 	return key & ((1 << HASH_BITS) - 1)
 }
 
@@ -181,8 +184,8 @@ func GetPartitionRange(partNum, totalParts int) (start int, end int) {
 	partSize := INITIAL_BUCKETS / totalParts
 	start = partNum * partSize
 	end = start + partSize
-	if end > INITIAL_BUCKETS {
-		end = INITIAL_BUCKETS
+	if partNum == totalParts-1 {
+		end = INITIAL_BUCKETS - 1
 	}
 	return
 }
