@@ -49,7 +49,7 @@ func HTTest(t *testing.T) {
 	if err = client.Call("DataSvc.HTGetPartition", HTGetPartitionInput{"ht1", -1, -1, 123}, entries); err == nil {
 		t.Fatal("Did not error")
 	}
-	if err = client.Call("DataSvc.HTGetPartition", HTGetPartitionInput{"ht1", 0, 10, schemaVersion2}, entries); err != nil {
+	if err = client.Call("DataSvc.HTGetPartition", HTGetPartitionInput{"ht1", 0, 1, schemaVersion2}, entries); err != nil {
 		t.Fatal(err)
 	}
 	if !(len(entries.Keys) == 1 && len(entries.Vals) == 1 && entries.Keys[0] == 100 && entries.Vals[0] == 200) {
