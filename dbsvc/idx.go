@@ -1,7 +1,11 @@
 package dbsvc
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/datasvc"
+	"github.com/HouzuoGuo/tiedot/tdlog"
+	"net/rpc"
 	"os"
 	"path"
 	"strings"
@@ -32,11 +36,12 @@ func (db *DBSvc) IdxCreate(colName string, idxPath []string) error {
 	defer db.lock.Unlock()
 	db.lockAllData()
 	defer db.unlockAllData()
+	idxName := mkIndexUID(colName, idxPath)
 	if err := db.loadSchema(false); err != nil {
 		return err
 	} else if _, exists := db.schema[colName]; !exists {
 		return fmt.Errorf("Collection %s does not exist", colName)
-	} else if _, exists := db.schema[colName][mkIndexUID(colName, idxPath)]; exists {
+	} else if _, exists := db.schema[colName][idxName]; exists {
 		return fmt.Errorf("Path %v is already indexed", idxPath)
 	} else if err := os.MkdirAll(path.Join(db.dataDir, db.mkColDirName(colName), mkIndexDirName(idxPath)), 0700); err != nil {
 		return err
@@ -45,6 +50,22 @@ func (db *DBSvc) IdxCreate(colName string, idxPath []string) error {
 	if err := db.loadSchema(true); err != nil {
 		return err
 	}
+	// Index all documents on the new index
+	db.forEachDoc(colName, func(srv *rpc.Client, id int, doc string) bool {
+		var docObj map[string]interface{}
+		if err := json.Unmarshal([]byte(doc), &docObj); err != nil {
+			return true
+		}
+		for _, idxVal := range GetIn(docObj, idxPath) {
+			hashKey := StrHash(fmt.Sprint(idxVal))
+			hashPart := db.data[hashKey%db.totalRank]
+			if err := hashPart.Call("DataSvc.HTPut", datasvc.HTPutInput{idxName, hashKey, id, db.mySchemaVersion}, discard); err != nil {
+				tdlog.Printf("IdxCreate %s: failed to index document on the new index, error - %v", idxName, err)
+				return true
+			}
+		}
+		return true
+	})
 	return nil
 }
 

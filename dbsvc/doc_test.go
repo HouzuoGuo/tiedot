@@ -107,7 +107,7 @@ func idxHasNot(t *testing.T, colName string, path []string, idxVal, docID int) e
 	return nil
 }
 
-func DocCrudTest(t *testing.T) {
+func DocCrudAndIndexTest(t *testing.T) {
 	var err error
 	if err = db.ColCreate("DocCrudTest"); err != nil {
 		t.Fatal(err)
@@ -232,6 +232,21 @@ func DocCrudTest(t *testing.T) {
 	}
 	// Scrub and verify unaffected docs
 	if err = db.ColScrub("DocCrudTest"); err != nil {
+		t.Fatal(err)
+	}
+	for i := numDocs/2 + 1; i < numDocs; i++ {
+		if doc, err := db.DocRead("DocCrudTest", docIDs[i]); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i*2) {
+			t.Fatal(doc, err)
+		}
+		if err = idxHas(t, "DocCrudTest", []string{"a", "b"}, i*2, docIDs[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Recreate index and verify
+	if err = db.IdxDrop("DocCrudTest", []string{"a", "b"}); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.IdxCreate("DocCrudTest", []string{"a", "b"}); err != nil {
 		t.Fatal(err)
 	}
 	for i := numDocs/2 + 1; i < numDocs; i++ {

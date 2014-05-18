@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/datasvc"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"net/rpc"
 	"os"
 	"path"
 	"strconv"
@@ -32,6 +33,27 @@ func (db *DBSvc) destructColDirName(dirName string) (string, int, error) {
 	} else {
 		return dirName[0:split], parts, nil
 	}
+}
+
+// Do fun for all documents in the collection.
+func (db *DBSvc) forEachDoc(colName string, fun func(*rpc.Client, int, string) bool) error {
+	totalIterations := 1000
+	for iteratePart := 0; iteratePart < db.totalRank; iteratePart++ {
+		tdlog.Printf("forEachDoc %s: Going through partition %d", colName, iteratePart)
+		srv := db.data[iteratePart]
+		for i := 0; i < totalIterations; i++ {
+			var docs map[int]string
+			if err := srv.Call("DataSvc.DocGetPartition", datasvc.DocGetPartitionInput{colName, i, totalIterations, db.mySchemaVersion}, &docs); err != nil {
+				return err
+			}
+			for id, doc := range docs {
+				if !fun(srv, id, doc) {
+					return nil
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // Create a new collection.
@@ -149,31 +171,21 @@ func (db *DBSvc) ColScrub(name string) error {
 	}
 	// Temporary collection is now ready
 	// Iterate through all documents in 1000 iterations, put them into the temporary collection
-	totalIterations := 1000
-	for iteratePart := 0; iteratePart < db.totalRank; iteratePart++ {
-		tdlog.Printf("Scrub %s: Going through partition %d", name, iteratePart)
-		srv := db.data[iteratePart]
-		for i := 0; i < totalIterations; i++ {
-			var docs map[int]string
-			if err := srv.Call("DataSvc.DocGetPartition", datasvc.DocGetPartitionInput{name, i, totalIterations, db.mySchemaVersion}, &docs); err != nil {
-				return err
-			}
-			for id, doc := range docs {
-				// Deserialize the document
-				var docObj map[string]interface{}
-				if err := json.Unmarshal([]byte(doc), &docObj); err != nil {
-					continue
-				}
-				// The document goes to the partition it used to belong to
-				if err := srv.Call("DataSvc.DocInsert", datasvc.DocInsertInput{tmpColName, strings.TrimSpace(doc), id, db.mySchemaVersion}, discard); err != nil {
-					return err
-				}
-				if err := db.indexDoc(tmpColName, 9999, id, docObj, false); err != nil {
-					return err
-				}
-			}
+	db.forEachDoc(name, func(srv *rpc.Client, id int, doc string) bool {
+		// Deserialize the document
+		var docObj map[string]interface{}
+		if err := json.Unmarshal([]byte(doc), &docObj); err != nil {
+			return true
 		}
-	}
+		// The document goes to the partition it used to belong to
+		if err := srv.Call("DataSvc.DocInsert", datasvc.DocInsertInput{tmpColName, strings.TrimSpace(doc), id, db.mySchemaVersion}, discard); err != nil {
+			tdlog.Printf("Scrub %s: failed to insert document back, error - %v", name, err)
+		}
+		if err := db.indexDoc(tmpColName, 1234567890, id, docObj, false); err != nil {
+			tdlog.Printf("Scrub %s: failed to index document, error - %v", name, err)
+		}
+		return true
+	})
 	db.unloadAll() // implicitly flushes all buffers
 	// Replace the original collection by the temporary collection
 	if err := os.RemoveAll(path.Join(db.dataDir, db.mkColDirName(name))); err != nil {

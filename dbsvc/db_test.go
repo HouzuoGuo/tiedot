@@ -41,10 +41,10 @@ func TestSequence(t *testing.T) {
 	GetInTest(t)
 	StrHashTest(t)
 	IDTest(t)
-	//	MgmtTest(t)
-	//	ColCrudTest(t)
-	//	IdxCrudTest(t)
-	DocCrudTest(t)
+	MgmtTest(t)
+	ColCrudTest(t)
+	IdxCrudTest(t)
+	DocCrudAndIndexTest(t)
 	// Sync test
 	version1 := db.mySchemaVersion
 	if err = db.Sync(); err != nil {
