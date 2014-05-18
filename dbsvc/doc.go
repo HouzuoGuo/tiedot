@@ -104,16 +104,19 @@ func (db *DBSvc) DocInsert(colName string, doc map[string]interface{}) (id int, 
 	partNum := id % db.totalRank
 	part := db.data[partNum]
 	db.lock.Lock()
-	defer db.lock.Unlock()
 	if _, exists := db.schema[colName]; !exists {
+		db.lock.Unlock()
 		return 0, fmt.Errorf("Collection %s does not exist", colName)
 	}
 	db.lockPart(part)
-	defer db.unlockPart(part)
 	if err = db.callPartHandleReload(part, "DataSvc.DocInsert", &datasvc.DocInsertInput{colName, string(docJS), id, db.mySchemaVersion}, discard); err != nil {
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return
 	}
 	err = db.indexDoc(colName, partNum, id, doc, true)
+	db.unlockPart(part)
+	db.lock.Unlock()
 	return
 }
 
@@ -122,19 +125,24 @@ func (db *DBSvc) DocRead(colName string, id int) (doc map[string]interface{}, er
 	partNum := id % db.totalRank
 	part := db.data[partNum]
 	db.lock.Lock()
-	defer db.lock.Unlock()
 	if _, exists := db.schema[colName]; !exists {
+		db.lock.Unlock()
 		return nil, fmt.Errorf("Collection %s does not exist", colName)
 	}
 	db.lockPart(part)
-	defer db.unlockPart(part)
 	var docStr string
 	if err = db.callPartHandleReload(part, "DataSvc.DocRead", datasvc.DocReadInput{colName, id, db.mySchemaVersion}, &docStr); err != nil {
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return
 	}
 	if err = json.Unmarshal([]byte(docStr), &doc); err != nil {
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return
 	}
+	db.unlockPart(part)
+	db.lock.Unlock()
 	return
 }
 
@@ -147,27 +155,38 @@ func (db *DBSvc) DocUpdate(colName string, id int, newDoc map[string]interface{}
 	partNum := id % db.totalRank
 	part := db.data[partNum]
 	db.lock.Lock()
-	defer db.lock.Unlock()
 	if _, exists := db.schema[colName]; !exists {
+		db.lock.Unlock()
 		return fmt.Errorf("Collection %s does not exist", colName)
 	}
 	db.lockPart(part)
-	defer db.unlockPart(part)
 	// Read original document and remove it from all indexes
 	var docStr string
 	var oldDoc map[string]interface{}
 	if err := db.callPartHandleReload(part, "DataSvc.DocRead", datasvc.DocReadInput{colName, id, db.mySchemaVersion}, &docStr); err != nil {
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return err
 	} else if err := json.Unmarshal([]byte(docStr), &oldDoc); err != nil {
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return err
 	} else if err := db.unindexDoc(colName, partNum, id, oldDoc); err != nil {
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return err
 		// Then update the document and put it on all indexes
 	} else if err := part.Call("DataSvc.DocUpdate", datasvc.DocUpdateInput{colName, string(docJS), id, db.mySchemaVersion}, discard); err != nil {
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return err
 	} else if err := db.indexDoc(colName, partNum, id, newDoc, true); err != nil {
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return err
 	}
+	db.unlockPart(part)
+	db.lock.Unlock()
 	return nil
 }
 
@@ -176,25 +195,33 @@ func (db *DBSvc) DocDelete(colName string, id int) error {
 	partNum := id % db.totalRank
 	part := db.data[partNum]
 	db.lock.Lock()
-	defer db.lock.Unlock()
 	if _, exists := db.schema[colName]; !exists {
+		db.lock.Unlock()
 		return fmt.Errorf("Collection %s does not exist", colName)
 	}
 	db.lockPart(part)
-	defer db.unlockPart(part)
 	// Read original document and remove it from all indexes
 	var docStr string
 	var oldDoc map[string]interface{}
 	if err := db.callPartHandleReload(part, "DataSvc.DocRead", datasvc.DocReadInput{colName, id, db.mySchemaVersion}, &docStr); err != nil {
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return err
 	} else if err := json.Unmarshal([]byte(docStr), &oldDoc); err != nil {
-		println(docStr)
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return err
 	} else if err := db.unindexDoc(colName, partNum, id, oldDoc); err != nil {
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return err
 		// Then delete the document
 	} else if err := part.Call("DataSvc.DocDelete", datasvc.DocDeleteInput{colName, id, db.mySchemaVersion}, discard); err != nil {
+		db.unlockPart(part)
+		db.lock.Unlock()
 		return err
 	}
+	db.unlockPart(part)
+	db.lock.Unlock()
 	return nil
 }
