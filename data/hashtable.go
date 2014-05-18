@@ -7,13 +7,13 @@ import (
 )
 
 const (
-	HT_FILE_GROWTH  = 64 * 1048576                          // Initial hash table file size; file growth
-	ENTRY_SIZE      = 1 + 10 + 10                           // Hash entry: validity, key, value
-	BUCKET_HEADER   = 10                                    // Bucker header: next chained bucket number
-	PER_BUCKET      = 10                                    // Entries per bucket
-	HASH_BITS       = 18                                    // Number of hash key bits
-	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE // Size of a bucket
-	INITIAL_BUCKETS = 1024 * 256                            // Initial number of buckets
+	HT_FILE_GROWTH  = 64 * 1048576                            // Initial hash table file size; file growth
+	ENTRY_SIZE      = 1 + 10 + 10                             // Hash entry: validity, key, value
+	BUCKET_HEADER   = 10                                      // Bucker header: next chained bucket number
+	PER_BUCKET      = 10                                      // Entries per bucket
+	HASH_BITS       = 18                                      // Number of hash key bits
+	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET * ENTRY_SIZE // Size of a bucket
+	INITIAL_BUCKETS = 1024 * 256                              // Initial number of buckets
 )
 
 // Hash table is an ordinary data file; it also tracks total number of buckets.
@@ -24,9 +24,9 @@ type HashTable struct {
 
 // Calculate the hash key of an entry's key.
 func HashKey(key int) int {
-	key = key ^ (key >> 4)
-	key = (key ^ 0xdeadbeef) + (key << 5)
-	key = key ^ (key >> 11)
+	key = key^(key>>4)
+	key = (key^0xdeadbeef)+(key<<5)
+	key = key^(key>>11)
 	return key & ((1 << HASH_BITS) - 1)
 }
 
@@ -40,7 +40,7 @@ func OpenHashTable(path string) (ht *HashTable, err error) {
 
 // Follow the longest bucket chain to calculate total number of buckets.
 func (ht *HashTable) calculateNumBuckets() {
-	ht.numBuckets = ht.Size / BUCKET_SIZE
+	ht.numBuckets = ht.Size/BUCKET_SIZE
 	largestBucketNum := INITIAL_BUCKETS - 1
 	for i := 0; i < INITIAL_BUCKETS; i++ {
 		lastBucket := ht.lastBucket(i)
@@ -48,7 +48,7 @@ func (ht *HashTable) calculateNumBuckets() {
 			largestBucketNum = lastBucket
 		}
 	}
-	ht.numBuckets = largestBucketNum + 1
+	ht.numBuckets = largestBucketNum+1
 	usedSize := ht.numBuckets * BUCKET_SIZE
 	if usedSize > ht.Size {
 		ht.Used = ht.Size
@@ -64,7 +64,7 @@ func (ht *HashTable) nextBucket(bucket int) int {
 		return 0
 	}
 	bucketAddr := bucket * BUCKET_SIZE
-	nextUint, err := binary.Varint(ht.Buf[bucketAddr : bucketAddr+10])
+	nextUint, err := binary.Varint(ht.Buf[bucketAddr : bucketAddr + 10])
 	next := int(nextUint)
 	if next == 0 {
 		return 0
@@ -108,7 +108,7 @@ func (ht *HashTable) Clear() (err error) {
 // Store a key-value pair into a vacant entry.
 func (ht *HashTable) Put(key, val int) {
 	for bucket, entry := HashKey(key), 0; ; {
-		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
+		entryAddr := bucket * BUCKET_SIZE + BUCKET_HEADER + entry * ENTRY_SIZE
 		if ht.Buf[entryAddr] != 1 {
 			ht.Buf[entryAddr] = 1
 			binary.PutVarint(ht.Buf[entryAddr+1:entryAddr+11], int64(key))
@@ -134,9 +134,9 @@ func (ht *HashTable) Get(key, limit int) (vals []int) {
 		vals = make([]int, 0, limit)
 	}
 	for count, entry, bucket := 0, 0, HashKey(key); ; {
-		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
-		entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
-		entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
+		entryAddr := bucket * BUCKET_SIZE + BUCKET_HEADER + entry * ENTRY_SIZE
+		entryKey, _ := binary.Varint(ht.Buf[entryAddr + 1 : entryAddr + 11])
+		entryVal, _ := binary.Varint(ht.Buf[entryAddr + 11 : entryAddr + 21])
 		if ht.Buf[entryAddr] == 1 {
 			if int(entryKey) == key {
 				vals = append(vals, int(entryVal))
@@ -159,9 +159,9 @@ func (ht *HashTable) Get(key, limit int) (vals []int) {
 // Flag a key-value pair as invalid.
 func (ht *HashTable) Remove(key, val int) {
 	for entry, bucket := 0, HashKey(key); ; {
-		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
-		entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
-		entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
+		entryAddr := bucket * BUCKET_SIZE + BUCKET_HEADER + entry * ENTRY_SIZE
+		entryKey, _ := binary.Varint(ht.Buf[entryAddr + 1 : entryAddr + 11])
+		entryVal, _ := binary.Varint(ht.Buf[entryAddr + 11 : entryAddr + 21])
 		if ht.Buf[entryAddr] == 1 {
 			if int(entryKey) == key && int(entryVal) == val {
 				ht.Buf[entryAddr] = 0
@@ -182,26 +182,26 @@ func (ht *HashTable) Remove(key, val int) {
 // Return hash key range start (inclusive) and range end(exclusive) after hash table is divided into (almost) equally sized partitions.
 func GetPartitionRange(partNum, totalParts int) (start int, end int) {
 	partSize := INITIAL_BUCKETS / totalParts
-	start = partNum * partSize
-	end = start + partSize
+	start = partNum*partSize
+	end = start+partSize
 	if partNum == totalParts-1 {
-		end = INITIAL_BUCKETS - 1
+		end = INITIAL_BUCKETS-1
 	}
 	return
 }
 
 // Partition all entries into equally sized portions, and return all entries in the specified portion.
 func (ht *HashTable) GetPartition(partitionNum, partitionSize int) (keys, vals []int) {
-	prealloc := INITIAL_BUCKETS * PER_BUCKET / partitionSize / 2
+	rangeStart, rangeEnd := GetPartitionRange(partitionNum, partitionSize)
+	prealloc := (rangeEnd - rangeStart) * PER_BUCKET
 	keys = make([]int, 0, prealloc)
 	vals = make([]int, 0, prealloc)
-	rangeStart, rangeEnd := GetPartitionRange(partitionNum, partitionSize)
 	for head := rangeStart; head < rangeEnd; head++ {
 		var entry, bucket int = 0, head
 		for {
-			entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
-			entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
-			entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
+			entryAddr := bucket * BUCKET_SIZE + BUCKET_HEADER + entry * ENTRY_SIZE
+			entryKey, _ := binary.Varint(ht.Buf[entryAddr + 1 : entryAddr + 11])
+			entryVal, _ := binary.Varint(ht.Buf[entryAddr + 11 : entryAddr + 21])
 			if ht.Buf[entryAddr] == 1 {
 				keys = append(keys, int(entryKey))
 				vals = append(vals, int(entryVal))

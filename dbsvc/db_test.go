@@ -41,9 +41,9 @@ func TestSequence(t *testing.T) {
 	GetInTest(t)
 	StrHashTest(t)
 	IDTest(t)
-	MgmtTest(t)
-	ColCrudTest(t)
-	IdxCrudTest(t)
+	//	MgmtTest(t)
+	//	ColCrudTest(t)
+	//	IdxCrudTest(t)
 	DocCrudTest(t)
 	// Sync test
 	version1 := db.mySchemaVersion

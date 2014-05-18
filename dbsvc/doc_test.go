@@ -230,6 +230,18 @@ func DocCrudTest(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// Scrub and verify unaffected docs
+	if err = db.ColScrub("DocCrudTest"); err != nil {
+		t.Fatal(err)
+	}
+	for i := numDocs/2 + 1; i < numDocs; i++ {
+		if doc, err := db.DocRead("DocCrudTest", docIDs[i]); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i*2) {
+			t.Fatal(doc, err)
+		}
+		if err = idxHas(t, "DocCrudTest", []string{"a", "b"}, i*2, docIDs[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err = db.ColDrop("DocCrudTest"); err != nil {
 		t.Fatal(err)
 	}

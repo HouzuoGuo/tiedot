@@ -2,8 +2,11 @@
 package dbsvc
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/datasvc"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"os"
 	"path"
 	"strconv"
@@ -86,9 +89,7 @@ func (db *DBSvc) ColRename(oldName string, newName string) error {
 		return fmt.Errorf("Collection %s already exists", newName)
 	}
 	db.unloadAll()
-	oldDirName := db.mkColDirName(oldName)
-	newDirName := db.mkColDirName(newName)
-	if err := os.Rename(path.Join(db.dataDir, oldDirName), path.Join(db.dataDir, newDirName)); err != nil {
+	if err := os.Rename(path.Join(db.dataDir, db.mkColDirName(oldName)), path.Join(db.dataDir, db.mkColDirName(newName))); err != nil {
 		return err
 	} else if err := db.loadSchema(true); err != nil {
 		return err
@@ -131,18 +132,57 @@ func (db *DBSvc) ColScrub(name string) error {
 	} else if _, exists := db.schema[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	}
-	// Make a temporary, mirrored collection
-	tmpColName := fmt.Sprint("scrub-%s-%d", name, time.Now().UnixNano())
+	// Make a temporary collection
+	tmpColName := fmt.Sprintf("scrub-%s-%d", name, time.Now().UnixNano())
 	if err := os.MkdirAll(path.Join(db.dataDir, db.mkColDirName(tmpColName)), 0700); err != nil {
 		return err
 	}
-	// Mirror all indexes as well
+	// Mirror indexes from original collection
 	for _, idxPath := range db.schema[name] {
 		if err := os.MkdirAll(path.Join(db.dataDir, db.mkColDirName(tmpColName), mkIndexDirName(idxPath)), 0700); err != nil {
 			return err
 		}
 	}
 	db.unloadAll()
+	if err := db.loadSchema(true); err != nil {
+		return err
+	}
+	// Temporary collection is now ready
+	// Iterate through all documents in 1000 iterations, put them into the temporary collection
+	totalIterations := 1000
+	for iteratePart := 0; iteratePart < db.totalRank; iteratePart++ {
+		tdlog.Printf("Scrub %s: Going through partition %d", name, iteratePart)
+		srv := db.data[iteratePart]
+		for i := 0; i < totalIterations; i++ {
+			var docs map[int]string
+			if err := srv.Call("DataSvc.DocGetPartition", datasvc.DocGetPartitionInput{name, i, totalIterations, db.mySchemaVersion}, &docs); err != nil {
+				return err
+			}
+			for id, doc := range docs {
+				// Deserialize the document
+				var docObj map[string]interface{}
+				if err := json.Unmarshal([]byte(doc), &docObj); err != nil {
+					continue
+				}
+				// The document goes to the partition it used to belong to
+				if err := srv.Call("DataSvc.DocInsert", datasvc.DocInsertInput{tmpColName, strings.TrimSpace(doc), id, db.mySchemaVersion}, discard); err != nil {
+					return err
+				}
+				if err := db.indexDoc(tmpColName, 9999, id, docObj, false); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	db.unloadAll() // implicitly flushes all buffers
+	// Replace the original collection by the temporary collection
+	if err := os.RemoveAll(path.Join(db.dataDir, db.mkColDirName(name))); err != nil {
+		return err
+	}
+	if err := os.Rename(path.Join(db.dataDir, db.mkColDirName(tmpColName)), path.Join(db.dataDir, db.mkColDirName(name))); err != nil {
+		return err
+	}
+	// Reload all and done
 	if err := db.loadSchema(true); err != nil {
 		return err
 	}

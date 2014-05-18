@@ -47,22 +47,22 @@ func StrHash(thing interface{}) int {
 }
 
 // Put a document on all indexes.
-func (db *DBSvc) indexDoc(colName string, docPartNum, id int, doc map[string]interface{}) error {
+func (db *DBSvc) indexDoc(colName string, docPartNum, id int, doc map[string]interface{}, placeLock bool) error {
 	for idxName, idxPath := range db.schema[colName] {
 		for _, idxVal := range GetIn(doc, idxPath) {
 			hashKey := StrHash(fmt.Sprint(idxVal))
 			hashPartNum := hashKey % db.totalRank
 			hashPart := db.data[hashPartNum]
-			if hashPartNum != docPartNum {
+			if hashPartNum != docPartNum && placeLock {
 				db.lockPart(hashPart)
 			}
 			if err := hashPart.Call("DataSvc.HTPut", datasvc.HTPutInput{idxName, hashKey, id, db.mySchemaVersion}, discard); err != nil {
-				if hashPartNum != docPartNum {
+				if hashPartNum != docPartNum && placeLock {
 					db.unlockPart(hashPart)
 				}
 				return err
 			}
-			if hashPartNum != docPartNum {
+			if hashPartNum != docPartNum && placeLock {
 				db.unlockPart(hashPart)
 			}
 		}
@@ -113,7 +113,7 @@ func (db *DBSvc) DocInsert(colName string, doc map[string]interface{}) (id int, 
 	if err = db.callPartHandleReload(part, "DataSvc.DocInsert", &datasvc.DocInsertInput{colName, string(docJS), id, db.mySchemaVersion}, discard); err != nil {
 		return
 	}
-	err = db.indexDoc(colName, partNum, id, doc)
+	err = db.indexDoc(colName, partNum, id, doc, true)
 	return
 }
 
@@ -165,7 +165,7 @@ func (db *DBSvc) DocUpdate(colName string, id int, newDoc map[string]interface{}
 		// Then update the document and put it on all indexes
 	} else if err := part.Call("DataSvc.DocUpdate", datasvc.DocUpdateInput{colName, string(docJS), id, db.mySchemaVersion}, discard); err != nil {
 		return err
-	} else if err := db.indexDoc(colName, partNum, id, newDoc); err != nil {
+	} else if err := db.indexDoc(colName, partNum, id, newDoc, true); err != nil {
 		return err
 	}
 	return nil
