@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 const (
@@ -39,7 +38,7 @@ type DataSvc struct {
 func NewDataSvc(workingDir string, rank int) *DataSvc {
 	return &DataSvc{ht: make(map[string]*data.HashTable), part: make(map[string]*data.Partition),
 		accessLock:    new(sync.Mutex),
-		schemaVersion: time.Now().UnixNano(),
+		schemaVersion: 0,
 		rank:          rank, clients: make([]net.Conn, 0, 10), clientsLock: new(sync.Mutex),
 		workingDir: workingDir, sockPath: path.Join(workingDir, strconv.Itoa(rank))}
 }

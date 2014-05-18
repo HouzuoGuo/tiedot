@@ -33,6 +33,17 @@ func NewDBSvc(totalRank int, srvWorkingDir string, dataDir string) (db *DBSvc, e
 			return
 		}
 	}
+	// Initialize data partitions
+	var remoteSchemaVersion int64
+	if err := db.data[0].Call("DataSvc.SchemaVersion", true, &remoteSchemaVersion); err != nil {
+		tdlog.Panicf("Error during DB initialization: %v", err)
+	}
+	if remoteSchemaVersion == 0 {
+		tdlog.Println("Intiialize database partitions")
+		if err := db.loadSchema(true); err != nil {
+			tdlog.Panicf("Error duing DB initialization: %v", err)
+		}
+	}
 	return
 }
 

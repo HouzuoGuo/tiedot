@@ -88,18 +88,16 @@ go build || exit $?
 MODE=$1
 
 case $MODE in
-	'test-uid')
-		go_test_dir 'uid' ;;
-	'test-dstruct')
-		go_test_dir 'dstruct' ;;
-	'test-colpart')
-		go_test_dir 'colpart' ;;
-	'test-network')
-		test_network ;;
+	'test-data')
+		go_test_dir 'data' ;;
+	'test-datasvc')
+		go_test_dir 'datasvc' ;;
+	'test-dbsvc')
+		go_test_dir 'dbsvc' ;;
 	'test-all')
-		for dir in uid dstruct colpart; do
+		for dir in data datasvc dbsvc; do
 			go_test_dir $dir
-		done && test_network ;;
+		done ;;
 	'bench')
 		benchmark $2 ;;
 esac
