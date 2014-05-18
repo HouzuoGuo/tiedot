@@ -63,37 +63,3 @@ func (db *DBSvc) Shutdown() (err error) {
 	}
 	return
 }
-
-// Construct a directory name for collection.
-func (db *DBSvc) mkColDirName(colName string) string {
-	return colName + COL_NAME_SPLIT + strconv.Itoa(db.totalRank)
-}
-
-// Get collection name and number of partitions from a collection directory name.
-func (db *DBSvc) destructColDirName(dirName string) (string, int, error) {
-	// Collection directory name looks like: "My_Wonderful_Stuff_8"
-	split := strings.LastIndex(dirName, COL_NAME_SPLIT)
-	if split == -1 {
-		return "", 0, errors.New("Not a valid collection directory name")
-	} else if split == 0 || split == len(dirName)-1 {
-		return "", 0, errors.New("Not a valid collection directory name")
-	} else if parts, err := strconv.Atoi(dirName[split+1:]); err != nil {
-		return "", 0, errors.New("Not a valid collection directory name")
-	} else {
-		return dirName[0:split], parts, nil
-	}
-}
-
-// Construct an index ID which uniquely identifies the index in a data partition.
-func mkIndexUID(colName string, idxPath []string) string {
-	together := make([]string, len(idxPath)+1)
-	together[0] = colName
-	copy(together[1:], idxPath)
-	return strings.Join(together, IDX_PATH_SPLIT)
-}
-
-// Get collection name and indexed path from an index ID.
-func destructIndexUID(indexUID string) (colName string, idxPath []string) {
-	splitted := strings.Split(indexUID, IDX_PATH_SPLIT)
-	return splitted[0], splitted[1:]
-}

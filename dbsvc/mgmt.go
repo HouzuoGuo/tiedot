@@ -121,7 +121,6 @@ func (db *DBSvc) loadSchema(loadIntoServers bool) error {
 				if len(idxPath) < 2 {
 					return fmt.Errorf("%s appears to be an index, however the dir name is malformed", htDir.Name())
 				}
-				idxPath = idxPath[1:]
 				idxUID := mkIndexUID(colName, idxPath)
 				db.schema[colName][idxUID] = idxPath
 				// Open index partitions on data server

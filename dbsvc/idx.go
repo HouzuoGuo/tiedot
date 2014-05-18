@@ -4,7 +4,27 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 )
+
+// Make a unique ID name for identifying an indexed path in a document collection.
+func mkIndexUID(colName string, idxPath []string) string {
+	together := make([]string, len(idxPath)+1)
+	together[0] = colName
+	copy(together[1:], idxPath)
+	return strings.Join(together, IDX_PATH_SPLIT)
+}
+
+// Get collection name and indexed path from an index ID.
+func destructIndexUID(indexUID string) (colName string, idxPath []string) {
+	splitted := strings.Split(indexUID, IDX_PATH_SPLIT)
+	return splitted[0], splitted[1:]
+}
+
+// Make a directory name for an indexed path.
+func mkIndexDirName(idxPath []string) string {
+	return HT_DIR_MAGIC + strings.Join(idxPath, IDX_PATH_SPLIT)
+}
 
 // Create a new index.
 func (db *DBSvc) IdxCreate(colName string, idxPath []string) error {
@@ -12,14 +32,13 @@ func (db *DBSvc) IdxCreate(colName string, idxPath []string) error {
 	defer db.lock.Unlock()
 	db.lockAllData()
 	defer db.unlockAllData()
-	idxUID := mkIndexUID(colName, idxPath)
 	if err := db.loadSchema(false); err != nil {
 		return err
 	} else if _, exists := db.schema[colName]; !exists {
 		return fmt.Errorf("Collection %s does not exist", colName)
-	} else if _, exists := db.schema[colName][idxUID]; exists {
+	} else if _, exists := db.schema[colName][mkIndexUID(colName, idxPath)]; exists {
 		return fmt.Errorf("Path %v is already indexed", idxPath)
-	} else if err := os.MkdirAll(path.Join(db.dataDir, db.mkColDirName(colName), HT_DIR_MAGIC+idxUID), 0700); err != nil {
+	} else if err := os.MkdirAll(path.Join(db.dataDir, db.mkColDirName(colName), mkIndexDirName(idxPath)), 0700); err != nil {
 		return err
 	}
 	db.unloadAll()
@@ -52,14 +71,13 @@ func (db *DBSvc) IdxDrop(colName string, idxPath []string) error {
 	defer db.lock.Unlock()
 	db.lockAllData()
 	defer db.unlockAllData()
-	idxUID := mkIndexUID(colName, idxPath)
 	if err := db.loadSchema(false); err != nil {
 		return err
 	} else if _, exists := db.schema[colName]; !exists {
 		return fmt.Errorf("Collection %s does not exist", colName)
-	} else if _, exists := db.schema[colName][idxUID]; !exists {
+	} else if _, exists := db.schema[colName][mkIndexUID(colName, idxPath)]; !exists {
 		return fmt.Errorf("Path %v is not indexed", idxPath)
-	} else if err := os.RemoveAll(path.Join(db.dataDir, db.mkColDirName(colName), HT_DIR_MAGIC+idxUID)); err != nil {
+	} else if err := os.RemoveAll(path.Join(db.dataDir, db.mkColDirName(colName), mkIndexDirName(idxPath))); err != nil {
 		return err
 	}
 	return nil

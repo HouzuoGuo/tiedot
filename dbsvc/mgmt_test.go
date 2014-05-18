@@ -30,8 +30,8 @@ func MgmtTest(t *testing.T) {
 	touchFile(TEST_DATA_DIR+"/ColA_2", "id_0")
 	touchFile(TEST_DATA_DIR+"/ColA_2", "dat_1")
 	touchFile(TEST_DATA_DIR+"/ColA_2", "id_1")
-	touchFile(TEST_DATA_DIR+"/ColA_2/ht_ColA!a!b_c", "0")
-	touchFile(TEST_DATA_DIR+"/ColA_2/ht_ColA!a!b_c", "1")
+	touchFile(TEST_DATA_DIR+"/ColA_2/ht_a!b_c", "0")
+	touchFile(TEST_DATA_DIR+"/ColA_2/ht_a!b_c", "1")
 	var schemaVer1, schemaVer2, schemaVer3 int64
 	schemaVer1 = db.mySchemaVersion
 	if err := db.loadSchema(false); err != nil {

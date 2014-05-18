@@ -163,3 +163,27 @@ func (ds *DataSvc) DocUnlockUpdate(in DocUnlockUpdateInput, _ *bool) (err error)
 	}
 	return
 }
+
+// Partition documents into roughly equally sized portions in undetermined order, and return documents in the chosen partition.
+type DocGetPartitionInput struct {
+	Name                string
+	PartNum, TotalParts int
+	MySchemaVersion     int64
+}
+
+func (ds *DataSvc) DocGetPartition(in DocGetPartitionInput, out *map[int]string) (err error) {
+	if part, exists := ds.part[in.Name]; !exists {
+		err = errors.New(fmt.Sprintf("Partition %s does not exist", in.Name))
+	} else if in.MySchemaVersion < ds.schemaVersion {
+		err = errors.New(SCHEMA_VERSION_LOW)
+	} else if in.PartNum < 0 || in.TotalParts < 1 || in.PartNum >= in.TotalParts {
+		err = fmt.Errorf("Both partition number and total number should be positive, and partition number should be less than total")
+	} else {
+		*out = make(map[int]string)
+		part.ForEachDoc(in.PartNum, in.TotalParts, func(id int, doc []byte) bool {
+			(*out)[id] = string(doc)
+			return true
+		})
+	}
+	return
+}

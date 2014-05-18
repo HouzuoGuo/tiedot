@@ -6,7 +6,30 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
+	"strings"
+	"time"
 )
+
+// Construct a directory name for collection.
+func (db *DBSvc) mkColDirName(colName string) string {
+	return colName + COL_NAME_SPLIT + strconv.Itoa(db.totalRank)
+}
+
+// Get collection name and number of partitions from a collection directory name.
+func (db *DBSvc) destructColDirName(dirName string) (string, int, error) {
+	// Collection directory name looks like: "My_Wonderful_Stuff_8"
+	split := strings.LastIndex(dirName, COL_NAME_SPLIT)
+	if split == -1 {
+		return "", 0, errors.New("Not a valid collection directory name")
+	} else if split == 0 || split == len(dirName)-1 {
+		return "", 0, errors.New("Not a valid collection directory name")
+	} else if parts, err := strconv.Atoi(dirName[split+1:]); err != nil {
+		return "", 0, errors.New("Not a valid collection directory name")
+	} else {
+		return dirName[0:split], parts, nil
+	}
+}
 
 // Create a new collection.
 func (db *DBSvc) ColCreate(name string) error {
@@ -108,7 +131,21 @@ func (db *DBSvc) ColScrub(name string) error {
 	} else if _, exists := db.schema[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	}
-	// TODO: re-create the collection and its documents
+	// Make a temporary, mirrored collection
+	tmpColName := fmt.Sprint("scrub-%s-%d", name, time.Now().UnixNano())
+	if err := os.MkdirAll(path.Join(db.dataDir, db.mkColDirName(tmpColName)), 0700); err != nil {
+		return err
+	}
+	// Mirror all indexes as well
+	for _, idxPath := range db.schema[name] {
+		if err := os.MkdirAll(path.Join(db.dataDir, db.mkColDirName(tmpColName), mkIndexDirName(idxPath)), 0700); err != nil {
+			return err
+		}
+	}
+	db.unloadAll()
+	if err := db.loadSchema(true); err != nil {
+		return err
+	}
 	return nil
 }
 

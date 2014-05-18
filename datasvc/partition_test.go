@@ -14,6 +14,7 @@ func PartitionTest(t *testing.T) {
 	defer os.Remove(colPath)
 	defer os.Remove(htPath)
 	var schemaVersion1, schemaVersion2, schemaVersion3 int64
+	// Schema version & open & sync
 	if err = client.Call("DataSvc.SchemaVersion", false, &schemaVersion1); err != nil {
 		t.Fatal(err)
 	}
@@ -29,6 +30,7 @@ func PartitionTest(t *testing.T) {
 	if err = client.Call("DataSvc.PartSync", "colABCD", discard); err == nil {
 		t.Fatal("Did not error")
 	}
+	// Insert doc
 	if err = client.Call("DataSvc.DocInsert", DocInsertInput{"col1", "doc123", 1, 123}, discard); err == nil || err.Error() != SCHEMA_VERSION_LOW {
 		t.Fatal("Did not error")
 	}
@@ -38,6 +40,7 @@ func PartitionTest(t *testing.T) {
 	if err = client.Call("DataSvc.DocInsert", DocInsertInput{"col1", "doc098", 2, schemaVersion2}, discard); err != nil {
 		t.Fatal(err)
 	}
+	// Read doc
 	var readback string
 	if err = client.Call("DataSvc.DocRead", DocReadInput{"col1", 2, 123}, &readback); err == nil || err.Error() != SCHEMA_VERSION_LOW {
 		t.Fatal("Did not error")
@@ -45,6 +48,7 @@ func PartitionTest(t *testing.T) {
 	if err = client.Call("DataSvc.DocRead", DocReadInput{"col1", 2, schemaVersion2}, &readback); err != nil || readback != "doc098      " {
 		t.Fatal(err, readback)
 	}
+	// Update & readback
 	if err = client.Call("DataSvc.DocUpdate", DocUpdateInput{"col1", "01234567890123456789", 2, 123}, discard); err == nil || err.Error() != SCHEMA_VERSION_LOW {
 		t.Fatal("Did not error")
 	}
@@ -57,6 +61,7 @@ func PartitionTest(t *testing.T) {
 	if err = client.Call("DataSvc.DocRead", DocReadInput{"col1", 1, schemaVersion2}, &readback); err != nil || strings.TrimSpace(readback) != "doc123" {
 		t.Fatal(err, readback)
 	}
+	// Lock & unlock doc
 	if err = client.Call("DataSvc.DocLockUpdate", DocLockUpdateInput{"col1", 2, 123}, discard); err == nil || err.Error() != SCHEMA_VERSION_LOW {
 		t.Fatal("Did not error")
 	}
@@ -72,6 +77,15 @@ func PartitionTest(t *testing.T) {
 	if err = client.Call("DataSvc.DocUnlockUpdate", DocUnlockUpdateInput{"col1", 2, schemaVersion2}, discard); err != nil {
 		t.Fatal(err)
 	}
+	// Get partition
+	var docs map[int]string
+	if err = client.Call("DataSvc.DocGetPartition", DocGetPartitionInput{"col1", 0, 1, schemaVersion2}, &docs); err != nil {
+		t.Fatal(err)
+	}
+	if len(docs) != 2 || strings.TrimSpace(docs[1]) != "doc123" || strings.TrimSpace(docs[2]) != "01234567890123456789" {
+		t.Fatal(docs)
+	}
+	// Delete doc
 	if err = client.Call("DataSvc.DocDelete", DocDeleteInput{"col1", 2, 123}, discard); err == nil || err.Error() != SCHEMA_VERSION_LOW {
 		t.Fatal("Did not error")
 	}
@@ -81,6 +95,7 @@ func PartitionTest(t *testing.T) {
 	if err = client.Call("DataSvc.DocDelete", DocDeleteInput{"col1", 2, schemaVersion2}, discard); err == nil {
 		t.Fatal("Did not error")
 	}
+	// Clear and close
 	if err = client.Call("DataSvc.PartClear", "col1", discard); err != nil {
 		t.Fatal(err)
 	}
