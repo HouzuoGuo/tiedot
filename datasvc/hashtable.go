@@ -17,7 +17,7 @@ func (ds *DataSvc) HTOpen(in HTOpenInput, _ *bool) (err error) {
 	if _, alreadyOpened := ds.ht[in.Name]; alreadyOpened {
 		return errors.New("Hash table is already opened")
 	}
-	if ds.ht[in.Name], err = data.OpenHashTable(in.Path); err != nil {
+	if ds.ht[in.Name], err = data.OpenHashTable(in.Path); err == nil {
 		ds.schemaVersion = time.Now().UnixNano()
 	}
 	return

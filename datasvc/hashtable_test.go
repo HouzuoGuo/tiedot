@@ -25,7 +25,7 @@ func HTTest(t *testing.T) {
 		t.Fatal("Did not error")
 	}
 	if err = client.Call("DataSvc.HTPut", HTPutInput{"ht1", 100, 200, 123}, discard); err == nil || err.Error() != SCHEMA_VERSION_LOW {
-		t.Fatal("Did not error")
+		t.Fatal("Did not error", schemaVersion1, schemaVersion2)
 	}
 	if err = client.Call("DataSvc.HTPut", HTPutInput{"ht1", 100, 200, schemaVersion2}, discard); err != nil {
 		t.Fatal(err)

@@ -31,6 +31,7 @@ go_test_dir() {
 	GOMAXPROCS=4 go test
 	if [ $? != 0 ]; then
 		cleanup_procs
+		popd
 		exit 1
 	fi
 	popd
@@ -49,12 +50,6 @@ run_ipc_servers() {
 		ipc_pids+=($ipc_pid)
 	done
 	echo "RPC server PIDs: ${ipc_pids[*]}"
-}
-
-# Spawn 4 server processes then run test cases that require IPC connection.
-test_network() {
-	run_ipc_servers 4 /tmp/tiedot_test_ipc_tmp /tmp/tiedot_test_ipc_db
-	go_test_dir 'network'
 }
 
 # Spawn 4 server processes, prepare and then run benchmark

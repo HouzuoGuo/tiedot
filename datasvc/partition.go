@@ -17,7 +17,7 @@ func (ds *DataSvc) PartOpen(in PartOpenInput, _ *bool) (err error) {
 	if _, alreadyOpened := ds.part[in.Name]; alreadyOpened {
 		return errors.New("Partition is already opened")
 	}
-	if ds.part[in.Name], err = data.OpenPartition(in.ColPath, in.LookupPath); err != nil {
+	if ds.part[in.Name], err = data.OpenPartition(in.ColPath, in.LookupPath); err == nil {
 		ds.schemaVersion = time.Now().UnixNano()
 	}
 	return
