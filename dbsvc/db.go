@@ -43,6 +43,8 @@ func NewDBSvc(totalRank int, srvWorkingDir string, dataDir string) (db *DBSvc, e
 		if err := db.loadSchema(true); err != nil {
 			tdlog.Panicf("Error duing DB initialization: %v", err)
 		}
+	} else if err := db.loadSchema(false); err != nil {
+		tdlog.Panicf("Error during DB initialization: %v", err)
 	}
 	return
 }

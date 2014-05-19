@@ -39,30 +39,33 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 
 // Return string hash code using sdbm algorithm.
 func StrHash(thing interface{}) int {
-	var hash rune
+	var hash int
 	for _, c := range fmt.Sprint(thing) {
-		hash = c + (hash << 6) + (hash << 16) - hash
+		hash = int(c) + (hash << 6) + (hash << 16) - hash
 	}
-	return int(hash)
+	if hash < 0 {
+		return -hash
+	}
+	return hash
 }
 
 // Put a document on all indexes.
-func (db *DBSvc) indexDoc(colName string, docPartNum, id int, doc map[string]interface{}, placeLock bool) error {
+func (db *DBSvc) indexDoc(colName string, id int, doc map[string]interface{}, placeLock bool) error {
 	for idxName, idxPath := range db.schema[colName] {
 		for _, idxVal := range GetIn(doc, idxPath) {
 			hashKey := StrHash(fmt.Sprint(idxVal))
 			hashPartNum := hashKey % db.totalRank
 			hashPart := db.data[hashPartNum]
-			if hashPartNum != docPartNum && placeLock {
+			if placeLock {
 				db.lockPart(hashPart)
 			}
 			if err := hashPart.Call("DataSvc.HTPut", datasvc.HTPutInput{idxName, hashKey, id, db.mySchemaVersion}, discard); err != nil {
-				if hashPartNum != docPartNum && placeLock {
+				if placeLock {
 					db.unlockPart(hashPart)
 				}
 				return err
 			}
-			if hashPartNum != docPartNum && placeLock {
+			if placeLock {
 				db.unlockPart(hashPart)
 			}
 		}
@@ -71,24 +74,18 @@ func (db *DBSvc) indexDoc(colName string, docPartNum, id int, doc map[string]int
 }
 
 // Remove a document from all indexes.
-func (db *DBSvc) unindexDoc(colName string, docPartNum, id int, doc map[string]interface{}) error {
+func (db *DBSvc) unindexDoc(colName string, id int, doc map[string]interface{}) error {
 	for idxName, idxPath := range db.schema[colName] {
 		for _, idxVal := range GetIn(doc, idxPath) {
 			hashKey := StrHash(fmt.Sprint(idxVal))
 			hashPartNum := hashKey % db.totalRank
 			hashPart := db.data[hashPartNum]
-			if hashPartNum != docPartNum {
-				db.lockPart(hashPart)
-			}
+			db.lockPart(hashPart)
 			if err := hashPart.Call("DataSvc.HTRemove", datasvc.HTRemoveInput{idxName, hashKey, id, db.mySchemaVersion}, discard); err != nil {
-				if hashPartNum != docPartNum {
-					db.unlockPart(hashPart)
-				}
+				db.unlockPart(hashPart)
 				return err
 			}
-			if hashPartNum != docPartNum {
-				db.unlockPart(hashPart)
-			}
+			db.unlockPart(hashPart)
 		}
 	}
 	return nil
@@ -104,18 +101,14 @@ func (db *DBSvc) DocInsert(colName string, doc map[string]interface{}) (id int, 
 	partNum := id % db.totalRank
 	part := db.data[partNum]
 	db.lock.Lock()
-	if _, exists := db.schema[colName]; !exists {
-		db.lock.Unlock()
-		return 0, fmt.Errorf("Collection %s does not exist", colName)
-	}
 	db.lockPart(part)
 	if err = db.callPartHandleReload(part, "DataSvc.DocInsert", &datasvc.DocInsertInput{colName, string(docJS), id, db.mySchemaVersion}, discard); err != nil {
 		db.unlockPart(part)
 		db.lock.Unlock()
 		return
 	}
-	err = db.indexDoc(colName, partNum, id, doc, true)
 	db.unlockPart(part)
+	err = db.indexDoc(colName, id, doc, true)
 	db.lock.Unlock()
 	return
 }
@@ -125,10 +118,6 @@ func (db *DBSvc) DocRead(colName string, id int) (doc map[string]interface{}, er
 	partNum := id % db.totalRank
 	part := db.data[partNum]
 	db.lock.Lock()
-	if _, exists := db.schema[colName]; !exists {
-		db.lock.Unlock()
-		return nil, fmt.Errorf("Collection %s does not exist", colName)
-	}
 	db.lockPart(part)
 	var docStr string
 	if err = db.callPartHandleReload(part, "DataSvc.DocRead", datasvc.DocReadInput{colName, id, db.mySchemaVersion}, &docStr); err != nil {
@@ -155,37 +144,33 @@ func (db *DBSvc) DocUpdate(colName string, id int, newDoc map[string]interface{}
 	partNum := id % db.totalRank
 	part := db.data[partNum]
 	db.lock.Lock()
-	if _, exists := db.schema[colName]; !exists {
-		db.lock.Unlock()
-		return fmt.Errorf("Collection %s does not exist", colName)
-	}
-	db.lockPart(part)
-	// Read original document and remove it from all indexes
 	var docStr string
 	var oldDoc map[string]interface{}
+	db.lockPart(part)
+	// Read original document, then update document content
 	if err := db.callPartHandleReload(part, "DataSvc.DocRead", datasvc.DocReadInput{colName, id, db.mySchemaVersion}, &docStr); err != nil {
 		db.unlockPart(part)
 		db.lock.Unlock()
 		return err
-	} else if err := json.Unmarshal([]byte(docStr), &oldDoc); err != nil {
-		db.unlockPart(part)
-		db.lock.Unlock()
-		return err
-	} else if err := db.unindexDoc(colName, partNum, id, oldDoc); err != nil {
-		db.unlockPart(part)
-		db.lock.Unlock()
-		return err
-		// Then update the document and put it on all indexes
 	} else if err := part.Call("DataSvc.DocUpdate", datasvc.DocUpdateInput{colName, string(docJS), id, db.mySchemaVersion}, discard); err != nil {
-		db.unlockPart(part)
-		db.lock.Unlock()
-		return err
-	} else if err := db.indexDoc(colName, partNum, id, newDoc, true); err != nil {
 		db.unlockPart(part)
 		db.lock.Unlock()
 		return err
 	}
 	db.unlockPart(part)
+	// Remove old document from all indexes, and put new document onto indexes
+	if err := json.Unmarshal([]byte(docStr), &oldDoc); err != nil {
+		db.lock.Unlock()
+		tdlog.Printf("DocUpdate %d: Overwrite corrupted document in %s", id, colName)
+		return nil
+	} else if err := db.unindexDoc(colName, id, oldDoc); err != nil {
+		db.lock.Unlock()
+		return err
+		// Then update the document and put it on all indexes
+	} else if err := db.indexDoc(colName, id, newDoc, true); err != nil {
+		db.lock.Unlock()
+		return err
+	}
 	db.lock.Unlock()
 	return nil
 }
@@ -195,33 +180,29 @@ func (db *DBSvc) DocDelete(colName string, id int) error {
 	partNum := id % db.totalRank
 	part := db.data[partNum]
 	db.lock.Lock()
-	if _, exists := db.schema[colName]; !exists {
-		db.lock.Unlock()
-		return fmt.Errorf("Collection %s does not exist", colName)
-	}
 	db.lockPart(part)
-	// Read original document and remove it from all indexes
+	// Read original document and delete it
 	var docStr string
 	var oldDoc map[string]interface{}
 	if err := db.callPartHandleReload(part, "DataSvc.DocRead", datasvc.DocReadInput{colName, id, db.mySchemaVersion}, &docStr); err != nil {
 		db.unlockPart(part)
 		db.lock.Unlock()
 		return err
-	} else if err := json.Unmarshal([]byte(docStr), &oldDoc); err != nil {
-		db.unlockPart(part)
-		db.lock.Unlock()
-		return err
-	} else if err := db.unindexDoc(colName, partNum, id, oldDoc); err != nil {
-		db.unlockPart(part)
-		db.lock.Unlock()
-		return err
-		// Then delete the document
 	} else if err := part.Call("DataSvc.DocDelete", datasvc.DocDeleteInput{colName, id, db.mySchemaVersion}, discard); err != nil {
 		db.unlockPart(part)
 		db.lock.Unlock()
 		return err
 	}
 	db.unlockPart(part)
+	// Remove the original document from all indexes
+	if err := json.Unmarshal([]byte(docStr), &oldDoc); err != nil {
+		db.lock.Unlock()
+		tdlog.Printf("DocDelete %d: Corrupted document is deleted from %s", id, colName)
+		return err
+	} else if err := db.unindexDoc(colName, id, oldDoc); err != nil {
+		db.lock.Unlock()
+		return err
+	}
 	db.lock.Unlock()
 	return nil
 }

@@ -118,7 +118,7 @@ func (db *DBSvc) loadSchema(loadIntoServers bool) error {
 					continue
 				}
 				idxPath := strings.Split(htDir.Name()[len(HT_DIR_MAGIC):], IDX_PATH_SPLIT)
-				if len(idxPath) < 2 {
+				if len(idxPath) < 1 {
 					return fmt.Errorf("%s appears to be an index, however the dir name is malformed", htDir.Name())
 				}
 				idxUID := mkIndexUID(colName, idxPath)

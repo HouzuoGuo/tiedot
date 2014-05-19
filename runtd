@@ -13,10 +13,11 @@ cleanup_procs() {
 	fi
 }
 cleanup() {
+	echo 'Cleanup'
 	cleanup_procs
 	cleanup_files
 }
-trap cleanup SIGINT SIGTERM SIGHUP
+trap cleanup_procs SIGINT SIGTERM SIGHUP
 
 # Full path name of tiedot code and executable
 cd `dirname $0`
@@ -26,58 +27,48 @@ cd $CODEBASE
 
 # Run go test cases in the directory
 go_test_dir() {
-	cleanup_files
+	cleanup
 	pushd $1
+	find . -name '*.go' -exec go fmt {} \; || exit $?
 	GOMAXPROCS=4 go test
 	if [ $? != 0 ]; then
-		cleanup_procs
 		popd
 		exit 1
 	fi
 	popd
 }
 
-# Spawn N server processes at once
-declare -a ipc_pids
-run_ipc_servers() {
-	num_servers=$1
-	tmp_dir=$2
-	db_dir=$3
-	for (( i = 0; i < $num_servers; i++ )); do
-		./tiedot -mode=ipc -myrank=$i -totalrank=$num_servers -tmpdir=$tmp_dir -dbdir=$db_dir &
-		ipc_pid=$!
-		all_pids+=($ipc_pid)
-		ipc_pids+=($ipc_pid)
-	done
-	echo "RPC server PIDs: ${ipc_pids[*]}"
-}
-
 # Spawn 4 server processes, prepare and then run benchmark
 declare -a bench_client_pids
 benchmark() {
-	total_ranks=$1
-	tmp_dir=/tmp/tiedot_test_ipc_tmp_bench
-	db_dir=/tmp/tiedot_test_ipc_db_bench
 	cleanup
-	run_ipc_servers $total_ranks $tmp_dir $db_dir
-	# Wait for servers to come up, then run benchmark setup
-	sleep `echo "2+($total_ranks-1)/3" | bc`
-	./tiedot -mode=bench-setup -totalrank $total_ranks -tmpdir=$tmp_dir -dbdir=$db_dir
-	sleep `echo "2+($total_ranks-1)/3" | bc`
+	total_ranks=$1
+    [[ -z "$total_ranks" ]] && echo 'Please provide number of servers to be used'
+	work_dir=/tmp/tiedot_test_ipc_tmp_bench
+	db_dir=/tmp/tiedot_test_ipc_db_bench
+	go build || exit $?
+	mkdir $db_dir
+	mkdir $work_dir
+	# Spawn data structure servers
+	for (( i=0; i<$total_ranks; i++ )); do
+		./tiedot -mode=datasvc -myrank=$i -totalrank=$total_ranks -workdir=$work_dir -dbdir=$db_dir &
+		all_pids+=($!)
+	done
+	# Wait for servers to come up and then run benchmark setup
+	sleep 1
+	./tiedot -mode=bench-setup -totalrank $total_ranks -workdir=$work_dir -dbdir=$db_dir
+	sleep 2
 	# Spawn clients
-	for (( i = 0; i < $total_ranks; i++ )); do
-		./tiedot -mode=bench-client -myrank=$i -totalrank=$total_ranks -tmpdir=$tmp_dir -dbdir=$db_dir &
-		ipc_pid=$!
-		all_pids+=($ipc_pid)
-		bench_client_pids+=($ipc_pid)
+	for (( i=0; i<$total_ranks; i++ )); do
+		./tiedot -mode=bench-client -totalrank=$total_ranks -workdir=$work_dir -dbdir=$db_dir -dump-stack-on-interrupt &
+		all_pids+=($!)
+		bench_client_pids+=($!)
 	done
 	echo "Benchmark client PIDs: ${bench_client_pids[*]}"
 	wait ${bench_client_pids[*]}
+	cleanup
 }
 
-# Format and compile tiedot
-find . -name '*.go' -exec go fmt {} \; || exit $?
-go build || exit $?
 
 # Parse mode parameter
 MODE=$1
@@ -96,6 +87,4 @@ case $MODE in
 	'bench')
 		benchmark $2 ;;
 esac
-
-cleanup
 

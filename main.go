@@ -19,7 +19,7 @@ const (
 	BENCH_COL_NAME = "bench"
 )
 
-var stacktraceDumpOnInterrupt = false
+var dumpStackOnInterrupt = false
 
 func main() {
 
@@ -29,16 +29,16 @@ func main() {
 	flag.StringVar(&workDir, "workdir", "", "Location of IPC server working directory (not data directory)")
 	flag.StringVar(&dbDir, "dbdir", "", "Location of database directory")
 	flag.BoolVar(&tdlog.VerboseLog, "verbose", true, "Turn verbose output on/off")
-	flag.BoolVar(&stacktraceDumpOnInterrupt, "dump-on-interrupt", false, "Dump stack traces of all goroutines upon receiving interrupt signal")
+	flag.BoolVar(&dumpStackOnInterrupt, "dump-stack-on-interrupt", false, "Dump stack traces of all goroutines upon receiving interrupt signal")
 
-	if stacktraceDumpOnInterrupt {
+	if dumpStackOnInterrupt {
 		// Print all goroutine stacktraces on interrupt
 		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
+		signal.Notify(c, os.Interrupt, os.Kill)
 		go func() {
 			for {
 				<-c
-				pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
+				pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
 			}
 		}()
 	}
@@ -50,7 +50,7 @@ func main() {
 
 	// Benchmark flags
 	var benchSize int
-	flag.IntVar(&benchSize, "benchsize", 100000, "number of iterations in individual benchmark measure")
+	flag.IntVar(&benchSize, "benchsize", 10000, "number of iterations in individual benchmark measure")
 
 	flag.Parse()
 	switch mode {
@@ -65,6 +65,9 @@ func main() {
 		}
 	case "dbsvc":
 		// Run a database server
+		if totalRank < 1 {
+			tdlog.Panicf("totalrank shall be greater than 0")
+		}
 		db, err := dbsvc.NewDBSvc(totalRank, workDir, dbDir)
 		if err != nil {
 			panic(err)
@@ -74,6 +77,9 @@ func main() {
 		}
 	case "bench-setup":
 		// Prepare a collection with two indexes
+		if totalRank < 1 {
+			tdlog.Panicf("totalrank shall be greater than 0")
+		}
 		db, err := dbsvc.NewDBSvc(totalRank, workDir, dbDir)
 		if err != nil {
 			panic(err)
@@ -86,12 +92,14 @@ func main() {
 		} else if err := db.Sync(); err != nil {
 			panic(err)
 		}
+		fmt.Println("Benchmark setup completed")
 	case "bench-client":
 		// Benchmark sequence - begins immediately
 		db, err := dbsvc.NewDBSvc(totalRank, workDir, dbDir)
 		if err != nil {
 			panic(err)
 		}
+		fmt.Println("Benchmark client ready")
 		start := float64(time.Now().UnixNano())
 		for i := 0; i < benchSize; i++ {
 			doc := map[string]interface{}{

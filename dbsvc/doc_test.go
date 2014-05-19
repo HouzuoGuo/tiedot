@@ -9,7 +9,7 @@ import (
 
 func StrHashTest(t *testing.T) {
 	strings := []string{"", " ", "abc", "123"}
-	hashes := []int{0, 32, 807794786, 408093746}
+	hashes := []int{0, 32, 417419622498, 210861491250}
 	for i := range strings {
 		if StrHash(strings[i]) != hashes[i] {
 			t.Fatalf("Hash of %s equals to %d, it should equal to %d", strings[i], StrHash(strings[i]), hashes[i])

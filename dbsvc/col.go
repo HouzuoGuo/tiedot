@@ -181,7 +181,7 @@ func (db *DBSvc) ColScrub(name string) error {
 		if err := srv.Call("DataSvc.DocInsert", datasvc.DocInsertInput{tmpColName, strings.TrimSpace(doc), id, db.mySchemaVersion}, discard); err != nil {
 			tdlog.Printf("Scrub %s: failed to insert document back, error - %v", name, err)
 		}
-		if err := db.indexDoc(tmpColName, 1234567890, id, docObj, false); err != nil {
+		if err := db.indexDoc(tmpColName, id, docObj, false); err != nil {
 			tdlog.Printf("Scrub %s: failed to index document, error - %v", name, err)
 		}
 		return true
