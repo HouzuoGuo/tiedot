@@ -18,11 +18,10 @@ func TestPutGetReopenClear(t *testing.T) {
 	if !(ht.numBuckets == INITIAL_BUCKETS && ht.Used == INITIAL_BUCKETS*BUCKET_SIZE && ht.Size == HT_FILE_GROWTH) {
 		t.Fatal("Wrong size", ht.numBuckets, INITIAL_BUCKETS, ht.Used, INITIAL_BUCKETS*BUCKET_SIZE, ht.Size, HT_FILE_GROWTH)
 	}
-	fmt.Println("Please be patient, this may take a minute.")
-	for i := int(0); i < 1024*1024*4; i++ {
+	for i := int(0); i < 1024*1024; i++ {
 		ht.Put(i, i)
 	}
-	for i := int(0); i < 1024*1024*4; i++ {
+	for i := int(0); i < 1024*1024; i++ {
 		vals := ht.Get(i, 0)
 		if !(len(vals) == 1 && vals[0] == i) {
 			t.Fatalf("Get failed on key %d, got %v", i, vals)
@@ -43,7 +42,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	if reopened.Used != numBuckets*BUCKET_SIZE {
 		t.Fatalf("Wrong UsedSize")
 	}
-	for i := int(0); i < 1024*1024*4; i++ {
+	for i := int(0); i < 1024*1024; i++ {
 		vals := reopened.Get(i, 0)
 		if !(len(vals) == 1 && vals[0] == i) {
 			t.Fatalf("Get failed on key %d, got %v", i, vals)
@@ -137,10 +136,10 @@ func TestPartitionEntries(t *testing.T) {
 		t.Fatalf("Failed to open: %v", err)
 		return
 	}
-	for i := 0; i < 100000; i++ {
+	number := 100000
+	for i := 0; i < number; i++ {
 		ht.Put(i, i*2)
 	}
-	// Iterate through 100 partitions
 	allKV := make(map[int]int)
 	for i := 0; i < 100; i++ {
 		start, end := GetPartitionRange(i, 100)
@@ -151,10 +150,10 @@ func TestPartitionEntries(t *testing.T) {
 		}
 	}
 	// Verify read back
-	if len(allKV) != 100000 {
+	if len(allKV) != number {
 		t.Fatal("Not enough entries, only got ", len(allKV))
 	}
-	for i := 0; i < 100000; i++ {
+	for i := 0; i < number; i++ {
 		if allKV[i] != i*2 {
 			t.Fatal("Wrong readback", i, allKV[i])
 		}

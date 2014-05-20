@@ -7,13 +7,13 @@ import (
 )
 
 const (
-	HT_FILE_GROWTH  = 64 * 1048576                          // Initial hash table file size; file growth
+	HT_FILE_GROWTH  = 16 * 1048576                          // Initial hash table file size; file growth
 	ENTRY_SIZE      = 1 + 10 + 10                           // Hash entry: validity, key, value
-	BUCKET_HEADER   = 10                                    // Bucker header: next chained bucket number
-	PER_BUCKET      = 10                                    // Entries per bucket
-	HASH_BITS       = 18                                    // Number of hash key bits
+	BUCKET_HEADER   = 10                                    // Bucket header: next chained bucket number
+	PER_BUCKET      = 15                                    // Entries per bucket
+	HASH_BITS       = 15                                    // Number of hash key bits
 	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE // Size of a bucket
-	INITIAL_BUCKETS = 1024 * 256                            // Initial number of buckets
+	INITIAL_BUCKETS = 32768                                 // Initial number of buckets == 2 ^ HASH_BITS
 )
 
 // Hash table is an ordinary data file; it also tracks total number of buckets.
@@ -185,7 +185,7 @@ func GetPartitionRange(partNum, totalParts int) (start int, end int) {
 	start = partNum * partSize
 	end = start + partSize
 	if partNum == totalParts-1 {
-		end = INITIAL_BUCKETS - 1
+		end = INITIAL_BUCKETS
 	}
 	return
 }
