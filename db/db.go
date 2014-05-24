@@ -1,58 +1,32 @@
+// Database logic.
 package db
 
 import (
-	"github.com/HouzuoGuo/tiedot/data"
-	"strconv"
-	"path"
+	"fmt"
 	"io/ioutil"
-	"strings"
-	"sync"
+	"os"
+	"path"
+	"strconv"
 )
-
-
-// Collection has data partitions and some index meta information.
-type Col struct {
-	parts []*data.Partition // document data partitions
-	hts []map[string]*data.HashTable // index partitions
-	indexPaths map[string][]string // index names and paths
-	updating []map[int]struct{}
-	partLock []*sync.RWMutex
-}
-
-// Database structures.
-type DB struct {
-	path string // root path of database directory
-	numParts int // total number of partitions
-	cols map[string]*Col // collection by name lookup
-}
 
 const (
 	PART_NUM_FILE = "number_of_partitions"
-	DOC_DATA_FILE = "dat_"
-	DOC_LOOKUP_FILE = "id_"
-	INDEX_PATH_SEP = "!"
 )
 
-// Open database and load all tables & indexes.
+// Database structures.
+type DB struct {
+	path     string          // root path of database directory
+	numParts int             // total number of partitions
+	cols     map[string]*Col // collection by name lookup
+}
+
+// Open database and load all collections & indexes.
 func OpenDB(dbPath string) (*DB, error) {
-	db := &DB{dbPath}
+	db := &DB{path: dbPath}
 	return db, db.load()
 }
 
-func (db *DB) Sync() error {
-	errs := make([]error, 0, 0)
-	for _, col := range db.cols {
-		for i := 0; i < db.numParts; i++ {
-			col.partLock[i].RLock()
-			if err := col.parts[i].Sync(); err != nil {
-				errs = append(errs, err)
-			}
-			col.partLock[i].RUnlock()
-		}
-	}
-}
-
-// Load all collection and index schema.
+// Load all collection schema.
 func (db *DB) load() error {
 	// Get number of partitions from the text file
 	if numParts, err := ioutil.ReadFile(path.Join(db.path, PART_NUM_FILE)); err != nil {
@@ -70,40 +44,124 @@ func (db *DB) load() error {
 		if !maybeColDir.IsDir() {
 			continue
 		}
-		colName := maybeColDir.Name()
-		theCol := &Col{
-			parts: make([]*data.Partition, db.numParts), hts: make([]map[string]*data.HashTable, db.numParts), indexPaths: make(map[string][]string),
-			updating: make([]map[int]struct{}, db.numParts), partLock: make([]*sync.RWMutex, db.numParts)}
-		db.cols[colName] = theCol
-		for i := 0; i < db.numParts; i++ {
-			theCol.updating[i] = make(map[int]struct{})
-			theCol.partLock[i] = new(sync.RWMutex)
-		}
-		// Open document data partitions
-		for i := 0; i < db.numParts; i++ {
-			if theCol.parts[i], err = data.OpenPartition(path.Join(db.path, colName, DOC_DATA_FILE + strconv.Itoa(i)), path.Join(db.path, colName, DOC_LOOKUP_FILE + strconv.Itoa(i))); err != nil {
-				return err
-			}
-		}
-		// Look for index directories
-		colDirContent, err := ioutil.ReadDir(path.Join(db.path, colName))
-		if err != nil {
+		if db.cols[maybeColDir.Name()], err = OpenCol(db, maybeColDir.Name()); err != nil {
 			return err
-		}
-		for _, htDir := range colDirContent {
-			if (!htDir.IsDir()) {
-				continue
-			}
-			idxName := htDir.Name()
-			idxPath := strings.Split(idxName, INDEX_PATH_SEP)
-			theCol.indexPaths[idxName] = idxPath
-			for i := 0; i < db.numParts; i++ {
-				theCol.hts[i] = make(map[string]*data.HashTable)
-				if theCol.hts[i][idxName], err = data.OpenHashTable(path.Join(db.path, colName, idxName, strconv.Itoa(i))); err != nil {
-					return err
-				}
-			}
 		}
 	}
 	return err
+}
+
+// Synchronize all data files to disk.
+func (db *DB) Sync() error {
+	errs := make([]error, 0, 0)
+	for _, col := range db.cols {
+		if err := col.Sync(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%v", errs)
+}
+
+// Close all database files.
+func (db *DB) Close() error {
+	errs := make([]error, 0, 0)
+	for _, col := range db.cols {
+		if err := col.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%v", errs)
+}
+
+// Create a new collection.
+func (db *DB) Create(name string) error {
+	if _, exists := db.cols[name]; exists {
+		return fmt.Errorf("Collection %s already exists", name)
+	} else if err := os.MkdirAll(path.Join(db.path, name), 0700); err != nil {
+		return err
+	} else if db.cols[name], err = OpenCol(db, name); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Return all collection names.
+func (db *DB) AllCols() (ret []string) {
+	ret = make([]string, 0, len(db.cols))
+	for name, _ := range db.cols {
+		ret = append(ret, name)
+	}
+	return
+}
+
+// Return a ready-to-use collection in that name. Remember to create the collection before use!
+func (db *DB) Use(name string) *Col {
+	if col, exists := db.cols[name]; exists {
+		return col
+	}
+	return nil
+}
+
+// Rename a collection.
+func (db *DB) Rename(oldName, newName string) error {
+	if _, exists := db.cols[oldName]; !exists {
+		return fmt.Errorf("Collection %s does not exist", oldName)
+	} else if _, exists := db.cols[newName]; exists {
+		return fmt.Errorf("Collection %s already exists", newName)
+	} else if newName == oldName {
+		return fmt.Errorf("Old and new names are the same")
+	} else if err := db.cols[oldName].Close(); err != nil {
+		return err
+	} else if err := os.Rename(path.Join(db.path, oldName), path.Join(db.path, newName)); err != nil {
+		return err
+	} else if db.cols[newName], err = OpenCol(db, newName); err != nil {
+		return err
+	}
+	delete(db.cols, oldName)
+	return nil
+}
+
+// Truncate a collection - delete all documents and clear
+func (db *DB) Truncate(name string) error {
+	if _, exists := db.cols[name]; !exists {
+		return fmt.Errorf("Collection %s does not exist", name)
+	} else if err := db.cols[name].Sync(); err != nil {
+		return err
+	}
+	col := db.cols[name]
+	for i := 0; i < db.numParts; i++ {
+		if err := col.parts[i].Clear(); err != nil {
+			return err
+		}
+		for _, ht := range col.hts[i] {
+			if err := ht.Clear(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Scrub a collection - fix corrupted documents and defragment free space.
+func (db *DB) Scrub(name string) error {
+	return nil
+}
+
+// Drop a collection and lose all of its documents and indexes.
+func (db *DB) Drop(name string) error {
+	if _, exists := db.cols[name]; !exists {
+		return fmt.Errorf("Collection %s does not exist", name)
+	} else if err := db.cols[name].Close(); err != nil {
+		return err
+	} else if err := os.RemoveAll(path.Join(db.path, name)); err != nil {
+		return err
+	}
+	delete(db.cols, name)
+	return nil
 }

@@ -7,11 +7,11 @@ import (
 )
 
 const (
-	COL_FILE_GROWTH = 16 * 1048576 // Initial collection file size; file growth
-	DOC_MAX_ROOM    = 1 * 1048576   // Max document size
-	DOC_HEADER      = 1 + 10        // Document header size - validity (1), document room (10)
+	COL_FILE_GROWTH = 32 * 1048576 // Initial collection file size; file growth
+	DOC_MAX_ROOM    = 1 * 1048576  // Max document size
+	DOC_HEADER      = 1 + 10       // Document header size - validity (1), document room (10)
 	// Pre-compiled document padding (128 spaces)
-	PADDING = "                                                                                                                                "
+	PADDING     = "                                                                                                                                "
 	LEN_PADDING = len(PADDING)
 )
 

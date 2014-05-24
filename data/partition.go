@@ -4,6 +4,7 @@ package data
 import (
 	"errors"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"sync"
 )
 
 // Collection partition consists of a document data file and a lookup table for locating document using unique IDs.
@@ -11,11 +12,12 @@ type Partition struct {
 	col      *Collection
 	lookup   *HashTable // For finding document physical location by ID
 	updating map[int]struct{}
+	Lock     *sync.RWMutex
 }
 
 // Open a collection partition.
 func OpenPartition(colPath, lookupPath string) (part *Partition, err error) {
-	part = &Partition{updating: make(map[int]struct{})}
+	part = &Partition{updating: make(map[int]struct{}), Lock: new(sync.RWMutex)}
 	if part.col, err = OpenCollection(colPath); err != nil {
 		return
 	} else if part.lookup, err = OpenHashTable(lookupPath); err != nil {

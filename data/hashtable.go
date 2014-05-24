@@ -4,22 +4,24 @@ package data
 import (
 	"encoding/binary"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"sync"
 )
 
 const (
-	HT_FILE_GROWTH  = 16 * 1048576                          // Initial hash table file size; file growth
+	HT_FILE_GROWTH  = 32 * 1048576                          // Initial hash table file size; file growth
 	ENTRY_SIZE      = 1 + 10 + 10                           // Hash entry: validity, key, value
 	BUCKET_HEADER   = 10                                    // Bucket header: next chained bucket number
-	PER_BUCKET      = 15                                    // Entries per bucket
-	HASH_BITS       = 15                                    // Number of hash key bits
+	PER_BUCKET      = 16                                    // Entries per bucket
+	HASH_BITS       = 16                                    // Number of hash key bits
 	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE // Size of a bucket
-	INITIAL_BUCKETS = 32768                                 // Initial number of buckets == 2 ^ HASH_BITS
+	INITIAL_BUCKETS = 65536                                 // Initial number of buckets == 2 ^ HASH_BITS
 )
 
 // Hash table is an ordinary data file; it also tracks total number of buckets.
 type HashTable struct {
 	*DataFile
 	numBuckets int
+	Lock       *sync.RWMutex
 }
 
 // Calculate the hash key of an entry's key.
@@ -32,8 +34,10 @@ func HashKey(key int) int {
 
 // Open a hash table file.
 func OpenHashTable(path string) (ht *HashTable, err error) {
-	ht = new(HashTable)
-	ht.DataFile, err = OpenDataFile(path, HT_FILE_GROWTH)
+	ht = &HashTable{Lock: new(sync.RWMutex)}
+	if ht.DataFile, err = OpenDataFile(path, HT_FILE_GROWTH); err != nil {
+		return
+	}
 	ht.calculateNumBuckets()
 	return
 }
