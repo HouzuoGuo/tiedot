@@ -2,11 +2,15 @@
 package db
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
+	"strings"
+	"time"
 )
 
 const (
@@ -65,7 +69,7 @@ func (db *DB) Sync() error {
 	return fmt.Errorf("%v", errs)
 }
 
-// Close all database files.
+// Close all database files. Do not use the DB afterwards!
 func (db *DB) Close() error {
 	errs := make([]error, 0, 0)
 	for _, col := range db.cols {
@@ -100,7 +104,7 @@ func (db *DB) AllCols() (ret []string) {
 	return
 }
 
-// Return a ready-to-use collection in that name. Remember to create the collection before use!
+// Use the return value to interact with collection. Return value may be nil if the collection does not exist.
 func (db *DB) Use(name string) *Col {
 	if col, exists := db.cols[name]; exists {
 		return col
@@ -148,8 +152,55 @@ func (db *DB) Truncate(name string) error {
 	return nil
 }
 
-// Scrub a collection - fix corrupted documents and defragment free space.
+// Scrub a collection - fix corrupted documents and de-fragment free space.
 func (db *DB) Scrub(name string) error {
+	if _, exists := db.cols[name]; !exists {
+		return fmt.Errorf("Collection %s does not exist", name)
+	} else if err := db.cols[name].Sync(); err != nil {
+		return err
+	}
+	// Prepare a temporary collection in file system
+	tmpColName := fmt.Sprintf("scrub-%s-%d", name, time.Now().UnixNano())
+	tmpColDir := path.Join(db.path, tmpColName)
+	if err := os.MkdirAll(tmpColDir, 0700); err != nil {
+		return err
+	}
+	// Mirror indexes from original collection
+	for _, idxPath := range db.cols[name].indexPaths {
+		if err := os.MkdirAll(path.Join(tmpColDir, strings.Join(idxPath, INDEX_PATH_SEP)), 0700); err != nil {
+			return err
+		}
+	}
+	// Iterate through all documents and put them into the temporary collection
+	tmpCol, err := OpenCol(db, tmpColName)
+	if err != nil {
+		return err
+	}
+	db.cols[name].forEachDoc(func(id int, doc []byte) (moveOn bool) {
+		var docObj map[string]interface{}
+		if err := json.Unmarshal([]byte(doc), &docObj); err != nil {
+			// Skip corrupted document
+			return true
+		}
+		if err := tmpCol.InsertRecovery(id, docObj); err != nil {
+			tdlog.Errorf("Scrub %s: failed to insert back document %v", name, docObj)
+		}
+		return true
+	})
+	if err := tmpCol.Close(); err != nil {
+		return err
+	}
+	// Replace the original collection with the "temporary" one
+	db.cols[name].Close()
+	if err := os.RemoveAll(path.Join(db.path, name)); err != nil {
+		return err
+	}
+	if err := os.Rename(path.Join(db.path, tmpColName), path.Join(db.path, name)); err != nil {
+		return err
+	}
+	if db.cols[name], err = OpenCol(db, name); err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -91,16 +91,17 @@ func (part *Partition) Delete(id int) (err error) {
 }
 
 // Partition documents into roughly equally sized portions in undetermined order, and run the function on every document in the portion.
-func (part *Partition) ForEachDoc(partNum, totalPart int, fun func(id int, doc []byte) bool) {
+func (part *Partition) ForEachDoc(partNum, totalPart int, fun func(id int, doc []byte) bool) (moveOn bool) {
 	ids, physIDs := part.lookup.GetPartition(partNum, totalPart)
 	for i, id := range ids {
 		data := part.col.Read(physIDs[i])
 		if data != nil {
 			if !fun(id, data) {
-				return
+				return false
 			}
 		}
 	}
+	return true
 }
 
 // Clear data file and lookup hash table.

@@ -137,6 +137,18 @@ func TestColCrud(t *testing.T) {
 	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
 		t.Fatal(db.cols)
 	}
+	// Scrub
+	if err := db.Scrub("c"); err != nil {
+		t.Fatal(err)
+	}
+	// Scrub - verify
+	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c") {
+		t.Fatal(allNames)
+	}
+	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
+		t.Fatal(db.cols)
+	}
+	// More scrub tests are in doc_test.go
 	// Drop
 	if db.Drop("a") == nil {
 		t.Fatal("Did not error")
