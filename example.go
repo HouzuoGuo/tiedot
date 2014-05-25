@@ -68,7 +68,7 @@ func embeddedExample() {
 
 	// Read document
 	var readBack interface{}
-	feeds.Read(docID, &readBack) // pass in document's physical ID
+	feeds.Read(docID, &readBack)
 	fmt.Println(readBack)
 
 	// Update document (document must be map[string]interface{})
