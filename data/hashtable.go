@@ -2,7 +2,7 @@
 Static hash table implementation is a binary file made of buckets. Every bucket has a fixed number of entries.
 When a bucket becomes full, a new bucket is chained to it in order to store more entries.
 Entry is a key-value pair; both key and value are integers.
- */
+*/
 package data
 
 import (

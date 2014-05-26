@@ -4,30 +4,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
-	"math/rand"
 	"os"
-	"time"
 )
 
-// You are encouraged to use (nearly) all tiedot public functions concurrently.
-// There are few exceptions - see individual package/functions for details.
+/*
+You are encouraged to use nearly all tiedot public functions concurrently, except schema management functions such as:
+- Create, rename, drop collection
+- Create and remove collection index
+During the above operations, no other operation should be carried out at the same time, such as document update!
+
+To compile and run the example:
+    go build && ./tiedot -mode=example
+*/
 
 func embeddedExample() {
 	// ****************** Collection Management ******************
 
-	// It is very important to initialize random number generator seed!
-	rand.Seed(time.Now().UTC().UnixNano())
-	// Create and open database
-	dir := "/tmp/MyDatabase"
-	os.RemoveAll(dir)
-	defer os.RemoveAll(dir)
+	myDBDir := "/tmp/MyDatabase"
+	os.RemoveAll(myDBDir)
+	defer os.RemoveAll(myDBDir)
 
-	myDB, err := db.OpenDB(dir)
+	// (Create if not exists) open a database
+	myDB, err := db.OpenDB(myDBDir)
 	if err != nil {
 		panic(err)
 	}
 
-	// Create two collections Feeds and Votes
+	// Create two collections: Feeds and Votes
 	if err := myDB.Create("Feeds"); err != nil {
 		panic(err)
 	}
@@ -36,7 +39,7 @@ func embeddedExample() {
 	}
 
 	// What collections do I now have?
-	for name := range myDB.AllCols() {
+	for _, name := range myDB.AllCols() {
 		fmt.Printf("I have a collection called %s\n", name)
 	}
 
@@ -55,6 +58,7 @@ func embeddedExample() {
 
 	// ****************** Document Management ******************
 	// Start using a collection
+	// (The reference is valid until DB schema changes or Scrub is carried out)
 	feeds := myDB.Use("Feeds")
 
 	// Insert document (document must be map[string]interface{})
@@ -80,9 +84,6 @@ func embeddedExample() {
 	// Delete document
 	feeds.Delete(docID)
 
-	// Delete document
-	feeds.Delete(123) // An ID which does not exist does no harm
-
 	// ****************** Index Management ******************
 	// Secondary indexes assist in many types of queries
 	// Create index (path leads to document JSON attribute)
@@ -97,7 +98,7 @@ func embeddedExample() {
 	}
 
 	// What indexes do I have on collection A?
-	for path := range feeds.AllIndexes() {
+	for _, path := range feeds.AllIndexes() {
 		fmt.Printf("I have an index on path %v\n", path)
 	}
 
@@ -107,22 +108,21 @@ func embeddedExample() {
 	}
 
 	// ****************** Queries ******************
-	// Let's prepare a number of docments for a start
+	// Prepare some documents for the query
 	feeds.Insert(map[string]interface{}{"Title": "New Go release", "Source": "golang.org", "Age": 3})
 	feeds.Insert(map[string]interface{}{"Title": "Kitkat is here", "Source": "google.com", "Age": 2})
 	feeds.Insert(map[string]interface{}{"Title": "Good Slackware", "Source": "slackware.com", "Age": 1})
 
-	queryStr := `[{"eq": "New Go release", "in": ["Title"]}, {"eq": "slackware.com", "in": ["Source"]}]`
 	var query interface{}
-	json.Unmarshal([]byte(queryStr), &query)
+	json.Unmarshal([]byte(`[{"eq": "New Go release", "in": ["Title"]}, {"eq": "slackware.com", "in": ["Source"]}]`), &query)
 
 	queryResult := make(map[int]struct{}) // query result (document IDs) goes into map keys
 
-	//if err := db.EvalQuery(query, feeds, &queryResult); err != nil {
-	//	panic(err)
-	//}
+	if err := db.EvalQuery(query, feeds, &queryResult); err != nil {
+		panic(err)
+	}
 
-	// Query results are physical document IDs
+	// Query results are document IDs
 	for id := range queryResult {
 		fmt.Printf("Query returned document ID %d\n", id)
 	}
