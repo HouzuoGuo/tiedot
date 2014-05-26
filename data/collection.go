@@ -1,4 +1,7 @@
-// Collection data file.
+/*
+Collection data file has a mixture of binary (document header) and text (utf8 string) data.
+Documents are inserted one after another, and deleted documents are marked as invalid.
+ */
 package data
 
 import (

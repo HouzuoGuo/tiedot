@@ -1,4 +1,7 @@
-// Collection partition.
+/*
+Collection partition is made of a document data file and a hash table.
+Every new document is given a random ID, and the hash table file binds the ID to the physical location of the document.
+ */
 package data
 
 import (

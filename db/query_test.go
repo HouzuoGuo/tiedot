@@ -59,9 +59,17 @@ func TestQuery(t *testing.T) {
 		var jsonDoc map[string]interface{}
 		json.Unmarshal([]byte(doc), &jsonDoc)
 		if ids[i], err = col.Insert(jsonDoc); err != nil {
-			fmt.Println(err)
+			t.Fatal(err)
 			return
 		}
+	}
+	q, err := runQuery(`["all"]`, col)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id, _ := range q {
+		fmt.Print(id)
+		fmt.Println(col.Read(id))
 	}
 	col.Index([]string{"a", "b"})
 	col.Index([]string{"f"})
@@ -69,7 +77,7 @@ func TestQuery(t *testing.T) {
 	col.Index([]string{"special"})
 	col.Index([]string{"e"})
 	// expand numbers
-	q, err := runQuery(`["1", "2", ["3", "4"], "5"]`, col)
+	q, err = runQuery(`["1", "2", ["3", "4"], "5"]`, col)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +199,7 @@ func TestQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ensureMapHasKeys(q, ids[0], ids[4]) {
+	if !ensureMapHasKeys(q, ids[0], ids[4]) && !ensureMapHasKeys(q, ids[1], ids[4]) {
 		t.Fatal(q)
 	}
 	// intersection

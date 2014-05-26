@@ -1,3 +1,4 @@
+/* Collection schema and index management. */
 package db
 
 import (

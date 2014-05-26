@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"runtime"
 	"testing"
 )
 
@@ -17,6 +18,37 @@ func touchFile(dir, filename string) {
 	}
 	if err := ioutil.WriteFile(path.Join(dir, filename), make([]byte, 0), 0600); err != nil {
 		panic(err)
+	}
+}
+
+func TestOpenEmptyDB(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, err := OpenDB(TEST_DATA_DIR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if db.numParts != runtime.NumCPU() {
+		t.Fatal(db.numParts)
+	}
+	if err := db.Create("a"); err != nil {
+		t.Fatal(err)
+	}
+	if len(db.cols["a"].parts) != runtime.NumCPU() {
+		t.Fatal(err)
+	}
+}
+
+func TestOpenErrDB(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
+		t.Fatal(err)
+	}
+	touchFile(TEST_DATA_DIR+"/ColA", "dat_0")
+	touchFile(TEST_DATA_DIR+"/ColA/a!b!c", "0")
+	if _, err := OpenDB(TEST_DATA_DIR); err == nil {
+		t.Fatal("Did not error")
 	}
 }
 

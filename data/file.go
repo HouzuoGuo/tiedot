@@ -1,4 +1,4 @@
-// Common data file features.
+// Common data file features - enlarge, close, sync, close, etc.
 package data
 
 import (

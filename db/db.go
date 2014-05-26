@@ -1,4 +1,4 @@
-// Database logic.
+/* Collection and storage management. */
 package db
 
 import (
@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	PART_NUM_FILE = "number_of_partitions"
+	PART_NUM_FILE = "number_of_partitions" // A database configuration file's name, content is a single number
 )
 
 // Database structures.
@@ -26,14 +28,31 @@ type DB struct {
 
 // Open database and load all collections & indexes.
 func OpenDB(dbPath string) (*DB, error) {
+	// New collection documents get their ID from this RNG
+	rand.Seed(time.Now().UnixNano())
 	db := &DB{path: dbPath}
 	return db, db.load()
 }
 
 // Load all collection schema.
 func (db *DB) load() error {
+	// If opening an empty database, create the DB directory and PART_NUM_FILE.
+	var numPartsAssumed = false
+	numPartsFilePath := path.Join(db.path, PART_NUM_FILE)
+	if err := os.MkdirAll(db.path, 0700); err != nil {
+		return err
+	}
+	if partNumFile, err := os.Stat(numPartsFilePath); err != nil {
+		// The new database has as many partitions as there are CPUs
+		if err := ioutil.WriteFile(numPartsFilePath, []byte(strconv.Itoa(runtime.NumCPU())), 0600); err != nil {
+			return err
+		}
+		numPartsAssumed = true
+	} else if partNumFile.IsDir() {
+		return fmt.Errorf("Database config file %s is actually a directory, is database path correct?", PART_NUM_FILE)
+	}
 	// Get number of partitions from the text file
-	if numParts, err := ioutil.ReadFile(path.Join(db.path, PART_NUM_FILE)); err != nil {
+	if numParts, err := ioutil.ReadFile(numPartsFilePath); err != nil {
 		return err
 	} else if db.numParts, err = strconv.Atoi(string(numParts)); err != nil {
 		return err
@@ -47,6 +66,9 @@ func (db *DB) load() error {
 	for _, maybeColDir := range dirContent {
 		if !maybeColDir.IsDir() {
 			continue
+		}
+		if numPartsAssumed {
+			return fmt.Errorf("Please manually repair database partition number config file %s", numPartsFilePath)
 		}
 		if db.cols[maybeColDir.Name()], err = OpenCol(db, maybeColDir.Name()); err != nil {
 			return err

@@ -7,7 +7,6 @@ import (
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 )
 
 // Calculate union of sub-query results.
@@ -30,7 +29,7 @@ func EvalAllIDs(src *Col, result *map[int]struct{}) (err error) {
 	return
 }
 
-// Execute value equity check ("attribute == value") using hash lookup or collection scan.
+// Value equity check ("attribute == value") using hash lookup.
 func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, result *map[int]struct{}) (err error) {
 	// Figure out lookup path - JSON array "in"
 	path, hasPath := expr["in"]
@@ -54,26 +53,24 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
 		}
 	}
-	lookupStrValue := fmt.Sprint(lookupValue) // the value to match
+	lookupStrValue := fmt.Sprint(lookupValue) // the value to look for
 	lookupValueHash := StrHash(lookupStrValue)
 	scanPath := strings.Join(vecPath, INDEX_PATH_SEP)
-
-	if _, indexed := src.indexPaths[scanPath]; indexed {
-		num := lookupValueHash % src.db.numParts
-		ht := src.hts[num][scanPath]
-		ht.Lock.RLock()
-		vals := ht.Get(lookupValueHash, intLimit)
-		ht.Lock.RUnlock()
-		for _, v := range vals {
-			(*result)[v] = struct{}{}
-		}
-		return
+	if _, indexed := src.indexPaths[scanPath]; !indexed {
+		return errors.New(fmt.Sprintf("Please index %v and retry query %v", scanPath, expr))
 	}
-	// Neither PK or secondary index...
-	return errors.New(fmt.Sprintf("Please index %v and retry query %v", scanPath, expr))
+	num := lookupValueHash % src.db.numParts
+	ht := src.hts[num][scanPath]
+	ht.Lock.RLock()
+	vals := ht.Get(lookupValueHash, intLimit)
+	ht.Lock.RUnlock()
+	for _, v := range vals {
+		(*result)[v] = struct{}{}
+	}
+	return
 }
 
-// Execute value existence check.
+// Value existence check (value != nil) using hash lookup.
 func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, result *map[int]struct{}) (err error) {
 	// Figure out the path
 	vecPath := make([]string, 0)
@@ -93,35 +90,33 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
 		}
 	}
-
 	jointPath := strings.Join(vecPath, INDEX_PATH_SEP)
-	if _, indexed := src.indexPaths[jointPath]; indexed {
-		counter := 0
-		partitionSize := 1993 // not a magic, feel free to change
-		for iteratePart := 0; iteratePart < src.db.numParts; iteratePart++ {
-			ht := src.hts[iteratePart][jointPath]
-			ht.Lock.RLock()
-			for i := 0; i < partitionSize; i++ {
-				_, vals := ht.GetPartition(i, partitionSize)
-				for _, v := range vals {
-					(*result)[v] = struct{}{}
-					counter++
-					if counter == intLimit {
-						ht.Lock.RUnlock()
-						return nil
-					}
-
-				}
-			}
-			ht.Lock.RUnlock()
-		}
-		return nil
-	} else {
+	if _, indexed := src.indexPaths[jointPath]; !indexed {
 		return errors.New(fmt.Sprintf("Please index %v and retry query %v", vecPath, expr))
 	}
+	counter := 0
+	partitionSize := 1993 // not a magic, feel free to change
+	for iteratePart := 0; iteratePart < src.db.numParts; iteratePart++ {
+		ht := src.hts[iteratePart][jointPath]
+		ht.Lock.RLock()
+		for i := 0; i < partitionSize; i++ {
+			_, vals := ht.GetPartition(i, partitionSize)
+			for _, v := range vals {
+				(*result)[v] = struct{}{}
+				counter++
+				if counter == intLimit {
+					ht.Lock.RUnlock()
+					return nil
+				}
+
+			}
+		}
+		ht.Lock.RUnlock()
+	}
+	return nil
 }
 
-// Calculate intersection of sub query results.
+// Calculate intersection of sub-query results.
 func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err error) {
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		first := true
@@ -149,7 +144,7 @@ func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err er
 	return
 }
 
-// Calculate complement of sub query results.
+// Calculate complement of sub-query results.
 func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err error) {
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		for _, subExpr := range subExprVecs {
@@ -238,43 +233,40 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 	}
 	counter := int(0) // Number of results already collected
 	htPath := strings.Join(vecPath, ",")
-	if _, indexScan := src.indexPaths[htPath]; indexScan {
-		if from < to {
-			// Forward scan - from low value to high value
-			for lookupValue := from; lookupValue <= to; lookupValue++ {
-				lookupStrValue := fmt.Sprint(lookupValue)
-				hashValue := StrHash(lookupStrValue)
-				vals := src.hashScan(htPath, hashValue, int(intLimit))
-				for _, docID := range vals {
-					if intLimit > 0 && counter == intLimit {
-						break
-					}
-					counter += 1
-					(*result)[docID] = struct{}{}
+	if _, indexScan := src.indexPaths[htPath]; !indexScan {
+		return errors.New(fmt.Sprintf("Please index %v and retry query %v", vecPath, expr))
+	}
+	if from < to {
+		// Forward scan - from low value to high value
+		for lookupValue := from; lookupValue <= to; lookupValue++ {
+			lookupStrValue := fmt.Sprint(lookupValue)
+			hashValue := StrHash(lookupStrValue)
+			vals := src.hashScan(htPath, hashValue, int(intLimit))
+			for _, docID := range vals {
+				if intLimit > 0 && counter == intLimit {
+					break
 				}
-			}
-		} else {
-			// Backward scan - from high value to low value
-			for lookupValue := from; lookupValue >= to; lookupValue-- {
-				lookupStrValue := fmt.Sprint(lookupValue)
-				hashValue := StrHash(lookupStrValue)
-				vals := src.hashScan(htPath, hashValue, int(intLimit))
-				for _, docID := range vals {
-					if intLimit > 0 && counter == intLimit {
-						break
-					}
-					counter += 1
-					(*result)[docID] = struct{}{}
-				}
+				counter += 1
+				(*result)[docID] = struct{}{}
 			}
 		}
 	} else {
-		return errors.New(fmt.Sprintf("Please index %v and retry query %v", vecPath, expr))
+		// Backward scan - from high value to low value
+		for lookupValue := from; lookupValue >= to; lookupValue-- {
+			lookupStrValue := fmt.Sprint(lookupValue)
+			hashValue := StrHash(lookupStrValue)
+			vals := src.hashScan(htPath, hashValue, int(intLimit))
+			for _, docID := range vals {
+				if intLimit > 0 && counter == intLimit {
+					break
+				}
+				counter += 1
+				(*result)[docID] = struct{}{}
+			}
+		}
 	}
 	return
 }
-
-// TODO: How to bring back regex matcher?
 
 // Main entrance to query processor - evaluate a query and put result into result map (as map keys).
 func EvalQuery(q interface{}, src *Col, result *map[int]struct{}) (err error) {
@@ -312,95 +304,5 @@ func EvalQuery(q interface{}, src *Col, result *map[int]struct{}) (err error) {
 	return nil
 }
 
-//Escape any control characters,  ", or \ in the string, and wrap in double quotes
-func escapeJSONString(s string) string {
-	replacerTable := []string{
-		`"`, `\"`, `\`, `\\`,
-		"\u0000", "\\\u0000", "\u0001", "\\\u0001",
-		"\u0002", "\\\u0002", "\u0003", "\\\u0003",
-		"\u0004", "\\\u0004", "\u0005", "\\\u0005",
-		"\u0006", "\\\u0006", "\u0007", "\\\u0007",
-		"\u0008", "\\\u0008", "\u0009", "\\\u0009",
-		"\u000A", "\\\u000A", "\u000B", "\\\u000B",
-		"\u000C", "\\\u000C", "\u000D", "\\\u000D",
-		"\u000E", "\\\u000E", "\u000F", "\\\u000F",
-		"\u0010", "\\\u0010", "\u0011", "\\\u0011",
-		"\u0012", "\\\u0012", "\u0013", "\\\u0013",
-		"\u0014", "\\\u0014", "\u0015", "\\\u0015",
-		"\u0016", "\\\u0016", "\u0017", "\\\u0017",
-		"\u0018", "\\\u0018", "\u0019", "\\\u0019",
-		"\u001A", "\\\u001A", "\u001B", "\\\u001B",
-		"\u001C", "\\\u001C", "\u001D", "\\\u001D",
-		"\u001E", "\\\u001E", "\u001F", "\\\u001F",
-	}
-	jsonEscaper := strings.NewReplacer(replacerTable...)
-	return `"` + jsonEscaper.Replace(s) + `"`
-}
-
-// Detect ? characters outside of an embedded string, and replace them with
-// the appropriate parameter, which will be encoded as a string.
-// Does not verify that the resulting JSON is valid, but should not allow
-// injecting parameters that change the structure of the source JSON (a la SQL
-// injection).  Use this to derive final query strings from any user-supplied input.
-//
-// ParameterizeJSON(`{"eq": "New Go release", "in": [?]}`, `"thing1","thing2"`)
-// -> {"eq": "New Go release", "in": ["\"thing1\",\"thing2\""]}
-func ParameterizeJSON(q string, params ...string) string {
-	const backslash_rune = 92
-	const dbl_quote_rune = 34
-	const question_rune = 63
-
-	//Track the state of the cursor
-	backslash := false
-	in_quotes := false
-	param_positions := make([]int, 0)
-	for i, c := range q {
-		if in_quotes {
-			if backslash {
-				//Ignore the character after a backslash (ie, an escape)
-				//Technically we might need to ignore up to 5 for unicode literals
-				//But those are themselves valid characters for a string & shouldn't
-				//embed anything that changes escaping of subsequent characters
-				//Be careful though if you plan on writing invalid JSON in the first
-				//place - if you do something like "\u43"?" you might be able to
-				//cause a syntax error in a different place
-				backslash = false
-			} else if c == backslash_rune {
-				//Start escaping if we haven't already
-				backslash = true
-			} else if c == dbl_quote_rune {
-				//If we're in a string and not escaping, a quote ends the present string
-				in_quotes = false
-			}
-		} else if c == question_rune {
-			//Not in quotes (ie, outside a string) a naked question rune is interpolated
-			param_positions = append(param_positions, i)
-		} else if c == dbl_quote_rune {
-			//Not in quotes, a double quote starts a string
-			in_quotes = true
-		}
-	}
-
-	//Loop again, this time splitting at those positions and inserting the
-	//appropriate param
-	param_ct := 0
-	accumulator := make([]byte, 0, len(q))
-	for i, c := range q {
-		if len(param_positions) == 0 || i != param_positions[0] {
-			//Accumulate from the original into the output buffer
-			buf := make([]byte, 8)
-			n := utf8.EncodeRune(buf, c)
-			buf = buf[:n]
-			accumulator = append(accumulator, buf...)
-		} else {
-			//Interpolate
-			interpolate_val := escapeJSONString(params[param_ct])
-			//Append it to the output buffer
-			accumulator = append(accumulator, []byte(interpolate_val)...)
-			//Continue
-			param_ct += 1
-			param_positions = param_positions[1:]
-		}
-	}
-	return string(accumulator)
-}
+// TODO: How to bring back regex matcher?
+// TODO: How to bring back JSON parameterized query?
