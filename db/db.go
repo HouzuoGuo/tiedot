@@ -18,7 +18,7 @@ import (
 
 const (
 	PART_NUM_FILE      = "number_of_partitions" // A database configuration file's name, content is a single number
-	AUTO_SYNC_INTERVAL = 1000                   // Data file auto-save interval in milliseconds
+	AUTO_SYNC_INTERVAL = 1000                   // Data file auto-save interval in milliseconds (do not set too small)
 )
 
 // Database structures.
@@ -86,10 +86,10 @@ func (db *DB) load() error {
 			for {
 				select {
 				case <-db.autoSync.C:
-					if err := db.Sync(); err != nil {
-						tdlog.Errorf("Background Auto-Sync on %s: Failed with error: %v",db.path,  err)
-					} else {
+					if err := db.Sync(); err == nil {
 						tdlog.Printf("Background Auto-Sync on %s: OK", db.path)
+					} else {
+						tdlog.Errorf("Background Auto-Sync on %s: Failed with error: %v", db.path, err)
 					}
 				case <-db.autoSyncStop:
 					db.autoSync.Stop()

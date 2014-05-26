@@ -11,7 +11,7 @@ import (
 You are encouraged to use nearly all tiedot public functions concurrently, except schema management functions such as:
 - Create, rename, drop collection
 - Create and remove collection index
-During the above operations, no other operation should be carried out at the same time, such as document update!
+During the above operations, no other operation should be carried out at the same time (such as document update)!
 
 To compile and run the example:
     go build && ./tiedot -mode=example
@@ -24,7 +24,7 @@ func embeddedExample() {
 	os.RemoveAll(myDBDir)
 	defer os.RemoveAll(myDBDir)
 
-	// (Create if not exists) open a database
+	// (Create if not exist) open a database
 	myDB, err := db.OpenDB(myDBDir)
 	if err != nil {
 		panic(err)
