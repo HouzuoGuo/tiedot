@@ -83,7 +83,7 @@ func benchmark(benchSize int) {
 
 	// Collect all document IDs and benchmark document read
 	average("read", benchSize, func() {
-		col.ForEachDoc(func(id int, _ []byte) bool {
+		col.ForEachDoc(false, func(id int, _ []byte) bool {
 			ids = append(ids, id)
 			return true
 		})
@@ -91,6 +91,19 @@ func benchmark(benchSize int) {
 		doc, err := col.Read(ids[rand.Intn(benchSize)])
 		if doc == nil || err != nil {
 			fmt.Println("Read error", doc, err)
+		}
+	})
+
+	// Benchmark lookup query (two attributes)
+	average("lookup", benchSize, func() {}, func() {
+		var query interface{}
+		if err := json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a"], "limit": 1}, `+
+			`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["b"], "limit": 1}]}`), &query); err != nil {
+			panic("json error")
+		}
+		result := make(map[int]struct{})
+		if err := db.EvalQuery(query, col, &result); err != nil {
+			fmt.Println("Query error", err)
 		}
 	})
 
@@ -175,6 +188,27 @@ func benchmark2(benchSize int) {
 				col.Read(docs[rand.Intn(len(docs))])
 			}
 			fmt.Printf("Read thread %d completed\n", i)
+		}(i)
+	}
+
+	// Query benchSize times (lookup on two attributes)
+	for i := 0; i < numThreads; i++ {
+		go func(i int) {
+			fmt.Printf("Query thread %d starting\n", i)
+			defer wp.Done()
+			var query interface{}
+			var err error
+			for j := 0; j < benchSize/numThreads; j++ {
+				if err = json.Unmarshal([]byte(`{"c": [{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["a"], "limit": 1}, `+
+					`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["b"], "limit": 1}]}`), &query); err != nil {
+					panic("json error")
+				}
+				result := make(map[int]struct{})
+				if err = db.EvalQuery(query, col, &result); err != nil {
+					fmt.Println("Query error", err)
+				}
+			}
+			fmt.Printf("Query thread %d completed\n", i)
 		}(i)
 	}
 
