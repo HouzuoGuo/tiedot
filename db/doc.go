@@ -175,7 +175,9 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	}
 	col.indexDoc(id, doc)
 	// Done with the document
+	part.Lock.Lock()
 	part.UnlockUpdate(id)
+	part.Lock.Unlock()
 	return nil
 }
 
@@ -208,6 +210,11 @@ func (col *Col) Delete(id int) error {
 	if original != nil {
 		col.unindexDoc(id, original)
 	}
+	if part == nil {
+		panic("SHALL NOT HAPPEN")
+	}
+	part.Lock.Lock()
 	part.UnlockUpdate(id)
+	part.Lock.Unlock()
 	return nil
 }

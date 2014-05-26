@@ -95,16 +95,20 @@ func (col *Col) Sync() error {
 }
 
 // Do fun for all documents in the collection.
-func (col *Col) forEachDoc(fun func(id int, doc []byte) (moveOn bool)) {
+func (col *Col) ForEachDoc(withRLocks bool, fun func(id int, doc []byte) (moveOn bool)) {
 	totalIterations := 1993 // not a magic - feel free to adjust the number
 	for iteratePart := 0; iteratePart < col.db.numParts; iteratePart++ {
-		tdlog.Printf("forEachDoc %s: Going through partition %d", col.name, iteratePart)
+		tdlog.Printf("ForEachDoc %s: Going through partition %d", col.name, iteratePart)
+		part := col.parts[iteratePart]
+		part.Lock.RLock()
 		for i := 0; i < totalIterations; i++ {
-			if !col.parts[iteratePart].ForEachDoc(i, totalIterations, fun) {
-				tdlog.Printf("forEachDoc %s: Stopped on collection partition %d, hash partition %d", iteratePart, i)
+			if !part.ForEachDoc(i, totalIterations, fun) {
+				tdlog.Printf("ForEachDoc %s: Stopped on collection partition %d, hash partition %d", iteratePart, i)
+				part.Lock.RUnlock()
 				return
 			}
 		}
+		part.Lock.RUnlock()
 	}
 }
 
@@ -146,7 +150,7 @@ func (col *Col) Index(idxPath []string) (err error) {
 		}
 	}
 	// Put all documents on the new index
-	col.forEachDoc(func(id int, doc []byte) (moveOn bool) {
+	col.ForEachDoc(false, func(id int, doc []byte) (moveOn bool) {
 		var docObj map[string]interface{}
 		if err := json.Unmarshal(doc, &docObj); err != nil {
 			// Skip corrupted document
