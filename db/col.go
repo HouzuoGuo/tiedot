@@ -157,8 +157,10 @@ func (col *Col) Index(idxPath []string) (err error) {
 			return true
 		}
 		for _, idxVal := range GetIn(docObj, idxPath) {
-			hashKey := StrHash(fmt.Sprint(idxVal))
-			col.hts[hashKey%col.db.numParts][idxName].Put(hashKey, id)
+			if idxVal != nil {
+				hashKey := StrHash(fmt.Sprint(idxVal))
+				col.hts[hashKey%col.db.numParts][idxName].Put(hashKey, id)
+			}
 		}
 		return true
 	})

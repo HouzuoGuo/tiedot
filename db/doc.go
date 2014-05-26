@@ -52,13 +52,14 @@ func StrHash(thing interface{}) int {
 func (col *Col) indexDoc(id int, doc map[string]interface{}) {
 	for idxName, idxPath := range col.indexPaths {
 		for _, idxVal := range GetIn(doc, idxPath) {
-			hashKey := StrHash(fmt.Sprint(idxVal))
-			partNum := hashKey % col.db.numParts
-			ht := col.hts[partNum][idxName]
-			// fmt.Printf("Value %v (%d) goes to partition %d ht %s docID %d\n", idxVal, hashKey, partNum, idxName, id)
-			ht.Lock.Lock()
-			ht.Put(hashKey, id)
-			ht.Lock.Unlock()
+			if idxVal != nil {
+				hashKey := StrHash(fmt.Sprint(idxVal))
+				partNum := hashKey % col.db.numParts
+				ht := col.hts[partNum][idxName]
+				ht.Lock.Lock()
+				ht.Put(hashKey, id)
+				ht.Lock.Unlock()
+			}
 		}
 	}
 }
@@ -67,12 +68,14 @@ func (col *Col) indexDoc(id int, doc map[string]interface{}) {
 func (col *Col) unindexDoc(id int, doc map[string]interface{}) {
 	for idxName, idxPath := range col.indexPaths {
 		for _, idxVal := range GetIn(doc, idxPath) {
-			hashKey := StrHash(fmt.Sprint(idxVal))
-			partNum := hashKey % col.db.numParts
-			ht := col.hts[partNum][idxName]
-			ht.Lock.Lock()
-			ht.Remove(hashKey, id)
-			ht.Lock.Unlock()
+			if idxVal != nil {
+				hashKey := StrHash(fmt.Sprint(idxVal))
+				partNum := hashKey % col.db.numParts
+				ht := col.hts[partNum][idxName]
+				ht.Lock.Lock()
+				ht.Remove(hashKey, id)
+				ht.Lock.Unlock()
+			}
 		}
 	}
 }
