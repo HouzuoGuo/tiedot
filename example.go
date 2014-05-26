@@ -136,6 +136,13 @@ func embeddedExample() {
 		fmt.Printf("Query returned document %v\n", readBack)
 	}
 
+	// Make sure important transactions are persisted (very expensive call: do NOT invoke too often)
+	// (A background goroutine is already doing it for you every few seconds)
+	if err := myDB.Sync(); err != nil {
+		panic(err)
+	}
 	// Gracefully close database
-	myDB.Close()
+	if err := myDB.Close(); err != nil {
+		panic(err)
+	}
 }

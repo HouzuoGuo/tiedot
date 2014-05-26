@@ -12,25 +12,30 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	PART_NUM_FILE = "number_of_partitions" // A database configuration file's name, content is a single number
+	PART_NUM_FILE      = "number_of_partitions" // A database configuration file's name, content is a single number
+	AUTO_SYNC_INTERVAL = 1000                   // Data file auto-save interval in milliseconds
 )
 
 // Database structures.
 type DB struct {
-	path     string          // root path of database directory
-	numParts int             // total number of partitions
-	cols     map[string]*Col // collection by name lookup
+	path         string          // root path of database directory
+	numParts     int             // total number of partitions
+	cols         map[string]*Col // collection by name lookup
+	schemaLock   *sync.RWMutex   // Schema-related operations use ExLock, other operations use RLock
+	autoSync     *time.Ticker    // Synchronize all data files at regular interval
+	autoSyncStop chan struct{}   // Inform auto-synchronize routine to stop (on DB shutdown)
 }
 
 // Open database and load all collections & indexes.
 func OpenDB(dbPath string) (*DB, error) {
 	// New collection documents get their ID from this RNG
 	rand.Seed(time.Now().UnixNano())
-	db := &DB{path: dbPath}
+	db := &DB{path: dbPath, schemaLock: new(sync.RWMutex), autoSyncStop: make(chan struct{})}
 	return db, db.load()
 }
 
@@ -74,11 +79,32 @@ func (db *DB) load() error {
 			return err
 		}
 	}
+	// Initialize auto-sync (synchronize all data files regularly)
+	if db.autoSync == nil {
+		db.autoSync = time.NewTicker(AUTO_SYNC_INTERVAL * time.Millisecond)
+		go func() {
+			for {
+				select {
+				case <-db.autoSync.C:
+					if err := db.Sync(); err != nil {
+						tdlog.Errorf("Background Auto-Sync on %s: Failed with error: %v",db.path,  err)
+					} else {
+						tdlog.Printf("Background Auto-Sync on %s: OK", db.path)
+					}
+				case <-db.autoSyncStop:
+					db.autoSync.Stop()
+					return
+				}
+			}
+		}()
+	}
 	return err
 }
 
 // Synchronize all data files to disk.
 func (db *DB) Sync() error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
 	errs := make([]error, 0, 0)
 	for _, col := range db.cols {
 		if err := col.Sync(); err != nil {
@@ -93,6 +119,9 @@ func (db *DB) Sync() error {
 
 // Close all database files. Do not use the DB afterwards!
 func (db *DB) Close() error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	close(db.autoSyncStop)
 	errs := make([]error, 0, 0)
 	for _, col := range db.cols {
 		if err := col.Close(); err != nil {
@@ -107,6 +136,8 @@ func (db *DB) Close() error {
 
 // Create a new collection.
 func (db *DB) Create(name string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
 	if _, exists := db.cols[name]; exists {
 		return fmt.Errorf("Collection %s already exists", name)
 	} else if err := os.MkdirAll(path.Join(db.path, name), 0700); err != nil {
@@ -119,6 +150,8 @@ func (db *DB) Create(name string) error {
 
 // Return all collection names.
 func (db *DB) AllCols() (ret []string) {
+	db.schemaLock.RLock()
+	defer db.schemaLock.RUnlock()
 	ret = make([]string, 0, len(db.cols))
 	for name, _ := range db.cols {
 		ret = append(ret, name)
@@ -128,6 +161,8 @@ func (db *DB) AllCols() (ret []string) {
 
 // Use the return value to interact with collection. Return value may be nil if the collection does not exist.
 func (db *DB) Use(name string) *Col {
+	db.schemaLock.RLock()
+	defer db.schemaLock.RUnlock()
 	if col, exists := db.cols[name]; exists {
 		return col
 	}
@@ -136,6 +171,8 @@ func (db *DB) Use(name string) *Col {
 
 // Rename a collection.
 func (db *DB) Rename(oldName, newName string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
 	if _, exists := db.cols[oldName]; !exists {
 		return fmt.Errorf("Collection %s does not exist", oldName)
 	} else if _, exists := db.cols[newName]; exists {
@@ -155,6 +192,8 @@ func (db *DB) Rename(oldName, newName string) error {
 
 // Truncate a collection - delete all documents and clear
 func (db *DB) Truncate(name string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	} else if err := db.cols[name].Sync(); err != nil {
@@ -176,6 +215,8 @@ func (db *DB) Truncate(name string) error {
 
 // Scrub a collection - fix corrupted documents and de-fragment free space.
 func (db *DB) Scrub(name string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	} else if err := db.cols[name].Sync(); err != nil {
@@ -228,6 +269,8 @@ func (db *DB) Scrub(name string) error {
 
 // Drop a collection and lose all of its documents and indexes.
 func (db *DB) Drop(name string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	} else if err := db.cols[name].Close(); err != nil {

@@ -37,6 +37,9 @@ func TestOpenEmptyDB(t *testing.T) {
 	if len(db.cols["a"].parts) != runtime.NumCPU() {
 		t.Fatal(err)
 	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestOpenErrDB(t *testing.T) {
@@ -47,8 +50,10 @@ func TestOpenErrDB(t *testing.T) {
 	}
 	touchFile(TEST_DATA_DIR+"/ColA", "dat_0")
 	touchFile(TEST_DATA_DIR+"/ColA/a!b!c", "0")
-	if _, err := OpenDB(TEST_DATA_DIR); err == nil {
+	if db, err := OpenDB(TEST_DATA_DIR); err == nil {
 		t.Fatal("Did not error")
+	} else if err := db.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -66,7 +71,6 @@ func TestOpenSyncCloseDB(t *testing.T) {
 	if err := os.MkdirAll(TEST_DATA_DIR+"/ColB", 0700); err != nil {
 		panic(err)
 	}
-
 	db, err := OpenDB(TEST_DATA_DIR)
 	if err != nil {
 		t.Fatal(err)
