@@ -36,6 +36,9 @@ func OpenCol(db *DB, name string) (*Col, error) {
 
 // Load collection schema including index schema.
 func (col *Col) load() error {
+	if err := os.MkdirAll(path.Join(col.db.path, col.name), 0700); err != nil {
+		return err
+	}
 	col.parts = make([]*data.Partition, col.db.numParts)
 	col.hts = make([]map[string]*data.HashTable, col.db.numParts)
 	for i := 0; i < col.db.numParts; i++ {

@@ -1,14 +1,16 @@
-// Benchmark of tiedot individual features and usages.
+/*
+Two benchmrk scenarios:
+- Document CRUD benchmark (intend to catch performance regressions)
+- Document CRUD in parallel (intend to catch concurrency related bugs)
+*/
 package main
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
-	"io/ioutil"
 	"math/rand"
 	"os"
-	"path"
 	"runtime"
 	"strconv"
 	"sync"
@@ -33,19 +35,13 @@ func average(name string, total int, init func(), do func()) {
 		}()
 	}
 	wp.Wait()
-	// Print average time consumption and summary.
 	end := float64(time.Now().UTC().UnixNano())
 	fmt.Printf("%s %d: %d ns/iter, %d iter/sec\n", name, int(total), int((end-start)/iter), int(1000000000/((end-start)/iter)))
 }
 
-func mkTmpDBAndCol(dbPath string, numParts int, colName string) (col *db.Col) {
+// Create a temporary database and collection for benchmark use.
+func mkTmpDBAndCol(dbPath string, colName string) (col *db.Col) {
 	os.RemoveAll(dbPath)
-	if err := os.MkdirAll(path.Join(dbPath, colName), 0700); err != nil {
-		panic(err)
-	}
-	if err := ioutil.WriteFile(path.Join(dbPath, db.PART_NUM_FILE), []byte(strconv.Itoa(numParts)), 0600); err != nil {
-		panic(err)
-	}
 	tmpDB, err := db.OpenDB(dbPath)
 	if err != nil {
 		panic(err)
@@ -57,14 +53,13 @@ func mkTmpDBAndCol(dbPath string, numParts int, colName string) (col *db.Col) {
 	return tmpCol
 }
 
-// Benchmark document insert, read, query, update and delete.
+// Benchmark individual document operation: insert, read, query, update and delete.
 func benchmark(benchSize int) {
-	ids := make([]int, 0)
-
+	ids := make([]int, 0, benchSize)
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_bench2"
 	defer os.RemoveAll(tmp)
-	col := mkTmpDBAndCol(tmp, 4, "tmp")
+	col := mkTmpDBAndCol(tmp, "tmp")
 	col.Index([]string{"a"})
 	col.Index([]string{"b"})
 
@@ -127,7 +122,7 @@ func benchmark(benchSize int) {
 	col.Close()
 }
 
-// Run document opearations (insert, read, query, update and delete) all at once.
+// Run document operations (insert, read, query, update and delete) all at once.
 func benchmark2(benchSize int) {
 	docs := make([]int, 0, benchSize*2+1000)
 	wp := new(sync.WaitGroup)
@@ -137,7 +132,7 @@ func benchmark2(benchSize int) {
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_bench"
 	defer os.RemoveAll(tmp)
-	col := mkTmpDBAndCol(tmp, 4, "tmp")
+	col := mkTmpDBAndCol(tmp, "tmp")
 	col.Index([]string{"a"})
 	col.Index([]string{"b"})
 
