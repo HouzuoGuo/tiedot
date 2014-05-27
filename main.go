@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/httpapi"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"log"
 	"os"
@@ -62,11 +63,11 @@ func main() {
 		if port == 0 {
 			tdlog.Fatal("Please specify port number, for example -port=8080")
 		}
-		_, err := db.OpenDB(dir)
+		db, err := db.OpenDB(dir)
 		if err != nil {
 			tdlog.Fatal(err)
 		}
-		// httpServer.Start(db, port)
+		httpapi.Start(db, port)
 	case "example": // Run embedded usage examples
 		embeddedExample()
 	case "bench": // Benchmark scenarios
