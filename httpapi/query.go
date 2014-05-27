@@ -38,12 +38,12 @@ func Query(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Construct array of result
-	resultDocs := make([]map[string]interface{}, len(queryResult))
+	resultDocs := make(map[string]interface{}, len(queryResult))
 	counter := 0
 	for docID := range queryResult {
 		doc, _ := dbcol.Read(docID)
 		if doc != nil {
-			resultDocs[counter] = doc
+			resultDocs[strconv.Itoa(docID)] = doc
 			counter++
 		}
 	}
