@@ -286,9 +286,6 @@ func (db *DB) Drop(name string) error {
 
 // Copy this database into destination directory.
 func (db *DB) Dump(dest string) error {
-	if dest == db.path {
-		return fmt.Errorf("")
-	}
 	db.schemaLock.Lock()
 	defer db.schemaLock.Unlock()
 	for _, col := range db.cols {
@@ -297,6 +294,9 @@ func (db *DB) Dump(dest string) error {
 		}
 	}
 	cpFun := func(currPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if info.IsDir() {
 			relPath, err := filepath.Rel(db.path, currPath)
 			if err != nil {
@@ -317,6 +317,9 @@ func (db *DB) Dump(dest string) error {
 				return err
 			}
 			destPath := path.Join(dest, relPath)
+			if _, fileExists := os.Open(destPath); fileExists == nil {
+				return fmt.Errorf("Destination file %s already exists", destPath)
+			}
 			destFile, err := os.Create(destPath)
 			if err != nil {
 				return err
