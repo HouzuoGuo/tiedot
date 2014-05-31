@@ -35,7 +35,7 @@ Let me know what you think about tiedot, I love to hear from you! Please [Email 
 
 tiedot is distributed under the [Simplified BSD license][Contributors and License].
 
-The newest version 2.0 (branch 2.0) is a complete re-write aiming to bring a much cleaner codebase. Please check out [Version History] for change logs and historical version informaion.
+Please clone branch 2.1 for the latest features. Please check out [Version History] for change logs and historical version informaion.
 
 ### Project Story
 
