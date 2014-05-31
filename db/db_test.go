@@ -215,3 +215,47 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDumpDB(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR + "bak")
+	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(TEST_DATA_DIR+"/number_of_partitions", []byte("2"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := OpenDB(TEST_DATA_DIR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create("a"); err != nil {
+		t.Fatal(err)
+	} else if err := db.Create("b"); err != nil {
+		t.Fatal(err)
+	}
+	id1, err := db.Use("a").Insert(map[string]interface{}{"whatever": "1"})
+	if err != nil {
+		t.Fatal(err)
+	} else if err := db.Dump(TEST_DATA_DIR + "bak"); err != nil {
+		t.Fatal(err)
+	}
+	// Open the new database
+	db2, err := OpenDB(TEST_DATA_DIR + "bak")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allCols := db2.AllCols(); !(allCols[0] == "a" && allCols[1] == "b" || allCols[0] == "b" && allCols[1] == "a") {
+		t.Fatal(allCols)
+	}
+	if doc, err := db2.Use("a").Read(id1); err != nil || doc["whatever"].(string) != "1" {
+		t.Fatal(doc, err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := db2.Close(); err != nil {
+		t.Fatal(err)
+	}
+}

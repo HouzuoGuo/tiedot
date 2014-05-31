@@ -7,6 +7,7 @@ import (
 	"net/http"
 )
 
+// Create a collection.
 func Create(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -23,6 +24,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Return all collection names.
 func All(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
@@ -40,6 +42,7 @@ func All(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
+// Rename a collection.
 func Rename(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -57,6 +60,7 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Drop a collection.
 func Drop(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -71,6 +75,7 @@ func Drop(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// De-fragment collection free space and fix corrupted documents.
 func Scrub(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -88,6 +93,10 @@ func Scrub(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+/*
+Synchronize all data files to disk.
+Note that HTTP service already does it automatically.
+*/
 func Sync(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")

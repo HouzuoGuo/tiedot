@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -280,4 +282,52 @@ func (db *DB) Drop(name string) error {
 	}
 	delete(db.cols, name)
 	return nil
+}
+
+// Copy this database into destination directory.
+func (db *DB) Dump(dest string) error {
+	if dest == db.path {
+		return fmt.Errorf("")
+	}
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	for _, col := range db.cols {
+		if err := col.Sync(); err != nil {
+			return err
+		}
+	}
+	cpFun := func(currPath string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			relPath, err := filepath.Rel(db.path, currPath)
+			if err != nil {
+				return err
+			}
+			destDir := path.Join(dest, relPath)
+			if err := os.MkdirAll(destDir, 0700); err != nil {
+				return err
+			}
+			tdlog.Printf("Dump: created directory %s", destDir)
+		} else {
+			src, err := os.Open(currPath)
+			if err != nil {
+				return err
+			}
+			relPath, err := filepath.Rel(db.path, currPath)
+			if err != nil {
+				return err
+			}
+			destPath := path.Join(dest, relPath)
+			destFile, err := os.Create(destPath)
+			if err != nil {
+				return err
+			}
+			written, err := io.Copy(destFile, src)
+			if err != nil {
+				return err
+			}
+			tdlog.Printf("Dump: copied file %s, size is %d", destPath, written)
+		}
+		return nil
+	}
+	return filepath.Walk(db.path, cpFun)
 }
