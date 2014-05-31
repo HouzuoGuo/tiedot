@@ -20,7 +20,7 @@ import (
 
 const (
 	PART_NUM_FILE      = "number_of_partitions" // A database configuration file's name, content is a single number
-	AUTO_SYNC_INTERVAL = 1000                   // Data file auto-save interval in milliseconds (do not set too small)
+	AUTO_SYNC_INTERVAL = 2000                   // Data file auto-save interval in milliseconds (do not set too small)
 )
 
 // Database structures.
