@@ -102,7 +102,7 @@ func (col *Col) Sync() error {
 
 // Do fun for all documents in the collection.
 func (col *Col) ForEachDoc(withRLocks bool, fun func(id int, doc []byte) (moveOn bool)) {
-	totalIterations := 1993 // not a magic - feel free to adjust the number
+	totalIterations := 193 // not a magic - feel free to adjust the number
 	for iteratePart := 0; iteratePart < col.db.numParts; iteratePart++ {
 		tdlog.Printf("ForEachDoc %s: Going through partition %d", col.name, iteratePart)
 		part := col.parts[iteratePart]

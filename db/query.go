@@ -95,7 +95,7 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 		return errors.New(fmt.Sprintf("Please index %v and retry query %v", vecPath, expr))
 	}
 	counter := 0
-	partitionSize := 1993 // not a magic, feel free to change
+	partitionSize := 193 // not a magic, feel free to change
 	for iteratePart := 0; iteratePart < src.db.numParts; iteratePart++ {
 		ht := src.hts[iteratePart][jointPath]
 		ht.Lock.RLock()
