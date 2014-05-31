@@ -1,27 +1,22 @@
-// tiedot main entrance.
 package main
 
 import (
 	"flag"
 	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/HouzuoGuo/tiedot/srv/v3"
+	"github.com/HouzuoGuo/tiedot/httpapi"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"log"
-	"math/rand"
 	"os"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
-	"time"
 )
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
-
 	var err error
 	var defaultMaxprocs int
 	if defaultMaxprocs, err = strconv.Atoi(os.Getenv("GOMAXPROCS")); err != nil {
-		defaultMaxprocs = runtime.NumCPU() * 2
+		defaultMaxprocs = runtime.NumCPU()
 	}
 
 	// Parse CLI parameters
@@ -29,11 +24,12 @@ func main() {
 	var port, maxprocs, benchSize int
 	var profile bool
 	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|example]")
-	flag.StringVar(&dir, "dir", "", "database directory")
-	flag.IntVar(&port, "port", 8080, "listening port number")
+	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
+	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
 	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
-	flag.BoolVar(&profile, "profile", false, "write profiler results to prof.out")
+	flag.BoolVar(&profile, "profile", false, "Write profiler results to prof.out")
+	flag.BoolVar(&tdlog.VerboseLog, "verbose", false, "Turn verbose logging on/off")
 	flag.Parse()
 
 	// User must specify a mode to run
@@ -42,11 +38,11 @@ func main() {
 		return
 	}
 
-	// Setup appropriate GOMAXPROCS parameter
+	// Set appropriate GOMAXPROCS
 	runtime.GOMAXPROCS(maxprocs)
 	log.Printf("GOMAXPROCS is set to %d", maxprocs)
 	if maxprocs < runtime.NumCPU() {
-		tdlog.Printf("GOMAXPROCS (%d) is less than number of CPUs (%d), this may affect performance. You can change it via environment variable GOMAXPROCS or by passing CLI parameter -gomaxprocs", maxprocs, runtime.NumCPU())
+		tdlog.Printf("GOMAXPROCS (%d) is less than number of CPUs (%d), this may reduce performance. You can change it via environment variable GOMAXPROCS or by passing CLI parameter -gomaxprocs", maxprocs, runtime.NumCPU())
 	}
 
 	// Start profiler if enabled
@@ -71,7 +67,7 @@ func main() {
 		if err != nil {
 			tdlog.Fatal(err)
 		}
-		v3.Start(db, port)
+		httpapi.Start(db, port)
 	case "example": // Run embedded usage examples
 		embeddedExample()
 	case "bench": // Benchmark scenarios

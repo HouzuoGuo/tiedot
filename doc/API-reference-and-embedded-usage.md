@@ -57,9 +57,9 @@ HTTP 4xx/5xx response will always include a text message (not JSON) to help with
     <td>HTTP 200</td>
   </tr>
   <tr>
-    <td>Repartition collection</td>
-    <td>/repartition</td>
-    <td>Collection name `col` and new number of partitions `numparts`</td>
+    <td>Flush all database file</td>
+    <td>/sync</td>
+    <td>(nil)</td>
     <td>HTTP 200</td>
   </tr>
 </table>
@@ -97,12 +97,6 @@ HTTP 4xx/5xx response will always include a text message (not JSON) to help with
     <td>Collection name `col` and document ID `id`</td>
     <td>HTTP 200</td>
   </tr>
-  <tr>
-    <td>Flush all database file</td>
-    <td>/flush</td>
-    <td>(nil)</td>
-    <td>HTTP 200</td>
-  </tr>
 </table>
 
 Document ID is unique and never changes til the document vanishes.
@@ -126,7 +120,7 @@ Document ID is unique and never changes til the document vanishes.
     <td>Get list of all indexes in a collection</td>
         <td>/indexes</td>
     <td>Collection name `col`</td>
-    <td>HTTP 200 and a JSON array of all index information</td>
+    <td>HTTP 200 and a JSON array of all indexed paths</td>
   </tr>
   <tr>
     <td>Remove an index</td>
@@ -167,7 +161,7 @@ Document ID is unique and never changes til the document vanishes.
     <td>Version number</td>
     <td>/version</td>
     <td>(nil)</td>
-    <td>HTTP 200 and "3"</td>
+    <td>HTTP 200 and "4"</td>
   </tr>
 </table>
 
@@ -188,7 +182,7 @@ All query responses return content type `text/plain` instead of `application/jso
     <td>Execute query and return documents</td>
     <td>/query</td>
     <td>Collection `col` and query string `q`</td>
-    <td>HTTP 200 and result documents (one per line)</td>
+    <td>HTTP 200 and result document IDs and content</td>
   </tr>
   <tr>
     <td>Execute query and count results</td>
@@ -211,10 +205,6 @@ Bare strings are Document IDs that go directly into query result, this may be us
 Lookup finds documents with specific value in a path: `{"in": [ path ... ], "eq": loookup_value}`.
 
 For example: `{"in": ["Author", "Name", "First Name"], "eq": "John"}`.
-
-You can also find documents by using regex: `{"in": [ path ... ], "re": "Go regular expression"}`.
-
-For example: `{"in": ["Author, "Name", "First Name"], "re": "^John.*ed$"}`
 
 Another operation, "has", finds any document with any not-null value in the path: `{"has": [ path ...] }`.
 

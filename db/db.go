@@ -1,213 +1,336 @@
-/* Database is a collection of collections. */
+/* Collection and storage management. */
 package db
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path"
+	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
 
 const (
-	NUMCHUNKS_FILENAME = "numchunks"
+	PART_NUM_FILE      = "number_of_partitions" // A database configuration file's name, content is a single number
+	AUTO_SYNC_INTERVAL = 2000                   // Data file auto-save interval in milliseconds (do not set too small)
 )
 
+// Database structures.
 type DB struct {
-	BaseDir string          // Database directory path
-	StrCol  map[string]*Col // Collection name to collection mapping
+	path         string          // root path of database directory
+	numParts     int             // total number of partitions
+	cols         map[string]*Col // collection by name lookup
+	schemaLock   *sync.RWMutex   // Schema-related operations use ExLock, other operations use RLock
+	autoSync     *time.Ticker    // Synchronize all data files at regular interval
+	autoSyncStop chan struct{}   // Inform auto-synchronize routine to stop (on DB shutdown)
 }
 
-func OpenDB(baseDir string) (db *DB, err error) {
-	if err = os.MkdirAll(baseDir, 0700); err != nil {
-		return
-	}
-	db = &DB{BaseDir: baseDir, StrCol: make(map[string]*Col)}
-	files, err := ioutil.ReadDir(baseDir)
-	if err != nil {
-		return
-	}
-	// Try to open sub-directory as document collection
-	for _, f := range files {
-		if f.IsDir() {
-			// Figure out how many chunks there are in the collection
-			var numchunksFH *os.File
-			numchunksFH, err = os.OpenFile(path.Join(baseDir, f.Name(), NUMCHUNKS_FILENAME), os.O_CREATE|os.O_RDWR, 0600)
-			defer numchunksFH.Close()
-			if err != nil {
-				return
-			}
-			numchunksContent, err := ioutil.ReadAll(numchunksFH)
-			if err != nil {
-				panic(err)
-			}
-			numchunks, err := strconv.Atoi(string(numchunksContent))
-			if err != nil || numchunks < 1 {
-				panic(fmt.Sprintf("Cannot figure out number of chunks for collection %s, manually repair it maybe? %v", baseDir, err))
-			}
+// Open database and load all collections & indexes.
+func OpenDB(dbPath string) (*DB, error) {
+	// New collection documents get their ID from this RNG
+	rand.Seed(time.Now().UnixNano())
+	db := &DB{path: dbPath, schemaLock: new(sync.RWMutex), autoSyncStop: make(chan struct{})}
+	return db, db.load()
+}
 
-			// Open the directory as a collection
-			if db.StrCol[f.Name()], err = OpenCol(path.Join(baseDir, f.Name()), numchunks); err != nil {
-				tdlog.Errorf("ERROR: Failed to open collection %s, error: %v", f.Name(), err)
-			} else {
-				tdlog.Printf("Successfully opened collection %s", f.Name())
-			}
+// Load all collection schema.
+func (db *DB) load() error {
+	// If opening an empty database, create the DB directory and PART_NUM_FILE.
+	var numPartsAssumed = false
+	numPartsFilePath := path.Join(db.path, PART_NUM_FILE)
+	if err := os.MkdirAll(db.path, 0700); err != nil {
+		return err
+	}
+	if partNumFile, err := os.Stat(numPartsFilePath); err != nil {
+		// The new database has as many partitions as there are CPUs
+		if err := ioutil.WriteFile(numPartsFilePath, []byte(strconv.Itoa(runtime.NumCPU())), 0600); err != nil {
+			return err
+		}
+		numPartsAssumed = true
+	} else if partNumFile.IsDir() {
+		return fmt.Errorf("Database config file %s is actually a directory, is database path correct?", PART_NUM_FILE)
+	}
+	// Get number of partitions from the text file
+	if numParts, err := ioutil.ReadFile(numPartsFilePath); err != nil {
+		return err
+	} else if db.numParts, err = strconv.Atoi(strings.Trim(string(numParts), "\r\n ")); err != nil {
+		return err
+	}
+	// Look for collection directories
+	db.cols = make(map[string]*Col)
+	dirContent, err := ioutil.ReadDir(db.path)
+	if err != nil {
+		return err
+	}
+	for _, maybeColDir := range dirContent {
+		if !maybeColDir.IsDir() {
+			continue
+		}
+		if numPartsAssumed {
+			return fmt.Errorf("Please manually repair database partition number config file %s", numPartsFilePath)
+		}
+		if db.cols[maybeColDir.Name()], err = OpenCol(db, maybeColDir.Name()); err != nil {
+			return err
 		}
 	}
-	return
-}
-
-// Create a collection.
-func (db *DB) Create(name string, numChunks int) (err error) {
-	if numChunks < 1 {
-		return errors.New(fmt.Sprintf("Number of of partitions must be above 0"))
-	}
-	if _, nope := db.StrCol[name]; nope {
-		return errors.New(fmt.Sprintf("Collection %s already exists in %s", name, db.BaseDir))
-	}
-	if db.StrCol[name], err = OpenCol(path.Join(db.BaseDir, name), numChunks); err != nil {
-		return
-	}
-	if err = ioutil.WriteFile(path.Join(db.BaseDir, name, NUMCHUNKS_FILENAME), []byte(fmt.Sprint(numChunks)), 0600); err != nil {
-		return
+	// Initialize auto-sync (synchronize all data files regularly)
+	if db.autoSync == nil {
+		db.autoSync = time.NewTicker(AUTO_SYNC_INTERVAL * time.Millisecond)
+		go func() {
+			for {
+				select {
+				case <-db.autoSync.C:
+					if err := db.Sync(); err == nil {
+						tdlog.Printf("Background Auto-Sync on %s: OK", db.path)
+					} else {
+						tdlog.Errorf("Background Auto-Sync on %s: Failed with error: %v", db.path, err)
+					}
+				case <-db.autoSyncStop:
+					db.autoSync.Stop()
+					return
+				}
+			}
+		}()
 	}
 	return err
 }
 
-// Return collection reference by collection name. This function is safe for concurrent use.
+// Synchronize all data files to disk.
+func (db *DB) Sync() error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	errs := make([]error, 0, 0)
+	for _, col := range db.cols {
+		if err := col.Sync(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%v", errs)
+}
+
+// Close all database files. Do not use the DB afterwards!
+func (db *DB) Close() error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	close(db.autoSyncStop)
+	errs := make([]error, 0, 0)
+	for _, col := range db.cols {
+		if err := col.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%v", errs)
+}
+
+// Create a new collection.
+func (db *DB) Create(name string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	if _, exists := db.cols[name]; exists {
+		return fmt.Errorf("Collection %s already exists", name)
+	} else if err := os.MkdirAll(path.Join(db.path, name), 0700); err != nil {
+		return err
+	} else if db.cols[name], err = OpenCol(db, name); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Return all collection names.
+func (db *DB) AllCols() (ret []string) {
+	db.schemaLock.RLock()
+	defer db.schemaLock.RUnlock()
+	ret = make([]string, 0, len(db.cols))
+	for name, _ := range db.cols {
+		ret = append(ret, name)
+	}
+	return
+}
+
+// Use the return value to interact with collection. Return value may be nil if the collection does not exist.
 func (db *DB) Use(name string) *Col {
-	if col, ok := db.StrCol[name]; ok {
+	db.schemaLock.RLock()
+	defer db.schemaLock.RUnlock()
+	if col, exists := db.cols[name]; exists {
 		return col
 	}
 	return nil
 }
 
 // Rename a collection.
-func (db *DB) Rename(oldName, newName string) (err error) {
-	var numChunks int
-	col, ok := db.StrCol[oldName]
-	if ok {
-		numChunks = len(db.StrCol[oldName].Chunks)
-	} else {
-		return errors.New(fmt.Sprintf("Collection %s does not exists in %s", oldName, db.BaseDir))
+func (db *DB) Rename(oldName, newName string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	if _, exists := db.cols[oldName]; !exists {
+		return fmt.Errorf("Collection %s does not exist", oldName)
+	} else if _, exists := db.cols[newName]; exists {
+		return fmt.Errorf("Collection %s already exists", newName)
+	} else if newName == oldName {
+		return fmt.Errorf("Old and new names are the same")
+	} else if err := db.cols[oldName].Close(); err != nil {
+		return err
+	} else if err := os.Rename(path.Join(db.path, oldName), path.Join(db.path, newName)); err != nil {
+		return err
+	} else if db.cols[newName], err = OpenCol(db, newName); err != nil {
+		return err
 	}
-	if _, nope := db.StrCol[newName]; nope {
-		return errors.New(fmt.Sprintf("Collection name %s is already used in %s", newName, db.BaseDir))
-	}
-	col.Close()
-	delete(db.StrCol, oldName)
-	if err = os.Rename(path.Join(db.BaseDir, oldName), path.Join(db.BaseDir, newName)); err != nil {
-		return
-	}
-	db.StrCol[newName], err = OpenCol(path.Join(db.BaseDir, newName), numChunks)
-	return
+	delete(db.cols, oldName)
+	return nil
 }
 
-// Drop (delete) a collection.
-func (db *DB) Drop(name string) (err error) {
-	if col, ok := db.StrCol[name]; ok {
-		col.Close()
-		delete(db.StrCol, name)
-		return os.RemoveAll(path.Join(db.BaseDir, name))
-	} else {
-		return errors.New(fmt.Sprintf("Collection %s does not exists in %s", name, db.BaseDir))
+// Truncate a collection - delete all documents and clear
+func (db *DB) Truncate(name string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	if _, exists := db.cols[name]; !exists {
+		return fmt.Errorf("Collection %s does not exist", name)
+	} else if err := db.cols[name].Sync(); err != nil {
+		return err
 	}
+	col := db.cols[name]
+	for i := 0; i < db.numParts; i++ {
+		if err := col.parts[i].Clear(); err != nil {
+			return err
+		}
+		for _, ht := range col.hts[i] {
+			if err := ht.Clear(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
-// Compact and repair a collection.
-func (db *DB) Scrub(name string) (counter uint64, err error) {
-	counterMutex := &sync.Mutex{}
-	target := db.Use(name)
-	if target == nil {
-		return 0, errors.New(fmt.Sprintf("Collection %s does not exist in %s", name, db.BaseDir))
+// Scrub a collection - fix corrupted documents and de-fragment free space.
+func (db *DB) Scrub(name string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	if _, exists := db.cols[name]; !exists {
+		return fmt.Errorf("Collection %s does not exist", name)
+	} else if err := db.cols[name].Sync(); err != nil {
+		return err
 	}
-	// Create a temporary collection
-	numChunks := target.NumChunks
-	tempName := fmt.Sprintf("temp-%s-%v", name, time.Now().Unix())
-	db.Create(tempName, numChunks)
-	temp := db.Use(tempName)
-	// Recreate secondary indexes
-	for _, index := range target.SecIndexes {
-		temp.Index(index[0].Path)
+	// Prepare a temporary collection in file system
+	tmpColName := fmt.Sprintf("scrub-%s-%d", name, time.Now().UnixNano())
+	tmpColDir := path.Join(db.path, tmpColName)
+	if err := os.MkdirAll(tmpColDir, 0700); err != nil {
+		return err
 	}
-	// Reinsert documents
-	target.ForAll(func(id uint64, doc map[string]interface{}) bool {
-		if err := temp.InsertRecovery(id, doc); err == nil {
-			counterMutex.Lock()
-			counter += 1
-			counterMutex.Unlock()
-		} else {
-			tdlog.Errorf("Failed to recover document %v", doc)
+	// Mirror indexes from original collection
+	for _, idxPath := range db.cols[name].indexPaths {
+		if err := os.MkdirAll(path.Join(tmpColDir, strings.Join(idxPath, INDEX_PATH_SEP)), 0700); err != nil {
+			return err
+		}
+	}
+	// Iterate through all documents and put them into the temporary collection
+	tmpCol, err := OpenCol(db, tmpColName)
+	if err != nil {
+		return err
+	}
+	db.cols[name].ForEachDoc(false, func(id int, doc []byte) (moveOn bool) {
+		var docObj map[string]interface{}
+		if err := json.Unmarshal([]byte(doc), &docObj); err != nil {
+			// Skip corrupted document
+			return true
+		}
+		if err := tmpCol.InsertRecovery(id, docObj); err != nil {
+			tdlog.Errorf("Scrub %s: failed to insert back document %v", name, docObj)
 		}
 		return true
 	})
-	// Drop the old collection and rename the recovery collection
-	if err = db.Drop(name); err != nil {
-		tdlog.Errorf("Scrub operation failed to drop original collection %s: %v", name, err)
-		return
+	if err := tmpCol.Close(); err != nil {
+		return err
 	}
-	if err = db.Rename(tempName, name); err != nil {
-		tdlog.Errorf("Scrub operation failed to rename recovery collection %s: %v", tempName, err)
+	// Replace the original collection with the "temporary" one
+	db.cols[name].Close()
+	if err := os.RemoveAll(path.Join(db.path, name)); err != nil {
+		return err
 	}
-	return
+	if err := os.Rename(path.Join(db.path, tmpColName), path.Join(db.path, name)); err != nil {
+		return err
+	}
+	if db.cols[name], err = OpenCol(db, name); err != nil {
+		return err
+	}
+	return nil
 }
 
-// Change the number of partitions in collection
-func (db *DB) Repartition(name string, newNumber int) (counter uint64, err error) {
-	counterMutex := &sync.Mutex{}
-	target := db.Use(name)
-	if target == nil {
-		return 0, errors.New(fmt.Sprintf("Collection %s does not exist in %s", name, db.BaseDir))
+// Drop a collection and lose all of its documents and indexes.
+func (db *DB) Drop(name string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	if _, exists := db.cols[name]; !exists {
+		return fmt.Errorf("Collection %s does not exist", name)
+	} else if err := db.cols[name].Close(); err != nil {
+		return err
+	} else if err := os.RemoveAll(path.Join(db.path, name)); err != nil {
+		return err
 	}
-	if newNumber < 1 {
-		return 0, errors.New(fmt.Sprintf("New number of partitions must be above 0, %d given", newNumber))
+	delete(db.cols, name)
+	return nil
+}
+
+// Copy this database into destination directory.
+func (db *DB) Dump(dest string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	for _, col := range db.cols {
+		if err := col.Sync(); err != nil {
+			return err
+		}
 	}
-	// Create a temporary collection
-	tempName := fmt.Sprintf("temp-%s-%v", name, time.Now().Unix())
-	db.Create(tempName, newNumber)
-	temp := db.Use(tempName)
-	// Recreate secondary indexes
-	for _, index := range target.SecIndexes {
-		temp.Index(index[0].Path)
-	}
-	// Reinsert documents
-	target.ForAll(func(id uint64, doc map[string]interface{}) bool {
-		if err := temp.InsertRecovery(id, doc); err == nil {
-			counterMutex.Lock()
-			counter += 1
-			counterMutex.Unlock()
+	cpFun := func(currPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			relPath, err := filepath.Rel(db.path, currPath)
+			if err != nil {
+				return err
+			}
+			destDir := path.Join(dest, relPath)
+			if err := os.MkdirAll(destDir, 0700); err != nil {
+				return err
+			}
+			tdlog.Printf("Dump: created directory %s", destDir)
 		} else {
-			tdlog.Errorf("Failed to recover document %v", doc)
+			src, err := os.Open(currPath)
+			if err != nil {
+				return err
+			}
+			relPath, err := filepath.Rel(db.path, currPath)
+			if err != nil {
+				return err
+			}
+			destPath := path.Join(dest, relPath)
+			if _, fileExists := os.Open(destPath); fileExists == nil {
+				return fmt.Errorf("Destination file %s already exists", destPath)
+			}
+			destFile, err := os.Create(destPath)
+			if err != nil {
+				return err
+			}
+			written, err := io.Copy(destFile, src)
+			if err != nil {
+				return err
+			}
+			tdlog.Printf("Dump: copied file %s, size is %d", destPath, written)
 		}
-		return true
-	})
-	// Drop the old collection and rename the recovery collection
-	if err = db.Drop(name); err != nil {
-		tdlog.Errorf("Scrub operation failed to drop original collection %s: %v", name, err)
-		return
+		return nil
 	}
-	if err = db.Rename(tempName, name); err != nil {
-		tdlog.Errorf("Scrub operation failed to rename recovery collection %s: %v", tempName, err)
-	}
-	return
-}
-
-// Flush all collection data and index files.
-func (db *DB) Flush() {
-	for _, col := range db.StrCol {
-		if err := col.Flush(); err != nil {
-			tdlog.Errorf("Error during database flush: %v", err)
-		}
-	}
-}
-
-// Close all collections.
-func (db *DB) Close() {
-	for _, col := range db.StrCol {
-		col.Close()
-	}
+	return filepath.Walk(db.path, cpFun)
 }

@@ -1,5 +1,5 @@
 /* Query handlers. */
-package v3
+package httpapi
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"strconv"
 )
 
+// Execute a query and return documents from the result.
 func Query(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -24,27 +25,26 @@ func Query(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("'%v' is not valid JSON.", q), 400)
 		return
 	}
-	V3Sync.RLock()
-	defer V3Sync.RUnlock()
-	dbcol := V3DB.Use(col)
+	HttpDBSync.RLock()
+	defer HttpDBSync.RUnlock()
+	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
 	// Evaluate the query
-	queryResult := make(map[uint64]struct{})
+	queryResult := make(map[int]struct{})
 	if err := db.EvalQuery(qJson, dbcol, &queryResult); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 		return
 	}
 	// Construct array of result
-	resultDocs := make([]map[string]interface{}, len(queryResult))
+	resultDocs := make(map[string]interface{}, len(queryResult))
 	counter := 0
 	for docID := range queryResult {
-		var doc map[string]interface{}
-		dbcol.Read(docID, &doc)
+		doc, _ := dbcol.Read(docID)
 		if doc != nil {
-			resultDocs[counter] = doc
+			resultDocs[strconv.Itoa(docID)] = doc
 			counter++
 		}
 	}
@@ -57,6 +57,7 @@ func Query(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(string(resp)))
 }
 
+// Execute a query and return number of documents from the result.
 func Count(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -72,14 +73,14 @@ func Count(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("'%v' is not valid JSON.", q), 400)
 		return
 	}
-	V3Sync.RLock()
-	defer V3Sync.RUnlock()
-	dbcol := V3DB.Use(col)
+	HttpDBSync.RLock()
+	defer HttpDBSync.RUnlock()
+	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	queryResult := make(map[uint64]struct{})
+	queryResult := make(map[int]struct{})
 	if err := db.EvalQuery(qJson, dbcol, &queryResult); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 		return

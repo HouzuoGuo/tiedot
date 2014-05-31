@@ -32,7 +32,7 @@ This benchmark focuses on concurrency, to reflect performance under mixed worklo
 
 ## Available memory VS performance
 
-tiedot runs well with even less than 100 MB of available memory during normal operations. Similar to other NoSQL solutions, having larger free memory usually benefits performance.
+tiedot runs well with even less than 100 MB of available memory during normal operations. Similar to other NoSQL solutions, having larger amount of free memory improves performance when the database is also large.
 
 ### When data size < available memory
 
@@ -43,14 +43,6 @@ This is the preferred situation - there is plenty memory available for holding a
 This is not ideal - there is not enough memory to hold all collection data, memory buffer becomes less efficient due to frequent page faults.
 
 When approximately half of collection data resides in virtual memory, the performance of mixed workloads drops by approximately 400%; depending on your virtual memory media (flash/conventional HDD), amount of available main memory and usage, actual performance may vary.
-
-### Performance of "immediate durability" operations
-
-Normally, when running HTTP service, tiedot synchronizes memory buffers with disk files every 10 seconds.
-
-If you are using tiedot as an embedded database, the `db.Flush` and `col.Flush` APIs are available for manual control over durability.
-
-Durability control makes use of syscall `msync` to ensure immediate data durability on storage media. They are very expensive calls.
 
 ### Performance comparison with other NoSQL solutions
 

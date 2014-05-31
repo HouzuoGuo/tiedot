@@ -2,21 +2,25 @@
 
 Similar to many other popular NoSQL solutions, tiedot does not provide ACID transactions. However, atomic operations are possible within the scope of a single document.
 
-Buffer synchronization ("durability") is entirely automated when tiedot runs HTTP services, however embedded tiedot instance must manually invoke buffer synchronization APIs.
+A background goroutine is associated with every database instance, that periodically synchronizes file buffers (every 2 seconds).
+
+There are APIs for both HTTP API service and embedded usage for manually synchronizing all buffers.
 
 ## Concurrency of IO operations
 
-tiedot collection is partitioned into number of chunks; partitions function independent of each other, hence IO operations can be carried out concurrently on many partitions at once, governed by RWMutex.
+When you create a tiedot database, the number of CPUs available in the system is written down into a file called "number_of_partitions". From there, all new collections will be partitioned automatically.
 
-Secondary indexes are also partitioned - there are as many collection partitions as there are sec.index partitions. Governed by RWMutex, secondary index reads/updates can be carried out concurrently on many partitions.
+Partitions function independent of each other, hence IO operations can be carried out concurrently on many partitions at once, governed by RWMutex. In this way, tiedot confidently scales to 4 CPU cores.
+
+Indexes are also partitioned - there are as many collection partitions as there are index partitions. Governed by RWMutex, secondary index reads/updates can be carried out concurrently on many partitions.
 
 ## Concurrency of HTTP API endpoints
 
-While most HTTP endpoints support concurrency, there is a small number of operations which must "stop the world" to ensure safe operation - these operations block __all__ other HTTP endpoints until completed:
+While most HTTP endpoints support concurrency, there is a small number of operations which must "stop the world" to ensure safe operation - these operations block __all__ other HTTP endpoints until completion:
 
 - Create/rename/drop/scrub/repartition collection
 - Create/remove index
-- Dump/flush database
+- Dump/sync database
 
 Governed by a RWMutex, "stop the world" operations put write lock and all non-blocking operations put read lock on it.
 

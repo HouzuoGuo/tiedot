@@ -2,32 +2,23 @@
 
 <pre>
 TiedotDatabase         # Database "TiedotDatabase
-|-- CollectionA            # Collection "CollectionA"
-|   |-- chunk_0                # Partition 0
-|   |   |-- _data                  # Per-partition document data
-|   |   `-- _pk                    # Per-partition primary index
-|   |-- chunk_1                # Partiton 1
-|   |   |-- _data                  # Per-partition document data
-|   |   `-- _pk                    # Per-partition primary index
-|   |-- ht_Book,Author,Name    # Secondary index on ["Book, "Author", "Name"]
-|   |   |-- 0                      # Index partition 0
-|   |   `-- 1                      # Index partition 1
-|   `-- numchunks              # Text file - content indicates number of partitions
-`-- CollectionB
-    |-- chunk_0
-    |   |-- _data
-    |   `-- _pk
-    |-- chunk_1
-    |   |-- _data
-    |   `-- _pk
-    |-- chunk_2
-    |   |-- _data
-    |   `-- _pk
-    |-- ht_Day,Temperature,High
-    |   |-- 0
-    |   |-- 1
-    |   `-- 2
-    `-- numchunks
+├── CollectionA        # Collection called "CollectionA"
+│   ├── Book!Author!Name   # An index on path "Book" -> "Author" -> "Name"
+│   │   ├── 0                  # Index data partition 0
+│   │   └── 1                  # Index data partition 1
+│   ├── dat_0              # Document data partition 0
+│   ├── dat_1              # Document data partition 1
+│   ├── id_0               # Document ID lookup table for partition 0
+│   └── id_1               # Document ID lookup table for partition 1
+├── CollectionB        # Another collection called "CollectionA"
+│   ├── Day!Temperature!High
+│   │   ├── 0
+│   │   └── 1
+│   ├── dat_0
+│   ├── dat_1
+│   ├── id_0
+│   └── id_1
+└── number_of_partitions
 </pre>
 
 ### Data file structure
@@ -38,7 +29,7 @@ File has a capacity and may grow beyond the capacity to fit more documents. New 
 
 Updating document usually happens in-place, however if there is not enough room for the updated version, the document has to be deleted and re-inserted. Deleted documents are marked as deleted.
 
-Document partition is initially 16MB. It grows automatically by 16MB when there is no place left to append more documents.
+Document partition is initially 32MB. It grows automatically by 32MB when there is no place left to append more documents.
 
 #### Document format
 
@@ -57,7 +48,7 @@ There is no padding before or after a document. Every document has:
     <td>0 - deleted, 1 - valid</td>
   </tr>
   <tr>
-    <td>Unsigned 64-bit integer</td>
+    <td>Signed 64-bit integer</td>
     <td>10</td>
     <td>Allocated room</td>
     <td>How much room is left for the document</td>
@@ -91,7 +82,7 @@ There is no padding before or after a bucket. Each bucket is stored in the follo
     <th></th>
   </tr>
   <tr>
-    <td>Unsigned 64-bit integer</td>
+    <td>Signed 64-bit integer</td>
     <td>10</td>
     <td>Next chained bucket number</td>
     <td>When a bucket is the last in its chain, this number is 0.</td>
@@ -120,13 +111,13 @@ There is no padding before or after an entry. Each entry is stored in the follow
     <td>0 - deleted, 1 - valid</td>
   </tr>
   <tr>
-    <td>Unsigned 64-bit integer</td>
+    <td>Signed 64-bit integer</td>
     <td>10</td>
     <td>Key</td>
     <td>Entry key</td>
   </tr>
   <tr>
-    <td>Unsigned 64-bit integer</td>
+    <td>Signed 64-bit integer</td>
     <td>10</td>
     <td>Value</td>
     <td>Entry value</td>

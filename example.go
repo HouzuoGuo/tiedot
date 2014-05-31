@@ -4,40 +4,42 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
-	"math/rand"
 	"os"
-	"time"
 )
 
-// You are encouraged to use (nearly) all tiedot public functions concurrently.
-// There are few exceptions - see individual package/functions for details.
+/*
+You are encouraged to use nearly all tiedot public functions concurrently, except schema management functions such as:
+- Create, rename, drop collection
+- Create and remove collection index
+During the above operations, no other operation should be carried out at the same time (such as document update)!
+
+To compile and run the example:
+    go build && ./tiedot -mode=example
+*/
 
 func embeddedExample() {
 	// ****************** Collection Management ******************
 
-	// It is very important to initialize random number generator seed!
-	rand.Seed(time.Now().UTC().UnixNano())
-	// Create and open database
-	dir := "/tmp/MyDatabase"
-	os.RemoveAll(dir)
-	defer os.RemoveAll(dir)
+	myDBDir := "/tmp/MyDatabase"
+	os.RemoveAll(myDBDir)
+	defer os.RemoveAll(myDBDir)
 
-	myDB, err := db.OpenDB(dir)
+	// (Create if not exist) open a database
+	myDB, err := db.OpenDB(myDBDir)
 	if err != nil {
 		panic(err)
 	}
 
-	// Create two collections Feeds and Votes
-	// "2" means collection data and indexes are divided into two halves, allowing concurrent access from two threads
-	if err := myDB.Create("Feeds", 2); err != nil {
+	// Create two collections: Feeds and Votes
+	if err := myDB.Create("Feeds"); err != nil {
 		panic(err)
 	}
-	if err := myDB.Create("Votes", 2); err != nil {
+	if err := myDB.Create("Votes"); err != nil {
 		panic(err)
 	}
 
 	// What collections do I now have?
-	for name := range myDB.StrCol {
+	for _, name := range myDB.AllCols() {
 		fmt.Printf("I have a collection called %s\n", name)
 	}
 
@@ -56,6 +58,7 @@ func embeddedExample() {
 
 	// ****************** Document Management ******************
 	// Start using a collection
+	// (The reference is valid until DB schema changes or Scrub is carried out)
 	feeds := myDB.Use("Feeds")
 
 	// Insert document (document must be map[string]interface{})
@@ -67,8 +70,7 @@ func embeddedExample() {
 	}
 
 	// Read document
-	var readBack interface{}
-	feeds.Read(docID, &readBack)
+	readBack, err := feeds.Read(docID)
 	fmt.Println(readBack)
 
 	// Update document (document must be map[string]interface{})
@@ -81,9 +83,6 @@ func embeddedExample() {
 
 	// Delete document
 	feeds.Delete(docID)
-
-	// Delete document
-	feeds.Delete(123) // An ID which does not exist does no harm
 
 	// ****************** Index Management ******************
 	// Secondary indexes assist in many types of queries
@@ -99,8 +98,8 @@ func embeddedExample() {
 	}
 
 	// What indexes do I have on collection A?
-	for path := range feeds.SecIndexes {
-		fmt.Printf("I have an index on path %s\n", path)
+	for _, path := range feeds.AllIndexes() {
+		fmt.Printf("I have an index on path %v\n", path)
 	}
 
 	// Remove index
@@ -109,32 +108,41 @@ func embeddedExample() {
 	}
 
 	// ****************** Queries ******************
-	// Let's prepare a number of docments for a start
+	// Prepare some documents for the query
 	feeds.Insert(map[string]interface{}{"Title": "New Go release", "Source": "golang.org", "Age": 3})
 	feeds.Insert(map[string]interface{}{"Title": "Kitkat is here", "Source": "google.com", "Age": 2})
 	feeds.Insert(map[string]interface{}{"Title": "Good Slackware", "Source": "slackware.com", "Age": 1})
 
-	queryStr := `[{"eq": "New Go release", "in": ["Title"]}, {"eq": "slackware.com", "in": ["Source"]}]`
 	var query interface{}
-	json.Unmarshal([]byte(queryStr), &query)
+	json.Unmarshal([]byte(`[{"eq": "New Go release", "in": ["Title"]}, {"eq": "slackware.com", "in": ["Source"]}]`), &query)
 
-	queryResult := make(map[uint64]struct{}) // query result (document IDs) goes into map keys
+	queryResult := make(map[int]struct{}) // query result (document IDs) goes into map keys
 
 	if err := db.EvalQuery(query, feeds, &queryResult); err != nil {
 		panic(err)
 	}
 
-	// Query results are physical document IDs
+	// Query results are document IDs
 	for id := range queryResult {
 		fmt.Printf("Query returned document ID %d\n", id)
 	}
 
 	// To use the document itself, simply read it back
 	for id := range queryResult {
-		feeds.Read(id, &readBack)
+		readBack, err := feeds.Read(id)
+		if err != nil {
+			panic(err)
+		}
 		fmt.Printf("Query returned document %v\n", readBack)
 	}
 
+	// Make sure important transactions are persisted (very expensive call: do NOT invoke too often)
+	// (A background goroutine is already doing it for you every few seconds)
+	if err := myDB.Sync(); err != nil {
+		panic(err)
+	}
 	// Gracefully close database
-	myDB.Close()
+	if err := myDB.Close(); err != nil {
+		panic(err)
+	}
 }

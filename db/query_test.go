@@ -3,13 +3,12 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/chunkfile"
+	"io/ioutil"
 	"os"
-	"strings"
 	"testing"
 )
 
-func ensureMapHasKeys(m map[uint64]struct{}, keys ...uint64) bool {
+func ensureMapHasKeys(m map[int]struct{}, keys ...int) bool {
 	if len(m) != len(keys) {
 		return false
 	}
@@ -21,8 +20,8 @@ func ensureMapHasKeys(m map[uint64]struct{}, keys ...uint64) bool {
 	return true
 }
 
-func runQuery(query string, col *Col) (map[uint64]struct{}, error) {
-	result := make(map[uint64]struct{})
+func runQuery(query string, col *Col) (map[int]struct{}, error) {
+	result := make(map[int]struct{})
 	var jq interface{}
 	if err := json.Unmarshal([]byte(query), &jq); err != nil {
 		fmt.Println(err)
@@ -30,36 +29,43 @@ func runQuery(query string, col *Col) (map[uint64]struct{}, error) {
 	return result, EvalQuery(jq, col, &result)
 }
 
-func PaddingAttr(n uint64) string {
-	return `"padding": "` + strings.Repeat(" ", int(n)) + `"`
-}
-
 func TestQuery(t *testing.T) {
-	// prepare a collection of documents
-	tmp := "/tmp/tiedot_query_test"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	col, err := OpenCol(tmp, 2)
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(TEST_DATA_DIR+"/number_of_partitions", []byte("2"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := OpenDB(TEST_DATA_DIR)
 	if err != nil {
 		t.Fatal(err)
-		return
 	}
-	defer col.Close()
+	// Prepare collection and index
+	if err = db.Create("col"); err != nil {
+		t.Fatal(err)
+	}
+	col := db.Use("col")
 	docs := []string{
-		`{"a": {"b": [1]}, "c": 1, "d": 1, "f": 1, "g": 1, "special": {"thing": null}, "h": 1, ` + PaddingAttr(chunkfile.DOC_MAX_ROOM/3) + `}`,
-		`{"a": {"b": 1}, "c": [1], "d": 2, "f": 2, "g": 2, ` + PaddingAttr(chunkfile.DOC_MAX_ROOM/3) + `}`,
-		`{"a": [{"b": [2]}], "c": 2, "d": 1, "f": 3, "g": 3, "h": 3, ` + PaddingAttr(chunkfile.DOC_MAX_ROOM/3) + `}`,
-		`{"a": {"b": 3}, "c": [3], "d": 2, "f": 4, "g": 4, ` + PaddingAttr(chunkfile.DOC_MAX_ROOM/3) + `}`,
-		`{"a": {"b": [4]}, "c": 4, "d": 1, "f": 5, "g": 5, ` + PaddingAttr(chunkfile.DOC_MAX_ROOM/3) + `}`,
-		`{"a": [{"b": 5}, {"b": 6}], "c": 4, "d": 1, "f": 5, "g": 5, "h": 2, ` + PaddingAttr(chunkfile.DOC_MAX_ROOM/3) + `}`}
-	ids := [6]uint64{}
+		`{"a": {"b": [1]}, "c": 1, "d": 1, "f": 1, "g": 1, "special": {"thing": null}, "h": 1}`,
+		`{"a": {"b": 1}, "c": [1], "d": 2, "f": 2, "g": 2}`,
+		`{"a": [{"b": [2]}], "c": 2, "d": 1, "f": 3, "g": 3, "h": 3}`,
+		`{"a": {"b": 3}, "c": [3], "d": 2, "f": 4, "g": 4}`,
+		`{"a": {"b": [4]}, "c": 4, "d": 1, "f": 5, "g": 5}`,
+		`{"a": [{"b": 5}, {"b": 6}], "c": 4, "d": 1, "f": 5, "g": 5, "h": 2}`}
+	ids := [6]int{}
 	for i, doc := range docs {
 		var jsonDoc map[string]interface{}
 		json.Unmarshal([]byte(doc), &jsonDoc)
 		if ids[i], err = col.Insert(jsonDoc); err != nil {
-			fmt.Println(err)
+			t.Fatal(err)
 			return
 		}
+	}
+	q, err := runQuery(`["all"]`, col)
+	if err != nil {
+		t.Fatal(err)
 	}
 	col.Index([]string{"a", "b"})
 	col.Index([]string{"f"})
@@ -67,7 +73,7 @@ func TestQuery(t *testing.T) {
 	col.Index([]string{"special"})
 	col.Index([]string{"e"})
 	// expand numbers
-	q, err := runQuery(`["1", "2", ["3", "4"], "5"]`, col)
+	q, err = runQuery(`["1", "2", ["3", "4"], "5"]`, col)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,45 +181,6 @@ func TestQuery(t *testing.T) {
 	if !ensureMapHasKeys(q, ids[5], ids[4]) {
 		t.Fatal(q)
 	}
-	// regexes
-	q, err = runQuery(`{"re": "^[0-9]*$", "in": ["f"]}`, col)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ensureMapHasKeys(q, ids[0], ids[1], ids[2], ids[3], ids[4], ids[5]) {
-		t.Fatal(q)
-	}
-	q, err = runQuery(`{"re": ".*", "in": ["a"]}`, col)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ensureMapHasKeys(q, ids[0], ids[1], ids[2], ids[3], ids[4], ids[5]) {
-		fmt.Printf("%+v\n", q)
-		t.Fatal(q)
-	}
-	q, err = runQuery(`{"re": "thing", "in": ["special"]}`, col)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ensureMapHasKeys(q, ids[0]) {
-		fmt.Printf("%+v\n", q)
-		t.Fatal(q)
-	}
-	q, err = runQuery(`{"re": "thing", "in": ["special"]}`, col)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ensureMapHasKeys(q, ids[0]) {
-		fmt.Printf("%+v\n", q)
-		t.Fatal(q)
-	}
-	q, err = runQuery(`{"re": "^[234]$", "in": ["f"], "limit": 2}`, col)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ensureMapHasKeys(q, ids[1], ids[2]) && !ensureMapHasKeys(q, ids[2], ids[3]) && !ensureMapHasKeys(q, ids[1], ids[3]) {
-		t.Fatal(q)
-	}
 	// all documents
 	q, err = runQuery(`"all"`, col)
 	if err != nil {
@@ -228,7 +195,7 @@ func TestQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ensureMapHasKeys(q, ids[0], ids[4]) {
+	if !ensureMapHasKeys(q, ids[0], ids[4]) && !ensureMapHasKeys(q, ids[1], ids[4]) {
 		t.Fatal(q)
 	}
 	// intersection

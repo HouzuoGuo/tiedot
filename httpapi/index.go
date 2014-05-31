@@ -1,5 +1,5 @@
 /* Index management handlers. */
-package v3
+package httpapi
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// Put an index on a document path.
 func Index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
@@ -18,9 +19,9 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "path", &path) {
 		return
 	}
-	V3Sync.Lock()
-	defer V3Sync.Unlock()
-	dbcol := V3DB.Use(col)
+	HttpDBSync.Lock()
+	defer HttpDBSync.Unlock()
+	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
@@ -32,6 +33,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(201)
 }
 
+// Return all indexed paths.
 func Indexes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
@@ -39,15 +41,15 @@ func Indexes(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "col", &col) {
 		return
 	}
-	V3Sync.Lock()
-	defer V3Sync.Unlock()
-	dbcol := V3DB.Use(col)
+	HttpDBSync.Lock()
+	defer HttpDBSync.Unlock()
+	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	indexes := make([]string, 0)
-	for path := range dbcol.SecIndexes {
+	indexes := make([][]string, 0)
+	for _, path := range dbcol.AllIndexes() {
 		indexes = append(indexes, path)
 	}
 	resp, err := json.Marshal(indexes)
@@ -58,6 +60,7 @@ func Indexes(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
+// Remove an indexed path.
 func Unindex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
@@ -68,9 +71,9 @@ func Unindex(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "path", &path) {
 		return
 	}
-	V3Sync.Lock()
-	defer V3Sync.Unlock()
-	dbcol := V3DB.Use(col)
+	HttpDBSync.Lock()
+	defer HttpDBSync.Unlock()
+	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return

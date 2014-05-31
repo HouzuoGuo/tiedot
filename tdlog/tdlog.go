@@ -4,7 +4,7 @@ import (
 	"log"
 )
 
-var VerboseLog bool = true
+var VerboseLog bool = false
 
 // Write a non-fatal advisory log message
 func Printf(template string, params ...interface{}) {
@@ -12,15 +12,15 @@ func Printf(template string, params ...interface{}) {
 		log.Printf(template, params...)
 	}
 }
-func Println(line ...interface{}) {
+func Println(params ...interface{}) {
 	if VerboseLog {
-		log.Println(line...)
+		log.Println(params...)
 	}
 }
 
 // Write an error log message, but continue program execution
-func Error(line ...interface{}) {
-	log.Println(line...)
+func Error(params ...interface{}) {
+	log.Println(params...)
 }
 func Errorf(template string, params ...interface{}) {
 	log.Printf(template, params...)

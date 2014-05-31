@@ -1,293 +1,261 @@
-/* Database test cases. */
 package db
 
 import (
-	"encoding/json"
-	"fmt"
+	"io/ioutil"
 	"os"
-	"sync"
+	"path"
+	"runtime"
 	"testing"
 )
 
-func TestCRUD(t *testing.T) {
-	tmp := "/tmp/tiedot_db_test"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	db, err := OpenDB(tmp)
+const (
+	TEST_DATA_DIR = "/tmp/tiedot_test"
+)
+
+func touchFile(dir, filename string) {
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		panic(err)
+	}
+	if err := ioutil.WriteFile(path.Join(dir, filename), make([]byte, 0), 0600); err != nil {
+		panic(err)
+	}
+}
+
+func TestOpenEmptyDB(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, err := OpenDB(TEST_DATA_DIR)
 	if err != nil {
-		t.Fatalf("Failed to open: %v", err)
-		return
-	}
-	// create
-	if err := db.Create("a", 2); err != nil {
-		t.Fatalf("Failed to create: %v", err)
-	}
-	if err := db.Create("b", 3); err != nil {
-		t.Fatalf("Failed to create: %v", err)
-	}
-	if db.Use("a") == nil {
-		t.Fatalf("a doesn't exist?!")
-	}
-	if db.Use("b") == nil {
-		t.Fatalf("b doesn't exist?!")
-	}
-	// use
-	col := db.Use("a")
-	if err = col.Index([]string{"a"}); err != nil {
 		t.Fatal(err)
 	}
-	// rename
+	if db.numParts != runtime.NumCPU() {
+		t.Fatal(db.numParts)
+	}
+	if err := db.Create("a"); err != nil {
+		t.Fatal(err)
+	}
+	if len(db.cols["a"].parts) != runtime.NumCPU() {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOpenErrDB(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
+		t.Fatal(err)
+	}
+	touchFile(TEST_DATA_DIR+"/ColA", "dat_0")
+	touchFile(TEST_DATA_DIR+"/ColA/a!b!c", "0")
+	if db, err := OpenDB(TEST_DATA_DIR); err == nil {
+		t.Fatal("Did not error")
+	} else if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOpenSyncCloseDB(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(TEST_DATA_DIR+"/number_of_partitions", []byte("2"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	touchFile(TEST_DATA_DIR+"/ColA", "dat_0")
+	touchFile(TEST_DATA_DIR+"/ColA/a!b!c", "0")
+	if err := os.MkdirAll(TEST_DATA_DIR+"/ColB", 0700); err != nil {
+		panic(err)
+	}
+	db, err := OpenDB(TEST_DATA_DIR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if db.path != TEST_DATA_DIR || db.numParts != 2 || db.cols["ColA"] == nil || db.cols["ColB"] == nil {
+		t.Fatal(db.cols)
+	}
+	colA := db.cols["ColA"]
+	colB := db.cols["ColB"]
+	if len(colA.parts) != 2 || len(colA.hts) != 2 {
+		t.Fatal(colA)
+	}
+	if colA.indexPaths["a!b!c"][0] != "a" || colA.indexPaths["a!b!c"][1] != "b" || colA.indexPaths["a!b!c"][2] != "c" {
+		t.Fatal(colA.indexPaths)
+	}
+	if colA.hts[0]["a!b!c"] == nil || colA.hts[1]["a!b!c"] == nil {
+		t.Fatal(colA.hts)
+	}
+	if len(colB.parts) != 2 || len(colB.hts) != 2 {
+		t.Fatal(colB)
+	}
+	if err := db.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestColCrud(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(TEST_DATA_DIR+"/number_of_partitions", []byte("2"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := OpenDB(TEST_DATA_DIR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(db.AllCols()) != 0 {
+		t.Fatal(db.AllCols())
+	}
+	// Create
+	if err := db.Create("a"); err != nil {
+		t.Fatal(err)
+	}
+	if db.Create("a") == nil {
+		t.Fatal("Did not error")
+	}
+	if err := db.Create("b"); err != nil {
+		t.Fatal(err)
+	}
+	// Get all names & use
+	if allNames := db.AllCols(); !(allNames[0] == "a" && allNames[1] == "b") {
+		t.Fatal(allNames)
+	}
+	if db.Use("a") == nil || db.Use("b") == nil || db.Use("abcde") != nil {
+		t.Fatal(db.cols)
+	}
+	// Rename
+	if db.Rename("a", "a") == nil {
+		t.Fatal("Did not error")
+	}
+	if db.Rename("a", "b") == nil {
+		t.Fatal("Did not error")
+	}
+	if db.Rename("abc", "b") == nil {
+		t.Fatal("Did not error")
+	}
 	if err := db.Rename("a", "c"); err != nil {
 		t.Fatal(err)
 	}
-	if _, nope := db.StrCol["a"]; nope {
-		t.Fatalf("a still exists after it is renamed")
-	}
-	if _, ok := db.StrCol["c"]; !ok {
-		t.Fatalf("c does not exist")
-	}
-	// scrub, flush and reopen
-	if _, err = db.Scrub("c"); err != nil {
+	if err := db.Rename("b", "d"); err != nil {
 		t.Fatal(err)
 	}
-	db.Flush()
-	db.Close()
-	db, err = OpenDB(tmp)
-	if err != nil {
-		t.Fatalf("Failed to open: %v", err)
-		return
+	// Rename - verify
+	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c") {
+		t.Fatal(allNames)
 	}
-
-	col = db.Use("c")
-	// use renamed
-	if err = col.Index([]string{"b"}); err != nil {
+	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
+		t.Fatal(db.cols)
+	}
+	// Truncate
+	if db.Truncate("a") == nil {
+		t.Fatal("Did not error")
+	}
+	if err := db.Truncate("c"); err != nil {
 		t.Fatal(err)
 	}
-	// drop
+	if err := db.Truncate("d"); err != nil {
+		t.Fatal(err)
+	}
+	// Truncate - verify
+	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c") {
+		t.Fatal(allNames)
+	}
+	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
+		t.Fatal(db.cols)
+	}
+	// Scrub
+	if err := db.Scrub("c"); err != nil {
+		t.Fatal(err)
+	}
+	// Scrub - verify
+	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c") {
+		t.Fatal(allNames)
+	}
+	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
+		t.Fatal(db.cols)
+	}
+	// More scrub tests are in doc_test.go
+	// Drop
+	if db.Drop("a") == nil {
+		t.Fatal("Did not error")
+	}
 	if err := db.Drop("c"); err != nil {
 		t.Fatal(err)
 	}
-	if _, nope := db.StrCol["c"]; nope {
-		t.Fatalf("c still exists after it is deleted")
+	if allNames := db.AllCols(); allNames[0] != "d" {
+		t.Fatal(allNames)
 	}
-	// flush & close
-	db.Flush()
-	db.Close()
-	// use reopened
-	db, err = OpenDB(tmp)
-	if err != nil {
-		t.Fatalf("Failed to open: %v", err)
-		return
+	if db.Use("d") == nil {
+		t.Fatal(db.cols)
 	}
-	if err = db.Use("b").Index([]string{"c"}); err != nil {
+	if err := db.Drop("d"); err != nil {
 		t.Fatal(err)
 	}
-	// reopen and verify chunk number
-	if db.Use("b").NumChunks != 3 {
-		t.Fatal()
+	if allNames := db.AllCols(); len(allNames) != 0 {
+		t.Fatal(allNames)
+	}
+	if db.Use("d") != nil {
+		t.Fatal(db.cols)
+	}
+	// Sync & close
+	if err := db.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 
-func TestScrub(t *testing.T) {
-	tmp := "/tmp/tiedot_db_test"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	db, err := OpenDB(tmp)
-	if err != nil {
-		t.Fatalf("Failed to open: %v", err)
-		return
-	}
-	// Create and use collection A
-	db.Create("a", 2)
-	col := db.Use("a")
-	// Create two indexes
-	if err = col.Index([]string{"a", "b", "c"}); err != nil {
+func TestDumpDB(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR + "bak")
+	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
 		t.Fatal(err)
-		return
 	}
-	if err = col.Index([]string{"d"}); err != nil {
+	if err := ioutil.WriteFile(TEST_DATA_DIR+"/number_of_partitions", []byte("2"), 0600); err != nil {
 		t.Fatal(err)
-		return
 	}
-	// Insert 10000 documents
-	var doc map[string]interface{}
-	json.Unmarshal([]byte(`{"a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`), &doc)
-	for i := 0; i < 10000; i++ {
-		_, err := col.Insert(doc)
-		if err != nil {
-			t.Fatal("Insert fault")
-		}
-	}
-	// Do some serious damage to index and collection data
-	for i := 0; i < 1024*1024*1; i++ {
-		col.Chunks[0].PK.File.Buf[i] = 6
-	}
-	for i := 0; i < 1024*1024*1; i++ {
-		col.Chunks[1].PK.File.Buf[i] = 6
-	}
-	for i := 1024 * 512; i < 1024*1024; i++ {
-		col.Chunks[0].Data.File.Buf[i] = 6
-	}
-	for i := 1024 * 512; i < 1024*1024; i++ {
-		col.Chunks[1].Data.File.Buf[i] = 6
-	}
-	for i := 1024; i < 1024*128; i++ {
-		col.SecIndexes["a,b,c"][0].File.Buf[i] = 6
-	}
-	for i := 1024; i < 1024*128; i++ {
-		col.SecIndexes["d"][1].File.Buf[i] = 6
-	}
-	db.Flush()
-	db.Close()
-	// Reopen the chunk and expect data structure failure messages from log
-	fmt.Println("Please ignore the following error messages")
-	reopen, err := OpenDB(tmp)
+	db, err := OpenDB(TEST_DATA_DIR)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recoveredNum, err := reopen.Scrub("a")
+	if err := db.Create("a"); err != nil {
+		t.Fatal(err)
+	} else if err := db.Create("b"); err != nil {
+		t.Fatal(err)
+	}
+	id1, err := db.Use("a").Insert(map[string]interface{}{"whatever": "1"})
+	if err != nil {
+		t.Fatal(err)
+	} else if err := db.Dump(TEST_DATA_DIR + "bak"); err != nil {
+		t.Fatal(err)
+	}
+	// Open the new database
+	db2, err := OpenDB(TEST_DATA_DIR + "bak")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Confirm that 6212 documents are successfully recovered in four ways
-	counter := 0
-	// first - deserialization & scan
-	var recoveredDoc interface{}
-	reopen.Use("a").DeserializeAll(&recoveredDoc, func() bool {
-		counter++
-		return true
-	})
-	if counter != 6174 {
-		t.Fatal("Did not recover enough documents", counter)
+	if allCols := db2.AllCols(); !(allCols[0] == "a" && allCols[1] == "b" || allCols[0] == "b" && allCols[1] == "a") {
+		t.Fatal(allCols)
 	}
-	// second - collection scan
-	counter = 0
-	counterMutex := &sync.Mutex{}
-	reopen.Use("a").ForAll(func(_ uint64, _ map[string]interface{}) bool {
-		counterMutex.Lock()
-		counter++
-		counterMutex.Unlock()
-		return true
-	})
-	if counter != 6174 {
-		t.Fatal("Did not recover enough documents")
+	if doc, err := db2.Use("a").Read(id1); err != nil || doc["whatever"].(string) != "1" {
+		t.Fatal(doc, err)
 	}
-	// third - index scan
-	keys1, vals1 := reopen.Use("a").SecIndexes["a,b,c"][0].GetAll(0)
-	keys2, vals2 := reopen.Use("a").SecIndexes["a,b,c"][1].GetAll(0)
-	if !(len(keys1)+len(keys2) == 6174*3 && len(vals1)+len(vals2) == 6174*3) {
-		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals1)+len(vals2))
-	}
-	keys3, vals3 := reopen.Use("a").SecIndexes["d"][1].GetAll(0)
-	keys4, vals4 := reopen.Use("a").SecIndexes["d"][0].GetAll(0)
-	if !(len(keys3)+len(keys4) == 6174*2 && len(vals3)+len(vals4) == 6174*2) {
-		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals1)+len(vals2))
-	}
-
-	// fourth - scrub return value
-	if recoveredNum != 6174 {
-		t.Fatal("Scrub return value is wrong")
-	}
-}
-
-func TestRepartition(t *testing.T) {
-	tmp := "/tmp/tiedot_db_test"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	db, err := OpenDB(tmp)
-	if err != nil {
-		t.Fatalf("Failed to open: %v", err)
-		return
-	}
-	// Create and use collection A
-	db.Create("a", 4)
-	col := db.Use("a")
-	// Create two indexes
-	if err = col.Index([]string{"a", "b", "c"}); err != nil {
-		t.Fatal(err)
-		return
-	}
-	if err = col.Index([]string{"d"}); err != nil {
-		t.Fatal(err)
-		return
-	}
-	// Insert 10000 documents
-	var doc map[string]interface{}
-	json.Unmarshal([]byte(`{"a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`), &doc)
-	for i := 0; i < 10000; i++ {
-		_, err := col.Insert(doc)
-		if err != nil {
-			t.Fatal("Insert fault")
-		}
-	}
-	// Do some serious damage to index and collection data
-	for i := 0; i < 1024*1024*1; i++ {
-		col.Chunks[0].PK.File.Buf[i] = 6
-	}
-	for i := 0; i < 1024*1024*1; i++ {
-		col.Chunks[1].PK.File.Buf[i] = 6
-	}
-	for i := 1024 * 256; i < 1024*1024; i++ {
-		col.Chunks[0].Data.File.Buf[i] = 6
-	}
-	for i := 1024 * 256; i < 1024*1024; i++ {
-		col.Chunks[1].Data.File.Buf[i] = 6
-	}
-	for i := 1024; i < 1024*128; i++ {
-		col.SecIndexes["a,b,c"][0].File.Buf[i] = 6
-	}
-	for i := 1024; i < 1024*128; i++ {
-		col.SecIndexes["d"][1].File.Buf[i] = 6
-	}
-	db.Flush()
-	db.Close()
-	// Reopen the chunk and expect data structure failure messages from log
-	fmt.Println("Please ignore the following error messages")
-	reopen, err := OpenDB(tmp)
-	if err != nil {
+	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
-	recoveredNum, err := reopen.Repartition("a", 2)
-	if err != nil {
+	if err := db2.Close(); err != nil {
 		t.Fatal(err)
-	}
-	// Confirm that 8110 documents are successfully recovered in four ways
-	counter := 0
-	// first - deserialization & scan
-	var recoveredDoc interface{}
-	reopen.Use("a").DeserializeAll(&recoveredDoc, func() bool {
-		counter++
-		return true
-	})
-	if counter != 8102 {
-		t.Fatal("Did not recover enough documents", counter)
-	}
-	// second - collection scan
-	counter = 0
-	counterMutex := &sync.Mutex{}
-	reopen.Use("a").ForAll(func(_ uint64, _ map[string]interface{}) bool {
-		counterMutex.Lock()
-		counter++
-		counterMutex.Unlock()
-		return true
-	})
-	if counter != 8102 {
-		t.Fatal("Did not recover enough documents")
-	}
-	// third - index scan
-	keys1, vals1 := reopen.Use("a").SecIndexes["a,b,c"][0].GetAll(0)
-	keys2, vals2 := reopen.Use("a").SecIndexes["a,b,c"][1].GetAll(0)
-	if !(len(keys1)+len(keys2) == 8102*3 && len(vals1)+len(vals2) == 8102*3) {
-		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals1)+len(vals2))
-	}
-	keys3, vals3 := reopen.Use("a").SecIndexes["d"][1].GetAll(0)
-	keys4, vals4 := reopen.Use("a").SecIndexes["d"][0].GetAll(0)
-	if !(len(keys3)+len(keys4) == 8102*2 && len(vals3)+len(vals4) == 8102*2) {
-		t.Fatalf("Did not recover enough documents on index, got only %d", len(vals1)+len(vals2))
-	}
-
-	// fourth - scrub return value
-	if recoveredNum != 8102 {
-		t.Fatal("Scrub return value is wrong")
 	}
 }

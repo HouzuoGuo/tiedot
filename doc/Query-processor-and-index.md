@@ -37,19 +37,15 @@ Here is the complete list of all supported operations:
     <td>{"c": [sub-query1, sub-query2..]}</td>
     <td>Evaluate and complement sub-query results.</td>
   </tr>
-  <tr>
-    <td>{"re": #, "limit": #}</td>
-    <td>Return all documents that match the regex.</td>
-  </tr>
 </table>
 
-Limits are optional.
+`limit` is optional.
 
 ### Lookup queries
 
-Document unique IDs are indexed on primary key. Secondary indexes works on a different "path" - a series of attribute names locating the indexed value, for example, path `a,b,c` will locate value `1` in document `{"a": {"b": {"c": 1}}}`.
+Indexes works on a "path" - a series of attribute names locating the indexed value, for example, path `a,b,c` will locate value `1` in document `{"a": {"b": {"c": 1}}}`.
 
-Secondary index should be available before carrying out lookup queries.
+Index must be available before carrying out lookup queries.
 
 ### Index assisted range queries
 

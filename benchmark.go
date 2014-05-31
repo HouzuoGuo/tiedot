@@ -1,4 +1,8 @@
-// Benchmark of tiedot individual features and usages.
+/*
+Two benchmrk scenarios:
+- Document CRUD benchmark (intend to catch performance regressions)
+- Document CRUD in parallel (intend to catch concurrency related bugs)
+*/
 package main
 
 import (
@@ -31,23 +35,31 @@ func average(name string, total int, init func(), do func()) {
 		}()
 	}
 	wp.Wait()
-	// Print average time consumption and summary.
 	end := float64(time.Now().UTC().UnixNano())
 	fmt.Printf("%s %d: %d ns/iter, %d iter/sec\n", name, int(total), int((end-start)/iter), int(1000000000/((end-start)/iter)))
 }
 
-// Benchmark document insert, read, query, update and delete.
-func benchmark(benchSize int) {
-	ids := make([]uint64, 0)
-
-	// Prepare a collection with two indexes
-	tmp := "/tmp/tiedot_bench2"
-	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
-	col, err := db.OpenCol(tmp, 16)
+// Create a temporary database and collection for benchmark use.
+func mkTmpDBAndCol(dbPath string, colName string) (col *db.Col) {
+	os.RemoveAll(dbPath)
+	tmpDB, err := db.OpenDB(dbPath)
 	if err != nil {
 		panic(err)
 	}
+	tmpCol, err := db.OpenCol(tmpDB, colName)
+	if err != nil {
+		panic(err)
+	}
+	return tmpCol
+}
+
+// Benchmark individual document operation: insert, read, query, update and delete.
+func benchmark(benchSize int) {
+	ids := make([]int, 0, benchSize)
+	// Prepare a collection with two indexes
+	tmp := "/tmp/tiedot_bench2"
+	defer os.RemoveAll(tmp)
+	col := mkTmpDBAndCol(tmp, "tmp")
 	col.Index([]string{"a"})
 	col.Index([]string{"b"})
 
@@ -60,27 +72,20 @@ func benchmark(benchSize int) {
 			panic("json error")
 		}
 		if _, err := col.Insert(doc); err != nil {
-			panic(err)
+			fmt.Println("Insert error", err)
 		}
 	})
 
 	// Collect all document IDs and benchmark document read
-	idsMutex := sync.Mutex{}
 	average("read", benchSize, func() {
-		col.ForAll(func(id uint64, _ map[string]interface{}) bool {
-			idsMutex.Lock()
+		col.ForEachDoc(false, func(id int, _ []byte) bool {
 			ids = append(ids, id)
-			idsMutex.Unlock()
 			return true
 		})
 	}, func() {
-		var doc interface{}
-		_, err := col.Read(ids[rand.Intn(benchSize)], &doc)
-		if err != nil {
-			panic(err)
-		}
-		if doc == nil {
-			panic("read error")
+		doc, err := col.Read(ids[rand.Intn(benchSize)])
+		if doc == nil || err != nil {
+			fmt.Println("Read error", doc, err)
 		}
 	})
 
@@ -91,9 +96,9 @@ func benchmark(benchSize int) {
 			`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["b"], "limit": 1}]}`), &query); err != nil {
 			panic("json error")
 		}
-		result := make(map[uint64]struct{})
+		result := make(map[int]struct{})
 		if err := db.EvalQuery(query, col, &result); err != nil {
-			panic("query error")
+			fmt.Println("Query error", err)
 		}
 	})
 
@@ -106,7 +111,7 @@ func benchmark(benchSize int) {
 			panic("json error")
 		}
 		if err := col.Update(ids[rand.Intn(benchSize)], doc); err != nil {
-			panic(err)
+			fmt.Println("Update error", err)
 		}
 	})
 
@@ -117,20 +122,17 @@ func benchmark(benchSize int) {
 	col.Close()
 }
 
-// Run document opearations (insert, read, query, update and delete) all at once.
+// Run document operations (insert, read, query, update and delete) all at once.
 func benchmark2(benchSize int) {
-	docs := make([]uint64, 0, benchSize*2+1000)
+	docs := make([]int, 0, benchSize*2+1000)
 	wp := new(sync.WaitGroup)
 	numThreads := runtime.GOMAXPROCS(-1)
 	wp.Add(5 * numThreads) // There are 5 goroutines: insert, read, query, update and delete
 
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_bench"
-	os.RemoveAll(tmp)
-	col, err := db.OpenCol(tmp, 16)
-	if err != nil {
-		panic(err)
-	}
+	defer os.RemoveAll(tmp)
+	col := mkTmpDBAndCol(tmp, "tmp")
 	col.Index([]string{"a"})
 	col.Index([]string{"b"})
 
@@ -145,7 +147,7 @@ func benchmark2(benchSize int) {
 		if newID, err := col.Insert(docToInsert); err == nil {
 			docs = append(docs, newID)
 		} else {
-			panic(err)
+			fmt.Println("Insert error", err)
 		}
 	}
 	start := float64(time.Now().UTC().UnixNano())
@@ -165,7 +167,7 @@ func benchmark2(benchSize int) {
 				if newID, err := col.Insert(docToInsert); err == nil {
 					docs = append(docs, newID)
 				} else {
-					panic(err)
+					fmt.Println("Insert error", err)
 				}
 			}
 			fmt.Printf("Insert thread %d completed\n", i)
@@ -177,9 +179,8 @@ func benchmark2(benchSize int) {
 		go func(i int) {
 			fmt.Printf("Read thread %d starting\n", i)
 			defer wp.Done()
-			var doc interface{}
 			for j := 0; j < benchSize/numThreads*2; j++ {
-				col.Read(docs[rand.Intn(len(docs))], &doc)
+				col.Read(docs[rand.Intn(len(docs))])
 			}
 			fmt.Printf("Read thread %d completed\n", i)
 		}(i)
@@ -197,9 +198,9 @@ func benchmark2(benchSize int) {
 					`{"eq": `+strconv.Itoa(rand.Intn(benchSize))+`, "in": ["b"], "limit": 1}]}`), &query); err != nil {
 					panic("json error")
 				}
-				result := make(map[uint64]struct{})
+				result := make(map[int]struct{})
 				if err = db.EvalQuery(query, col, &result); err != nil {
-					panic("query error")
+					fmt.Println("Query error", err)
 				}
 			}
 			fmt.Printf("Query thread %d completed\n", i)
@@ -218,7 +219,7 @@ func benchmark2(benchSize int) {
 			"more": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed mi sem, ultrices mollis nisl quis, convallis volutpat ante. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Proin interdum egestas risus, imperdiet vulputate est. Cras semper risus sit amet dolor facilisis malesuada. Nunc velit augue, accumsan id facilisis ultricies, vehicula eget massa. Ut non dui eu magna egestas aliquam. Fusce in pellentesque risus. Aliquam ornare pharetra lacus in rhoncus. In eu commodo nibh. Praesent at lacinia quam. Curabitur laoreet pellentesque mollis. Maecenas mollis bibendum neque. Pellentesque semper justo ac purus auctor cursus. In egestas sodales metus sed dictum. Vivamus at elit nunc. Phasellus sit amet augue sed augue rhoncus congue. Aenean et molestie augue. Aliquam blandit lacus eu nunc rhoncus, vitae varius mauris placerat. Quisque velit urna, pretium quis dolor et, blandit sodales libero. Nulla sollicitudin est vel dolor feugiat viverra massa nunc."}`), &updated); err != nil {
 					panic("json error")
 				}
-				col.Update(docs[uint64(rand.Intn(len(docs)))], updated)
+				col.Update(docs[rand.Intn(len(docs))], updated)
 			}
 			fmt.Printf("Update thread %d completed\n", i)
 		}(i)

@@ -1,5 +1,5 @@
 /* Document management handlers. */
-package v3
+package httpapi
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 	"strconv"
 )
 
+// Insert a document into collection.
 func Insert(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -18,9 +19,9 @@ func Insert(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "doc", &doc) {
 		return
 	}
-	V3Sync.RLock()
-	defer V3Sync.RUnlock()
-	dbcol := V3DB.Use(col)
+	HttpDBSync.RLock()
+	defer HttpDBSync.RUnlock()
+	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
@@ -39,6 +40,7 @@ func Insert(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprint(id)))
 }
 
+// Get a document.
 func Get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
@@ -49,20 +51,19 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "id", &id) {
 		return
 	}
-	V3Sync.RLock()
-	defer V3Sync.RUnlock()
-	dbcol := V3DB.Use(col)
+	HttpDBSync.RLock()
+	defer HttpDBSync.RUnlock()
+	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	docID, err := strconv.ParseUint(id, 10, 64)
+	docID, err := strconv.Atoi(id)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
 	}
-	var doc interface{}
-	_, err = dbcol.Read(docID, &doc)
+	doc, err := dbcol.Read(docID)
 	if doc == nil {
 		http.Error(w, fmt.Sprintf("No such document ID %d.", docID), 404)
 		return
@@ -75,6 +76,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
+// Update a document.
 func Update(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -88,14 +90,14 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "doc", &doc) {
 		return
 	}
-	V3Sync.RLock()
-	defer V3Sync.RUnlock()
-	dbcol := V3DB.Use(col)
+	HttpDBSync.RLock()
+	defer HttpDBSync.RUnlock()
+	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	docID, err := strconv.ParseUint(id, 10, 64)
+	docID, err := strconv.Atoi(id)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
@@ -112,6 +114,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Delete a document.
 func Delete(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -122,14 +125,14 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "id", &id) {
 		return
 	}
-	V3Sync.RLock()
-	defer V3Sync.RUnlock()
-	dbcol := V3DB.Use(col)
+	HttpDBSync.RLock()
+	defer HttpDBSync.RUnlock()
+	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	docID, err := strconv.ParseUint(id, 10, 64)
+	docID, err := strconv.Atoi(id)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
