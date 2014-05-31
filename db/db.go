@@ -61,7 +61,7 @@ func (db *DB) load() error {
 	// Get number of partitions from the text file
 	if numParts, err := ioutil.ReadFile(numPartsFilePath); err != nil {
 		return err
-	} else if db.numParts, err = strconv.Atoi(string(numParts)); err != nil {
+	} else if db.numParts, err = strconv.Atoi(strings.Trim(string(numParts), "\r\n ")); err != nil {
 		return err
 	}
 	// Look for collection directories
