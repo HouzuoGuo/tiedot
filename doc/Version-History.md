@@ -1,10 +1,30 @@
-##
+### 3.0 (2014-05-31)
+
+Bug fix:
+
+- Fix numerous bugs that may cause inconsistent index state in version 2.x
+
+Improvements:
+
+- Move document ID out of document data itself, improving performance.
+- Tweaked hash table initial parameters.
+
+Be aware that:
+
+- Version 3.0 is not compatible with older databases, unfortunately a migration tool is not available at the moment.
+
+### 2.1 (2014-05-31)
+
+New experimental features:
+
+- JSON parameterized queries
+- A Python client for HTTP APIs
 
 ### 2.0 (2014-01-20)
 
 tiedot 2.0 brings to you new file structures, APIs and a much cleaner codebase. The essential new feature in 2.0 is that all collections are partitioned, hoping to show better scalability; but the mechanism is still being tweaked.
 
-Unfortunately, it is not compatible with older 1.x data files.
+Unfortunately, it is not compatible with older 1.x databases.
 
 ### 1.2 (2013-12-31)
 
