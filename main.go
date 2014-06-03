@@ -20,12 +20,13 @@ func main() {
 	}
 
 	// Parse CLI parameters
-	var mode, dir string
+	var mode, dir, webcp string
 	var port, maxprocs, benchSize int
 	var profile bool
 	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|example]")
 	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
 	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
+	flag.StringVar(&webcp, "webcp", "", "(HTTP API) web control panel route")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
 	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
 	flag.BoolVar(&profile, "profile", false, "Write profiler results to prof.out")
@@ -67,7 +68,7 @@ func main() {
 		if err != nil {
 			tdlog.Fatal(err)
 		}
-		httpapi.Start(db, port)
+		httpapi.Start(db, port, webcp)
 	case "example": // Run embedded usage examples
 		embeddedExample()
 	case "bench": // Benchmark scenarios
