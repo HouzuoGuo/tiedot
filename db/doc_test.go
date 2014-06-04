@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func StrHashTest(t *testing.T) {
@@ -232,6 +233,17 @@ func TestDocCrudAndIdx(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+
+	// Iterate over all documents 20 times
+	start := time.Now().UnixNano()
+	for i := 0; i < 20; i++ {
+		col.ForEachDoc(false, func(_ int, _ []byte) bool {
+			return true
+		})
+	}
+	timediff := time.Now().UnixNano() - start
+	fmt.Println("It took", timediff/1000000, "milliseconds")
+
 	if err = col.Sync(); err != nil {
 		t.Fatal(err)
 	} else if err = db.Sync(); err != nil {

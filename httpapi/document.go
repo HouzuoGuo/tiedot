@@ -8,6 +8,7 @@ import (
 	"strconv"
 )
 
+// Insert a document into collection.
 func Insert(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -39,6 +40,7 @@ func Insert(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprint(id)))
 }
 
+// Get a document.
 func Get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
@@ -74,6 +76,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
+// Update a document.
 func Update(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -111,6 +114,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Delete a document.
 func Delete(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")

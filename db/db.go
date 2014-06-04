@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -18,7 +20,7 @@ import (
 
 const (
 	PART_NUM_FILE      = "number_of_partitions" // A database configuration file's name, content is a single number
-	AUTO_SYNC_INTERVAL = 1000                   // Data file auto-save interval in milliseconds (do not set too small)
+	AUTO_SYNC_INTERVAL = 2000                   // Data file auto-save interval in milliseconds (do not set too small)
 )
 
 // Database structures.
@@ -59,7 +61,7 @@ func (db *DB) load() error {
 	// Get number of partitions from the text file
 	if numParts, err := ioutil.ReadFile(numPartsFilePath); err != nil {
 		return err
-	} else if db.numParts, err = strconv.Atoi(string(numParts)); err != nil {
+	} else if db.numParts, err = strconv.Atoi(strings.Trim(string(numParts), "\r\n ")); err != nil {
 		return err
 	}
 	// Look for collection directories
@@ -280,4 +282,55 @@ func (db *DB) Drop(name string) error {
 	}
 	delete(db.cols, name)
 	return nil
+}
+
+// Copy this database into destination directory.
+func (db *DB) Dump(dest string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	for _, col := range db.cols {
+		if err := col.Sync(); err != nil {
+			return err
+		}
+	}
+	cpFun := func(currPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			relPath, err := filepath.Rel(db.path, currPath)
+			if err != nil {
+				return err
+			}
+			destDir := path.Join(dest, relPath)
+			if err := os.MkdirAll(destDir, 0700); err != nil {
+				return err
+			}
+			tdlog.Printf("Dump: created directory %s", destDir)
+		} else {
+			src, err := os.Open(currPath)
+			if err != nil {
+				return err
+			}
+			relPath, err := filepath.Rel(db.path, currPath)
+			if err != nil {
+				return err
+			}
+			destPath := path.Join(dest, relPath)
+			if _, fileExists := os.Open(destPath); fileExists == nil {
+				return fmt.Errorf("Destination file %s already exists", destPath)
+			}
+			destFile, err := os.Create(destPath)
+			if err != nil {
+				return err
+			}
+			written, err := io.Copy(destFile, src)
+			if err != nil {
+				return err
+			}
+			tdlog.Printf("Dump: copied file %s, size is %d", destPath, written)
+		}
+		return nil
+	}
+	return filepath.Walk(db.path, cpFun)
 }

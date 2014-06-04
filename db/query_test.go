@@ -67,10 +67,6 @@ func TestQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for id, _ := range q {
-		fmt.Print(id)
-		fmt.Println(col.Read(id))
-	}
 	col.Index([]string{"a", "b"})
 	col.Index([]string{"f"})
 	col.Index([]string{"h"})

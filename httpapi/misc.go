@@ -3,6 +3,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"runtime"
@@ -18,7 +19,7 @@ func Shutdown(w http.ResponseWriter, r *http.Request) {
 	os.Exit(0)
 }
 
-// Pause all activities and make a dump of entire database to another file system location.
+// Copy this database into destination directory.
 func Dump(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
@@ -28,7 +29,10 @@ func Dump(w http.ResponseWriter, r *http.Request) {
 	}
 	HttpDBSync.Lock()
 	defer HttpDBSync.Unlock()
-	// TODO: implement me
+	if err := HttpDB.Dump(dest); err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
 }
 
 // Return server memory statistics.
@@ -49,5 +53,5 @@ func MemStats(w http.ResponseWriter, r *http.Request) {
 func Version(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("3"))
+	w.Write([]byte("4"))
 }

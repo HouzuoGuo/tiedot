@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// Put an index on a document path.
 func Index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
@@ -32,6 +33,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(201)
 }
 
+// Return all indexed paths.
 func Indexes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
@@ -58,6 +60,7 @@ func Indexes(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
+// Remove an indexed path.
 func Unindex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")

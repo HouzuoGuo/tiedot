@@ -9,6 +9,7 @@ import (
 	"strconv"
 )
 
+// Execute a query and return documents from the result.
 func Query(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
@@ -56,6 +57,7 @@ func Query(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(string(resp)))
 }
 
+// Execute a query and return number of documents from the result.
 func Count(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
