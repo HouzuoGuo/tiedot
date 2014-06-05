@@ -1,5 +1,7 @@
 Keywords: Golang, go, document database, NoSQL, JSON
 
+<img src="https://travis-ci.org/HouzuoGuo/tiedot.svg?branch=master" alt="build status"/>
+
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
 ### tiedot - Your NoSQL database powered by Golang
