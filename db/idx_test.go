@@ -39,7 +39,7 @@ func TestIdxCRUD(t *testing.T) {
 	if err = col.Index([]string{"c"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(col.AllIndexes()) != 2 || col.AllIndexes()[0][0] != "a" || col.AllIndexes()[0][1] != "b" || col.AllIndexes()[1][0] != "c" {
+	if len(col.AllIndexes()) != 2 || !((col.AllIndexes()[0][0] == "a" && col.AllIndexes()[0][1] == "b" && col.AllIndexes()[1][0] == "c") || (col.AllIndexes()[0][0] == "c" && col.AllIndexes()[1][0] == "a" && col.AllIndexes()[1][1] == "b")) {
 		t.Fatal(col.AllIndexes())
 	}
 	// Unindex & verify
