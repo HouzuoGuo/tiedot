@@ -127,7 +127,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Get all names & use
-	if allNames := db.AllCols(); !(allNames[0] == "a" && allNames[1] == "b") {
+	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "a" && allNames[1] == "b" || allNames[0] == "b" && allNames[1] == "a") {
 		t.Fatal(allNames)
 	}
 	if db.Use("a") == nil || db.Use("b") == nil || db.Use("abcde") != nil {
@@ -150,7 +150,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Rename - verify
-	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
+	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
 	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
@@ -167,7 +167,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Truncate - verify
-	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
+	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
 	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
@@ -178,7 +178,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Scrub - verify
-	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
+	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
 	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
@@ -192,7 +192,7 @@ func TestColCrud(t *testing.T) {
 	if err := db.Drop("c"); err != nil {
 		t.Fatal(err)
 	}
-	if allNames := db.AllCols(); allNames[0] != "d" {
+	if allNames := db.AllCols(); len(allNames) != 1 || allNames[0] != "d" {
 		t.Fatal(allNames)
 	}
 	if db.Use("d") == nil {
