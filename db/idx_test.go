@@ -3,6 +3,7 @@ package db
 import (
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -39,8 +40,11 @@ func TestIdxCRUD(t *testing.T) {
 	if err = col.Index([]string{"c"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(col.AllIndexes()) != 2 || !((col.AllIndexes()[0][0] == "a" && col.AllIndexes()[0][1] == "b" && col.AllIndexes()[1][0] == "c") || (col.AllIndexes()[0][0] == "c" && col.AllIndexes()[1][0] == "a" && col.AllIndexes()[1][1] == "b")) {
-		t.Fatal(col.AllIndexes())
+	allIndexes := col.AllIndexes()
+	idx0 := strings.Join(allIndexes[0], ",")
+	idx1 := strings.Join(allIndexes[1], ",")
+	if !(idx0 == "a,b" && idx1 == "c" || idx0 == "c" && idx1 == "a,b") {
+		t.Fatal(allIndexes)
 	}
 	// Unindex & verify
 	if col.Unindex([]string{"%&^*"}) == nil {
