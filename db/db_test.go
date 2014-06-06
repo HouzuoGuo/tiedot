@@ -150,7 +150,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Rename - verify
-	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c") {
+	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
 	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
@@ -167,7 +167,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Truncate - verify
-	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c") {
+	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
 	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
@@ -178,7 +178,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Scrub - verify
-	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c") {
+	if allNames := db.AllCols(); !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
 	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
