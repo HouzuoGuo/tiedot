@@ -14,18 +14,18 @@ import (
 )
 
 const (
-	DOC_DATA_FILE   = "dat_"
-	DOC_LOOKUP_FILE = "id_"
-	INDEX_PATH_SEP  = "!"
+	DOC_DATA_FILE   = "dat_" // Prefix of partition collection data file name.
+	DOC_LOOKUP_FILE = "id_"  // Prefix of partition hash table (ID lookup) file name.
+	INDEX_PATH_SEP  = "!"    // Separator between index keys in index directory name.
 )
 
 // Collection has data partitions and some index meta information.
 type Col struct {
 	db         *DB
 	name       string
-	parts      []*data.Partition            // document data partitions
-	hts        []map[string]*data.HashTable // index partitions
-	indexPaths map[string][]string          // index names and paths
+	parts      []*data.Partition            // Collection partitions
+	hts        []map[string]*data.HashTable // Index partitions
+	indexPaths map[string][]string          // Index names and paths
 }
 
 // Open a collection and load all indexes.
@@ -45,7 +45,7 @@ func (col *Col) load() error {
 		col.hts[i] = make(map[string]*data.HashTable)
 	}
 	col.indexPaths = make(map[string][]string)
-	// Open document data partitions
+	// Open collection document partitions
 	for i := 0; i < col.db.numParts; i++ {
 		var err error
 		if col.parts[i], err = data.OpenPartition(
@@ -63,6 +63,7 @@ func (col *Col) load() error {
 		if !htDir.IsDir() {
 			continue
 		}
+		// Open index partitions
 		idxName := htDir.Name()
 		idxPath := strings.Split(idxName, INDEX_PATH_SEP)
 		col.indexPaths[idxName] = idxPath
@@ -101,8 +102,8 @@ func (col *Col) Sync() error {
 }
 
 // Do fun for all documents in the collection.
-func (col *Col) ForEachDoc(withRLocks bool, fun func(id int, doc []byte) (moveOn bool)) {
-	totalIterations := 193 // not a magic - feel free to adjust the number
+func (col *Col) ForEachDoc(_ bool, fun func(id int, doc []byte) (moveOn bool)) {
+	totalIterations := 193 // not a magic - feel free to adjust the number, but do not make it too small
 	for iteratePart := 0; iteratePart < col.db.numParts; iteratePart++ {
 		tdlog.Printf("ForEachDoc %s: Going through partition %d", col.name, iteratePart)
 		part := col.parts[iteratePart]

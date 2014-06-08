@@ -37,7 +37,7 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 	}
 }
 
-// Return string hash code using sdbm algorithm.
+// Hash a string using sdbm algorithm.
 func StrHash(thing interface{}) int {
 	var hash int
 	for _, c := range fmt.Sprint(thing) {
@@ -81,7 +81,7 @@ func (col *Col) unindexDoc(id int, doc map[string]interface{}) {
 	}
 }
 
-// Insert a document with the specified ID into the collection. Take care of index but does not take care of locking.
+// Insert a document with the specified ID into the collection (incl. index). Does not place a partition lock.
 func (col *Col) InsertRecovery(id int, doc map[string]interface{}) (err error) {
 	docJS, err := json.Marshal(doc)
 	if err != nil {
@@ -113,8 +113,7 @@ func (col *Col) Insert(doc map[string]interface{}) (id int, err error) {
 		part.Lock.Unlock()
 		return
 	}
-	// If another thread is updating the document in the meanwhile,
-	// it will take care of index maintenance
+	// If another thread is updating the document in the meanwhile, let it take over index maintenance
 	if err = part.LockUpdate(id); err != nil {
 		part.Lock.Unlock()
 		return id, nil
@@ -128,7 +127,7 @@ func (col *Col) Insert(doc map[string]interface{}) (id int, err error) {
 	return
 }
 
-// Read a document and return it.
+// Find and retrieve a document by ID.
 func (col *Col) Read(id int) (doc map[string]interface{}, err error) {
 	part := col.parts[id%col.db.numParts]
 	part.Lock.RLock()
@@ -172,7 +171,7 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 		part.Lock.Unlock()
 		return err
 	}
-	// Done with the data partition, next is to maintain indexed valued
+	// Done with the collection data, next is to maintain indexed values
 	part.Lock.Unlock()
 	if original != nil {
 		col.unindexDoc(id, original)
@@ -209,13 +208,10 @@ func (col *Col) Delete(id int) error {
 		part.Lock.Unlock()
 		return err
 	}
-	// Done with the partition, next is to remove indexed values
+	// Done with the collection data, next is to remove indexed values
 	part.Lock.Unlock()
 	if original != nil {
 		col.unindexDoc(id, original)
-	}
-	if part == nil {
-		panic("SHALL NOT HAPPEN")
 	}
 	part.Lock.Lock()
 	part.UnlockUpdate(id)

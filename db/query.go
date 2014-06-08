@@ -12,7 +12,6 @@ import (
 // Calculate union of sub-query results.
 func EvalUnion(exprs []interface{}, src *Col, result *map[int]struct{}) (err error) {
 	for _, subExpr := range exprs {
-		// Evaluate all sub-queries - they will put their result into the result map
 		if err = EvalQuery(subExpr, src, result); err != nil {
 			return
 		}
@@ -95,7 +94,7 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 		return errors.New(fmt.Sprintf("Please index %v and retry query %v", vecPath, expr))
 	}
 	counter := 0
-	partitionSize := 193 // not a magic, feel free to change
+	partitionSize := 193 // not a magic, feel free to change, but do not make it too small
 	for iteratePart := 0; iteratePart < src.db.numParts; iteratePart++ {
 		ht := src.hts[iteratePart][jointPath]
 		ht.Lock.RLock()
@@ -172,9 +171,6 @@ func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err e
 }
 
 func (col *Col) hashScan(idxName string, key, limit int) []int {
-	if _, indexed := col.indexPaths[idxName]; !indexed {
-		panic("not indexed")
-	}
 	ht := col.hts[key%col.db.numParts][idxName]
 	ht.Lock.RLock()
 	vals := ht.Get(key, limit)
@@ -182,7 +178,7 @@ func (col *Col) hashScan(idxName string, key, limit int) []int {
 	return vals
 }
 
-// Scan hash table or collection documents using an integer range.
+// Look for indexed integer values within the specified integer range.
 func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result *map[int]struct{}) (err error) {
 	path, hasPath := expr["in"]
 	if !hasPath {
@@ -274,7 +270,7 @@ func EvalQuery(q interface{}, src *Col, result *map[int]struct{}) (err error) {
 	case []interface{}: // [sub query 1, sub query 2, etc]
 		return EvalUnion(expr, src, result)
 	case string:
-		if expr == "all" { // Put all IDs into result
+		if expr == "all" {
 			return EvalAllIDs(src, result)
 		} else {
 			// Might be single document number

@@ -1,4 +1,4 @@
-/* Bootstrap V3 server. */
+/* HTTP service API handler registration. */
 package httpapi
 
 import (

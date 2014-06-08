@@ -1,4 +1,4 @@
-/* Collection and storage management. */
+/* Collection and DB storage management. */
 package db
 
 import (
@@ -19,38 +19,37 @@ import (
 )
 
 const (
-	PART_NUM_FILE      = "number_of_partitions" // A database configuration file's name, content is a single number
+	PART_NUM_FILE      = "number_of_partitions" // DB-collection-partition-number-configuration file name
 	AUTO_SYNC_INTERVAL = 2000                   // Data file auto-save interval in milliseconds (do not set too small)
 )
 
 // Database structures.
 type DB struct {
-	path         string          // root path of database directory
-	numParts     int             // total number of partitions
-	cols         map[string]*Col // collection by name lookup
-	schemaLock   *sync.RWMutex   // Schema-related operations use ExLock, other operations use RLock
-	autoSync     *time.Ticker    // Synchronize all data files at regular interval
-	autoSyncStop chan struct{}   // Inform auto-synchronize routine to stop (on DB shutdown)
+	path         string          // Root path of database directory
+	numParts     int             // Total number of partitions
+	cols         map[string]*Col // All collections
+	schemaLock   *sync.RWMutex   // Control access to collection instances.
+	autoSync     *time.Ticker    // Automatically synchronize all data files at regular interval
+	autoSyncStop chan struct{}   // Auto-sync routine stopper (on DB shutdown)
 }
 
 // Open database and load all collections & indexes.
 func OpenDB(dbPath string) (*DB, error) {
-	// New collection documents get their ID from this RNG
-	rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano()) // document ID generation relies on this RNG
 	db := &DB{path: dbPath, schemaLock: new(sync.RWMutex), autoSyncStop: make(chan struct{})}
 	return db, db.load()
 }
 
 // Load all collection schema.
 func (db *DB) load() error {
-	// If opening an empty database, create the DB directory and PART_NUM_FILE.
+	// Create DB directory and PART_NUM_FILE if necessary
 	var numPartsAssumed = false
 	numPartsFilePath := path.Join(db.path, PART_NUM_FILE)
 	if err := os.MkdirAll(db.path, 0700); err != nil {
 		return err
 	}
 	if partNumFile, err := os.Stat(numPartsFilePath); err != nil {
-		// The new database has as many partitions as there are CPUs
+		// The new database has as many partitions as number of CPUs recognized by OS
 		if err := ioutil.WriteFile(numPartsFilePath, []byte(strconv.Itoa(runtime.NumCPU())), 0600); err != nil {
 			return err
 		}
@@ -64,7 +63,7 @@ func (db *DB) load() error {
 	} else if db.numParts, err = strconv.Atoi(strings.Trim(string(numParts), "\r\n ")); err != nil {
 		return err
 	}
-	// Look for collection directories
+	// Look for collection directories and open the collections
 	db.cols = make(map[string]*Col)
 	dirContent, err := ioutil.ReadDir(db.path)
 	if err != nil {
@@ -81,7 +80,7 @@ func (db *DB) load() error {
 			return err
 		}
 	}
-	// Initialize auto-sync (synchronize all data files regularly)
+	// Synchronize data files at regular interval
 	if db.autoSync == nil {
 		db.autoSync = time.NewTicker(AUTO_SYNC_INTERVAL * time.Millisecond)
 		go func() {
@@ -241,7 +240,7 @@ func (db *DB) Scrub(name string) error {
 	if err != nil {
 		return err
 	}
-	db.cols[name].ForEachDoc(false, func(id int, doc []byte) (moveOn bool) {
+	db.cols[name].ForEachDoc(false, func(id int, doc []byte) bool {
 		var docObj map[string]interface{}
 		if err := json.Unmarshal([]byte(doc), &docObj); err != nil {
 			// Skip corrupted document
@@ -284,7 +283,7 @@ func (db *DB) Drop(name string) error {
 	return nil
 }
 
-// Copy this database into destination directory.
+// Copy this database into destination directory (for backup).
 func (db *DB) Dump(dest string) error {
 	db.schemaLock.Lock()
 	defer db.schemaLock.Unlock()

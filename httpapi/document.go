@@ -40,7 +40,7 @@ func Insert(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprint(id)))
 }
 
-// Get a document.
+// Find and retrieve a document by ID.
 func Get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")

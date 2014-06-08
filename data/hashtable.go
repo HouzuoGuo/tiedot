@@ -1,7 +1,9 @@
 /*
-Static hash table implementation is a binary file made of buckets. Every bucket has a fixed number of entries.
-When a bucket becomes full, a new bucket is chained to it in order to store more entries.
-Entry is a key-value pair; both key and value are integers.
+Hash table file contains binary content; it implements a static hash table made of hash buckets and integer entries.
+Every bucket has a fixed number of entries. When a bucket becomes full, a new bucket is chained to it in order to store
+more entries. Every entry has an integer key and value.
+An entry key may have multiple values assigned to it, however the combination of entry key and value must be unique
+across the entire hash table.
 */
 package data
 
@@ -12,23 +14,23 @@ import (
 )
 
 const (
-	HT_FILE_GROWTH  = 32 * 1048576                          // Initial hash table file size; file growth
-	ENTRY_SIZE      = 1 + 10 + 10                           // Hash entry: validity, key, value
-	BUCKET_HEADER   = 10                                    // Bucket header: next chained bucket number
+	HT_FILE_GROWTH  = 32 * 1048576                          // Hash table file initial size & file growth
+	ENTRY_SIZE      = 1 + 10 + 10                           // Hash entry size: validity (single byte), key (int 10 bytes), value (int 10 bytes)
+	BUCKET_HEADER   = 10                                    // Bucket header size: next chained bucket number (int 10 bytes)
 	PER_BUCKET      = 16                                    // Entries per bucket
 	HASH_BITS       = 16                                    // Number of hash key bits
 	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE // Size of a bucket
 	INITIAL_BUCKETS = 65536                                 // Initial number of buckets == 2 ^ HASH_BITS
 )
 
-// Hash table is an ordinary data file; it also tracks total number of buckets.
+// Hash table file is a binary file containing buckets of hash entries.
 type HashTable struct {
 	*DataFile
 	numBuckets int
 	Lock       *sync.RWMutex
 }
 
-// Calculate the hash key of an entry's key.
+// Smear the integer entry key and return the portion (first HASH_BITS bytes) used for allocating the entry.
 func HashKey(key int) int {
 	key = key ^ (key >> 4)
 	key = (key ^ 0xdeadbeef) + (key << 5)
@@ -46,7 +48,7 @@ func OpenHashTable(path string) (ht *HashTable, err error) {
 	return
 }
 
-// Follow the longest bucket chain to calculate total number of buckets.
+// Follow the longest bucket chain to calculate total number of buckets, hence the "used size" of hash table file.
 func (ht *HashTable) calculateNumBuckets() {
 	ht.numBuckets = ht.Size / BUCKET_SIZE
 	largestBucketNum := INITIAL_BUCKETS - 1
@@ -95,7 +97,7 @@ func (ht *HashTable) lastBucket(bucket int) int {
 	}
 }
 
-// Chain a new bucket.
+// Create and chain a new bucket.
 func (ht *HashTable) growBucket(bucket int) {
 	ht.EnsureSize(BUCKET_SIZE)
 	lastBucketAddr := ht.lastBucket(bucket) * BUCKET_SIZE
@@ -113,7 +115,7 @@ func (ht *HashTable) Clear() (err error) {
 	return
 }
 
-// Store a key-value pair into a vacant entry.
+// Store the entry into a vacant (invalidated or empty) place in the appropriate bucket.
 func (ht *HashTable) Put(key, val int) {
 	for bucket, entry := HashKey(key), 0; ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
@@ -164,7 +166,7 @@ func (ht *HashTable) Get(key, limit int) (vals []int) {
 	}
 }
 
-// Flag a key-value pair as invalid.
+// Flag an entry as invalid, so that Get will not return it later on.
 func (ht *HashTable) Remove(key, val int) {
 	for entry, bucket := 0, HashKey(key); ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
@@ -187,7 +189,7 @@ func (ht *HashTable) Remove(key, val int) {
 	}
 }
 
-// Return hash key range start (inclusive) and range end(exclusive) after hash table is divided into (almost) equally sized partitions.
+// Divide the entire hash table into roughly equally sized partitions, and return the start/end key range of the chosen partition.
 func GetPartitionRange(partNum, totalParts int) (start int, end int) {
 	partSize := INITIAL_BUCKETS / totalParts
 	start = partNum * partSize
@@ -198,7 +200,7 @@ func GetPartitionRange(partNum, totalParts int) (start int, end int) {
 	return
 }
 
-// Partition all entries into equally sized portions, and return all entries in the specified portion.
+// Return all entries in the chosen partition.
 func (ht *HashTable) GetPartition(partitionNum, partitionSize int) (keys, vals []int) {
 	rangeStart, rangeEnd := GetPartitionRange(partitionNum, partitionSize)
 	prealloc := (rangeEnd - rangeStart) * PER_BUCKET

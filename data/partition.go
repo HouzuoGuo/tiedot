@@ -1,6 +1,7 @@
 /*
-Collection partition is made of a document data file and a hash table.
-Every new document is given a random ID, and the hash table file binds the ID to the physical location of the document.
+(Collection) Partition is a collection data file accompanied by a hash table in order to allow addressing of a
+document using an unchanging ID:
+The hash table stores the unchanging ID as entry key and the physical document location as entry value.
 */
 package data
 
@@ -10,10 +11,10 @@ import (
 	"sync"
 )
 
-// Collection partition consists of a document data file and a lookup table for locating document using unique IDs.
+// Partition associates a hash table with collection documents, allowing addressing of a document using an unchanging ID.
 type Partition struct {
 	col      *Collection
-	lookup   *HashTable // For finding document physical location by ID
+	lookup   *HashTable
 	updating map[int]struct{}
 	Lock     *sync.RWMutex
 }
@@ -29,7 +30,7 @@ func OpenPartition(colPath, lookupPath string) (part *Partition, err error) {
 	return
 }
 
-// Insert a document.
+// Insert a document. The ID may be used to retrieve/update/delete the document later on.
 func (part *Partition) Insert(id int, data []byte) (physID int, err error) {
 	physID, err = part.col.Insert(data)
 	if err != nil {
@@ -39,7 +40,7 @@ func (part *Partition) Insert(id int, data []byte) (physID int, err error) {
 	return
 }
 
-// Read a document by ID.
+// Find and retrieve a document by ID.
 func (part *Partition) Read(id int) ([]byte, error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
