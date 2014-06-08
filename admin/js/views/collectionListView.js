@@ -13,23 +13,14 @@ App.CollectionListView = Backbone.View.extend({
 		
 		this.listenTo(this.collection, 'reset', this.render);
 		
-		window.dispatcher.on('col:add', function(col) {
-			self.collection.add(col);
-			self.render();
-		});
-		window.dispatcher.on('col:remove', function(col) {
-			self.collection.remove(col);
-			self.render();
-		});
-		
 		this.collection.fetch();
 	},
 	
 	render: function() {
 		this.$el.html(this.template({cols: this.collection.toJSON() }));
 		
-		$('#sidebar').html('');
-		$('#sidebar').append(this.$el);
+		$('#app').html('');
+		$('#app').append(this.$el);
 		
 		this.delegateEvents();
 		return this;

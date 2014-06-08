@@ -9,9 +9,7 @@ App.AppView = Backbone.View.extend({
 		this.modal.init();
 
 		$('.load-doc').on('submit', this.onLoadDocFormSubmit);
-		
-		var collectionsList = new App.CollectionListView({ collection: new App.CollectionList() });
-		
+				
 		this.router = new App.Router();
 		Backbone.history.start({ root: '/admin' });
 		
@@ -59,7 +57,7 @@ App.Router = Backbone.Router.extend({
 	},
 	
 	index: function() {
-		$("#app").html('');
+		var collectionsList = new App.CollectionListView({ collection: new App.CollectionList() });
 	},
 		
 	collectionByName: function(name) {
@@ -122,7 +120,7 @@ App.Modal = function () {
 };
 
 $(function() {
-	window.dispatcher = _.clone(Backbone.Events);
-
+	window.dispatcher = _.clone(Backbone.Events)
+	
 	tiedotApp = new App.AppView();
 });

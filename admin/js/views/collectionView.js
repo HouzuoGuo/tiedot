@@ -72,7 +72,6 @@ App.CollectionView = Backbone.View.extend({
 			
 			$(that).find('.delete').on('click', function(e) {
 				window.dispatcher.trigger('modal:close');
-				
 				self.model.destroy();
 			});
 		});

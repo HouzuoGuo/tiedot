@@ -6,7 +6,7 @@ App.DocumentView = Backbone.View.extend({
 	
 	events: {
 		'click .delete': 'onDeleteClick',
-		'click #document-form-submit': 'onSaveSubmit'
+		'click .save': 'onSaveClick'
 	},
 	
 	initialize: function(options) {
@@ -24,32 +24,45 @@ App.DocumentView = Backbone.View.extend({
 	},
 	
 	render: function() {
-		var viewModel = this.model.toJSON();
-		delete viewModel.id;
-		
-		viewModel.json = JSON.stringify(viewModel, null, 4);
-		viewModel.col = this.col;
-		viewModel.id = this.id;
-		
-		this.$el.html(this.template(viewModel));
+		var json = this.model.toJSON();
+		delete json.id;
+
+		this.$el.html(this.template({ col: this.col, id: this.id }));
 		
 		$('#app').html('');
 		$('#app').append(this.$el);
+		
+		this.createEditor(JSON.stringify(json, null, 4));
 		return this;
 	},
 
 	renderNew: function() {
-		var viewModel = {
-			id: 'New Document',
-			col: this.col,
-			json: ''
-		};
-		
-		this.$el.html(this.template(viewModel));
+		var json = this.model.toJSON();
+		delete json.id;
+
+		this.$el.html(this.template({ col: this.col, id: 'New Document' }));
 		
 		$('#app').html('');
 		$('#app').append(this.$el);
+
+		this.createEditor('');
 		return this;
+	},
+	
+	createEditor: function(value) {
+		this.editor = ace.edit('json');
+		this.editor.getSession().setValue(value);
+		
+		this.editor.setOptions({
+			minLines: 15,
+			maxLines: 35
+		});
+	    this.editor.setTheme('ace/theme/github');
+	    this.editor.getSession().setMode("ace/mode/json");
+		this.editor.getSession().setTabSize(4);
+		this.editor.getSession().setUseWrapMode(true);
+		this.editor.setShowPrintMargin(false);
+		//this.editor.renderer.setShowGutter(false);
 	},
 	
 	onDeleteClick: function(e) {
@@ -71,13 +84,13 @@ App.DocumentView = Backbone.View.extend({
 		return false;
 	},
 	
-	onSaveSubmit: function(e) {
+	onSaveClick: function(e) {
 		e.preventDefault();
 		
 		try {	
-			var json = JSON.parse($('#json').val());
+			var json = JSON.parse(this.editor.getValue());
 		} catch(err) {
-			tiedotApp.notify('danger', 'Error parsing JSON.');
+			tiedotApp.notify('danger', 'Invalid JSON. Unable to save document.');
 			return false;
 		}
 		

@@ -21,8 +21,6 @@ App.Collection = Backbone.Model.extend({
 		.done(function(res) {
 			tiedotApp.router.navigate('cols/' + self.id, { trigger: true });
 			tiedotApp.notify('success', 'Collection created successfully!');
-
-			window.dispatcher.trigger('col:add', { id: self.id, numparts: self.get('numparts') });
 		})
 		.fail(function(jqXHR, textStatus) {
 			tiedotApp.notify('danger', 'Failed to create collection.');
@@ -36,13 +34,10 @@ App.Collection = Backbone.Model.extend({
 			url: this.renameUrl(name)
 		})
 		.done(function(res) {
-			window.dispatcher.trigger('col:remove', self);
 			self.set('id', name);
 			
 			tiedotApp.router.navigate('cols/' + self.id, { trigger: true });
 			tiedotApp.notify('success', 'Collection renamed successfully!');
-			
-			window.dispatcher.trigger('col:add', self);
 		})
 		.fail(function(jqXHR, textStatus) {
 			tiedotApp.notify('danger', 'Failed to rename collection.');
@@ -56,7 +51,6 @@ App.Collection = Backbone.Model.extend({
 			url: this.deleteUrl()
 		})
 		.done(function(res) {
-			window.dispatcher.trigger('col:remove', self);
 			tiedotApp.router.navigate('/', { trigger: true });
 			tiedotApp.notify('warning', 'Collection deleted successfully!');
 		})
