@@ -18,7 +18,7 @@ func Println(params ...interface{}) {
 	}
 }
 
-// Write an error log message, but continue program execution
+// Write an error log message, but continue program execution.
 func Error(params ...interface{}) {
 	log.Println(params...)
 }
@@ -29,9 +29,4 @@ func Errorf(template string, params ...interface{}) {
 // Write a log message then abort.
 func Fatal(reason interface{}) {
 	log.Fatal(reason)
-}
-
-// Write a log message then panic.
-func Panicf(template string, params ...interface{}) {
-	log.Panicf(template, params...)
 }

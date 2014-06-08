@@ -1,7 +1,7 @@
 package data
 
 import (
-	"fmt"
+	"math"
 	"os"
 	"testing"
 )
@@ -137,14 +137,20 @@ func TestPartitionEntries(t *testing.T) {
 		return
 	}
 	number := 100000
+	parts := 16
 	for i := 0; i < number; i++ {
 		ht.Put(i, i*2)
 	}
 	allKV := make(map[int]int)
-	for i := 0; i < 100; i++ {
-		start, end := GetPartitionRange(i, 100)
-		keys, vals := ht.GetPartition(i, 100)
-		fmt.Println("Between ", start, end, " there are ", len(keys))
+	for i := 0; i < parts; i++ {
+		start, end := GetPartitionRange(i, parts)
+		keys, vals := ht.GetPartition(i, parts)
+		t.Log("Between ", start, end, " there are ", len(keys))
+		sizeDev := math.Abs(float64(len(keys)-number/parts)) / float64(number/parts)
+		t.Log("sizeDev", sizeDev)
+		if sizeDev > 0.05 {
+			t.Fatal("imbalanced keys")
+		}
 		for i, key := range keys {
 			allKV[key] = vals[i]
 		}

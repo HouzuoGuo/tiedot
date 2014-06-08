@@ -1,6 +1,9 @@
 /*
-Collection data file has a mixture of binary (document header) and text (utf8 string) data.
-Documents are inserted one after another, and deleted documents are marked as invalid.
+Collection data file contains document data. Every document has a binary header and UTF-8 text content.
+Documents are inserted one after another, and occupies 2x original document size to leave room for future updates.
+Deleted documents are marked as deleted and the space is irrecoverable until a "scrub" action (in DB logic) is carried out.
+When update takes place, the new document may overwrite original document if there is enough space, otherwise the
+original document is marked as deleted and the updated document is inserted as a new document.
 */
 package data
 
@@ -10,15 +13,15 @@ import (
 )
 
 const (
-	COL_FILE_GROWTH = 32 * 1048576 // Initial collection file size; file growth
-	DOC_MAX_ROOM    = 2 * 1048576  // Max document size
-	DOC_HEADER      = 1 + 10       // Document header size - validity (1), document room (10)
+	COL_FILE_GROWTH = 32 * 1048576 // Collection file initial size & size growth (32 MBytes)
+	DOC_MAX_ROOM    = 2 * 1048576  // Max document size (2 MBytes)
+	DOC_HEADER      = 1 + 10       // Document header size - validity (single byte), document room (int 10 bytes)
 	// Pre-compiled document padding (128 spaces)
 	PADDING     = "                                                                                                                                "
 	LEN_PADDING = len(PADDING)
 )
 
-// Collection is an ordinary data file.
+// Collection file contains document headers and document text data.
 type Collection struct {
 	*DataFile
 }
@@ -30,7 +33,7 @@ func OpenCollection(path string) (col *Collection, err error) {
 	return
 }
 
-// Read a document by ID, return a copy of the read document.
+// Find and retrieve a document by ID (physical document location). Return value is a copy of the document.
 func (col *Collection) Read(id int) []byte {
 	if id < 0 || id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
 		return nil

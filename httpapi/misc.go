@@ -9,7 +9,7 @@ import (
 	"runtime"
 )
 
-// Flush and close all data files and shutdown entire program.
+// Flush and close all data files and shutdown the entire program.
 func Shutdown(w http.ResponseWriter, r *http.Request) {
 	HttpDBSync.Lock()
 	defer HttpDBSync.Unlock()
