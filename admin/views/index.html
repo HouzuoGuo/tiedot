@@ -23,7 +23,7 @@
 					<span class="icon-bar"></span>
 					<span class="icon-bar"></span>
 				</button>
-				<a class="navbar-brand" href="#">Tiedot Control Panel</a>
+				<a class="navbar-brand" href="#">Tiedot</a>
 			</div>
 			<div class="collapse navbar-collapse">
 				<ul class="nav navbar-nav">
@@ -34,7 +34,8 @@
 					<li><a href="#help">Help</a></li>
 				</ul>
 				<form action="#" class="navbar-form navbar-right load-doc">
-				  	<input type="text" name="id" class="form-control" placeholder="Goto doc id (col/id)">
+					<span>Load doc</span>
+				  	<input type="text" name="doc" class="doc form-control" placeholder="collection/doc id">
 				</form>
 			</div>
 		</div>
@@ -42,24 +43,34 @@
 
 	<div class="container-fluid">
 		<div class="row">
-			<div class="col-sm-3 col-md-2 sidebar">
-				<h4>Collections</h4>
-				<ul class="nav nav-sidebar">
-					<li><a href="#">Overview</a></li>
-					<li><a href="#">Reports</a></li>
-					<li><a href="#">Analytics</a></li>
-					<li><a href="#">Export</a></li>
-				</ul>
+			<div id="sidebar" class="col-sm-3 col-md-2 sidebar">
 			</div>
-			<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
-				<h1 class="page-header">Dashboard</h1>
+			<div id="main" class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+				<div id="app">&nbsp;</div>
 			</div>
 		</div>
 	</div>
+	<div id="modal" class="modal fade" role="dialog" aria-hidden="true">
+		<div class="modal-dialog modal-sm">
+		    <div id="modal-content" class="modal-content">&nbsp;</div>
+    	</div>
+	</div>
 
+	{{.templates}}
+	
 	<script src="/{{.root}}/js/lib/jquery-2.1.1.min.js"></script>
 	<script src="/{{.root}}/js/lib/bootstrap.min.js"></script>
 	<script src="/{{.root}}/js/lib/underscore-min.js"></script>
 	<script src="/{{.root}}/js/lib/backbone-min.js"></script>
+
+	<script type="text/javascript">var App = {};</script>
+	<script src="/{{.root}}/js/models/collection.js"></script>
+	<script src="/{{.root}}/js/models/collectionList.js"></script>
+	<script src="/{{.root}}/js/models/document.js"></script>
+	<script src="/{{.root}}/js/models/documentList.js"></script>
+	<script src="/{{.root}}/js/views/collectionListView.js"></script>
+	<script src="/{{.root}}/js/views/collectionView.js"></script>
+	<script src="/{{.root}}/js/views/documentView.js"></script>
+	<script src="/{{.root}}/js/app.js"></script>
 </body>
 </html>

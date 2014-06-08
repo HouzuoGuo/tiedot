@@ -2,6 +2,11 @@
 body {
   padding-top: 50px;
 }
+.navbar-form span {
+	color: #bbb;
+	margin: 0 6px 6px 0;
+	display: inline-block;
+}
 
 /*
  * Sidebar
@@ -46,14 +51,12 @@ body {
  * Main content
  */
 .main {
-  padding: 20px;
+	margin-top: 20px;
 }
-@media (min-width: 768px) {
-  .main {
-    padding-right: 40px;
-    padding-left: 40px;
-  }
+#app {
+	width: 100%;
 }
-.main .page-header {
-  margin-top: 0;
+textarea {
+	resize: none;
+	min-height: 500px;
 }

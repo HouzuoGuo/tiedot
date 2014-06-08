@@ -74,11 +74,15 @@ func HandleWebcp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		tdlog.Fatal(err)
 	}
-	templateString, err := templateBox.String("index.html")
+	templatesString, err := templateBox.String("templates.html")
+	if err != nil {
+		tdlog.Fatal(err)
+	}
+	viewString, err := templateBox.String("index.html")
 	if err != nil {
 		tdlog.Fatal(err)
 	}
 
-	tmpl, _ := template.New("index").Parse(templateString)
-	tmpl.Execute(w, map[string]interface{}{"root": WebCp})
+	tmpl, _ := template.New("index").Parse(viewString)
+	tmpl.Execute(w, map[string]interface{}{"root": WebCp, "templates": template.HTML(templatesString)})
 }
