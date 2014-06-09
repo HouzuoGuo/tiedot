@@ -1,7 +1,7 @@
 App.Collection = Backbone.Model.extend({
 	
 	saveUrl: function() {
-		return '/create?col=' + this.id + '&numparts=' + this.get('numparts');
+		return '/create?col=' + this.id;
 	},
 
 	renameUrl: function(name) {

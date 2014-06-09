@@ -47,14 +47,13 @@ App.CollectionListView = Backbone.View.extend({
 			
 			$(that).find('.create').on('click', function(e) {
 				var name = $(that).find('.name').val().trim();
-				var numparts = $(that).find('.numparts').val().trim();
 				window.dispatcher.trigger('modal:close');
 				
 				if (!name) {
 					return;
 				}
 				
-				new App.Collection({ id: name, numparts: numparts }).save();
+				new App.Collection({ id: name }).save();
 			});
 		});
 
