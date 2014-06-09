@@ -16,15 +16,18 @@ func RegisterWebCp() {
 		return
 	}
 	http.HandleFunc("/"+WebCp, handleWebCp)
-	http.Handle("/"+WebCp+"/css/", http.StripPrefix("/"+WebCp+"/css/", http.FileServer(rice.MustFindBox("admin/css").HTTPBox())))
-	http.Handle("/"+WebCp+"/js/", http.StripPrefix("/"+WebCp+"/js/", http.FileServer(rice.MustFindBox("admin/js").HTTPBox())))
+	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		w.Write(rice.MustFindBox("/").MustBytes("favicon.ico"))
+	})
+	http.Handle("/"+WebCp+"/css/", http.StripPrefix("/"+WebCp+"/css/", http.FileServer(rice.MustFindBox("static/css").HTTPBox())))
+	http.Handle("/"+WebCp+"/js/", http.StripPrefix("/"+WebCp+"/js/", http.FileServer(rice.MustFindBox("static/js").HTTPBox())))
 	tdlog.Printf("Web control panel is accessible at /%s", WebCp)
 }
 
 func handleWebCp(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 
-	templateBox, err := rice.FindBox("admin/views")
+	templateBox, err := rice.FindBox("static/views")
 	if err != nil {
 		tdlog.Fatal(err)
 	}
