@@ -6,13 +6,15 @@ App.DocumentView = Backbone.View.extend({
 	
 	events: {
 		'click .delete': 'onDeleteClick',
-		'click .save': 'onSaveClick'
+		'click .save': 'onSaveClick',
+		'click .search-link': 'onSearchLinkClick'
 	},
 	
 	initialize: function(options) {
 		_.extend(this, _.pick(options, 'col'));
 		
 		this.listenTo(this.model, 'change', this.render);
+		window.dispatcher.trigger('queryBox:close');
 		
 		this.model.collectionName = this.col;
 		
@@ -21,6 +23,10 @@ App.DocumentView = Backbone.View.extend({
 		} else {
 			this.renderNew();
 		}
+	},
+	
+	onSearchLinkClick: function(e) {
+		window.dispatcher.trigger('queryBox:open');
 	},
 	
 	render: function() {

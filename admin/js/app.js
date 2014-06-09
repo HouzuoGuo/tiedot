@@ -11,7 +11,7 @@ App.AppView = Backbone.View.extend({
 		$('.load-doc').on('submit', this.onLoadDocFormSubmit);
 				
 		this.router = new App.Router();
-		Backbone.history.start({ root: '/admin' });
+		this.queryBox = new App.QueryBoxView({ el: $('#query-box') });
 		
 		$.ajax({
 			url: "/version",
@@ -37,13 +37,13 @@ App.AppView = Backbone.View.extend({
 		return false;
 	},
 	
-	notify: function(type, msg) {
+	notify: function(type, msg, time) {
 		$('#main').prepend('<div class="alert alert-' + type + ' alert-dismissable fade in"><button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>' + msg + '</div>');
 		$(".alert").alert();
 		
 		setTimeout(function() {
 			$(".alert").alert('close')
-		}, 4000);
+		}, time ? time : 4000);
 	}
 });
 
@@ -53,7 +53,8 @@ App.Router = Backbone.Router.extend({
 		'': 'index',
 		'cols/:name': 'collectionByName',
 		'docs/new/:col': 'newDoc',
-		'docs/:col/:id': 'docById'
+		'docs/:col/:id': 'docById',
+		'query/:col/:q': 'docsByQuery'
 	},
 	
 	index: function() {
@@ -62,14 +63,22 @@ App.Router = Backbone.Router.extend({
 		
 	collectionByName: function(name) {
 		var collection = new App.CollectionView({ id: name, model: new App.Collection({ id: name }), collection: new App.DocumentList() });
+		tiedotApp.queryBox.setCol(name);
 	},
 
 	newDoc: function(col) {
 		var documentView = new App.DocumentView({ col: col, model: new App.Document() });
+		tiedotApp.queryBox.setCol(col);
 	},
 	
 	docById: function(col, id) {
 		var documentView = new App.DocumentView({ id: id, col: col, model: new App.Document({ id: id }) });
+		tiedotApp.queryBox.setCol(col);
+	},
+	
+	docsByQuery: function(col, q) {
+		var queryResultView = new App.QueryResultView({ id: col, model: new App.Collection({ id: col, query: q }), collection: new App.DocumentList() });
+		tiedotApp.queryBox.setQuery(q);
 	}
 
 });
@@ -123,4 +132,5 @@ $(function() {
 	window.dispatcher = _.clone(Backbone.Events)
 	
 	tiedotApp = new App.AppView();
+	Backbone.history.start({ root: '/admin' });
 });

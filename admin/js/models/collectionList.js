@@ -22,7 +22,21 @@ App.CollectionList = Backbone.Collection.extend({
 			self.reset(cols);
 		})
 		.fail(function(jqXHR, textStatus) {
-			alert('failed to load collections.');
+			alert('Error trying to load collections.');
+		});
+	},
+	
+	setDocumentCount: function(col, el) {
+		Backbone.ajax({
+			url: '/count?col=' + col + '&q={"c":["all"]}'
+		})
+		.done(function(data) {
+			var label = data == 1 ? ' document' : ' documents';
+			
+			$(el).html(data + label);
+		})
+		.fail(function(jqXHR, textStatus) {
+			return 0;
 		});
 	}
 });

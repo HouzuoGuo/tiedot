@@ -4,16 +4,9 @@
 	</ol>
 	<a href="#" id="new-collection" class="btn btn-primary btn-lg pull-right">New Collection</a>
 	<h2>All Collections</h2>
-	<table class="table table-bordered table-hover">
-		<tbody>
-			<% for (var x = 0; x < cols.length; x++) { %>
-			<tr>
-				<td><a href="#cols/<%= cols[x].id %>"><%= cols[x].id %></a></td>
-			</tr>
-			<% } %>
-		</tbody>
-	</ul>
-	</table>
+	<% for (var x = 0; x < cols.length; x++) { %>
+		<a class="pull-left collection" data-id="<%= cols[x].id %>" href="#cols/<%= cols[x].id %>"><h4><%= cols[x].id %></h4><span>&nbsp;</span></a>
+	<% } %>
 </script>
 
 <script id="collection-new-template" type="text/html">
@@ -70,6 +63,7 @@
 </script>
 
 <script id="collection-template" type="text/html">
+	<button type="button" class="btn btn-default pull-right search-link">Query</button>
 	<ol class="breadcrumb">
 	  <li><a href="#">Collections</a></li>
 	  <li><a href="#cols/<%= name %>"><%= name %></a></li>
@@ -110,7 +104,45 @@
 	<% } %>
 </script>
 
+<script id="query-template" type="text/html">
+	<ol class="breadcrumb">
+	  <li><a href="#">Collections</a></li>
+	  <li><a href="#cols/<%= name %>"><%= name %></a></li>
+	  <li>Query</li>
+	</ol>
+	<h2>Query results</h2>
+
+	<hr />
+	<% if (docs.length > 0) { %>
+	<table class="table table-bordered table-hover">
+		<thead>
+			<tr>
+				<th>id</th>
+			<% for (var x = 0; x < docKeys.length; x++) {
+				if (docKeys[x] === 'id') continue; %>
+				<th><%= docKeys[x] %></th>
+			<% } %>
+			</tr>
+		</thead>
+		<tbody>
+			<% for (var y = 0; y < docs.length; y++) { %>
+			<tr>
+				<td><a href="#docs/<%= name %>/<%= docs[y]['id'] %>"><%= docs[y]['id'] %></a></td>
+				<% for (var z = 0; z < docKeys.length; z++) {
+					if (docKeys[z] === 'id') continue; %>
+					<td><%= docs[y][docKeys[z]] %></td>
+				<% } %>
+			</tr>
+			<% } %>
+		</tbody>
+	</table>
+	<% } else { %>
+		<p>No results found</p>
+	<% } %>
+</script>
+
 <script id="document-template" type="text/html">
+	<button type="button" class="btn btn-default pull-right search-link">Query</button>
 	<ol class="breadcrumb">
 	  <li><a href="#">Collections</a></li>
 	  <li><a href="#cols/<%= col %>"><%= col %></a></li>

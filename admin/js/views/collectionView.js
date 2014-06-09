@@ -6,11 +6,13 @@ App.CollectionView = Backbone.View.extend({
 	
 	events: {
 		'click .rename': 'rename',
-		'click .delete': 'delete'
+		'click .delete': 'delete',
+		'click .search-link': 'onSearchLinkClick'
 	},
 	
 	initialize: function() {
 		this.listenTo(this.collection, 'reset', this.render);
+		window.dispatcher.trigger('queryBox:close');
 		
 		this.collection.id = this.id;
 		this.collection.fetch();
@@ -34,6 +36,10 @@ App.CollectionView = Backbone.View.extend({
 		
 		this.delegateEvents();
 		return this;
+	},
+	
+	onSearchLinkClick: function(e) {
+		window.dispatcher.trigger('queryBox:open');
 	},
 	
 	rename: function(e) {

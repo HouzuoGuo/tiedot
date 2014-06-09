@@ -1,14 +1,18 @@
 App.DocumentList = Backbone.Collection.extend({
 	
 	url: function() {
-		return '/query?col=' + this.id + '&q={"c":["all"]}';
+		return '/query?col=' + this.id + '&q="all"';
+	},
+
+	queryUrl: function(query) {
+		return '/query?col=' + this.id + '&q=' + query;
 	},
 	
-	fetch: function() {
+	fetch: function(query) {
 		var self = this;
 		
 		Backbone.ajax({
-			url: this.url()
+			url: query ? this.queryUrl(query) : this.url()
 		})
 		.done(function(res) {
 			var data = JSON.parse(res);
@@ -24,7 +28,7 @@ App.DocumentList = Backbone.Collection.extend({
 			self.reset(documents);
 		})
 		.fail(function(jqXHR, textStatus) {
-			alert('failed to load collections.');
+			tiedotApp.notify('danger', 'Error running query: ' + jqXHR.responseText, 8000);
 		});
 	}
 });

@@ -12,18 +12,28 @@ App.CollectionListView = Backbone.View.extend({
 		var self = this;
 		
 		this.listenTo(this.collection, 'reset', this.render);
+		window.dispatcher.trigger('queryBox:close');
 		
 		this.collection.fetch();
 	},
 	
 	render: function() {
-		this.$el.html(this.template({cols: this.collection.toJSON() }));
+		this.$el.html(this.template({ cols: this.collection.toJSON() }));
 		
 		$('#app').html('');
 		$('#app').append(this.$el);
+		this.setDocumentCounts();
 		
 		this.delegateEvents();
 		return this;
+	},
+	
+	setDocumentCounts: function() {
+		var self = this;
+		
+		this.$('.collection').each(function(index, el) {
+			self.collection.setDocumentCount($(el).data('id'), $(el).find('span'));
+		});
 	},
 	
 	newCollection: function(e) {
