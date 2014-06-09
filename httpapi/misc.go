@@ -14,7 +14,7 @@ func Shutdown(w http.ResponseWriter, r *http.Request) {
 	HttpDBSync.Lock()
 	defer HttpDBSync.Unlock()
 	w.Header().Set("Cache-Control", "must-revalidate")
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "text/plain")
 	HttpDB.Close()
 	os.Exit(0)
 }
@@ -22,7 +22,7 @@ func Shutdown(w http.ResponseWriter, r *http.Request) {
 // Copy this database into destination directory.
 func Dump(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "text/plain")
 	var dest string
 	if !Require(w, r, "dest", &dest) {
 		return

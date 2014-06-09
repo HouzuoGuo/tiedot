@@ -15,11 +15,10 @@ App.DocumentList = Backbone.Collection.extend({
 			url: query ? this.queryUrl(query) : this.url()
 		})
 		.done(function(res) {
-			var data = JSON.parse(res);
 			var documents = [];
 			
-			for (var id in data) {
-				var document = data[id];
+			for (var id in res) {
+				var document = res[id];
 				document.id = id;
 				
 				documents.push(new App.Document(document));
