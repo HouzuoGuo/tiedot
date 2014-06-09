@@ -17,7 +17,7 @@ App.AppView = Backbone.View.extend({
 			url: "/version",
 		})
 		.done(function(res) {
-			$('.navbar-brand').html('Tiedot v' + res);
+			$('.navbar-brand').html('Tiedot (API version ' + res + ')');
 		});
 	},
 	
