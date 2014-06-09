@@ -5,6 +5,7 @@ import (
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/httpapi"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"github.com/HouzuoGuo/tiedot/webcp"
 	"log"
 	"os"
 	"runtime"
@@ -20,13 +21,13 @@ func main() {
 	}
 
 	// Parse CLI parameters
-	var mode, dir, webcp string
+	var mode, dir string
 	var port, maxprocs, benchSize int
 	var profile bool
 	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|example]")
 	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
 	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
-	flag.StringVar(&webcp, "webcp", "", "(HTTP API) web control panel route")
+	flag.StringVar(&webcp.WebCp, "webcp", "admin", "(HTTP API) web control panel route (without leading slash)")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
 	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
 	flag.BoolVar(&profile, "profile", false, "Write profiler results to prof.out")
@@ -68,7 +69,7 @@ func main() {
 		if err != nil {
 			tdlog.Fatal(err)
 		}
-		httpapi.Start(db, port, webcp)
+		httpapi.Start(db, port)
 	case "example": // Run embedded usage examples
 		embeddedExample()
 	case "bench": // Benchmark scenarios
