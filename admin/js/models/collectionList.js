@@ -22,7 +22,7 @@ App.CollectionList = Backbone.Collection.extend({
 			self.reset(cols);
 		})
 		.fail(function(jqXHR, textStatus) {
-			alert('Error trying to load collections.');
+			tiedotApp.notify('danger', 'Failed to load collections: ' + jqXHR.responseText, 8000);
 		});
 	},
 	

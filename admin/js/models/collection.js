@@ -23,7 +23,7 @@ App.Collection = Backbone.Model.extend({
 			tiedotApp.notify('success', 'Collection created successfully!');
 		})
 		.fail(function(jqXHR, textStatus) {
-			tiedotApp.notify('danger', 'Failed to create collection.');
+			tiedotApp.notify('danger', 'Failed to create collection: ' + jqXHR.responseText, 8000);
 		});
 	},
 
@@ -40,7 +40,7 @@ App.Collection = Backbone.Model.extend({
 			tiedotApp.notify('success', 'Collection renamed successfully!');
 		})
 		.fail(function(jqXHR, textStatus) {
-			tiedotApp.notify('danger', 'Failed to rename collection.');
+			tiedotApp.notify('danger', 'Failed to rename collection: ' + jqXHR.responseText, 8000);
 		});
 	},
 
@@ -55,7 +55,7 @@ App.Collection = Backbone.Model.extend({
 			tiedotApp.notify('warning', 'Collection deleted successfully!');
 		})
 		.fail(function(jqXHR, textStatus) {
-			tiedotApp.notify('danger', 'Failed to delete collection.');
+			tiedotApp.notify('danger', 'Failed to delete collection: ' + jqXHR.responseText, 8000);
 		});
 	}
 

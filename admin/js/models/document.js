@@ -28,7 +28,7 @@ App.Document = Backbone.Model.extend({
 				tiedotApp.notify('success', 'Document updated successfully!');
 			})
 			.fail(function(jqXHR, textStatus) {
-				tiedotApp.notify('danger', 'failed to save document.');
+				tiedotApp.notify('danger', 'Failed to save document: ' + jqXHR.responseText, 8000);
 			});
 		} else {
 			Backbone.ajax({
@@ -39,7 +39,7 @@ App.Document = Backbone.Model.extend({
 				tiedotApp.notify('success', 'Document added successfully!');
 			})
 			.fail(function(jqXHR, textStatus) {
-				tiedotApp.notify('danger', 'failed to save document.');
+				tiedotApp.notify('danger', 'Failed to save document: ' + jqXHR.responseText, 8000);
 			});
 		}
 	},
@@ -55,7 +55,7 @@ App.Document = Backbone.Model.extend({
 			tiedotApp.notify('warning', 'Document deleted successfully!');
 		})
 		.fail(function(jqXHR, textStatus) {
-			tiedotApp.notify('danger', 'failed to delete document.');
+			tiedotApp.notify('danger', 'Failed to delete document: ' + jqXHR.responseText, 8000);
 		});
 	}
 

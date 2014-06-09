@@ -52,6 +52,7 @@ App.Router = Backbone.Router.extend({
 	routes: {
 		'': 'index',
 		'cols/:name': 'collectionByName',
+		'cols/:name/indexes': 'collectionIndexes',
 		'docs/new/:col': 'newDoc',
 		'docs/:col/:id': 'docById',
 		'query/:col/:q': 'docsByQuery'
@@ -64,6 +65,10 @@ App.Router = Backbone.Router.extend({
 	collectionByName: function(name) {
 		var collection = new App.CollectionView({ id: name, model: new App.Collection({ id: name }), collection: new App.DocumentList() });
 		tiedotApp.queryBox.setCol(name);
+	},
+	
+	collectionIndexes: function(name) {
+		var indexes = new App.IndexesView({ id: name, model: new App.Collection({ col: name }), collection: new App.IndexList() });
 	},
 
 	newDoc: function(col) {
