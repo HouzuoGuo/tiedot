@@ -6,6 +6,7 @@ App.DocumentView = Backbone.View.extend({
 	
 	events: {
 		'click .delete': 'onDeleteClick',
+		'click .cancel': 'onCancelClick',
 		'click .save': 'onSaveClick',
 		'click .search-link': 'onSearchLinkClick'
 	},
@@ -22,6 +23,7 @@ App.DocumentView = Backbone.View.extend({
 			this.model.fetch();
 		} else {
 			this.renderNew();
+			this.delegateEvents();
 		}
 	},
 	
@@ -50,6 +52,8 @@ App.DocumentView = Backbone.View.extend({
 		
 		$('#app').html('');
 		$('#app').append(this.$el);
+		this.$el.find('.delete').html('Cancel').removeClass('delete').addClass('cancel');
+		this.$el.find('.delete').off();
 
 		this.createEditor('');
 		return this;
@@ -102,6 +106,12 @@ App.DocumentView = Backbone.View.extend({
 		
 		this.model.save(json);		
 		
+		return false;
+	},
+	
+	onCancelClick: function(e) {
+		e.preventDefault();
+		tiedotApp.router.navigate('cols/' + this.col, { trigger: true });
 		return false;
 	}
 });
