@@ -17,7 +17,7 @@ func RegisterWebCp() {
 	}
 	http.HandleFunc("/"+WebCp, handleWebCp)
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(rice.MustFindBox("/").MustBytes("favicon.ico"))
+		w.Write(rice.MustFindBox("static/img").MustBytes("favicon.ico"))
 	})
 	http.Handle("/"+WebCp+"/css/", http.StripPrefix("/"+WebCp+"/css/", http.FileServer(rice.MustFindBox("static/css").HTTPBox())))
 	http.Handle("/"+WebCp+"/js/", http.StripPrefix("/"+WebCp+"/js/", http.FileServer(rice.MustFindBox("static/js").HTTPBox())))
