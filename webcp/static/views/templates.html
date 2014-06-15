@@ -26,6 +26,21 @@
     </div>
 </script>
 
+<script id="collection-scrub-template" type="text/html">
+    <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 class="modal-title">Scrub Collection</h4>
+    </div>
+    <div class="modal-body">
+        <p>Scrubbing a collection will recover corrupted documents and de-fragment free space.<p>
+        <p>Depending on collection size, it may take several minutes to complete.</p>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success scrub">Scrub</button>
+    </div>
+</script>
+
 <script id="collection-rename-template" type="text/html">
 	<div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
@@ -65,6 +80,7 @@
 	  <li><a href="#cols/<%= name %>"><%= name %></a></li>
 	</ol>
 	<p class="pull-right">
+        <a href="#" class="btn btn-info scrub">Scrub</a>
 		<a href="#" class="btn btn-info rename">Rename</a>
 		<a href="#" class="btn btn-danger delete">Delete</a>
 	</p>

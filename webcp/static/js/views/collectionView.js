@@ -5,6 +5,7 @@ App.CollectionView = Backbone.View.extend({
 	template: _.template($('#collection-template').html()),
 	
 	events: {
+	    'click .scrub': 'scrub',
 		'click .rename': 'rename',
 		'click .delete': 'delete',
 		'click .search-link': 'onSearchLinkClick'
@@ -40,6 +41,24 @@ App.CollectionView = Backbone.View.extend({
 	
 	onSearchLinkClick: function(e) {
 		window.dispatcher.trigger('queryBox:open');
+	},
+
+	scrub: function(e) {
+		var self = this;
+
+		e.preventDefault();
+
+		var html = $('#collection-scrub-template').html();
+		window.dispatcher.trigger('modal:open', html, function() {
+			var that = this;
+
+            $(that).find('.scrub').on('click', function(e) {
+                window.dispatcher.trigger('modal:close');
+                self.model.scrub();
+            });
+		});
+
+		return false;
 	},
 	
 	rename: function(e) {

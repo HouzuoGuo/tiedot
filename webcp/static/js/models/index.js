@@ -27,7 +27,7 @@ App.Index = Backbone.Model.extend({
 			url: this.removeUrl()
 		})
 		.done(function(res) {
-			tiedotApp.notify('warning', 'Index deleted successfully!');
+			tiedotApp.notify('success', 'Index deleted successfully!');
 		})
 		.fail(function(jqXHR, textStatus) {
 			tiedotApp.notify('danger', 'Failed to delete index: ' + jqXHR.responseText, 8000);
