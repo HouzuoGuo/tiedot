@@ -54,6 +54,6 @@ func Start(db *db.DB, port int) {
 	// web control panel
 	webcp.RegisterWebCp()
 
-	tdlog.Printf("Listening on all interfaces, port %d", port)
+	tdlog.Noticef("Will listen on all interfaces, port %d", port)
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }

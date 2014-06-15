@@ -225,7 +225,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 		return errors.New(fmt.Sprintf("Missing `int-to`"))
 	}
 	if to > from && to-from > 1000 || from > to && from-to > 1000 {
-		tdlog.Printf("Query %v is an index lookup of more than 1000 values, which may be inefficient", expr)
+		tdlog.CritNoRepeat("Query %v involves index lookup on more than 1000 values, which can be very inefficient", expr)
 	}
 	counter := int(0) // Number of results already collected
 	htPath := strings.Join(vecPath, ",")

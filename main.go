@@ -42,9 +42,9 @@ func main() {
 
 	// Set appropriate GOMAXPROCS
 	runtime.GOMAXPROCS(maxprocs)
-	log.Printf("GOMAXPROCS is set to %d", maxprocs)
+	tdlog.Noticef("GOMAXPROCS is set to %d", maxprocs)
 	if maxprocs < runtime.NumCPU() {
-		tdlog.Printf("GOMAXPROCS (%d) is less than number of CPUs (%d), this may reduce performance. You can change it via environment variable GOMAXPROCS or by passing CLI parameter -gomaxprocs", maxprocs, runtime.NumCPU())
+		tdlog.Noticef("GOMAXPROCS (%d) is less than number of CPUs (%d), this may reduce performance. You can change it via environment variable GOMAXPROCS or by passing CLI parameter -gomaxprocs", maxprocs, runtime.NumCPU())
 	}
 
 	// Start profiler if enabled
@@ -60,14 +60,14 @@ func main() {
 	switch mode {
 	case "httpd": // Run HTTP API server
 		if dir == "" {
-			tdlog.Fatal("Please specify database directory, for example -dir=/tmp/db")
+			tdlog.Panicf("Please specify database directory, for example -dir=/tmp/db")
 		}
 		if port == 0 {
-			tdlog.Fatal("Please specify port number, for example -port=8080")
+			tdlog.Panicf("Please specify port number, for example -port=8080")
 		}
 		db, err := db.OpenDB(dir)
 		if err != nil {
-			tdlog.Fatal(err)
+			panic(err)
 		}
 		httpapi.Start(db, port)
 	case "example": // Run embedded usage examples

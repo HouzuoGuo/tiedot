@@ -12,7 +12,7 @@ var WebCp string
 
 func RegisterWebCp() {
 	if WebCp == "" || WebCp == "none" || WebCp == "no" || WebCp == "false" {
-		tdlog.Println("Web control panel is disabled on your request")
+		tdlog.Noticef("Web control panel is disabled on your request")
 		return
 	}
 	http.HandleFunc("/"+WebCp, handleWebCp)
@@ -21,28 +21,28 @@ func RegisterWebCp() {
 	})
 	http.Handle("/"+WebCp+"/css/", http.StripPrefix("/"+WebCp+"/css/", http.FileServer(rice.MustFindBox("static/css").HTTPBox())))
 	http.Handle("/"+WebCp+"/js/", http.StripPrefix("/"+WebCp+"/js/", http.FileServer(rice.MustFindBox("static/js").HTTPBox())))
-	tdlog.Printf("Web control panel is accessible at /%s", WebCp)
+	tdlog.Noticef("Web control panel is accessible at /%s", WebCp)
 }
 
 func handleWebCp(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-
 	templateBox, err := rice.FindBox("static/views")
 	if err != nil {
-		tdlog.Fatal(err)
+		panic(err)
 	}
 	templatesString, err := templateBox.String("templates.html")
 	if err != nil {
-		tdlog.Fatal(err)
+		panic(err)
 	}
 	viewString, err := templateBox.String("index.html")
 	if err != nil {
-		tdlog.Fatal(err)
+		panic(err)
 	}
-
 	tmpl, err := template.New("index").Parse(viewString)
 	if err != nil {
 		panic(err)
 	}
-	tmpl.Execute(w, map[string]interface{}{"root": WebCp, "templates": template.HTML(templatesString)})
+	if err := tmpl.Execute(w, map[string]interface{}{"root": WebCp, "templates": template.HTML(templatesString)}); err != nil {
+		panic(err)
+	}
 }
