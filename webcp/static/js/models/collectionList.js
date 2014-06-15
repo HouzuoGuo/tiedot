@@ -28,12 +28,10 @@ App.CollectionList = Backbone.Collection.extend({
 	
 	setDocumentCount: function(col, el) {
 		Backbone.ajax({
-			url: '/count?col=' + col + '&q={"c":["all"]}'
+			url: '/approxdoccount?col=' + col
 		})
 		.done(function(data) {
-			var label = data == 1 ? ' document' : ' documents';
-			
-			$(el).html(data + label);
+			$(el).html(data + ' documents (approx.)');
 		})
 		.fail(function(jqXHR, textStatus) {
 			return 0;

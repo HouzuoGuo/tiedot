@@ -1,8 +1,11 @@
 package data
 
 import (
+	"math/rand"
 	"os"
+	"strconv"
 	"testing"
+	"time"
 )
 
 func TestPartitionDocCRUD(t *testing.T) {
@@ -76,5 +79,59 @@ func TestPartitionDocCRUD(t *testing.T) {
 	}
 	if err = part.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestApproxDocCount(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	colPath := "/tmp/tiedot_test_col"
+	htPath := "/tmp/tiedot_test_ht"
+	os.Remove(colPath)
+	os.Remove(htPath)
+	defer os.Remove(colPath)
+	defer os.Remove(htPath)
+	part, err := OpenPartition(colPath, htPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Insert 100 documents
+	for i := 0; i < 100; i++ {
+		if _, err = part.Insert(rand.Int(), []byte(strconv.Itoa(i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if part.ApproxDocCount() < 10 || part.ApproxDocCount() > 300 {
+		t.Fatal("Approximate is way off", part.ApproxDocCount())
+	}
+	t.Log("ApproxDocCount", part.ApproxDocCount())
+	// Insert 900 documents
+	for i := 0; i < 900; i++ {
+		if _, err = part.Insert(rand.Int(), []byte(strconv.Itoa(i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Log("ApproxDocCount", part.ApproxDocCount())
+	if part.ApproxDocCount() < 800 || part.ApproxDocCount() > 1200 {
+		t.Fatal("Approximate is way off", part.ApproxDocCount())
+	}
+	// Insert another 2000 documents
+	for i := 0; i < 2000; i++ {
+		if _, err = part.Insert(rand.Int(), []byte(strconv.Itoa(i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Log("ApproxDocCount", part.ApproxDocCount())
+	if part.ApproxDocCount() < 2500 || part.ApproxDocCount() > 3500 {
+		t.Fatal("Approximate is way off", part.ApproxDocCount())
+	}
+	// See how fast it is
+	start := time.Now().UnixNano()
+	for i := 0; i < 1000; i++ {
+		part.ApproxDocCount()
+	}
+	timediff := time.Now().UnixNano() - start
+	t.Log("It took", timediff/1000000, "milliseconds")
+	if timediff/1000000 > 1000 {
+		t.Fatal("Algorithm is way too slow")
 	}
 }

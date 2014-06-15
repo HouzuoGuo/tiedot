@@ -102,7 +102,8 @@ func (col *Col) Sync() error {
 
 // Do fun for all documents in the collection.
 func (col *Col) ForEachDoc(_ bool, fun func(id int, doc []byte) (moveOn bool)) {
-	totalIterations := 193 // not a magic - feel free to adjust the number, but do not make it too small
+	// This number is not a magic, but smaller equals to larger memory consumption, and larger equals to more time consumption
+	totalIterations := 193
 	for iteratePart := 0; iteratePart < col.db.numParts; iteratePart++ {
 		part := col.parts[iteratePart]
 		part.Lock.RLock()
@@ -199,4 +200,13 @@ func (col *Col) Unindex(idxPath []string) error {
 		return err
 	}
 	return nil
+}
+
+// Return approximate number of documents in the collection.
+func (col *Col) ApproxDocCount() int {
+	total := 0
+	for _, part := range col.parts {
+		total += part.ApproxDocCount()
+	}
+	return total
 }

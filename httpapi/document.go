@@ -139,3 +139,21 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	dbcol.Delete(docID)
 }
+
+// Return approximate number of documents in the collection.
+func ApproxDocCount(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "text/plain")
+	var col string
+	if !Require(w, r, "col", &col) {
+		return
+	}
+	HttpDBSync.RLock()
+	defer HttpDBSync.RUnlock()
+	dbcol := HttpDB.Use(col)
+	if dbcol == nil {
+		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
+		return
+	}
+	w.Write([]byte(strconv.Itoa(dbcol.ApproxDocCount())))
+}

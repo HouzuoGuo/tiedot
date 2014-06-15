@@ -108,6 +108,29 @@ func (part *Partition) ForEachDoc(partNum, totalPart int, fun func(id int, doc [
 	return true
 }
 
+// Return approximate number of documents in the partition.
+func (part *Partition) ApproxDocCount() int {
+	totalPart := 128 // not magic; a larger number makes estimation less accurate, but improves performance
+	tryUpTo := 8     // not magic; a larger number makes the estimation more accurate, but impacts performance
+	for {
+		count := 0
+		for i := 0; i < tryUpTo; i++ {
+			keys, _ := part.lookup.GetPartition(i, totalPart)
+			count += len(keys)
+		}
+		if count == 0 {
+			// "4" means it does not wish to go through 25% of hash table in order to find an approximate doc count
+			if tryUpTo*4 >= totalPart {
+				return 0 // the hash table is really really empty
+			}
+			// Try a larger partition size
+			totalPart = totalPart / 2
+		} else {
+			return int(float64(count) / float64(tryUpTo) * float64(totalPart))
+		}
+	}
+}
+
 // Clear data file and lookup hash table.
 func (part *Partition) Clear() (err error) {
 	var failure bool

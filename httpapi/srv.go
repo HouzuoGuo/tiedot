@@ -41,6 +41,7 @@ func Start(db *db.DB, port int) {
 	http.HandleFunc("/get", Get)
 	http.HandleFunc("/update", Update)
 	http.HandleFunc("/delete", Delete)
+	http.HandleFunc("/approxdoccount", ApproxDocCount)
 	// index management (stop-the-world)
 	http.HandleFunc("/index", Index)
 	http.HandleFunc("/indexes", Indexes)

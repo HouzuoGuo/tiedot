@@ -220,6 +220,13 @@ func TestDocCrudAndIdx(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+
+	// Verify that there are approximately 1000 documents
+	t.Log("ApproxDocCount", col.ApproxDocCount())
+	if col.ApproxDocCount() < 800 || col.ApproxDocCount() > 1200 {
+		t.Fatal("Approximate is way off", col.ApproxDocCount())
+	}
+
 	// Scrub and verify
 	if err = db.Scrub("col"); err != nil {
 		t.Fatal(err)
@@ -234,15 +241,21 @@ func TestDocCrudAndIdx(t *testing.T) {
 		}
 	}
 
-	// Iterate over all documents 20 times
+	// Iterate over all documents 10 times
 	start := time.Now().UnixNano()
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 10; i++ {
 		col.ForEachDoc(false, func(_ int, _ []byte) bool {
 			return true
 		})
 	}
 	timediff := time.Now().UnixNano() - start
-	fmt.Println("It took", timediff/1000000, "milliseconds")
+	t.Log("It took", timediff/1000000, "milliseconds")
+
+	// Verify again that there are approximately 1000 documents
+	t.Log("ApproxDocCount", col.ApproxDocCount())
+	if col.ApproxDocCount() < 800 || col.ApproxDocCount() > 1200 {
+		t.Fatal("Approximate is way off", col.ApproxDocCount())
+	}
 
 	if err = col.Sync(); err != nil {
 		t.Fatal(err)
