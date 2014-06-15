@@ -87,10 +87,8 @@ func (db *DB) load() error {
 			for {
 				select {
 				case <-db.autoSync.C:
-					if err := db.Sync(); err == nil {
-						tdlog.Printf("Background Auto-Sync on %s: OK", db.path)
-					} else {
-						tdlog.Errorf("Background Auto-Sync on %s: Failed with error: %v", db.path, err)
+					if err := db.Sync(); err != nil {
+						tdlog.CritNoRepeat("Background Auto-Sync on %s: Failed with error: %v", db.path, err)
 					}
 				case <-db.autoSyncStop:
 					db.autoSync.Stop()
@@ -247,7 +245,7 @@ func (db *DB) Scrub(name string) error {
 			return true
 		}
 		if err := tmpCol.InsertRecovery(id, docObj); err != nil {
-			tdlog.Errorf("Scrub %s: failed to insert back document %v", name, docObj)
+			tdlog.Noticef("Scrub %s: failed to insert back document %v", name, docObj)
 		}
 		return true
 	})
@@ -305,7 +303,7 @@ func (db *DB) Dump(dest string) error {
 			if err := os.MkdirAll(destDir, 0700); err != nil {
 				return err
 			}
-			tdlog.Printf("Dump: created directory %s", destDir)
+			tdlog.Noticef("Dump: created directory %s", destDir)
 		} else {
 			src, err := os.Open(currPath)
 			if err != nil {
@@ -327,7 +325,7 @@ func (db *DB) Dump(dest string) error {
 			if err != nil {
 				return err
 			}
-			tdlog.Printf("Dump: copied file %s, size is %d", destPath, written)
+			tdlog.Noticef("Dump: copied file %s, size is %d", destPath, written)
 		}
 		return nil
 	}

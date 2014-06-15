@@ -141,7 +141,8 @@ func embeddedExample() {
 	if err := myDB.Sync(); err != nil {
 		panic(err)
 	}
-	// Gracefully close database
+	// Gracefully close database, you should call Close on all opened databases
+	// Otherwise background goroutines will prevent program shutdown
 	if err := myDB.Close(); err != nil {
 		panic(err)
 	}

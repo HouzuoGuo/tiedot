@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io/ioutil"
 	"os"
 	"path"
@@ -105,12 +104,10 @@ func (col *Col) Sync() error {
 func (col *Col) ForEachDoc(_ bool, fun func(id int, doc []byte) (moveOn bool)) {
 	totalIterations := 193 // not a magic - feel free to adjust the number, but do not make it too small
 	for iteratePart := 0; iteratePart < col.db.numParts; iteratePart++ {
-		tdlog.Printf("ForEachDoc %s: Going through partition %d", col.name, iteratePart)
 		part := col.parts[iteratePart]
 		part.Lock.RLock()
 		for i := 0; i < totalIterations; i++ {
 			if !part.ForEachDoc(i, totalIterations, fun) {
-				tdlog.Printf("ForEachDoc %s: Stopped on collection partition %d, hash partition %d", iteratePart, i)
 				part.Lock.RUnlock()
 				return
 			}

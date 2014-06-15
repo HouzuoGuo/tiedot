@@ -50,6 +50,7 @@ func Start(db *db.DB, port int) {
 	// misc
 	http.HandleFunc("/version", Version)
 	http.HandleFunc("/memstats", MemStats)
-	tdlog.Printf("Listening on all interfaces, port %d", port)
+
+	tdlog.Noticef("Will listen on all interfaces, port %d", port)
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }

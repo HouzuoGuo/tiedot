@@ -12,7 +12,6 @@ import (
 func GetIn(doc interface{}, path []string) (ret []interface{}) {
 	docMap, ok := doc.(map[string]interface{})
 	if !ok {
-		tdlog.Printf("%v cannot be indexed because type conversation to map[string]interface{} failed", doc)
 		return
 	}
 	var thing interface{} = docMap
@@ -164,7 +163,7 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	}
 	var original map[string]interface{}
 	if err = json.Unmarshal(originalB, &original); err != nil {
-		tdlog.Errorf("Will not attempt to unindex document %d during update", id)
+		tdlog.Noticef("Will not attempt to unindex document %d during update", id)
 	}
 	if err = part.Update(id, []byte(docJS)); err != nil {
 		part.UnlockUpdate(id)
@@ -201,7 +200,7 @@ func (col *Col) Delete(id int) error {
 	}
 	var original map[string]interface{}
 	if err = json.Unmarshal(originalB, &original); err != nil {
-		tdlog.Errorf("Will not attempt to unindex document %d during delete", id)
+		tdlog.Noticef("Will not attempt to unindex document %d during delete", id)
 	}
 	if err = part.Delete(id); err != nil {
 		part.UnlockUpdate(id)

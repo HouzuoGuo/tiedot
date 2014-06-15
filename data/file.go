@@ -40,7 +40,7 @@ func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 			break
 		}
 	}
-	tdlog.Printf("%s opened: %d of %d bytes in-use", path, file.Used, file.Size)
+	tdlog.Infof("%s opened: %d of %d bytes in-use", path, file.Used, file.Size)
 	return
 }
 
@@ -60,7 +60,7 @@ func (file *DataFile) EnsureSize(more int) (err error) {
 		return
 	}
 	file.Size += file.Growth
-	tdlog.Printf("%s grown: %d -> %d bytes (%d bytes in-use)", file.Path, file.Size-file.Growth, file.Size, file.Used)
+	tdlog.Infof("%s grown: %d -> %d bytes (%d bytes in-use)", file.Path, file.Size-file.Growth, file.Size, file.Used)
 	return file.EnsureSize(more)
 }
 
@@ -89,6 +89,6 @@ func (file *DataFile) Clear() (err error) {
 		return
 	}
 	file.Used, file.Size = 0, file.Growth
-	tdlog.Printf("%s cleared: %d of %d bytes in-use", file.Path, file.Used, file.Size)
+	tdlog.Infof("%s cleared: %d of %d bytes in-use", file.Path, file.Used, file.Size)
 	return
 }

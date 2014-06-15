@@ -1,32 +1,54 @@
 package tdlog
 
 import (
+	"fmt"
 	"log"
+	"sync"
 )
 
-var VerboseLog bool = false
+// Controls whether INFO log messages are generated
+var VerboseLog = false
 
-// Write a non-fatal advisory log message
-func Printf(template string, params ...interface{}) {
+// LVL 6
+func Infof(template string, params ...interface{}) {
 	if VerboseLog {
 		log.Printf(template, params...)
 	}
 }
-func Println(params ...interface{}) {
+
+func Info(params ...interface{}) {
 	if VerboseLog {
-		log.Println(params...)
+		log.Print(params...)
 	}
 }
 
-// Write an error log message, but continue program execution.
-func Error(params ...interface{}) {
-	log.Println(params...)
-}
-func Errorf(template string, params ...interface{}) {
+// LVL 5
+func Noticef(template string, params ...interface{}) {
 	log.Printf(template, params...)
 }
 
-// Write a log message then abort.
-func Fatal(reason interface{}) {
-	log.Fatal(reason)
+func Notice(params ...interface{}) {
+	log.Print(params...)
+}
+
+var critHistory = make(map[string]struct{})
+var critLock = new(sync.Mutex)
+
+// LVL 2 - will not repeat a message twice over the past 100 distinct crit messages
+func CritNoRepeat(template string, params ...interface{}) {
+	msg := fmt.Sprintf(template, params...)
+	critLock.Lock()
+	if _, exists := critHistory[msg]; !exists {
+		log.Print(msg)
+		critHistory[msg] = struct{}{}
+	}
+	if len(critHistory) > 100 {
+		critHistory = make(map[string]struct{})
+	}
+	critLock.Unlock()
+}
+
+// LVL 1
+func Panicf(template string, params ...interface{}) {
+	log.Panicf(template, params...)
 }

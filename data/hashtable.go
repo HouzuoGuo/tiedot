@@ -65,7 +65,7 @@ func (ht *HashTable) calculateNumBuckets() {
 		ht.EnsureSize(usedSize - ht.Used)
 	}
 	ht.Used = usedSize
-	tdlog.Printf("%s: calculated used size is %d", ht.Path, usedSize)
+	tdlog.Infof("%s: calculated used size is %d", ht.Path, usedSize)
 }
 
 // Return number of the next chained bucket.
@@ -79,7 +79,7 @@ func (ht *HashTable) nextBucket(bucket int) int {
 	if next == 0 {
 		return 0
 	} else if err < 0 || next <= bucket || next >= ht.numBuckets || next < INITIAL_BUCKETS {
-		tdlog.Errorf("Bad hash table - repair ASAP %s", ht.Path)
+		tdlog.CritNoRepeat("Bad hash table - repair ASAP %s", ht.Path)
 		return 0
 	} else {
 		return next

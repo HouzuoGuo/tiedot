@@ -112,11 +112,11 @@ func (part *Partition) ForEachDoc(partNum, totalPart int, fun func(id int, doc [
 func (part *Partition) Clear() (err error) {
 	var failure bool
 	if err = part.col.Clear(); err != nil {
-		tdlog.Errorf("Failed to clear %s: %v", part.col.Path, err)
+		tdlog.CritNoRepeat("Failed to clear %s: %v", part.col.Path, err)
 		failure = true
 	}
 	if err = part.lookup.Clear(); err != nil {
-		tdlog.Errorf("Failed to clear %s: %v", part.lookup.Path, err)
+		tdlog.CritNoRepeat("Failed to clear %s: %v", part.lookup.Path, err)
 		failure = true
 	}
 	if failure {
@@ -129,11 +129,11 @@ func (part *Partition) Clear() (err error) {
 func (part *Partition) Sync() (err error) {
 	var failure bool
 	if err = part.col.Sync(); err != nil {
-		tdlog.Errorf("Failed to sync %s: %v", part.col.Path, err)
+		tdlog.CritNoRepeat("Failed to sync %s: %v", part.col.Path, err)
 		failure = true
 	}
 	if err = part.lookup.Sync(); err != nil {
-		tdlog.Errorf("Failed to sync %s: %v", part.lookup.Path, err)
+		tdlog.CritNoRepeat("Failed to sync %s: %v", part.lookup.Path, err)
 		failure = true
 	}
 	if failure {
@@ -146,11 +146,11 @@ func (part *Partition) Sync() (err error) {
 func (part *Partition) Close() (err error) {
 	var failure bool
 	if err = part.col.Close(); err != nil {
-		tdlog.Errorf("Failed to close %s: %v", part.col.Path, err)
+		tdlog.CritNoRepeat("Failed to close %s: %v", part.col.Path, err)
 		failure = true
 	}
 	if err = part.lookup.Close(); err != nil {
-		tdlog.Errorf("Failed to close %s: %v", part.lookup.Path, err)
+		tdlog.CritNoRepeat("Failed to close %s: %v", part.lookup.Path, err)
 		failure = true
 	}
 	if failure {
