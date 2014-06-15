@@ -32,6 +32,7 @@ func main() {
 	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
 	flag.BoolVar(&profile, "profile", false, "Write profiler results to prof.out")
 	flag.BoolVar(&tdlog.VerboseLog, "verbose", false, "Turn verbose logging on/off")
+	flag.BoolVar(&benchCleanup, "benchcleanup", true, "Whether to clean up (delete benchmark DB) after benchmark")
 	flag.Parse()
 
 	// User must specify a mode to run

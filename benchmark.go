@@ -17,6 +17,9 @@ import (
 	"time"
 )
 
+// Whether to clean up (delete benchmark DB) after benchmark
+var benchCleanup = true
+
 // Invoke initializer, then run the function a number of times across multiple goroutines, and collect average time consumption.
 func average(name string, total int, init func(), do func()) {
 	numThreads := runtime.GOMAXPROCS(-1)
@@ -57,8 +60,10 @@ func mkTmpDBAndCol(dbPath string, colName string) (col *db.Col) {
 func benchmark(benchSize int) {
 	ids := make([]int, 0, benchSize)
 	// Prepare a collection with two indexes
-	tmp := "/tmp/tiedot_bench2"
-	defer os.RemoveAll(tmp)
+	tmp := "/tmp/tiedot_bench"
+	if benchCleanup {
+		defer os.RemoveAll(tmp)
+	}
 	col := mkTmpDBAndCol(tmp, "tmp")
 	col.Index([]string{"a"})
 	col.Index([]string{"b"})
@@ -130,8 +135,10 @@ func benchmark2(benchSize int) {
 	wp.Add(5 * numThreads) // There are 5 goroutines: insert, read, query, update and delete
 
 	// Prepare a collection with two indexes
-	tmp := "/tmp/tiedot_bench"
-	defer os.RemoveAll(tmp)
+	tmp := "/tmp/tiedot_bench2"
+	if benchCleanup {
+		defer os.RemoveAll(tmp)
+	}
 	col := mkTmpDBAndCol(tmp, "tmp")
 	col.Index([]string{"a"})
 	col.Index([]string{"b"})
