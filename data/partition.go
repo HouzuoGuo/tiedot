@@ -110,7 +110,7 @@ func (part *Partition) ForEachDoc(partNum, totalPart int, fun func(id int, doc [
 
 // Return approximate number of documents in the partition.
 func (part *Partition) ApproxDocCount() int {
-	totalPart := 128 // not magic; a larger number makes estimation less accurate, but improves performance
+	totalPart := 512 // not magic; a larger number makes estimation less accurate, but improves performance
 	tryUpTo := 8     // not magic; a larger number makes the estimation more accurate, but impacts performance
 	for {
 		count := 0
