@@ -80,7 +80,7 @@ func (col *Col) load() error {
 }
 
 // Synchronize all data files to disk.
-func (col *Col) Sync() error {
+func (col *Col) sync() error {
 	errs := make([]error, 0, 0)
 	for i := 0; i < col.db.numParts; i++ {
 		col.parts[i].Lock.Lock()
@@ -89,6 +89,27 @@ func (col *Col) Sync() error {
 		}
 		for _, ht := range col.hts[i] {
 			if err := ht.Sync(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		col.parts[i].Lock.Unlock()
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%v", errs)
+}
+
+// Close all collection files. Do not use the collection afterwards!
+func (col *Col) close() error {
+	errs := make([]error, 0, 0)
+	for i := 0; i < col.db.numParts; i++ {
+		col.parts[i].Lock.Lock()
+		if err := col.parts[i].Close(); err != nil {
+			errs = append(errs, err)
+		}
+		for _, ht := range col.hts[i] {
+			if err := ht.Close(); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -117,29 +138,10 @@ func (col *Col) ForEachDoc(_ bool, fun func(id int, doc []byte) (moveOn bool)) {
 	}
 }
 
-// Close all collection files. Do not use the collection afterwards!
-func (col *Col) Close() error {
-	errs := make([]error, 0, 0)
-	for i := 0; i < col.db.numParts; i++ {
-		col.parts[i].Lock.Lock()
-		if err := col.parts[i].Close(); err != nil {
-			errs = append(errs, err)
-		}
-		for _, ht := range col.hts[i] {
-			if err := ht.Close(); err != nil {
-				errs = append(errs, err)
-			}
-		}
-		col.parts[i].Lock.Unlock()
-	}
-	if len(errs) == 0 {
-		return nil
-	}
-	return fmt.Errorf("%v", errs)
-}
-
 // Create an index on the path.
 func (col *Col) Index(idxPath []string) (err error) {
+	col.db.schemaLock.Lock()
+	col.db.schemaLock.Unlock()
 	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
 	if _, exists := col.indexPaths[idxName]; exists {
 		return fmt.Errorf("Path %v is already indexed", idxPath)
@@ -174,6 +176,8 @@ func (col *Col) Index(idxPath []string) (err error) {
 
 // Return all indexed paths.
 func (col *Col) AllIndexes() (ret [][]string) {
+	col.db.schemaLock.RLock()
+	col.db.schemaLock.RUnlock()
 	ret = make([][]string, 0, len(col.indexPaths))
 	for _, path := range col.indexPaths {
 		pathCopy := make([]string, len(path))
@@ -187,6 +191,8 @@ func (col *Col) AllIndexes() (ret [][]string) {
 
 // Remove an index.
 func (col *Col) Unindex(idxPath []string) error {
+	col.db.schemaLock.Lock()
+	col.db.schemaLock.Unlock()
 	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
 	if _, exists := col.indexPaths[idxName]; !exists {
 		return fmt.Errorf("Path %v is not indexed", idxPath)

@@ -111,7 +111,7 @@ func TestApproxDocCount(t *testing.T) {
 		}
 	}
 	t.Log("ApproxDocCount", part.ApproxDocCount())
-	if part.ApproxDocCount() < 800 || part.ApproxDocCount() > 1200 {
+	if part.ApproxDocCount() < 700 || part.ApproxDocCount() > 1300 {
 		t.Fatal("Approximate is way off", part.ApproxDocCount())
 	}
 	// Insert another 2000 documents
@@ -121,7 +121,7 @@ func TestApproxDocCount(t *testing.T) {
 		}
 	}
 	t.Log("ApproxDocCount", part.ApproxDocCount())
-	if part.ApproxDocCount() < 2500 || part.ApproxDocCount() > 3500 {
+	if part.ApproxDocCount() < 2400 || part.ApproxDocCount() > 3600 {
 		t.Fatal("Approximate is way off", part.ApproxDocCount())
 	}
 	// See how fast it is

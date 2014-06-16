@@ -257,7 +257,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 		t.Fatal("Approximate is way off", col.ApproxDocCount())
 	}
 
-	if err = col.Sync(); err != nil {
+	if err = col.sync(); err != nil {
 		t.Fatal(err)
 	} else if err = db.Sync(); err != nil {
 		t.Fatal(err)
