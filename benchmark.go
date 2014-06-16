@@ -119,7 +119,6 @@ func benchmark(benchSize int) {
 	average("delete", benchSize, func() {}, func() {
 		col.Delete(ids[rand.Intn(benchSize)])
 	})
-	col.Close()
 }
 
 // Run document operations (insert, read, query, update and delete) all at once.

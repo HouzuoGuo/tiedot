@@ -62,7 +62,7 @@ func TestIdxCRUD(t *testing.T) {
 	if len(col.AllIndexes()) != 0 {
 		t.Fatal(col.AllIndexes())
 	}
-	if err = col.Sync(); err != nil {
+	if err = col.sync(); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {

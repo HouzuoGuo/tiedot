@@ -244,7 +244,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 	timediff := time.Now().UnixNano() - start
 	fmt.Println("It took", timediff/1000000, "milliseconds")
 
-	if err = col.Sync(); err != nil {
+	if err = col.sync(); err != nil {
 		t.Fatal(err)
 	} else if err = db.Sync(); err != nil {
 		t.Fatal(err)

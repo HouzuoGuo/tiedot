@@ -88,7 +88,7 @@ func (db *DB) load() error {
 				select {
 				case <-db.autoSync.C:
 					if err := db.Sync(); err != nil {
-						tdlog.CritNoRepeat("Background Auto-Sync on %s: Failed with error: %v", db.path, err)
+						tdlog.Noticef("Background Auto-Sync on %s: Failed with error: %v", db.path, err)
 					}
 				case <-db.autoSyncStop:
 					db.autoSync.Stop()
@@ -106,7 +106,7 @@ func (db *DB) Sync() error {
 	defer db.schemaLock.Unlock()
 	errs := make([]error, 0, 0)
 	for _, col := range db.cols {
-		if err := col.Sync(); err != nil {
+		if err := col.sync(); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -123,7 +123,7 @@ func (db *DB) Close() error {
 	close(db.autoSyncStop)
 	errs := make([]error, 0, 0)
 	for _, col := range db.cols {
-		if err := col.Close(); err != nil {
+		if err := col.close(); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -178,7 +178,7 @@ func (db *DB) Rename(oldName, newName string) error {
 		return fmt.Errorf("Collection %s already exists", newName)
 	} else if newName == oldName {
 		return fmt.Errorf("Old and new names are the same")
-	} else if err := db.cols[oldName].Close(); err != nil {
+	} else if err := db.cols[oldName].close(); err != nil {
 		return err
 	} else if err := os.Rename(path.Join(db.path, oldName), path.Join(db.path, newName)); err != nil {
 		return err
@@ -195,7 +195,7 @@ func (db *DB) Truncate(name string) error {
 	defer db.schemaLock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
-	} else if err := db.cols[name].Sync(); err != nil {
+	} else if err := db.cols[name].sync(); err != nil {
 		return err
 	}
 	col := db.cols[name]
@@ -218,7 +218,7 @@ func (db *DB) Scrub(name string) error {
 	defer db.schemaLock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
-	} else if err := db.cols[name].Sync(); err != nil {
+	} else if err := db.cols[name].sync(); err != nil {
 		return err
 	}
 	// Prepare a temporary collection in file system
@@ -249,11 +249,11 @@ func (db *DB) Scrub(name string) error {
 		}
 		return true
 	})
-	if err := tmpCol.Close(); err != nil {
+	if err := tmpCol.close(); err != nil {
 		return err
 	}
 	// Replace the original collection with the "temporary" one
-	db.cols[name].Close()
+	db.cols[name].close()
 	if err := os.RemoveAll(path.Join(db.path, name)); err != nil {
 		return err
 	}
@@ -272,7 +272,7 @@ func (db *DB) Drop(name string) error {
 	defer db.schemaLock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
-	} else if err := db.cols[name].Close(); err != nil {
+	} else if err := db.cols[name].close(); err != nil {
 		return err
 	} else if err := os.RemoveAll(path.Join(db.path, name)); err != nil {
 		return err
@@ -286,7 +286,7 @@ func (db *DB) Dump(dest string) error {
 	db.schemaLock.Lock()
 	defer db.schemaLock.Unlock()
 	for _, col := range db.cols {
-		if err := col.Sync(); err != nil {
+		if err := col.sync(); err != nil {
 			return err
 		}
 	}
