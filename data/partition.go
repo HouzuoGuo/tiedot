@@ -125,16 +125,6 @@ func (part *Partition) ApproxDocCount() int {
 	}
 }
 
-// Return approximate number of pages in the partition, after dividing documents into roughly equally sized pages.
-func (part *Partition) ApproxPageCount(perPage int) int {
-	count := part.ApproxDocCount()
-	pages := count / perPage
-	if count%perPage > 0 {
-		pages++
-	}
-	return pages
-}
-
 // Clear data file and lookup hash table.
 func (part *Partition) Clear() (err error) {
 	var failure bool
