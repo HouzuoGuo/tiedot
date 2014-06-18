@@ -223,7 +223,11 @@ func TestDocCrudAndIdx(t *testing.T) {
 
 	// Verify that there are approximately 1000 documents
 	t.Log("ApproxDocCount", col.ApproxDocCount())
+	t.Log("ApproxPageCount", col.ApproxPageCount(100))
 	if col.ApproxDocCount() < 800 || col.ApproxDocCount() > 1200 {
+		t.Fatal("Approximate is way off", col.ApproxDocCount())
+	}
+	if col.ApproxPageCount(100) < 8 || col.ApproxPageCount(100) > 12 {
 		t.Fatal("Approximate is way off", col.ApproxDocCount())
 	}
 
@@ -253,8 +257,26 @@ func TestDocCrudAndIdx(t *testing.T) {
 
 	// Verify again that there are approximately 1000 documents
 	t.Log("ApproxDocCount", col.ApproxDocCount())
+	t.Log("ApproxPageCount", col.ApproxPageCount(10))
 	if col.ApproxDocCount() < 800 || col.ApproxDocCount() > 1200 {
 		t.Fatal("Approximate is way off", col.ApproxDocCount())
+	}
+	if col.ApproxPageCount(10) < 80 || col.ApproxPageCount(10) > 120 {
+		t.Fatal("Approximate is way off", col.ApproxDocCount())
+	}
+
+	// Read back all documents page by pabe
+	totalPage := col.ApproxPageCount(100)
+	collectedIDs := make(map[int]struct{})
+	for page := 0; page < totalPage; page++ {
+		col.ForEachDocInPage(page, totalPage, func(id int, _ []byte) bool {
+			collectedIDs[id] = struct{}{}
+			return true
+		})
+		t.Log("Went through page ", page, " got ", len(collectedIDs), " documents so far")
+	}
+	if len(collectedIDs) != numDocs/2 {
+		t.Fatal("Wrong number of docs", len(collectedIDs))
 	}
 
 	if err = col.sync(); err != nil {

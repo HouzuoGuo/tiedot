@@ -94,7 +94,7 @@ func (part *Partition) Delete(id int) (err error) {
 	return
 }
 
-// Partition documents into roughly equally sized portions in undetermined order, and run the function on every document in the portion.
+// Partition documents into roughly equally sized portions, and run the function on every document in the portion.
 func (part *Partition) ForEachDoc(partNum, totalPart int, fun func(id int, doc []byte) bool) (moveOn bool) {
 	ids, physIDs := part.lookup.GetPartition(partNum, totalPart)
 	for i, id := range ids {
@@ -110,25 +110,29 @@ func (part *Partition) ForEachDoc(partNum, totalPart int, fun func(id int, doc [
 
 // Return approximate number of documents in the partition.
 func (part *Partition) ApproxDocCount() int {
-	totalPart := 512 // not magic; a larger number makes estimation less accurate, but improves performance
-	tryUpTo := 8     // not magic; a larger number makes the estimation more accurate, but impacts performance
+	totalPart := 32 // not magic; a larger number makes estimation less accurate, but improves performance
 	for {
-		count := 0
-		for i := 0; i < tryUpTo; i++ {
-			keys, _ := part.lookup.GetPartition(i, totalPart)
-			count += len(keys)
-		}
-		if count == 0 {
-			// "4" means it does not wish to go through 25% of hash table in order to find an approximate doc count
-			if tryUpTo*4 >= totalPart {
+		keys, _ := part.lookup.GetPartition(0, totalPart)
+		if len(keys) == 0 {
+			if totalPart < 8 {
 				return 0 // the hash table is really really empty
 			}
 			// Try a larger partition size
 			totalPart = totalPart / 2
 		} else {
-			return int(float64(count) / float64(tryUpTo) * float64(totalPart))
+			return int(float64(len(keys)) * float64(totalPart))
 		}
 	}
+}
+
+// Return approximate number of pages in the partition, after dividing documents into roughly equally sized pages.
+func (part *Partition) ApproxPageCount(perPage int) int {
+	count := part.ApproxDocCount()
+	pages := count / perPage
+	if count%perPage > 0 {
+		pages++
+	}
+	return pages
 }
 
 // Clear data file and lookup hash table.

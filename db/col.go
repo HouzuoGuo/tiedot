@@ -216,3 +216,25 @@ func (col *Col) ApproxDocCount() int {
 	}
 	return total
 }
+
+// Return approximate number of pages in the collection, after dividing documents into roughly equally sized pages.
+func (col *Col) ApproxPageCount(perPage int) int {
+	total := 0
+	for _, part := range col.parts {
+		total += part.ApproxPageCount(perPage)
+	}
+	return total
+}
+
+// Divide the collection into roughly equally sized pages, and do fun on all documents in the specified page.
+func (col *Col) ForEachDocInPage(page, total int, fun func(id int, doc []byte) bool) {
+	for iteratePart := 0; iteratePart < col.db.numParts; iteratePart++ {
+		part := col.parts[iteratePart]
+		part.Lock.RLock()
+		if !part.ForEachDoc(page, total, fun) {
+			part.Lock.RUnlock()
+			return
+		}
+		part.Lock.RUnlock()
+	}
+}

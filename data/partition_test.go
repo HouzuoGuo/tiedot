@@ -100,10 +100,14 @@ func TestApproxDocCount(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	t.Log("ApproxDocCount", part.ApproxDocCount())
+	t.Log("ApproxPageCount", part.ApproxPageCount(10))
+	if part.ApproxPageCount(10) < 1 || part.ApproxPageCount(10) > 30 {
+		t.Fatal("Approximate is way off", part.ApproxDocCount())
+	}
 	if part.ApproxDocCount() < 10 || part.ApproxDocCount() > 300 {
 		t.Fatal("Approximate is way off", part.ApproxDocCount())
 	}
-	t.Log("ApproxDocCount", part.ApproxDocCount())
 	// Insert 900 documents
 	for i := 0; i < 900; i++ {
 		if _, err = part.Insert(rand.Int(), []byte(strconv.Itoa(i))); err != nil {
@@ -111,6 +115,10 @@ func TestApproxDocCount(t *testing.T) {
 		}
 	}
 	t.Log("ApproxDocCount", part.ApproxDocCount())
+	t.Log("ApproxPageCount", part.ApproxPageCount(100))
+	if part.ApproxPageCount(100) < 5 || part.ApproxPageCount(100) > 15 {
+		t.Fatal("Approximate is way off", part.ApproxDocCount())
+	}
 	if part.ApproxDocCount() < 500 || part.ApproxDocCount() > 1500 {
 		t.Fatal("Approximate is way off", part.ApproxDocCount())
 	}
@@ -121,15 +129,29 @@ func TestApproxDocCount(t *testing.T) {
 		}
 	}
 	t.Log("ApproxDocCount", part.ApproxDocCount())
+	t.Log("ApproxPageCount", part.ApproxPageCount(1000))
+	if part.ApproxPageCount(1000) < 2 || part.ApproxPageCount(1000) > 4 {
+		t.Fatal("Approximate is way off", part.ApproxDocCount())
+	}
 	if part.ApproxDocCount() < 2000 || part.ApproxDocCount() > 4000 {
 		t.Fatal("Approximate is way off", part.ApproxDocCount())
 	}
-	// See how fast it is
+	// See how fast doc count is
 	start := time.Now().UnixNano()
 	for i := 0; i < 1000; i++ {
 		part.ApproxDocCount()
 	}
 	timediff := time.Now().UnixNano() - start
+	t.Log("It took", timediff/1000000, "milliseconds")
+	if timediff/1000000 > 1000 {
+		t.Fatal("Algorithm is way too slow")
+	}
+	// See how fast page count is
+	start = time.Now().UnixNano()
+	for i := 0; i < 1000; i++ {
+		part.ApproxPageCount(100)
+	}
+	timediff = time.Now().UnixNano() - start
 	t.Log("It took", timediff/1000000, "milliseconds")
 	if timediff/1000000 > 1000 {
 		t.Fatal("Algorithm is way too slow")
