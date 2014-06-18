@@ -19,16 +19,16 @@ func Insert(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "doc", &doc) {
 		return
 	}
+	var jsonDoc map[string]interface{}
+	if err := json.Unmarshal([]byte(doc), &jsonDoc); err != nil {
+		http.Error(w, fmt.Sprintf("'%v' is not valid JSON document.", doc), 400)
+		return
+	}
 	HttpDBSync.RLock()
 	defer HttpDBSync.RUnlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
-		return
-	}
-	var jsonDoc map[string]interface{}
-	if err := json.Unmarshal([]byte(doc), &jsonDoc); err != nil {
-		http.Error(w, fmt.Sprintf("'%v' is not valid JSON document.", doc), 400)
 		return
 	}
 	id, err := dbcol.Insert(jsonDoc)
@@ -51,16 +51,16 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "id", &id) {
 		return
 	}
+	docID, err := strconv.Atoi(id)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
+		return
+	}
 	HttpDBSync.RLock()
 	defer HttpDBSync.RUnlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
-		return
-	}
-	docID, err := strconv.Atoi(id)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
 	}
 	doc, err := dbcol.Read(docID)
@@ -69,6 +69,53 @@ func Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp, err := json.Marshal(doc)
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	w.Write(resp)
+}
+
+// Divide documents into roughly equally sized pages, and return documents in the specified page.
+func GetPage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
+	var col, page, total string
+	if !Require(w, r, "col", &col) {
+		return
+	}
+	if !Require(w, r, "page", &page) {
+		return
+	}
+	if !Require(w, r, "total", &total) {
+		return
+	}
+	pageNum, err := strconv.Atoi(page)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid page number '%v'.", page), 400)
+		return
+	}
+	totalPage, err := strconv.Atoi(total)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid total page number '%v'.", totalPage), 400)
+		return
+	}
+	HttpDBSync.RLock()
+	defer HttpDBSync.RUnlock()
+	dbcol := HttpDB.Use(col)
+	if dbcol == nil {
+		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
+		return
+	}
+	docs := make(map[string]interface{})
+	dbcol.ForEachDocInPage(pageNum, totalPage, func(id int, doc []byte) bool {
+		var docObj map[string]interface{}
+		if err := json.Unmarshal(doc, &docObj); err == nil {
+			docs[strconv.Itoa(id)] = docObj
+		}
+		return true
+	})
+	resp, err := json.Marshal(docs)
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), 500)
 		return
@@ -90,13 +137,6 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "doc", &doc) {
 		return
 	}
-	HttpDBSync.RLock()
-	defer HttpDBSync.RUnlock()
-	dbcol := HttpDB.Use(col)
-	if dbcol == nil {
-		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
-		return
-	}
 	docID, err := strconv.Atoi(id)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
@@ -105,6 +145,13 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	var newDoc map[string]interface{}
 	if err := json.Unmarshal([]byte(doc), &newDoc); err != nil {
 		http.Error(w, fmt.Sprintf("'%v' is not valid JSON document.", newDoc), 400)
+		return
+	}
+	HttpDBSync.RLock()
+	defer HttpDBSync.RUnlock()
+	dbcol := HttpDB.Use(col)
+	if dbcol == nil {
+		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
 	err = dbcol.Update(docID, newDoc)
@@ -125,16 +172,16 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "id", &id) {
 		return
 	}
+	docID, err := strconv.Atoi(id)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
+		return
+	}
 	HttpDBSync.RLock()
 	defer HttpDBSync.RUnlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
-		return
-	}
-	docID, err := strconv.Atoi(id)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
 	}
 	dbcol.Delete(docID)
