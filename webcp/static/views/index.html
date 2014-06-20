@@ -68,7 +68,7 @@
 	<script src="/{{.root}}/js/lib/backbone-min.js"></script>
 	<script src="/{{.root}}/js/lib/ace/ace.js"></script>
 
-	<script type="text/javascript">var App = {};</script>
+	<script type="text/javascript">var App = { root: {{.root}} };</script>
 	<script src="/{{.root}}/js/models/collection.js"></script>
 	<script src="/{{.root}}/js/models/collectionList.js"></script>
 	<script src="/{{.root}}/js/models/document.js"></script>
@@ -81,6 +81,8 @@
 	<script src="/{{.root}}/js/views/queryResultView.js"></script>
 	<script src="/{{.root}}/js/views/queryBoxView.js"></script>
 	<script src="/{{.root}}/js/views/indexesView.js"></script>
+	<script src="/{{.root}}/js/router.js"></script>
+	<script src="/{{.root}}/js/modal.js"></script>
 	<script src="/{{.root}}/js/app.js"></script>
 </body>
 </html>

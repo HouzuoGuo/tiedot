@@ -47,95 +47,9 @@ App.AppView = Backbone.View.extend({
 	}
 });
 
-App.Router = Backbone.Router.extend({
-
-	routes: {
-		'': 'index',
-		'cols/:name': 'collectionByName',
-		'cols/:name/indexes': 'collectionIndexes',
-		'docs/new/:col': 'newDoc',
-		'docs/:col/:id': 'docById',
-		'query/:col/:q': 'docsByQuery'
-	},
-	
-	index: function() {
-		var collectionsList = new App.CollectionListView({ collection: new App.CollectionList() });
-	},
-		
-	collectionByName: function(name) {
-		var collection = new App.CollectionView({ id: name, model: new App.Collection({ id: name }), collection: new App.DocumentList() });
-		tiedotApp.queryBox.setCol(name);
-	},
-	
-	collectionIndexes: function(name) {
-		var indexes = new App.IndexesView({ id: name, model: new App.Collection({ col: name }), collection: new App.IndexList() });
-	},
-
-	newDoc: function(col) {
-		var documentView = new App.DocumentView({ col: col, model: new App.Document() });
-		tiedotApp.queryBox.setCol(col);
-	},
-	
-	docById: function(col, id) {
-		var documentView = new App.DocumentView({ id: id, col: col, model: new App.Document({ id: id }) });
-		tiedotApp.queryBox.setCol(col);
-	},
-	
-	docsByQuery: function(col, q) {
-		var queryResultView = new App.QueryResultView({ id: col, model: new App.Collection({ id: col, query: q }), collection: new App.DocumentList() });
-		tiedotApp.queryBox.setQuery(q);
-	}
-
-});
-
-App.Modal = function () {
-
-    var modalId = '#modal';
-	var modalContent = '#modal-content';
-    var closeCallback;
-
-    var showModal = function (content, callback, onClose) {
-        $(modalContent).html(content);
-        $(modalId).modal();
-
-        if (typeof callback === 'function') {
-            callback.apply($(modalId));
-        }
-        if (typeof onClose === 'function') {
-            closeCallback = onClose;
-        } else {
-            closeCallback = null;
-        }
-    };
-
-    var hideModal = function (callback) {
-        $(modalContent).html('');
-		$(modalId).modal('hide');
-
-        setTimeout(function () {
-          if (typeof callback === 'function') {
-            callback.apply($(modalId));
-          }
-          if (typeof closeCallback === 'function') {
-            closeCallback.apply($(modalId));
-            closeCallback = null;
-          }
-        }, 500);
-    };
-
-    return {
-
-        init: function () {
-			window.dispatcher.on('modal:open', showModal);
-			window.dispatcher.on('modal:close', hideModal);
-        }
-
-    };
-};
-
 $(function() {
-	window.dispatcher = _.clone(Backbone.Events)
+	window.dispatcher = _.clone(Backbone.Events);
 	
 	tiedotApp = new App.AppView();
-	Backbone.history.start({ root: '/admin' });
+	Backbone.history.start({ root: App.root });
 });

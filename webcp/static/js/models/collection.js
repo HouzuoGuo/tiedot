@@ -44,6 +44,7 @@ App.Collection = Backbone.Model.extend({
 		.fail(function(jqXHR, textStatus) {
 			tiedotApp.notify('danger', 'Failed to scrub collection: ' + jqXHR.responseText, 8000);
 		});
+		
 		tiedotApp.notify('warning', 'Scrub is in progress - it may take several minutes to complete...');
 	},
 
