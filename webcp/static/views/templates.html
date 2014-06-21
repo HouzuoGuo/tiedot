@@ -87,8 +87,51 @@
 	<h2><%= name %></h2>
 	<a href="#docs/new/<%= name %>" class="btn btn-primary btn-lg">New Doc</a>
 	<a href="#cols/<%= name %>/indexes" class="btn btn-default btn-lg">Indexes</a>
-
+	<span><%= total %> document(s)</span>
 	<hr />
+
+	<% if (docs.length > 0) { %>
+		<ul class="pagination">
+			<% if (page > 1) { %>
+				<li><a href="#/cols/<%= name %>/1">&laquo; First</a></li>
+			<% } %>
+			<% if ((page - 1) > 0) { %>
+				<li><a href="#/cols/<%= name %>/<%= page - 1 %>">&laquo;</a></li>
+			<% } %>
+			<% if ((page - 4) > 0) { %>
+				<li><a href="#/cols/<%= name %>/<%= page - 4 %>"><%= page - 4 %></a></li>
+			<% } %>
+			<% if ((page - 3) > 0) { %>
+				<li><a href="#/cols/<%= name %>/<%= page - 3 %>"><%= page - 3 %></a></li>
+			<% } %>
+			<% if ((page - 2) > 0) { %>
+				<li><a href="#/cols/<%= name %>/<%= page - 2 %>"><%= page - 2 %></a></li>
+			<% } %>
+			<% if ((page - 1) > 0) { %>
+				<li><a href="#/cols/<%= name %>/<%= page - 1 %>"><%= page - 1 %></a></li>
+			<% } %>
+			<li class="active"><span><%= page %><span class="sr-only">(current)</span></span></li>
+			<% if ((page + 1) <= totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= page + 1 %>"><%= page + 1 %></a></li>
+			<% } %>
+			<% if ((page + 2) <= totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= page + 2 %>"><%= page + 2 %></a></li>
+			<% } %>
+			<% if ((page + 3) <= totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= page + 3 %>"><%= page + 3 %></a></li>
+			<% } %>
+			<% if ((page + 4) <= totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= page + 4 %>"><%= page + 4 %></a></li>
+			<% } %>
+			<% if ((page + 1) <= totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= page + 1 %>">&raquo;</a></li>
+			<% } %>
+			<% if (page < totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= totalPages %>">Last &raquo;</a></li>
+			<% } %>
+		</ul>
+	<% } %>
+
 	<% if (docs.length > 0) { %>
 	<table class="table table-bordered table-hover">
 		<thead>
@@ -114,6 +157,48 @@
 	</table>
 	<% } else { %>
 		<p>No documents found</p>
+	<% } %>
+
+	<% if (docs.length > 0) { %>
+		<ul class="pagination">
+			<% if (page > 1) { %>
+				<li><a href="#/cols/<%= name %>/1">&laquo; First</a></li>
+			<% } %>
+			<% if ((page - 1) > 0) { %>
+				<li><a href="#/cols/<%= name %>/<%= page - 1 %>">&laquo;</a></li>
+			<% } %>
+			<% if ((page - 4) > 0) { %>
+				<li><a href="#/cols/<%= name %>/<%= page - 4 %>"><%= page - 4 %></a></li>
+			<% } %>
+			<% if ((page - 3) > 0) { %>
+				<li><a href="#/cols/<%= name %>/<%= page - 3 %>"><%= page - 3 %></a></li>
+			<% } %>
+			<% if ((page - 2) > 0) { %>
+				<li><a href="#/cols/<%= name %>/<%= page - 2 %>"><%= page - 2 %></a></li>
+			<% } %>
+			<% if ((page - 1) > 0) { %>
+				<li><a href="#/cols/<%= name %>/<%= page - 1 %>"><%= page - 1 %></a></li>
+			<% } %>
+			<li class="active"><span><%= page %><span class="sr-only">(current)</span></span></li>
+			<% if ((page + 1) <= totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= page + 1 %>"><%= page + 1 %></a></li>
+			<% } %>
+			<% if ((page + 2) <= totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= page + 2 %>"><%= page + 2 %></a></li>
+			<% } %>
+			<% if ((page + 3) <= totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= page + 3 %>"><%= page + 3 %></a></li>
+			<% } %>
+			<% if ((page + 4) <= totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= page + 4 %>"><%= page + 4 %></a></li>
+			<% } %>
+			<% if ((page + 1) <= totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= page + 1 %>">&raquo;</a></li>
+			<% } %>
+			<% if (page < totalPages) { %>
+				<li><a href="#/cols/<%= name %>/<%= totalPages %>">Last &raquo;</a></li>
+			<% } %>
+		</ul>
 	<% } %>
 </script>
 

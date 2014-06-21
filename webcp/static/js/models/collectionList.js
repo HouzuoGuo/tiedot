@@ -31,7 +31,7 @@ App.CollectionList = Backbone.Collection.extend({
 			url: '/approxdoccount?col=' + col
 		})
 		.done(function(data) {
-			$(el).html(data + ' documents (approx.)');
+			$(el).html(numeral(data).format('0,0') + ' documents (approx.)');
 		})
 		.fail(function(jqXHR, textStatus) {
 			return 0;

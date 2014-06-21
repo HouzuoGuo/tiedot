@@ -9,7 +9,7 @@ App.QueryResultView = Backbone.View.extend({
 		window.dispatcher.trigger('queryBox:open');
 		
 		this.collection.id = this.id;
-		this.collection.fetch(this.model.get('query'));
+		this.collection.query(this.model.get('query'));
 		tiedotApp.queryBox.setCol(this.id);
 	},
 	

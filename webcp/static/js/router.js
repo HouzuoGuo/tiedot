@@ -2,7 +2,7 @@ App.Router = Backbone.Router.extend({
 
 	routes: {
 		'': 'index',
-		'cols/:name': 'collectionByName',
+		'cols/:name(/:page)': 'collectionByName',
 		'cols/:name/indexes': 'collectionIndexes',
 		'docs/new/:col': 'newDoc',
 		'docs/:col/:id': 'docById',
@@ -13,8 +13,8 @@ App.Router = Backbone.Router.extend({
 		var collectionsList = new App.CollectionListView({ collection: new App.CollectionList() });
 	},
 		
-	collectionByName: function(name) {
-		var collection = new App.CollectionView({ id: name, model: new App.Collection({ id: name }), collection: new App.DocumentList() });
+	collectionByName: function(name, page) {
+		var collection = new App.CollectionView({ id: name, model: new App.Collection({ id: name }), collection: new App.DocumentList([], { page: page }) });
 		tiedotApp.queryBox.setCol(name);
 	},
 	
