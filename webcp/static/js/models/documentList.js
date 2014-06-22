@@ -29,6 +29,9 @@ App.DocumentList = Backbone.Collection.extend({
 			}
 			self.total = count;
 			self.totalPages = Math.ceil(count / 40);
+			if (self.totalPages === 0.0) {
+			    self.totalPages = 1;
+			}
 
 			Backbone.ajax({
 				url: self.url()

@@ -34,6 +34,7 @@
     <div class="modal-body">
         <p>Scrubbing a collection will recover corrupted documents and de-fragment free space.<p>
         <p>Depending on collection size, it may take several minutes to complete.</p>
+        <p>Database and this web app will be locked down until end of the operation.</p>
     </div>
     <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
@@ -87,7 +88,7 @@
 	<h2><%= name %></h2>
 	<a href="#docs/new/<%= name %>" class="btn btn-primary btn-lg">New Doc</a>
 	<a href="#cols/<%= name %>/indexes" class="btn btn-default btn-lg">Indexes</a>
-	<span><%= total %> document(s)</span>
+	<span>approx. <%= total %> document(s)</span>
 	<hr />
 
 	<% if (docs.length > 0) { %>

@@ -25,7 +25,7 @@ App.CollectionView = Backbone.View.extend({
 			docs: this.collection.toJSON(),
 			total: numeral(this.collection.total).format('0,0'),
 			page: parseInt(this.collection.page),
-			totalPages: parseInt(this.collection.totalPages - 1),
+			totalPages: this.collection.totalPages,
 			docKeys: []
 		};
 		
