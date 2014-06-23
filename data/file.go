@@ -15,6 +15,20 @@ type DataFile struct {
 	Buf                gommap.MMap
 }
 
+// Return true if the buffer begins with 64 consecutive zero bytes.
+func LooksEmpty(buf gommap.MMap) bool {
+	upTo := 1024
+	if upTo >= len(buf) {
+		upTo = len(buf) - 1
+	}
+	for i := 0; i < upTo; i++ {
+		if buf[i] != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // Open a data file that grows by the specified size.
 func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 	file = &DataFile{Path: path, Growth: growth}
@@ -34,10 +48,26 @@ func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 	if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
 		return
 	}
-	for i := file.Size - 1; i >= 0; i-- {
-		if file.Buf[i] != 0 {
-			file.Used = i + 1
-			break
+	// Bi-sect file buffer to find out how much space is in-use
+	for low, mid, high := 0, file.Size/2, file.Size; ; {
+		switch {
+		case high-mid == 1:
+			if LooksEmpty(file.Buf[mid:]) {
+				if mid > 0 && LooksEmpty(file.Buf[mid-1:]) {
+					file.Used = mid - 1
+				} else {
+					file.Used = mid
+				}
+				return
+			}
+			file.Used = high
+			return
+		case LooksEmpty(file.Buf[mid:]):
+			high = mid
+			mid = low + (mid-low)/2
+		default:
+			low = mid
+			mid = mid + (high-mid)/2
 		}
 	}
 	tdlog.Infof("%s opened: %d of %d bytes in-use", path, file.Used, file.Size)
