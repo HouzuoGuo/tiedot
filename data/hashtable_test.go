@@ -137,31 +137,35 @@ func TestPartitionEntries(t *testing.T) {
 		return
 	}
 	number := 100000
-	parts := 16
 	for i := 0; i < number; i++ {
 		ht.Put(i, i*2)
 	}
-	allKV := make(map[int]int)
-	for i := 0; i < parts; i++ {
-		start, end := GetPartitionRange(i, parts)
-		keys, vals := ht.GetPartition(i, parts)
-		t.Log("Between ", start, end, " there are ", len(keys))
-		sizeDev := math.Abs(float64(len(keys)-number/parts)) / float64(number/parts)
-		t.Log("sizeDev", sizeDev)
-		if sizeDev > 0.05 {
-			t.Fatal("imbalanced keys")
+	for parts := 2; parts < 19; parts++ {
+		t.Log("parts is", parts)
+		allKV := make(map[int]int)
+		counter := 0
+		for i := 0; i < parts; i++ {
+			start, end := GetPartitionRange(i, parts)
+			keys, vals := ht.GetPartition(i, parts)
+			t.Log("Between ", start, end, " there are ", len(keys))
+			sizeDev := math.Abs(float64(len(keys)-number/parts)) / float64(number/parts)
+			t.Log("sizeDev", sizeDev)
+			if sizeDev > 0.1 {
+				t.Fatal("imbalanced keys")
+			}
+			for i, key := range keys {
+				allKV[key] = vals[i]
+			}
+			counter += len(keys)
 		}
-		for i, key := range keys {
-			allKV[key] = vals[i]
+		// Verify read back
+		if counter != number {
+			t.Fatal("Number of entries does not match, got ", counter)
 		}
-	}
-	// Verify read back
-	if len(allKV) != number {
-		t.Fatal("Not enough entries, only got ", len(allKV))
-	}
-	for i := 0; i < number; i++ {
-		if allKV[i] != i*2 {
-			t.Fatal("Wrong readback", i, allKV[i])
+		for i := 0; i < number; i++ {
+			if allKV[i] != i*2 {
+				t.Fatal("Wrong readback", i, allKV[i])
+			}
 		}
 	}
 }

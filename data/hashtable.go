@@ -191,18 +191,29 @@ func (ht *HashTable) Remove(key, val int) {
 
 // Divide the entire hash table into roughly equally sized partitions, and return the start/end key range of the chosen partition.
 func GetPartitionRange(partNum, totalParts int) (start int, end int) {
-	partSize := INITIAL_BUCKETS / totalParts
-	start = partNum * partSize
-	end = start + partSize
+	perPart := INITIAL_BUCKETS / totalParts
+	leftOver := INITIAL_BUCKETS % totalParts
+	start = partNum * perPart
+	if leftOver > 0 {
+		if partNum == 0 {
+			end += 1
+		} else if partNum < leftOver {
+			start += partNum
+			end += 1
+		} else {
+			start += leftOver
+		}
+	}
+	end += start + perPart
 	if partNum == totalParts-1 {
 		end = INITIAL_BUCKETS
 	}
 	return
 }
 
-// Return all entries in the chosen partition.
-func (ht *HashTable) GetPartition(partitionNum, partitionSize int) (keys, vals []int) {
-	rangeStart, rangeEnd := GetPartitionRange(partitionNum, partitionSize)
+// Return all entries in the chosen part.
+func (ht *HashTable) GetPartition(partNum, partSize int) (keys, vals []int) {
+	rangeStart, rangeEnd := GetPartitionRange(partNum, partSize)
 	prealloc := (rangeEnd - rangeStart) * PER_BUCKET
 	keys = make([]int, 0, prealloc)
 	vals = make([]int, 0, prealloc)
