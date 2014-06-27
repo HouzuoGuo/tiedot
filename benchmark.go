@@ -1,8 +1,3 @@
-/*
-Two benchmrk scenarios:
-- Document CRUD benchmark (intend to catch performance regressions)
-- Document CRUD in parallel (intend to catch concurrency related bugs)
-*/
 package main
 
 import (
@@ -56,7 +51,7 @@ func mkTmpDBAndCol(dbPath string, colName string) (col *db.Col) {
 	return tmpCol
 }
 
-// Benchmark individual document operation: insert, read, query, update and delete.
+// Document CRUD benchmark (insert/read/query/update/delete), intended for catching performance regressions.
 func benchmark(benchSize int) {
 	ids := make([]int, 0, benchSize)
 	// Prepare a collection with two indexes
@@ -126,7 +121,7 @@ func benchmark(benchSize int) {
 	})
 }
 
-// Run document operations (insert, read, query, update and delete) all at once.
+// Document CRUD operations running in parallel, intended for catching concurrency related bugs.
 func benchmark2(benchSize int) {
 	docs := make([]int, 0, benchSize*2+1000)
 	wp := new(sync.WaitGroup)

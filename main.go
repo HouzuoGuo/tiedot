@@ -1,3 +1,4 @@
+/* Run tiedot HTTP API server, benchmarks, or embedded usage example. */
 package main
 
 import (

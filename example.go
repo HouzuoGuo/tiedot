@@ -8,10 +8,12 @@ import (
 )
 
 /*
-You are encouraged to use nearly all tiedot public functions concurrently, except schema management functions such as:
+You are encouraged to use nearly all tiedot public functions concurrently, except schema management functions:
 - Create, rename, drop collection
 - Create and remove collection index
-During the above operations, no other operation should be carried out at the same time (such as document update)!
+You may not manage schema and do document operations (such as updates/queries) at the same time.
+
+The embeddedExample requires as much as 1.5GB of free disk space (however not all 1.5 GB are used).
 
 To compile and run the example:
     go build && ./tiedot -mode=example
