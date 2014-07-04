@@ -141,7 +141,7 @@ func (col *Col) ForEachDoc(_ bool, fun func(id int, doc []byte) (moveOn bool)) {
 // Create an index on the path.
 func (col *Col) Index(idxPath []string) (err error) {
 	col.db.schemaLock.Lock()
-	col.db.schemaLock.Unlock()
+	defer col.db.schemaLock.Unlock()
 	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
 	if _, exists := col.indexPaths[idxName]; exists {
 		return fmt.Errorf("Path %v is already indexed", idxPath)
@@ -177,7 +177,7 @@ func (col *Col) Index(idxPath []string) (err error) {
 // Return all indexed paths.
 func (col *Col) AllIndexes() (ret [][]string) {
 	col.db.schemaLock.RLock()
-	col.db.schemaLock.RUnlock()
+	defer col.db.schemaLock.RUnlock()
 	ret = make([][]string, 0, len(col.indexPaths))
 	for _, path := range col.indexPaths {
 		pathCopy := make([]string, len(path))
@@ -192,7 +192,7 @@ func (col *Col) AllIndexes() (ret [][]string) {
 // Remove an index.
 func (col *Col) Unindex(idxPath []string) error {
 	col.db.schemaLock.Lock()
-	col.db.schemaLock.Unlock()
+	defer col.db.schemaLock.Unlock()
 	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
 	if _, exists := col.indexPaths[idxName]; !exists {
 		return fmt.Errorf("Path %v is not indexed", idxPath)
