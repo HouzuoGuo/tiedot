@@ -53,11 +53,15 @@ func TestQuery(t *testing.T) {
 		`{"a": [{"b": [2]}], "c": 2, "d": 1, "f": 3, "g": 3, "h": 3}`,
 		`{"a": {"b": 3}, "c": [3], "d": 2, "f": 4, "g": 4}`,
 		`{"a": {"b": [4]}, "c": 4, "d": 1, "f": 5, "g": 5}`,
-		`{"a": [{"b": 5}, {"b": 6}], "c": 4, "d": 1, "f": 5, "g": 5, "h": 2}`}
-	ids := [6]int{}
+		`{"a": [{"b": 5}, {"b": 6}], "c": 4, "d": 1, "f": 5, "g": 5, "h": 2}`,
+		`{"a": [{"b": "val1"}, {"b": "val2"}]}`,
+		`{"a": [{"b": "val3"}, {"b": ["val4", "val5"]}]}`}
+	ids := make([]int, len(docs))
 	for i, doc := range docs {
 		var jsonDoc map[string]interface{}
-		json.Unmarshal([]byte(doc), &jsonDoc)
+		if err := json.Unmarshal([]byte(doc), &jsonDoc); err != nil {
+			panic(err)
+		}
 		if ids[i], err = col.Insert(jsonDoc); err != nil {
 			t.Fatal(err)
 			return
@@ -109,21 +113,32 @@ func TestQuery(t *testing.T) {
 	if !ensureMapHasKeys(q, ids[1]) && !ensureMapHasKeys(q, ids[0]) {
 		t.Fatal(q, ids[1], ids[0])
 	}
-	// collection scan + pk scan
+	// collection scan
 	q, err = runQuery(`{"eq": 1, "in": ["c"]}`, col)
 	if err == nil {
-		t.Fatal("Collection scan should trigger error")
+		t.Fatal("Collection scan should not happen")
 	}
-	q, err = runQuery(`{"eq": 1, "in": ["@id"]}`, col)
-	if err == nil {
-		t.Fatal("PK scan should trigger error")
-	}
-	// lookup on "special"
+	// lookup on "special" (null)
 	q, err = runQuery(`{"eq": {"thing": null},  "in": ["special"]}`, col)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !ensureMapHasKeys(q, ids[0]) {
+		t.Fatal(q)
+	}
+	// lookup in list
+	q, err = runQuery(`{"eq": "val1",  "in": ["a", "b"]}`, col)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ensureMapHasKeys(q, ids[6]) {
+		t.Fatal(q)
+	}
+	q, err = runQuery(`{"eq": "val5",  "in": ["a", "b"]}`, col)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ensureMapHasKeys(q, ids[7]) {
 		t.Fatal(q)
 	}
 	// "e" should not exist
@@ -186,7 +201,7 @@ func TestQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ensureMapHasKeys(q, ids[0], ids[1], ids[2], ids[3], ids[4], ids[5]) {
+	if !ensureMapHasKeys(q, ids[0], ids[1], ids[2], ids[3], ids[4], ids[5], ids[6], ids[7]) {
 		t.Fatal(q)
 	}
 	// union
@@ -212,7 +227,7 @@ func TestQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ensureMapHasKeys(q, ids[0], ids[2]) {
+	if !ensureMapHasKeys(q, ids[0], ids[2], ids[6], ids[7]) {
 		t.Fatal(q)
 	}
 }

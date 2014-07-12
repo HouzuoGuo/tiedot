@@ -63,8 +63,15 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 	ht.Lock.RLock()
 	vals := ht.Get(lookupValueHash, intLimit)
 	ht.Lock.RUnlock()
-	for _, v := range vals {
-		(*result)[v] = struct{}{}
+	for _, match := range vals {
+		// Filter result to avoid hash collision
+		if doc, err := src.Read(match); err == nil {
+			for _, v := range GetIn(doc, vecPath) {
+				if fmt.Sprint(v) == lookupStrValue {
+					(*result)[match] = struct{}{}
+				}
+			}
+		}
 	}
 	return
 }
