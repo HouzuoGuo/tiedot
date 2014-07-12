@@ -23,7 +23,7 @@ func main() {
 
 	// Parse CLI parameters
 	var mode, dir string
-	var port, maxprocs, benchSize int
+	var port, maxprocs int
 	var profile bool
 	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|example]")
 	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
@@ -75,9 +75,9 @@ func main() {
 	case "example": // Run embedded usage examples
 		embeddedExample()
 	case "bench": // Benchmark scenarios
-		benchmark(benchSize)
+		benchmark()
 	case "bench2":
-		benchmark2(benchSize)
+		benchmark2()
 	default:
 		flag.PrintDefaults()
 		return
