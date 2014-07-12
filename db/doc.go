@@ -159,7 +159,7 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	if err != nil {
 		part.UnlockUpdate(id)
 		part.Lock.Unlock()
-		return fmt.Errorf("Cannot update %d: cannot read back original document (not found?)", err)
+		return fmt.Errorf("Cannot update %d: cannot read back original document - %v", id, err)
 	}
 	var original map[string]interface{}
 	if err = json.Unmarshal(originalB, &original); err != nil {
@@ -196,7 +196,7 @@ func (col *Col) Delete(id int) error {
 	if err != nil {
 		part.UnlockUpdate(id)
 		part.Lock.Unlock()
-		return fmt.Errorf("Cannot delete %d: cannot read back original document (not found?)", err)
+		return fmt.Errorf("Cannot delete %d: %v", id, err)
 	}
 	var original map[string]interface{}
 	if err = json.Unmarshal(originalB, &original); err != nil {
