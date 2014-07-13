@@ -8,15 +8,14 @@ import (
 )
 
 /*
-You are encouraged to use nearly all tiedot public functions concurrently, except schema management functions:
-- Create, rename, drop collection
-- Create and remove collection index
-You may not manage schema and do document operations (such as updates/queries) at the same time.
-
-The embeddedExample requires as much as 1.5GB of free disk space (however not all 1.5 GB are used).
+You are encouraged to use nearly all tiedot public functions concurrently, with only one exception: please do not
+execute queries or document operations while schema is changing (such as creating/removing index). Doing so may likely
+cause data inconsistency or program crash. This is not a concern for using HTTP API.
 
 To compile and run the example:
     go build && ./tiedot -mode=example
+
+It may require as much as 1.5GB of free disk space in order to run the example.
 */
 
 func embeddedExample() {
@@ -59,11 +58,11 @@ func embeddedExample() {
 	myDB.Scrub("Feeds")
 
 	// ****************** Document Management ******************
-	// Start using a collection
-	// (The reference is valid until DB schema changes or Scrub is carried out)
+
+	// Start using a collection (the reference is valid until DB schema changes or Scrub is carried out)
 	feeds := myDB.Use("Feeds")
 
-	// Insert document (document must be map[string]interface{})
+	// Insert document (afterwards the docID uniquely identifies the document and will never change)
 	docID, err := feeds.Insert(map[string]interface{}{
 		"name": "Go 1.2 is released",
 		"url":  "golang.org"})
@@ -73,9 +72,9 @@ func embeddedExample() {
 
 	// Read document
 	readBack, err := feeds.Read(docID)
-	fmt.Println(readBack)
+	fmt.Println("Document", docID, "is", readBack)
 
-	// Update document (document must be map[string]interface{})
+	// Update document
 	err = feeds.Update(docID, map[string]interface{}{
 		"name": "Go is very popular",
 		"url":  "google.com"})
@@ -83,11 +82,18 @@ func embeddedExample() {
 		panic(err)
 	}
 
+	// Process all documents (note that document order is undetermined)
+	feeds.ForEachDoc(func(id int, docContent []byte) (willMoveOn bool) {
+		fmt.Println("Document", id, "is", string(docContent))
+		return true  // move on to the next document OR
+		return false // do not move on to the next document
+	})
+
 	// Delete document
 	feeds.Delete(docID)
 
 	// ****************** Index Management ******************
-	// Secondary indexes assist in many types of queries
+	// Indexes assist in many types of queries
 	// Create index (path leads to document JSON attribute)
 	if err := feeds.Index([]string{"author", "name", "first_name"}); err != nil {
 		panic(err)
@@ -124,13 +130,9 @@ func embeddedExample() {
 		panic(err)
 	}
 
-	// Query results are document IDs
+	// Query result are document IDs
 	for id := range queryResult {
-		fmt.Printf("Query returned document ID %d\n", id)
-	}
-
-	// To use the document itself, simply read it back
-	for id := range queryResult {
+		// To get query result document, simply read it
 		readBack, err := feeds.Read(id)
 		if err != nil {
 			panic(err)

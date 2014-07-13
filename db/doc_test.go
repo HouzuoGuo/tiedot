@@ -244,7 +244,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 	// Iterate over all documents 10 times
 	start := time.Now().UnixNano()
 	for i := 0; i < 10; i++ {
-		col.ForEachDoc(false, func(_ int, _ []byte) bool {
+		col.ForEachDoc(func(_ int, _ []byte) bool {
 			return true
 		})
 	}

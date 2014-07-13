@@ -119,7 +119,7 @@ func benchmark() {
 	})
 
 	// Collect all document IDs and benchmark document read
-	col.ForEachDoc(false, func(id int, _ []byte) bool {
+	col.ForEachDoc(func(id int, _ []byte) bool {
 		ids = append(ids, id)
 		return true
 	})

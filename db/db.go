@@ -238,7 +238,7 @@ func (db *DB) Scrub(name string) error {
 	if err != nil {
 		return err
 	}
-	db.cols[name].ForEachDoc(false, func(id int, doc []byte) bool {
+	db.cols[name].ForEachDoc(func(id int, doc []byte) bool {
 		var docObj map[string]interface{}
 		if err := json.Unmarshal([]byte(doc), &docObj); err != nil {
 			// Skip corrupted document

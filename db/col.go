@@ -122,7 +122,7 @@ func (col *Col) close() error {
 }
 
 // Do fun for all documents in the collection.
-func (col *Col) ForEachDoc(_ bool, fun func(id int, doc []byte) (moveOn bool)) {
+func (col *Col) ForEachDoc(fun func(id int, doc []byte) (moveOn bool)) {
 	// Process approx.4k documents in each iteration
 	partDiv := col.ApproxDocCount() / col.db.numParts / 4000
 	if partDiv == 0 {
@@ -160,7 +160,7 @@ func (col *Col) Index(idxPath []string) (err error) {
 		}
 	}
 	// Put all documents on the new index
-	col.ForEachDoc(false, func(id int, doc []byte) (moveOn bool) {
+	col.ForEachDoc(func(id int, doc []byte) (moveOn bool) {
 		var docObj map[string]interface{}
 		if err := json.Unmarshal(doc, &docObj); err != nil {
 			// Skip corrupted document

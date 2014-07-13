@@ -21,7 +21,7 @@ func EvalUnion(exprs []interface{}, src *Col, result *map[int]struct{}) (err err
 
 // Put all document IDs into result.
 func EvalAllIDs(src *Col, result *map[int]struct{}) (err error) {
-	src.ForEachDoc(true, func(id int, _ []byte) bool {
+	src.ForEachDoc(func(id int, _ []byte) bool {
 		(*result)[id] = struct{}{}
 		return true
 	})
