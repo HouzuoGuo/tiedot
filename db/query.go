@@ -101,20 +101,22 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 		return errors.New(fmt.Sprintf("Please index %v and retry query %v", vecPath, expr))
 	}
 	counter := 0
-	partitionSize := 193 // not a magic, feel free to change, but do not make it too small
+	partDiv := src.ApproxDocCount() / src.db.numParts / 4000 // collect approx. 4k document IDs in each iteration
+	if partDiv == 0 {
+		partDiv++
+	}
 	for iteratePart := 0; iteratePart < src.db.numParts; iteratePart++ {
 		ht := src.hts[iteratePart][jointPath]
 		ht.Lock.RLock()
-		for i := 0; i < partitionSize; i++ {
-			_, vals := ht.GetPartition(i, partitionSize)
-			for _, v := range vals {
-				(*result)[v] = struct{}{}
+		for i := 0; i < partDiv; i++ {
+			_, ids := ht.GetPartition(i, partDiv)
+			for _, id := range ids {
+				(*result)[id] = struct{}{}
 				counter++
 				if counter == intLimit {
 					ht.Lock.RUnlock()
 					return nil
 				}
-
 			}
 		}
 		ht.Lock.RUnlock()

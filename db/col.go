@@ -123,13 +123,16 @@ func (col *Col) close() error {
 
 // Do fun for all documents in the collection.
 func (col *Col) ForEachDoc(_ bool, fun func(id int, doc []byte) (moveOn bool)) {
-	// This number is not a magic, but smaller equals to larger memory consumption, and larger equals to more time consumption
-	totalIterations := 193
+	// Process approx.4k documents in each iteration
+	partDiv := col.ApproxDocCount() / col.db.numParts / 4000
+	if partDiv == 0 {
+		partDiv++
+	}
 	for iteratePart := 0; iteratePart < col.db.numParts; iteratePart++ {
 		part := col.parts[iteratePart]
 		part.Lock.RLock()
-		for i := 0; i < totalIterations; i++ {
-			if !part.ForEachDoc(i, totalIterations, fun) {
+		for i := 0; i < partDiv; i++ {
+			if !part.ForEachDoc(i, partDiv, fun) {
 				part.Lock.RUnlock()
 				return
 			}
@@ -212,7 +215,9 @@ func (col *Col) Unindex(idxPath []string) error {
 func (col *Col) ApproxDocCount() int {
 	total := 0
 	for _, part := range col.parts {
+		part.Lock.RLock()
 		total += part.ApproxDocCount()
+		part.Lock.RUnlock()
 	}
 	return total
 }
