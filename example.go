@@ -55,7 +55,9 @@ func embeddedExample() {
 	}
 
 	// Scrub (repair and compact) "Feeds"
-	myDB.Scrub("Feeds")
+	if err := myDB.Scrub("Feeds"); err != nil {
+		panic(err)
+	}
 
 	// ****************** Document Management ******************
 
@@ -72,6 +74,9 @@ func embeddedExample() {
 
 	// Read document
 	readBack, err := feeds.Read(docID)
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println("Document", docID, "is", readBack)
 
 	// Update document
@@ -90,7 +95,9 @@ func embeddedExample() {
 	})
 
 	// Delete document
-	feeds.Delete(docID)
+	if err := feeds.Delete(docID); err != nil {
+		panic(err)
+	}
 
 	// ****************** Index Management ******************
 	// Indexes assist in many types of queries
