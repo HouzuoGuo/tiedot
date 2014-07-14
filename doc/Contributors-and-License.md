@@ -4,10 +4,15 @@ I sincerely appreciate the following individuals and organizations for their con
 
 - 2pi
 - Alexandre Stein
+- Bryce Nyeggen
+- Cristian Echeverria
+- David Corona
+- Evan Shaw
 - Freiheit.com
 - "IFQ"
 - Nick Prestra
 - NoahShen
+- Osman Bineev
 - Ross Albertson
 - Stefan Richter
 - Tom D

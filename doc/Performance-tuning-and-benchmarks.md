@@ -1,6 +1,6 @@
 ## tiedot built-in benchmark
 
-tiedot has three built-in benchmark cases. To invoke benchmark, compile and run tiedot with CLI parameter:
+tiedot has two built-in benchmark cases. To invoke benchmark, compile and run tiedot with CLI parameter:
 
     ./tiedot -mode=bench   # benchmark 1
     ./tiedot -mode=bench2  # benchmark 2
