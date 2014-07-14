@@ -253,7 +253,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 
 	// Verify again that there are approximately 1000 documents
 	t.Log("ApproxDocCount", col.ApproxDocCount())
-	if col.ApproxDocCount() < 700 || col.ApproxDocCount() > 1300 {
+	if col.ApproxDocCount() < 600 || col.ApproxDocCount() > 1400 {
 		t.Fatal("Approximate is way off", col.ApproxDocCount())
 	}
 
