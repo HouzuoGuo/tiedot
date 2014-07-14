@@ -4,12 +4,13 @@ Prepare HTTP server for serving web control panel application.
 tiedot uses go.rice package for serving static web content, therefore you will need
 both git and mercurial (due to go.rice dependency) in order to build tiedot.
 
-If you wish to completely remove the web control panel application, follow these steps:
+If you wish to embed web content into your program, please download go.rice and run
+`rice embed-go` in "webcp" directory and use the generated Go source code in your project.
+
+To completely remove all external project dependencies, you must remove the web control
+panel application entirely. If you wish to do so, please follow these steps:
 - Delete "webcp" directory (including this file)
 - Remove call to "webcp.RegisterWebCp" in httpapi/srv.go
-
-If you wish to embed web content into your program, please download go.rice and run
-`rice embed-go` in "webcp" directory.
 
 You can read more about go.rice here: https://github.com/GeertJohan/go.rice
 */

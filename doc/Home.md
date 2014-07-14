@@ -4,15 +4,15 @@ Keywords: Golang, go, document database, NoSQL, JSON
 
 ### tiedot - Your NoSQL database powered by Golang
 
-tiedot is a document database engine that uses __JSON__ as document notation; it has a powerful query processor that supports advanced set operations; it can be __embedded__ into your program, or run a stand-alone server using __HTTP__ for an API on most *nix and Windows operating systems.
+tiedot is a document database engine that uses __JSON__ as document notation; it has a powerful query processor that supports advanced set operations; it can be __embedded__ into your program, or run a stand-alone server using __HTTP__ for an API on most *nix operating systems.
 
-tiedot has fault-tolerant data structures that put your data safety *first*, while considering scalability in design.
+tiedot has fault-tolerant data structures that put your data safety *first*, while easily scales to 4+ CPU cores.
 
-> Did you know? The largest known tiedot deployment powers a personal offline Wikipedia indexing project, it has 5.9 million documents and over 73GB of data.
+> Did you know? The largest known tiedot deployment powers an offline Wikipedia indexing project, it has 5.9 million documents and over 73GB of data.
 
 ### Contributions welcome!
 
-tiedot is a very small project in the large open source community - it is growing fast thanks to the 500+ stars and watchers, as well as many contributors for their feedback, comments, ideas and code. Your contribution matters a lot!
+tiedot is a very small project in the large open source community - it is growing fast thanks to the 800+ stars and watchers, as well as many contributors for their feedback, comments, ideas and code. Your contribution matters a lot!
 
 Pull requests/forks all welcome, and please share your thoughts, questions and feature requests in [Issues] section.
 
@@ -22,7 +22,7 @@ Let me know what you think about tiedot, I love to hear from you! Please [Email 
 
 - [Tutorial: tiedot in 10 minutes]
 - [API reference and embedded usage]
-- [Limitations]
+- [Dependencies and limitations]
 
 ... and more
 
@@ -39,19 +39,15 @@ The newest version 3.0 (branch 3.0) is a complete re-write aiming to bring a muc
 
 ### Project Story
 
-__Is tiedot "yet another NoSQL database"?__
+Go is a fascinating language and it has attracted a lot of attention in the open source community over the past few years. But as a young programming language, there was a lack of database engine options for back-end development. As we all know, the design of Go was heavily inspired by C language, and there is sqlite for C - so I thought what about a making DB engine easily embeddable for Go programs?
 
-There are probably as many NoSQL database as there are Linux distributions.
+Then tiedot was born - the name "tiedot" is a cute Finnish word meaning "data". Initially being a programming exercise, tiedot greatly helped me exploring the performance characteristics of Go.
 
-tiedot is not as powerful (yet) - and does not intend to compete with mainstream NoSQL database engines such as CouchDB or Cassandra. However, tiedot performs reasonably well given its small size (around 3k LOC); and due to its simplicity, its performance may come close or even exceed those large brand NoSQL solutions (under certain workloads).
+Thanks to the very welcoming and helpful community of Go - when tiedot made its first release, a lot of people contributed feature ideas and suggestions pushing the project well beyond its initial goal. Till this day tiedot has been used in data analysis, embedded systems, utility applications, web applications, and some people also find it useful being a demo of several DB engine mechanisms.
 
-__What is the motive behind this project?__
+I love Go because it offers stable and predictable performance characteristics, very fast compilation speed and a complete toolchain for all development activities. And unlike many other languages, Go does not require an intelligent IDE to improve productivity of users - many of which find a syntax-highlighted text editor to be sufficient for coding Go!
 
-Golang (Go) is a fascinating language - very easy to use, scalable and reasonably stable. I am very passionate about document database technologies (check out my other GitHub projects!) and enjoy seeing my code scaling well on SMP machines. This is my Golang exercise.
-
-__Why the name "tiedot"?__
-
-"tiedot" is a Finnish word standing for "data". I enjoy learning (natural and computer) languages, also enjoy listening to music in many languages. "Tiedot" sounds cute, doesn't it?
+There are several other data structure servers/DB engines written in Go, namely "etcd", "leveldb-go" and "ql"; they emphasis on different usage scenarios, for example "etcd" is a data structure server designed for configuration management and service discovery, "leveldb-go" is a re-implementation of popular LevelDB in Go, and "ql" is an embeddable DB engine providing SQL capability. After all, when it comes to choosing a general purpose, embeddable NoSQL database engine, tiedot is perhaps the only choice so far (as far as I know).
 
 [Tutorial: tiedot in 10 minutes]: https://github.com/HouzuoGuo/tiedot/wiki/Tutorial
 [API reference and embedded usage]: https://github.com/HouzuoGuo/tiedot/wiki/API-reference-and-embedded-usage
@@ -60,7 +56,7 @@ __Why the name "tiedot"?__
 [Query processor and index]: https://github.com/HouzuoGuo/tiedot/wiki/Query-processor-and-index
 [Concurrency and networking]: https://github.com/HouzuoGuo/tiedot/wiki/Concurrency-and-networking
 [Performance tuning and benchmarks]: https://github.com/HouzuoGuo/tiedot/wiki/Performance-tuning-and-benchmarks
-[Limitations]: https://github.com/HouzuoGuo/tiedot/wiki/Limitations
+[Dependencies and limitations]: https://github.com/HouzuoGuo/tiedot/wiki/Dependencies-and-limitations
 [Email me]: mailto:guohouzuo@gmail.com
 [Twitter]: https://twitter.com/hzguo
 [blog]: http://allstarnix.blogspot.com.au

@@ -2,31 +2,29 @@
 
 Similar to many other popular NoSQL solutions, tiedot does not provide ACID transactions. However, atomic operations are possible within the scope of a single document.
 
-A background goroutine is associated with every database instance, that periodically synchronizes file buffers (every 2 seconds).
+Associated with every database instance is a background goroutine, it automatically synchronize all file buffers every 2 seconds.
 
-There are APIs for both HTTP API service and embedded usage for manually synchronizing all buffers.
+Both HTTP API and embedded usage support manual buffer synchronization for immediate guaranteed durability.
 
-## Concurrency of IO operations
+## Concurrency of document operations
 
-When you create a tiedot database, the number of CPUs available in the system is written down into a file called "number_of_partitions". From there, all new collections will be partitioned automatically.
+When a tiedot database is created, the number of system CPUs is written down into a file called `number_of_partitions`. From there, all collections and indexes are partitioned automatically ("sharding").
 
-Partitions function independent of each other, hence IO operations can be carried out concurrently on many partitions at once, governed by RWMutex. In this way, tiedot confidently scales to 4 CPU cores.
-
-Indexes are also partitioned - there are as many collection partitions as there are index partitions. Governed by RWMutex, secondary index reads/updates can be carried out concurrently on many partitions.
+These partitions function independently, to allow document operations be carried out concurrently on many partitions at once; in this way, tiedot confidently scales to 4+ CPU cores.
 
 ## Concurrency of HTTP API endpoints
 
-While most HTTP endpoints support concurrency, there is a small number of operations which must "stop the world" to ensure safe operation - these operations block __all__ other HTTP endpoints until completion:
+Nearly all HTTP endpoints encourage concurrent usage.
 
-- Create/rename/drop/scrub/repartition collection
+To ensure safe operation and data consistency, there is a very small number of HTTP endpoints which "stop the world" during their execution, these are the features operating on database schema:
+
+- Create/rename/drop/scrub collection
 - Create/remove index
 - Dump/sync database
 
-Governed by a RWMutex, "stop the world" operations put write lock and all non-blocking operations put read lock on it.
-
 ## HTTP service
 
-tiedot HTTP service is powered by HTTP server in standard Golang library `net/http`.
+tiedot HTTP service is powered by HTTP server in Go standard library `net/http`.
 
 The HTTP service:
 
@@ -36,7 +34,7 @@ The HTTP service:
 - Unconditionally processes all incoming requests
 - Scalability is affected by `GOMAXPROCS`
 
-See [API reference and embedded usage] for documentation HTTP service usage.
+See [API reference and embedded usage] for documentation on HTTP service usage.
 
 Once tiedot enters HTTP service mode, it keeps running in foreground until:
 

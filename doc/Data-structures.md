@@ -1,8 +1,8 @@
 ### Directory and file structure
 
 <pre>
-TiedotDatabase         # Database "TiedotDatabase
-├── CollectionA        # Collection called "CollectionA"
+TiedotDatabase         # A database "TiedotDatabase"
+├── CollectionA        # A collection called "CollectionA"
 │   ├── Book!Author!Name   # An index on path "Book" -> "Author" -> "Name"
 │   │   ├── 0                  # Index data partition 0
 │   │   └── 1                  # Index data partition 1
@@ -10,7 +10,7 @@ TiedotDatabase         # Database "TiedotDatabase
 │   ├── dat_1              # Document data partition 1
 │   ├── id_0               # Document ID lookup table for partition 0
 │   └── id_1               # Document ID lookup table for partition 1
-├── CollectionB        # Another collection called "CollectionA"
+├── CollectionB        # Another collection called "CollectionB"
 │   ├── Day!Temperature!High
 │   │   ├── 0
 │   │   └── 1
@@ -23,17 +23,16 @@ TiedotDatabase         # Database "TiedotDatabase
 
 ### Data file structure
 
-Every document has a random and practically unique ID that is also the primary index value - it decides in which partition the document goes into.
+Collection data file contains document data. Every document has a binary header and UTF-8 text content. The file has an initial size (32MB) and will grow beyond the initial size (by 32MB incrementally) to fit more documents.
 
-File has a capacity and may grow beyond the capacity to fit more documents. New documents are inserted to end-of-data position, and they are left room for future updates and size growth.
+New documents are inserted to end-of-data position, and they are left with room for future updates and size growth. Every document is assigned to a randomly generated, practically unique document ID, which also decides into which partition the document goes.
 
-Updating document usually happens in-place, however if there is not enough room for the updated version, the document has to be deleted and re-inserted. Deleted documents are marked as deleted.
+Updating document usually happens in-place, however if there is not pre-allocated enough room for the updated version, the document has to be deleted and re-inserted; document ID remains the same.
 
-Document partition is initially 32MB. It grows automatically by 32MB when there is no place left to append more documents.
+Deleted documents are marked as deleted, the wasted space is recovered in the next scrub operation.
 
-#### Document format
+#### Document format on disk
 
-There is no padding before or after a document. Every document has:
 <table>
   <tr>
     <th>Type</th>
@@ -69,11 +68,15 @@ There is no padding before or after a document. Every document has:
 
 ### Index hash table file structure
 
-All indexes (primary and secondary) are made of static hash tables of buckets. All buckets have the same number of entries and new buckets will be chained together should a bucket grow full.
+Hash table file contains binary content; it implements a static hash table made of hash buckets and integer entries.
 
-#### Bucket format
+Every bucket has a fixed number of entries. When a bucket becomes full, a new bucket is chained to it in order to store more entries. Every entry has an integer key and value.
 
-There is no padding before or after a bucket. Each bucket is stored in the following format:
+An entry key may have multiple values assigned to it, however the combination of entry key and value must be unique
+across the entire hash table.
+
+#### Bucket format on disk
+
 <table style="width: 100%;">
   <tr>
     <th>Type</th>
@@ -96,7 +99,7 @@ There is no padding before or after a bucket. Each bucket is stored in the follo
 </table>
 
 #### Bucket entry format
-There is no padding before or after an entry. Each entry is stored in the following format:
+
 <table style="width: 100%;">
   <tr>
     <th>Type</th>
