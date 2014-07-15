@@ -1,49 +1,45 @@
-## tiedot built-in benchmark
+## Built-in benchmark
 
-tiedot has two built-in benchmark cases. To invoke benchmark, compile and run tiedot with CLI parameter:
+tiedot performance is usually always limited by CPU power rather than disk IO capability.
+
+tiedot has two built-in benchmark scenarios. To invoke benchmark, compile and run tiedot with CLI parameter:
 
     ./tiedot -mode=bench   # benchmark 1
     ./tiedot -mode=bench2  # benchmark 2
 
-The default benchmark sample size is 400,000 for all three cases; it can be changed via CLI parameter `-benchsize=<new_size>`.
+The first scenario runs document insert, read, update, delete, and lookup queries one after the other. It is designed to demonstrate database engine throughput in each individual document operation, also for catching performance regressions.
 
-### Benchmark 1
+The second scenario runs all the above operations at the same time, demonstrating engine throughput under very mixed load; it is also used for catching unwanted behaviors caused by concurrency.
 
-Invoked by `tiedot -mode=bench`, the benchmark prepares a collection with two indexes, and prepares a large sample of documents (all deserialized, which uses a LOT of memory), then runs:
+In both scenarios, each benchmark sample document has 5 indexes, and each query looks for 5 documents across 3 indexes. The default benchmark size is 400,000 documents, the size may be changed via CLI parameter `-benchsize=<new_size>`.
 
-- Insert documents (effective on both indexes)
-- Read document at random locations
-- Query - lookup on both indexes
-- Update document at random locations
-- Delete document at random locations
+On an Intel i7 2.9GHZ mobile CPU, the two benchmarks demonstrate that tiedot can do:
 
-It is designed to test performance of each individual document operation, to assist in finding performance regressions. The result should accurately reflect batch CRUD operation performance.
+- 100k inserts per second
+- 370k single-document reads per second
+- 70k lookup queries per second
+- 50k updates per second
+- 180k deletes per second
+- 150k operations per second under mixed load (bench2)
 
-### Benchmark 2
-
-Invoked by `tiedot -mode=bench2`, the benchmark first prepares a collection with two indexes and 1000 documents, then do *all* these operations at the same time:
-
-- Insert/update/delete documents
-- Read documents and do lookup queries
-
-Unlike Benchmark 1, Benchmark 2 does not require large amount of free memory even if a very large `benchsize` is given.
-
-This benchmark focuses on concurrency, to reflect performance under mixed workloads.
+The throughput numbers are more than tripled when number of indexes is reduced to one.
 
 ## Available memory VS performance
 
-tiedot runs well with even less than 100 MB of available memory during normal operations. Similar to other NoSQL solutions, having larger amount of free memory improves performance when the database is also large.
+tiedot does not require much free memory to run! It still performs reasonably well even if the system has less than 100MB of available memory.
+
+Similar to other NoSQL solutions, tiedot takes advantage of larger available memory to buffer data files and improve throughput.
 
 ### When data size < available memory
 
-This is the preferred situation - there is plenty memory available for holding all data files. Operating system does a very good on managing mapped file buffers, swapping rarely happens and there is minimal to no IO on disk. In this situation, tiedot performs as an in-memory database. The benchmark results on the home page of this wiki was collected under this scenario.
+It is advantageous to have sufficient memory for all the data set. When there is plenty of memory available, the operating system does a very good job at managing mapped file buffers, swapping rarely occurs and there is minimal disk IO activity. In this case, tiedot performs just like an in-memory cache backed by disk files.
 
 ### When data size > available memory
 
-This is not ideal - there is not enough memory to hold all collection data, memory buffer becomes less efficient due to frequent page faults.
+This is not an ideal situation because swapping may occur. Depending on the actual access/usage pattern, the performance may suffer by up to 400% (when only 50% of data set resides in memory) or suffer no impact at all (when regularly accessed data resides in memory).
 
-When approximately half of collection data resides in virtual memory, the performance of mixed workloads drops by approximately 400%; depending on your virtual memory media (flash/conventional HDD), amount of available main memory and usage, actual performance may vary.
+When available memory is not adequate to accommodate half of the data set, depending on usage pattern, there is a potential for tiedot to generate massive disk IO activities (due to swapping) and slow down the entire system - the same issue happens to other NoSQL databases that utilize memory mapped files.
 
 ### Performance comparison with other NoSQL solutions
 
-Every NoSQL solution has its own advantages and disadvantages. By offering feature simplicity, tiedot performs as well as (and very likely, faster than) mainstream NoSQL solutions, but tiedot does not offer some advanced capabilities such as replication and map-reduce (yet), in which case other solutions may be more capable of handling.
+Every NoSQL solution has its own advantages and disadvantages. By offering feature simplicity, tiedot performs even faster than many mainstream NoSQL solutions, but tiedot does not offer some advanced capabilities such as replication and map-reduce (yet), in which case other solutions may be more capable of handling.

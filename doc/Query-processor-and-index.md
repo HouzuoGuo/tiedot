@@ -1,17 +1,17 @@
 ### Query processor - supported operations
 
-Query is a JSON structure (object or array) made of operations, including sub-queries.
+Query is a JSON structure (object or array) made of query operations, set operations and sub-queries.
 
-Here is the complete list of all supported operations:
+Here is the comprehensive list of all supported query operations:
 
 <table>
   <tr>
-    <td>ID number as a string</td>
+    <td>Document ID number as string</td>
     <td>No operation, the ID number goes to result</td>
   </tr>
   <tr>
     <td>"all"</td>
-    <td>Return all document IDs</td>
+    <td>Return all document IDs (slow!)</td>
   </tr>
   <tr>
     <td>{"eq": #, "in": [#], "limit": #}</td>
@@ -27,23 +27,30 @@ Here is the complete list of all supported operations:
   </tr>
   <tr>
     <td>[sub-query1, sub-query2..]</td>
-    <td>Evaluate and union sub-query results.</td>
+    <td>Evaluate union of sub-query results.</td>
   </tr>
   <tr>
     <td>{"n": [sub-query1, sub-query2..]}</td>
-    <td>Evaluate and intersect sub-query results.</td>
+    <td>Evaluate intersection of sub-query results.</td>
   </tr>
   <tr>
     <td>{"c": [sub-query1, sub-query2..]}</td>
-    <td>Evaluate and complement sub-query results.</td>
+    <td>Evaluate complement of sub-query results.</td>
   </tr>
 </table>
 
-`limit` is optional.
+`limit` is optional. Sub-query may have arbitrary complexity.
 
 ### Lookup queries
 
 Indexes works on a "path" - a series of attribute names locating the indexed value, for example, path `a,b,c` will locate value `1` in document `{"a": {"b": {"c": 1}}}`.
+
+If the index path visits or ultimately leads to an array of values, every value element will be indexed and a lookup query will match any value in the array. For example, an index on "Name,Pen Name" will index all of "John", "David", "Joshua" in the following document: 
+
+    { "Name: [
+        {"Pen Name": [ "John", "David" ]},
+        {"Pen Name": "Joshua"}
+    ] }
 
 Index must be available before carrying out lookup queries.
 

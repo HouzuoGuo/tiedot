@@ -1,3 +1,19 @@
+### 3.1 (not released yet)
+
+New stable features:
+
+- A beautiful web control panel application runs along with ordinary HTTP APIs.
+- Easily scan through large collections using new HTTP and embedded APIs.
+
+Improvements:
+
+- Significantly improved startup performance thanks to Smart File Scan.
+- Other improvements in error handling, locking, logging, and embedded usage examples.
+
+Bug fix:
+
+- Fix a bug that may cause inaccurate lookup query result to be returned.
+
 ### 3.0 (2014-05-31)
 
 Bug fix:
@@ -81,8 +97,6 @@ Improvements:
 - New query syntax - easier and more efficient, together with a new query processor.
 - A specific type of range query (integer lookup in a range) is now supported.
 
-Known issues: None
-
 ### beta (2013-07-12)
 
 A maintenance release to address outstanding issues discovered in alpha.
@@ -98,15 +112,9 @@ Improvements:
 - tiedot can now run on Windows platform.
 - tiedot now has a web control panel for managing collections/indexes/documents and run queries.
 
-Known issue:
-
-- Under a rare and specific data corruption situation, document update may panic.
-
 ### alpha (2013-06-28)
 
-Initial release.
-
-Known issues:
+Initial release with several known issues:
 
 - Under a rare and specific data corruption situation, document update may panic.
 - Several HTTP API endpoints return incorrect content type.

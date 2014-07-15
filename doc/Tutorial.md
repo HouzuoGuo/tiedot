@@ -2,7 +2,8 @@
 
 You will need:
 
-- git
+- Git
+- Mercurial (due to [external dependencies])
 - Go (>= 1.1)
 - A regular web browser OR curl/wget
 
@@ -16,11 +17,11 @@ You will need:
 
 ## Basics
 
-tiedot HTTP server serves one database; database is made of partitioned collections, the collections may use indexes to assist in query processing. Each document has an automatically assigned unique ID number that never change.
+tiedot HTTP server serves one database; collections in a database are automatically partitioned; the collections may use indexes to run queries.
 
-Collection partitioning is automatically managed.
+Each new document has an automatically assigned unique ID (string) that will always stay with the document.
 
-API requests (along with parameter values) may be sent using of GET, POST or PUT methods.
+API requests (along with parameter values) may be sent using GET, POST or PUT HTTP method.
 
 ## Manage collections
 
@@ -47,20 +48,20 @@ Drop (delete) collection "Points":
 Insert document:
 
     > curl --data-ascii doc='{"a": 1, "b": 2}' "http://localhost:8080/insert?col=Feeds"
-    2080426431464762175 # the new document's unique ID
+    791206372389179361 # the new document's unique ID
 
 Read document:
 
-    > curl "http://localhost:8080/get?col=Feeds&id=2080426431464762175"
+    > curl "http://localhost:8080/get?col=Feeds&id=791206372389179361"
     {"a":1,"b":2}
 
 Update document:
 
-    > curl --data-ascii doc='{"a": 3, "b": 4}' "http://localhost:8080/update?col=Feeds&id=2080426431464762175"
+    > curl --data-ascii doc='{"a": 3, "b": 4}' "http://localhost:8080/update?col=Feeds&id=791206372389179361"
 
 Delete document:
 
-    > curl "http://localhost:8080/delete?col=Feeds&id=2080426431464762175"
+    > curl "http://localhost:8080/delete?col=Feeds&id=791206372389179361"
 
 ## Manage indexes
 
@@ -116,10 +117,12 @@ Looking for young feeds (age between 1 and 3) from "slackware.com":
 
 `{"n": [ .. ]}` means "intersect"; `{"int-from": x, "int-to": y, "in": [ .. ] }` is an integer range lookup.
 
-There is also `count` API to return number of results.
+There is also `/count?col=foo` API to return number of results.
 
 ## Wrap up
 
 Let's gracefully shutdown server:
 
     > curl "http://localhost:8080/shutdown"
+
+[external dependencies]: https://github.com/HouzuoGuo/tiedot/wiki/Dependencies-and-limitations
