@@ -136,9 +136,12 @@ func TestPartitionEntries(t *testing.T) {
 		t.Fatalf("Failed to open: %v", err)
 		return
 	}
-	number := 100000
-	for i := 0; i < number; i++ {
+	number := 2000000
+	for i := 1; i <= number; i++ {
 		ht.Put(i, i*2)
+		if gotBack := ht.Get(i, 0); len(gotBack) != 1 || gotBack[0] != i*2 {
+			t.Fatal("Written ", i, i*2, "got back", gotBack)
+		}
 	}
 	for parts := 2; parts < 19; parts++ {
 		t.Log("parts is", parts)

@@ -219,31 +219,40 @@ func GetPartitionRange(partNum, totalParts int) (start int, end int) {
 	return
 }
 
-// Return all entries in the chosen part.
+// Collect entries all the way from "head" bucket to the end of its chained buckets.
+func (ht *HashTable) collectEntries(head int) (keys, vals []int) {
+	keys = make([]int, 0, PER_BUCKET)
+	vals = make([]int, 0, PER_BUCKET)
+	var entry, bucket int = 0, head
+	for {
+		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
+		entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
+		entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
+		if ht.Buf[entryAddr] == 1 {
+			keys = append(keys, int(entryKey))
+			vals = append(vals, int(entryVal))
+		} else if entryKey == 0 && entryVal == 0 {
+			return
+		}
+		if entry++; entry == PER_BUCKET {
+			entry = 0
+			if bucket = ht.nextBucket(bucket); bucket == 0 {
+				return
+			}
+		}
+	}
+}
+
+// Return all entries in the chosen partition.
 func (ht *HashTable) GetPartition(partNum, partSize int) (keys, vals []int) {
 	rangeStart, rangeEnd := GetPartitionRange(partNum, partSize)
 	prealloc := (rangeEnd - rangeStart) * PER_BUCKET
 	keys = make([]int, 0, prealloc)
 	vals = make([]int, 0, prealloc)
 	for head := rangeStart; head < rangeEnd; head++ {
-		var entry, bucket int = 0, head
-		for {
-			entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
-			entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
-			entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
-			if ht.Buf[entryAddr] == 1 {
-				keys = append(keys, int(entryKey))
-				vals = append(vals, int(entryVal))
-			} else if entryKey == 0 && entryVal == 0 {
-				break
-			}
-			if entry++; entry == PER_BUCKET {
-				entry = 0
-				if bucket = ht.nextBucket(bucket); bucket == 0 {
-					return
-				}
-			}
-		}
+		k, v := ht.collectEntries(head)
+		keys = append(keys, k...)
+		vals = append(vals, v...)
 	}
 	return
 }
