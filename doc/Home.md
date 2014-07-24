@@ -8,7 +8,7 @@ tiedot is a document database engine that uses __JSON__ as document notation; it
 
 tiedot has fault-tolerant data structures that put your data safety *first*, while easily scales to 4+ CPU cores.
 
-> Did you know? The largest known tiedot deployment powers an offline Wikipedia indexing project, it has 5.9 million documents and over 73GB of data.
+> Did you know? The performance of tiedot is very stable - even with millions of records, it consistently achieves high throughput - swallow more than 120k records or 80k complicated queries per second with confidence!
 
 ### Contributions welcome!
 

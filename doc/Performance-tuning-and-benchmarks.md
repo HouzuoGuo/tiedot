@@ -11,18 +11,18 @@ The first scenario runs document insert, read, update, delete, and lookup querie
 
 The second scenario runs all the above operations at the same time, demonstrating engine throughput under very mixed load; it is also used for catching unwanted behaviors caused by concurrency.
 
-In both scenarios, each benchmark sample document has 5 indexes, and each query looks for 5 documents across 3 indexes. The default benchmark size is 400,000 documents, the size may be changed via CLI parameter `-benchsize=<new_size>`.
+In both scenarios, each benchmark sample document has 5 indexes, and each query looks for 5 keys across 3 indexes. The default benchmark size is 400,000 documents, the size may be changed via CLI parameter `-benchsize=<new_size>`.
 
-On an Intel i7 2.9GHZ mobile CPU, the two benchmarks demonstrate that tiedot can do:
+On an Intel i7 2.9GHZ mobile CPU, the two benchmarks demonstrate that tiedot can consistently achieve:
 
-- 100k inserts per second
-- 370k single-document reads per second
-- 70k lookup queries per second
-- 50k updates per second
-- 180k deletes per second
-- 150k operations per second under mixed load (bench2)
+- 120k inserts per second
+- 420k single-document reads per second
+- 80k lookup queries per second
+- 60k updates per second
+- 140k deletes per second
+- 220k operations per second under mixed load (bench2)
 
-The throughput numbers are more than tripled when number of indexes is reduced to one.
+The throughput numbers are more than doubled when number of indexes is reduced to one.
 
 ## Available memory VS performance
 
