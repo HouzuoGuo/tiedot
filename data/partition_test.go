@@ -131,7 +131,7 @@ func TestApproxDocCount(t *testing.T) {
 	}
 	timediff := time.Now().UnixNano() - start
 	t.Log("It took", timediff/1000000, "milliseconds")
-	if timediff/1000000 > 2500 {
+	if timediff/1000000 > 3000 {
 		t.Fatal("Algorithm is way too slow")
 	}
 }
