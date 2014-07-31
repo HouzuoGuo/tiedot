@@ -45,7 +45,7 @@ func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 			return
 		}
 	}
-	if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
+	if file.Buf, err = gommap.Map(file.Fh); err != nil {
 		return
 	}
 	// Bi-sect file buffer to find out how much space is in-use
@@ -86,7 +86,7 @@ func (file *DataFile) EnsureSize(more int) (err error) {
 	}
 	if err = os.Truncate(file.Path, int64(file.Size+file.Growth)); err != nil {
 		return
-	} else if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
+	} else if file.Buf, err = gommap.Map(file.Fh); err != nil {
 		return
 	}
 	file.Size += file.Growth
@@ -115,7 +115,7 @@ func (file *DataFile) Clear() (err error) {
 		return
 	} else if err = os.Truncate(file.Path, int64(file.Growth)); err != nil {
 		return
-	} else if file.Buf, err = gommap.Map(file.Fh, gommap.RDWR, 0); err != nil {
+	} else if file.Buf, err = gommap.Map(file.Fh); err != nil {
 		return
 	}
 	file.Used, file.Size = 0, file.Growth

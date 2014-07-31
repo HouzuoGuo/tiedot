@@ -1,9 +1,9 @@
-This work is based on [mmap-go][] written by [edsrzf][] using BSD-style license.
+This work is based on [mmap-go][] (BSD-style license) written by [Evan Shaw][].
 
-On top of the original repository, I made these bug fixes:
+On top of the original work, I further simplified the API usage, and fixed two minor bugs:
 
-- Incorrect syscall parameters in Unix msync
-- Panic if buffer size is too large in Windows
+- Fix incorrect parameter usage in msync syscall (Unix)
+- Will panic if the desired memory buffer size is too large (Windows)
 
 [mmap-go]: https://github.com/edsrzf/mmap-go
-[edsrzf]: https://github.com/edsrzf/
+[Evan Shaw]: https://github.com/edsrzf/

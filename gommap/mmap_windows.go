@@ -23,28 +23,18 @@ var handleLock sync.Mutex
 var handleMap = map[uintptr]syscall.Handle{}
 
 // Windows mmap always mapes the entire file regardless of the specified length.
-func mmap(length int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
+func mmap(length int, prot, hfile uintptr) ([]byte, error) {
 	flProtect := uint32(syscall.PAGE_READONLY)
 	dwDesiredAccess := uint32(syscall.FILE_MAP_READ)
-	switch {
-	case prot&COPY != 0:
-		flProtect = syscall.PAGE_WRITECOPY
-		dwDesiredAccess = syscall.FILE_MAP_COPY
-	case prot&RDWR != 0:
-		flProtect = syscall.PAGE_READWRITE
-		dwDesiredAccess = syscall.FILE_MAP_WRITE
-	}
-	if prot&EXEC != 0 {
-		flProtect <<= 4
-		dwDesiredAccess |= syscall.FILE_MAP_EXECUTE
-	}
+	flProtect = syscall.PAGE_READWRITE
+	dwDesiredAccess = syscall.FILE_MAP_WRITE
 
 	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, flProtect, 0, 0, nil)
 	if h == 0 {
 		return nil, os.NewSyscallError("CreateFileMapping", errno)
 	}
 
-	addr, errno := syscall.MapViewOfFile(h, dwDesiredAccess, uint32(off>>32), uint32(off&0xFFFFFFFF), 0)
+	addr, errno := syscall.MapViewOfFile(h, dwDesiredAccess, 0, 0, 0)
 	if addr == 0 {
 		return nil, os.NewSyscallError("MapViewOfFile", errno)
 	}
@@ -64,16 +54,6 @@ func mmap(length int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 func flush(addr, len uintptr) error {
 	errno := syscall.FlushViewOfFile(addr, len)
 	return os.NewSyscallError("FlushViewOfFile", errno)
-}
-
-func lock(addr, len uintptr) error {
-	errno := syscall.VirtualLock(addr, len)
-	return os.NewSyscallError("VirtualLock", errno)
-}
-
-func unlock(addr, len uintptr) error {
-	errno := syscall.VirtualUnlock(addr, len)
-	return os.NewSyscallError("VirtualUnlock", errno)
 }
 
 func unmap(addr, len uintptr) error {

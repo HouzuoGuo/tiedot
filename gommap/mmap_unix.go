@@ -10,48 +10,12 @@ import (
 	"syscall"
 )
 
-func mmap(len int, inprot, inflags, fd uintptr, off int64) ([]byte, error) {
-	flags := syscall.MAP_SHARED
-	prot := syscall.PROT_READ
-	switch {
-	case inprot&COPY != 0:
-		prot |= syscall.PROT_WRITE
-		flags = syscall.MAP_PRIVATE
-	case inprot&RDWR != 0:
-		prot |= syscall.PROT_WRITE
-	}
-	if inprot&EXEC != 0 {
-		prot |= syscall.PROT_EXEC
-	}
-	if inflags&ANON != 0 {
-		flags |= MAP_ANONYMOUS
-	}
-
-	b, err := syscall.Mmap(int(fd), off, len, prot, flags)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
+func mmap(len int, fd uintptr) ([]byte, error) {
+	return syscall.Mmap(int(fd), 0, len, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 }
 
 func flush(addr, len uintptr) error {
 	_, _, errno := syscall.Syscall(syscall.SYS_MSYNC, addr, len, syscall.MS_SYNC)
-	if errno != 0 {
-		return syscall.Errno(errno)
-	}
-	return nil
-}
-
-func lock(addr, len uintptr) error {
-	_, _, errno := syscall.Syscall(syscall.SYS_MLOCK, addr, len, 0)
-	if errno != 0 {
-		return syscall.Errno(errno)
-	}
-	return nil
-}
-
-func unlock(addr, len uintptr) error {
-	_, _, errno := syscall.Syscall(syscall.SYS_MUNLOCK, addr, len, 0)
 	if errno != 0 {
 		return syscall.Errno(errno)
 	}

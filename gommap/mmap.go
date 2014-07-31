@@ -15,24 +15,9 @@
 package gommap
 
 import (
-	"errors"
 	"os"
 	"reflect"
 	"unsafe"
-)
-
-const (
-	// RDONLY maps the memory read-only.
-	// Attempts to write to the MMap object will result in undefined behavior.
-	RDONLY = 0
-	// RDWR maps the memory as read-write. Writes to the MMap object will update the
-	// underlying file.
-	RDWR = 1 << iota
-	// COPY maps the memory as copy-on-write. Writes to the MMap object will affect
-	// memory, but the underlying file will remain unchanged.
-	COPY
-	// If EXEC is set, the mapped memory is marked as executable.
-	EXEC
 )
 
 const (
@@ -47,56 +32,21 @@ type MMap []byte
 // Note that because of runtime limitations, no file larger than about 2GB can
 // be completely mapped into memory.
 // If ANON is set in flags, f is ignored.
-func Map(f *os.File, prot, flags int) (MMap, error) {
-	return MapRegion(f, 0, prot, flags, 0)
-}
-
-// MapRegion maps part of a file into memory.
-// The offset parameter must be a multiple of the system's page size.
-// If length is 0, the entire file will be mapped.
-// Note that because of runtime limitations, no file larger than about 2GB can
-// be completely mapped into memory.
-// If ANON is set in flags, f is ignored.
-func MapRegion(f *os.File, length int, prot, flags int, offset int64) (MMap, error) {
-	var fd uintptr
-	if flags&ANON == 0 {
-		fd = uintptr(f.Fd())
-		if length == 0 {
-			fi, err := f.Stat()
-			if err != nil {
-				return nil, err
-			}
-			length = int(fi.Size())
-		}
-	} else {
-		if length <= 0 {
-			return nil, errors.New("anonymous mapping requires positive length")
-		}
-		fd = ^uintptr(0)
+func Map(f *os.File) (MMap, error) {
+	fd := uintptr(f.Fd())
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
 	}
+	length := int(fi.Size())
 	if length < 0 {
 		panic("memory map file length overflow")
 	}
-	return mmap(length, uintptr(prot), uintptr(flags), fd, offset)
+	return mmap(length, fd)
 }
 
 func (m *MMap) header() *reflect.SliceHeader {
 	return (*reflect.SliceHeader)(unsafe.Pointer(m))
-}
-
-// Lock keeps the mapped region in physical memory, ensuring that it will not be
-// swapped out.
-func (m MMap) Lock() error {
-	dh := m.header()
-	return lock(dh.Data, uintptr(dh.Len))
-}
-
-// Unlock reverses the effect of Lock, allowing the mapped region to potentially
-// be swapped out.
-// If m is already unlocked, aan error will result.
-func (m MMap) Unlock() error {
-	dh := m.header()
-	return unlock(dh.Data, uintptr(dh.Len))
 }
 
 // Flush synchronizes the mapping's contents to the file's contents on disk.
