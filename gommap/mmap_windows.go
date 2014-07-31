@@ -23,7 +23,7 @@ var handleLock sync.Mutex
 var handleMap = map[uintptr]syscall.Handle{}
 
 // Windows mmap always mapes the entire file regardless of the specified length.
-func mmap(length int, prot, hfile uintptr) ([]byte, error) {
+func mmap(length int, hfile uintptr) ([]byte, error) {
 	flProtect := uint32(syscall.PAGE_READONLY)
 	dwDesiredAccess := uint32(syscall.FILE_MAP_READ)
 	flProtect = syscall.PAGE_READWRITE
