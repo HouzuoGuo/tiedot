@@ -42,6 +42,7 @@ func TestQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer db.Close()
 	// Prepare collection and index
 	if err = db.Create("col"); err != nil {
 		t.Fatal(err)

@@ -62,7 +62,9 @@ func TestFindingAppendAndClear(t *testing.T) {
 	}
 
 	// Write something again
-	tmpFile.Buf[750] = 1
+	for i := 750; i < 800; i++ {
+		tmpFile.Buf[i] = byte('a')
+	}
 	tmpFile.Close()
 
 	// Re-open again
@@ -70,15 +72,15 @@ func TestFindingAppendAndClear(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
-	if tmpFile.Used != 751 {
-		t.Fatalf("Incorrect Append")
+	if tmpFile.Used != 800 {
+		t.Fatal("Incorrect Append", tmpFile.Used)
 	}
 	// Clear the file and test size
 	if err = tmpFile.Clear(); err != nil {
 		t.Fatal(err)
 	}
 	if !(len(tmpFile.Buf) == 1024 && tmpFile.Buf[750] == 0 && tmpFile.Growth == 1024 && tmpFile.Size == 1024 && tmpFile.Used == 0) {
-		t.Fatal("Did not clear")
+		t.Fatal("Did not clear", len(tmpFile.Buf), tmpFile.Growth, tmpFile.Size, tmpFile.Used)
 	}
 	// Can still write to the buffer?
 	tmpFile.Buf[999] = 1
@@ -98,7 +100,7 @@ func TestFileGrow(t *testing.T) {
 	tmpFile.Buf[2] = 1
 	tmpFile.Used = 3
 	if tmpFile.Size != 4 {
-		t.Fatalf("Incorrect Size")
+		t.Fatal("Incorrect Size", tmpFile.Size)
 	}
 	tmpFile.EnsureSize(8)
 	if tmpFile.Size != 12 { // 3 times file growth = 12 bytes

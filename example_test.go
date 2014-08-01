@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func sameMap(m1 map[string]interface{}, m2 map[string]interface{}) bool {
@@ -145,4 +146,5 @@ func TestAll(t *testing.T) {
 	if err := myDB.Close(); err != nil {
 		t.Fatal(err)
 	}
+	time.Sleep(10 * time.Second)
 }

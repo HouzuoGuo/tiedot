@@ -24,17 +24,12 @@ var handleMap = map[uintptr]syscall.Handle{}
 
 // Windows mmap always mapes the entire file regardless of the specified length.
 func mmap(length int, hfile uintptr) ([]byte, error) {
-	flProtect := uint32(syscall.PAGE_READONLY)
-	dwDesiredAccess := uint32(syscall.FILE_MAP_READ)
-	flProtect = syscall.PAGE_READWRITE
-	dwDesiredAccess = syscall.FILE_MAP_WRITE
-
-	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, flProtect, 0, 0, nil)
+	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, syscall.PAGE_READWRITE, 0, 0, nil)
 	if h == 0 {
 		return nil, os.NewSyscallError("CreateFileMapping", errno)
 	}
 
-	addr, errno := syscall.MapViewOfFile(h, dwDesiredAccess, 0, 0, 0)
+	addr, errno := syscall.MapViewOfFile(h, syscall.FILE_MAP_WRITE, 0, 0, 0)
 	if addr == 0 {
 		return nil, os.NewSyscallError("MapViewOfFile", errno)
 	}
@@ -58,8 +53,7 @@ func flush(addr, len uintptr) error {
 
 func unmap(addr, len uintptr) error {
 	flush(addr, len)
-	err := syscall.UnmapViewOfFile(addr)
-	if err != nil {
+	if err := syscall.UnmapViewOfFile(addr); err != nil {
 		return err
 	}
 
@@ -72,6 +66,5 @@ func unmap(addr, len uintptr) error {
 	}
 	delete(handleMap, addr)
 
-	e := syscall.CloseHandle(syscall.Handle(handle))
-	return os.NewSyscallError("CloseHandle", e)
+	return os.NewSyscallError("CloseHandle", syscall.CloseHandle(syscall.Handle(handle)))
 }

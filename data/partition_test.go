@@ -94,6 +94,7 @@ func TestApproxDocCount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer part.Close()
 	// Insert 100 documents
 	for i := 0; i < 100; i++ {
 		if _, err = part.Insert(rand.Int(), []byte(strconv.Itoa(i))); err != nil {
