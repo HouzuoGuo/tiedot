@@ -4,7 +4,7 @@ Keywords: Golang, go, document database, NoSQL, JSON
 
 ### tiedot - Your NoSQL database powered by Golang
 
-tiedot is a document database engine that uses __JSON__ as document notation; it has a powerful query processor that supports advanced set operations; it can be __embedded__ into your program, or run a stand-alone server using __HTTP__ for an API on most *nix operating systems.
+tiedot is a document database engine that uses __JSON__ as document notation; it has a powerful query processor that supports advanced set operations; it can be __embedded__ into your program, or run a stand-alone server using __HTTP__ for an API. It runs on *nix and Windows operating systems.
 
 tiedot has fault-tolerant data structures that put your data safety *first*, while easily scales to 4+ CPU cores.
 
