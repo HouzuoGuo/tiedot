@@ -5,7 +5,6 @@
 package gommap
 
 import (
-	"errors"
 	"os"
 	"sync"
 	"syscall"
@@ -46,9 +45,9 @@ func mmap(length int, hfile uintptr) ([]byte, error) {
 	return m, nil
 }
 
-func flush(addr, len uintptr) error {
-	errno := syscall.FlushViewOfFile(addr, len)
-	return os.NewSyscallError("FlushViewOfFile", errno)
+// Nop (for now) due to major performance issue in FlushViewOfFile.
+func flush(addr, _ uintptr) (err error) {
+	return nil
 }
 
 func unmap(addr, len uintptr) error {
@@ -59,11 +58,7 @@ func unmap(addr, len uintptr) error {
 
 	handleLock.Lock()
 	defer handleLock.Unlock()
-	handle, ok := handleMap[addr]
-	if !ok {
-		// should be impossible; we would've errored above
-		return errors.New("unknown base address")
-	}
+	handle := handleMap[addr]
 	delete(handleMap, addr)
 
 	return os.NewSyscallError("CloseHandle", syscall.CloseHandle(syscall.Handle(handle)))
