@@ -41,17 +41,16 @@ func average(name string, fun func()) {
 }
 
 // Create a temporary database and collection for benchmark use.
-func mkTmpDBAndCol(dbPath string, colName string) (col *db.Col) {
+func mkTmpDBAndCol(dbPath string, colName string) (*db.DB, *db.Col) {
 	os.RemoveAll(dbPath)
 	tmpDB, err := db.OpenDB(dbPath)
 	if err != nil {
 		panic(err)
 	}
-	tmpCol, err := db.OpenCol(tmpDB, colName)
-	if err != nil {
+	if err = tmpDB.Create(colName); err != nil {
 		panic(err)
 	}
-	return tmpCol
+	return tmpDB, tmpDB.Use(colName)
 }
 
 func sampleDoc() (js map[string]interface{}) {
@@ -103,7 +102,8 @@ func benchmark() {
 	if benchCleanup {
 		defer os.RemoveAll(tmp)
 	}
-	col := mkTmpDBAndCol(tmp, "tmp")
+	benchDB, col := mkTmpDBAndCol(tmp, "tmp")
+	defer benchDB.Close()
 	col.Index([]string{"nested", "nested", "str"})
 	col.Index([]string{"nested", "nested", "int"})
 	col.Index([]string{"nested", "nested", "float"})
@@ -167,7 +167,8 @@ func benchmark2() {
 	if benchCleanup {
 		defer os.RemoveAll(tmp)
 	}
-	col := mkTmpDBAndCol(tmp, "tmp")
+	benchdb, col := mkTmpDBAndCol(tmp, "tmp")
+	defer benchdb.Close()
 	col.Index([]string{"nested", "nested", "str"})
 	col.Index([]string{"nested", "nested", "int"})
 	col.Index([]string{"nested", "nested", "float"})
