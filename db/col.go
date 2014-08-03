@@ -121,10 +121,13 @@ func (col *Col) close() error {
 	return fmt.Errorf("%v", errs)
 }
 
-// Do fun for all documents in the collection.
-func (col *Col) ForEachDoc(fun func(id int, doc []byte) (moveOn bool)) {
+func (col *Col) forEachDoc(fun func(id int, doc []byte) (moveOn bool), placeSchemaLock bool) {
+	if placeSchemaLock {
+		col.db.schemaLock.RLock()
+		defer col.db.schemaLock.RUnlock()
+	}
 	// Process approx.4k documents in each iteration
-	partDiv := col.ApproxDocCount() / col.db.numParts / 4000
+	partDiv := col.approxDocCount(false) / col.db.numParts / 4000
 	if partDiv == 0 {
 		partDiv++
 	}
@@ -139,6 +142,11 @@ func (col *Col) ForEachDoc(fun func(id int, doc []byte) (moveOn bool)) {
 		}
 		part.Lock.RUnlock()
 	}
+}
+
+// Do fun for all documents in the collection.
+func (col *Col) ForEachDoc(fun func(id int, doc []byte) (moveOn bool)) {
+	col.forEachDoc(fun, true)
 }
 
 // Create an index on the path.
@@ -160,7 +168,7 @@ func (col *Col) Index(idxPath []string) (err error) {
 		}
 	}
 	// Put all documents on the new index
-	col.ForEachDoc(func(id int, doc []byte) (moveOn bool) {
+	col.forEachDoc(func(id int, doc []byte) (moveOn bool) {
 		var docObj map[string]interface{}
 		if err := json.Unmarshal(doc, &docObj); err != nil {
 			// Skip corrupted document
@@ -173,7 +181,7 @@ func (col *Col) Index(idxPath []string) (err error) {
 			}
 		}
 		return true
-	})
+	}, false)
 	return
 }
 
@@ -211,8 +219,11 @@ func (col *Col) Unindex(idxPath []string) error {
 	return nil
 }
 
-// Return approximate number of documents in the collection.
-func (col *Col) ApproxDocCount() int {
+func (col *Col) approxDocCount(placeSchemaLock bool) int {
+	if placeSchemaLock {
+		col.db.schemaLock.RLock()
+		defer col.db.schemaLock.RUnlock()
+	}
 	total := 0
 	for _, part := range col.parts {
 		part.Lock.RLock()
@@ -222,8 +233,15 @@ func (col *Col) ApproxDocCount() int {
 	return total
 }
 
+// Return approximate number of documents in the collection.
+func (col *Col) ApproxDocCount() int {
+	return col.approxDocCount(true)
+}
+
 // Divide the collection into roughly equally sized pages, and do fun on all documents in the specified page.
 func (col *Col) ForEachDocInPage(page, total int, fun func(id int, doc []byte) bool) {
+	col.db.schemaLock.RLock()
+	defer col.db.schemaLock.RUnlock()
 	for iteratePart := 0; iteratePart < col.db.numParts; iteratePart++ {
 		part := col.parts[iteratePart]
 		part.Lock.RLock()

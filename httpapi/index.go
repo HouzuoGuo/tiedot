@@ -19,8 +19,6 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "path", &path) {
 		return
 	}
-	HttpDBSync.Lock()
-	defer HttpDBSync.Unlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -41,8 +39,6 @@ func Indexes(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "col", &col) {
 		return
 	}
-	HttpDBSync.Lock()
-	defer HttpDBSync.Unlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -71,8 +67,6 @@ func Unindex(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "path", &path) {
 		return
 	}
-	HttpDBSync.Lock()
-	defer HttpDBSync.Unlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)

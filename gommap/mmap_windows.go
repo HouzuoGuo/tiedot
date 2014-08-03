@@ -45,11 +45,6 @@ func mmap(length int, hfile uintptr) ([]byte, error) {
 	return m, nil
 }
 
-// Nop (for now) due to major performance issue in FlushViewOfFile.
-func flush(addr, _ uintptr) (err error) {
-	return nil
-}
-
 func unmap(addr, len uintptr) error {
 	flush(addr, len)
 	if err := syscall.UnmapViewOfFile(addr); err != nil {

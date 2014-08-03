@@ -9,6 +9,7 @@ import (
 	"github.com/HouzuoGuo/tiedot/webcp"
 	"log"
 	"os"
+	"os/signal"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
@@ -24,7 +25,7 @@ func main() {
 	// Parse CLI parameters
 	var mode, dir string
 	var port, maxprocs int
-	var profile bool
+	var profile, debug bool
 	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|example]")
 	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
 	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
@@ -32,6 +33,7 @@ func main() {
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
 	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
 	flag.BoolVar(&profile, "profile", false, "Write profiler results to prof.out")
+	flag.BoolVar(&debug, "debug", false, "Dump goroutine stack traces upon receiving interrupt signal")
 	flag.BoolVar(&tdlog.VerboseLog, "verbose", false, "Turn verbose logging on/off")
 	flag.BoolVar(&benchCleanup, "benchcleanup", true, "Whether to clean up (delete benchmark DB) after benchmark")
 	flag.Parse()
@@ -57,6 +59,17 @@ func main() {
 		}
 		pprof.StartCPUProfile(resultFile)
 		defer pprof.StopCPUProfile()
+	}
+
+	// Dump goroutine stacktraces upon receiving interrupt signal
+	if debug {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		go func() {
+			for _ = range c {
+				pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
+			}
+		}()
 	}
 
 	switch mode {

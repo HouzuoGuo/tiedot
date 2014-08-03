@@ -11,8 +11,6 @@ import (
 
 // Flush and close all data files and shutdown the entire program.
 func Shutdown(w http.ResponseWriter, r *http.Request) {
-	HttpDBSync.Lock()
-	defer HttpDBSync.Unlock()
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
 	HttpDB.Close()
@@ -27,8 +25,6 @@ func Dump(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "dest", &dest) {
 		return
 	}
-	HttpDBSync.Lock()
-	defer HttpDBSync.Unlock()
 	if err := HttpDB.Dump(dest); err != nil {
 		http.Error(w, fmt.Sprint(err), 500)
 		return

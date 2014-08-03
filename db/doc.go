@@ -80,7 +80,7 @@ func (col *Col) unindexDoc(id int, doc map[string]interface{}) {
 	}
 }
 
-// Insert a document with the specified ID into the collection (incl. index). Does not place a partition lock.
+// Insert a document with the specified ID into the collection (incl. index). Does not place partition/schema lock.
 func (col *Col) InsertRecovery(id int, doc map[string]interface{}) (err error) {
 	docJS, err := json.Marshal(doc)
 	if err != nil {
@@ -105,16 +105,19 @@ func (col *Col) Insert(doc map[string]interface{}) (id int, err error) {
 	}
 	id = rand.Int()
 	partNum := id % col.db.numParts
+	col.db.schemaLock.RLock()
 	part := col.parts[partNum]
 	// Put document data into collection
 	part.Lock.Lock()
 	if _, err = part.Insert(id, []byte(docJS)); err != nil {
 		part.Lock.Unlock()
+		col.db.schemaLock.RUnlock()
 		return
 	}
 	// If another thread is updating the document in the meanwhile, let it take over index maintenance
 	if err = part.LockUpdate(id); err != nil {
 		part.Lock.Unlock()
+		col.db.schemaLock.RUnlock()
 		return id, nil
 	}
 	part.Lock.Unlock()
@@ -123,20 +126,34 @@ func (col *Col) Insert(doc map[string]interface{}) (id int, err error) {
 	part.Lock.Lock()
 	part.UnlockUpdate(id)
 	part.Lock.Unlock()
+	col.db.schemaLock.RUnlock()
 	return
 }
 
-// Find and retrieve a document by ID.
-func (col *Col) Read(id int) (doc map[string]interface{}, err error) {
+func (col *Col) read(id int, placeSchemaLock bool) (doc map[string]interface{}, err error) {
+	if placeSchemaLock {
+		col.db.schemaLock.RLock()
+	}
 	part := col.parts[id%col.db.numParts]
 	part.Lock.RLock()
 	docB, err := part.Read(id)
 	part.Lock.RUnlock()
 	if err != nil {
+		if placeSchemaLock {
+			col.db.schemaLock.RUnlock()
+		}
 		return
 	}
 	err = json.Unmarshal(docB, &doc)
+	if placeSchemaLock {
+		col.db.schemaLock.RUnlock()
+	}
 	return
+}
+
+// Find and retrieve a document by ID.
+func (col *Col) Read(id int) (doc map[string]interface{}, err error) {
+	return col.read(id, true)
 }
 
 // Update a document.
@@ -148,17 +165,20 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+	col.db.schemaLock.RLock()
 	part := col.parts[id%col.db.numParts]
 	part.Lock.Lock()
 	// Place lock, read back original document and update
 	if err := part.LockUpdate(id); err != nil {
 		part.Lock.Unlock()
+		col.db.schemaLock.RUnlock()
 		return fmt.Errorf("Document %d is locked for update, please try again later", id)
 	}
 	originalB, err := part.Read(id)
 	if err != nil {
 		part.UnlockUpdate(id)
 		part.Lock.Unlock()
+		col.db.schemaLock.RUnlock()
 		return fmt.Errorf("Cannot update %d: cannot read back original document - %v", id, err)
 	}
 	var original map[string]interface{}
@@ -168,6 +188,7 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	if err = part.Update(id, []byte(docJS)); err != nil {
 		part.UnlockUpdate(id)
 		part.Lock.Unlock()
+		col.db.schemaLock.RUnlock()
 		return err
 	}
 	// Done with the collection data, next is to maintain indexed values
@@ -180,22 +201,26 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	part.Lock.Lock()
 	part.UnlockUpdate(id)
 	part.Lock.Unlock()
+	col.db.schemaLock.RUnlock()
 	return nil
 }
 
 // Delete a document.
 func (col *Col) Delete(id int) error {
+	col.db.schemaLock.RLock()
 	part := col.parts[id%col.db.numParts]
 	part.Lock.Lock()
 	// Place lock, read back original document and delete document
 	if err := part.LockUpdate(id); err != nil {
 		part.Lock.Unlock()
+		col.db.schemaLock.RUnlock()
 		return fmt.Errorf("Document %d is locked for update, please try again later", id)
 	}
 	originalB, err := part.Read(id)
 	if err != nil {
 		part.UnlockUpdate(id)
 		part.Lock.Unlock()
+		col.db.schemaLock.RUnlock()
 		return fmt.Errorf("Cannot delete %d: %v", id, err)
 	}
 	var original map[string]interface{}
@@ -205,6 +230,7 @@ func (col *Col) Delete(id int) error {
 	if err = part.Delete(id); err != nil {
 		part.UnlockUpdate(id)
 		part.Lock.Unlock()
+		col.db.schemaLock.RUnlock()
 		return err
 	}
 	// Done with the collection data, next is to remove indexed values
@@ -215,5 +241,6 @@ func (col *Col) Delete(id int) error {
 	part.Lock.Lock()
 	part.UnlockUpdate(id)
 	part.Lock.Unlock()
+	col.db.schemaLock.RUnlock()
 	return nil
 }

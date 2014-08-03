@@ -60,7 +60,11 @@ func (file *DataFile) EnsureSize(more int) (err error) {
 
 // Synchronize file buffer onto underlying storage device.
 func (file *DataFile) Sync() (err error) {
-	return file.Buf.Flush()
+	if err = file.Buf.Unmap(); err != nil {
+		return
+	}
+	file.Buf, err = gommap.Map(file.Fh)
+	return
 }
 
 // Un-map the file buffer and close the file handle.

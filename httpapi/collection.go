@@ -15,8 +15,6 @@ func Create(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "col", &col) {
 		return
 	}
-	HttpDBSync.Lock()
-	defer HttpDBSync.Unlock()
 	if err := HttpDB.Create(col); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 	} else {
@@ -29,8 +27,6 @@ func All(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
 	cols := make([]string, 0)
-	HttpDBSync.Lock()
-	defer HttpDBSync.Unlock()
 	for _, v := range HttpDB.AllCols() {
 		cols = append(cols, v)
 	}
@@ -53,8 +49,6 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "new", &newName) {
 		return
 	}
-	HttpDBSync.Lock()
-	defer HttpDBSync.Unlock()
 	if err := HttpDB.Rename(oldName, newName); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 	}
@@ -68,8 +62,6 @@ func Drop(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "col", &col) {
 		return
 	}
-	HttpDBSync.Lock()
-	defer HttpDBSync.Unlock()
 	if err := HttpDB.Drop(col); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 	}
@@ -83,8 +75,6 @@ func Scrub(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "col", &col) {
 		return
 	}
-	HttpDBSync.Lock()
-	defer HttpDBSync.Unlock()
 	dbCol := HttpDB.Use(col)
 	if dbCol == nil {
 		http.Error(w, fmt.Sprintf("Collection %s does not exist", col), 400)
@@ -100,7 +90,5 @@ Note that HTTP service already does it automatically.
 func Sync(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
-	HttpDBSync.Lock()
-	defer HttpDBSync.Unlock()
 	HttpDB.Sync()
 }

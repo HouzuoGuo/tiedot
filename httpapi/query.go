@@ -25,8 +25,6 @@ func Query(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("'%v' is not valid JSON.", q), 400)
 		return
 	}
-	HttpDBSync.RLock()
-	defer HttpDBSync.RUnlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -73,8 +71,6 @@ func Count(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("'%v' is not valid JSON.", q), 400)
 		return
 	}
-	HttpDBSync.RLock()
-	defer HttpDBSync.RUnlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)

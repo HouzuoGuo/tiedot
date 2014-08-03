@@ -8,9 +8,8 @@ import (
 )
 
 /*
-You are encouraged to use nearly all tiedot public functions concurrently, with only one exception: please do not
-execute queries or document operations while schema is changing (such as creating/removing index). Doing so may likely
-cause data inconsistency or program crash. This is not a concern for using HTTP API.
+You are encouraged to use all tiedot public functions concurrently, apart from all functions in data package (which you
+usually do not use directly).
 
 To compile and run the example:
     go build && ./tiedot -mode=example

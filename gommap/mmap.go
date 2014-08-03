@@ -49,12 +49,6 @@ func (m *MMap) header() *reflect.SliceHeader {
 	return (*reflect.SliceHeader)(unsafe.Pointer(m))
 }
 
-// Flush synchronizes the mapping's contents to the file's contents on disk.
-func (m MMap) Flush() error {
-	dh := m.header()
-	return flush(dh.Data, uintptr(dh.Len))
-}
-
 // Unmap deletes the memory mapped region, flushes any remaining changes, and sets
 // m to nil.
 // Trying to read or write any remaining references to m after Unmap is called will

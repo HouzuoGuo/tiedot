@@ -24,8 +24,6 @@ func Insert(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("'%v' is not valid JSON document.", doc), 400)
 		return
 	}
-	HttpDBSync.RLock()
-	defer HttpDBSync.RUnlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -56,8 +54,6 @@ func Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
 	}
-	HttpDBSync.RLock()
-	defer HttpDBSync.RUnlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -100,8 +96,6 @@ func GetPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid total page number '%v'.", totalPage), 400)
 		return
 	}
-	HttpDBSync.RLock()
-	defer HttpDBSync.RUnlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -147,8 +141,6 @@ func Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("'%v' is not valid JSON document.", newDoc), 400)
 		return
 	}
-	HttpDBSync.RLock()
-	defer HttpDBSync.RUnlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -177,8 +169,6 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
 	}
-	HttpDBSync.RLock()
-	defer HttpDBSync.RUnlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
@@ -195,8 +185,6 @@ func ApproxDocCount(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "col", &col) {
 		return
 	}
-	HttpDBSync.RLock()
-	defer HttpDBSync.RUnlock()
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)

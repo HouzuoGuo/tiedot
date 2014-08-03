@@ -12,7 +12,7 @@ import (
 // Calculate union of sub-query results.
 func EvalUnion(exprs []interface{}, src *Col, result *map[int]struct{}) (err error) {
 	for _, subExpr := range exprs {
-		if err = EvalQuery(subExpr, src, result); err != nil {
+		if err = evalQuery(subExpr, src, result, false); err != nil {
 			return
 		}
 	}
@@ -21,10 +21,10 @@ func EvalUnion(exprs []interface{}, src *Col, result *map[int]struct{}) (err err
 
 // Put all document IDs into result.
 func EvalAllIDs(src *Col, result *map[int]struct{}) (err error) {
-	src.ForEachDoc(func(id int, _ []byte) bool {
+	src.forEachDoc(func(id int, _ []byte) bool {
 		(*result)[id] = struct{}{}
 		return true
-	})
+	}, false)
 	return
 }
 
@@ -65,7 +65,7 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 	ht.Lock.RUnlock()
 	for _, match := range vals {
 		// Filter result to avoid hash collision
-		if doc, err := src.Read(match); err == nil {
+		if doc, err := src.read(match, false); err == nil {
 			for _, v := range GetIn(doc, vecPath) {
 				if fmt.Sprint(v) == lookupStrValue {
 					(*result)[match] = struct{}{}
@@ -101,7 +101,7 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 		return errors.New(fmt.Sprintf("Please index %v and retry query %v", vecPath, expr))
 	}
 	counter := 0
-	partDiv := src.ApproxDocCount() / src.db.numParts / 4000 // collect approx. 4k document IDs in each iteration
+	partDiv := src.approxDocCount(false) / src.db.numParts / 4000 // collect approx. 4k document IDs in each iteration
 	if partDiv == 0 {
 		partDiv++
 	}
@@ -131,7 +131,7 @@ func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err er
 		for _, subExpr := range subExprVecs {
 			subResult := make(map[int]struct{})
 			intersection := make(map[int]struct{})
-			if err = EvalQuery(subExpr, src, &subResult); err != nil {
+			if err = evalQuery(subExpr, src, &subResult, false); err != nil {
 				return
 			}
 			if first {
@@ -158,7 +158,7 @@ func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err e
 		for _, subExpr := range subExprVecs {
 			subResult := make(map[int]struct{})
 			complement := make(map[int]struct{})
-			if err = EvalQuery(subExpr, src, &subResult); err != nil {
+			if err = evalQuery(subExpr, src, &subResult, false); err != nil {
 				return
 			}
 			for k, _ := range subResult {
@@ -273,8 +273,11 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 	return
 }
 
-// Main entrance to query processor - evaluate a query and put result into result map (as map keys).
-func EvalQuery(q interface{}, src *Col, result *map[int]struct{}) (err error) {
+func evalQuery(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLock bool) (err error) {
+	if placeSchemaLock {
+		src.db.schemaLock.RLock()
+		defer src.db.schemaLock.RUnlock()
+	}
 	switch expr := q.(type) {
 	case []interface{}: // [sub query 1, sub query 2, etc]
 		return EvalUnion(expr, src, result)
@@ -307,6 +310,11 @@ func EvalQuery(q interface{}, src *Col, result *map[int]struct{}) (err error) {
 		}
 	}
 	return nil
+}
+
+// Main entrance to query processor - evaluate a query and put result into result map (as map keys).
+func EvalQuery(q interface{}, src *Col, result *map[int]struct{}) (err error) {
+	return evalQuery(q, src, result, true)
 }
 
 // TODO: How to bring back regex matcher?

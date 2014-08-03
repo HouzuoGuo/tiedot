@@ -100,10 +100,12 @@ func (db *DB) load() error {
 	return err
 }
 
-// Synchronize all data files to disk.
-func (db *DB) Sync() error {
-	db.schemaLock.Lock()
-	defer db.schemaLock.Unlock()
+func (db *DB) sync(placeSchemaLock bool) error {
+	if placeSchemaLock {
+		// File buffers are replaced, therefore it requires exclusive locks
+		db.schemaLock.Lock()
+		defer db.schemaLock.Unlock()
+	}
 	errs := make([]error, 0, 0)
 	for _, col := range db.cols {
 		if err := col.sync(); err != nil {
@@ -116,11 +118,16 @@ func (db *DB) Sync() error {
 	return fmt.Errorf("%v", errs)
 }
 
+// Synchronize all data files to disk.
+func (db *DB) Sync() error {
+	return db.sync(true)
+}
+
 // Close all database files. Do not use the DB afterwards!
 func (db *DB) Close() error {
+	close(db.autoSyncStop)
 	db.schemaLock.Lock()
 	defer db.schemaLock.Unlock()
-	close(db.autoSyncStop)
 	errs := make([]error, 0, 0)
 	for _, col := range db.cols {
 		if err := col.close(); err != nil {
@@ -238,7 +245,7 @@ func (db *DB) Scrub(name string) error {
 	if err != nil {
 		return err
 	}
-	db.cols[name].ForEachDoc(func(id int, doc []byte) bool {
+	db.cols[name].forEachDoc(func(id int, doc []byte) bool {
 		var docObj map[string]interface{}
 		if err := json.Unmarshal([]byte(doc), &docObj); err != nil {
 			// Skip corrupted document
@@ -248,7 +255,7 @@ func (db *DB) Scrub(name string) error {
 			tdlog.Noticef("Scrub %s: failed to insert back document %v", name, docObj)
 		}
 		return true
-	})
+	}, false)
 	if err := tmpCol.close(); err != nil {
 		return err
 	}
@@ -285,6 +292,7 @@ func (db *DB) Drop(name string) error {
 func (db *DB) Dump(dest string) error {
 	db.schemaLock.Lock()
 	defer db.schemaLock.Unlock()
+	db.sync(false)
 	for _, col := range db.cols {
 		if err := col.sync(); err != nil {
 			return err
