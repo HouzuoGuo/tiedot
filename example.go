@@ -8,8 +8,8 @@ import (
 )
 
 /*
-You are encouraged to use all tiedot public functions concurrently, apart from all functions in data package (which you
-usually do not use directly).
+In embedded usage, you are encouraged to use all public functions concurrently.
+However please do not use public functions in "data" package by yourself - you most likely will not need to use them directly.
 
 To compile and run the example:
     go build && ./tiedot -mode=example

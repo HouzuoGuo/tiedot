@@ -8,13 +8,15 @@ Both HTTP API and embedded usage support manual buffer synchronization for immed
 
 ## Concurrency of document operations
 
+In embedded usage, you are encouraged to use all public functions concurrently. However please do not use public functions in "data" package by yourself - you most likely will not need to use them directly.
+
 When a tiedot database is created, the number of system CPUs is written down into a file called `number_of_partitions`. From there, all collections and indexes are partitioned automatically ("sharding").
 
 These partitions function independently, to allow document operations be carried out concurrently on many partitions at once; in this way, tiedot confidently scales to 4+ CPU cores.
 
 ## Concurrency of HTTP API endpoints
 
-Nearly all HTTP endpoints encourage concurrent usage.
+You are encouraged to use all HTTP endpoints concurrently.
 
 To ensure safe operation and data consistency, there is a very small number of HTTP endpoints which "stop the world" during their execution, these are the features operating on database schema:
 
