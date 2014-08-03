@@ -246,13 +246,13 @@ func TestBenchmark2(t *testing.T) {
 	fmt.Printf("Read %d documents\n", readCount)
 	fmt.Printf("Updated %d documents\n", updateCount)
 	fmt.Printf("Deleted %d documents\n", delCount)
-	if readCount < int64(benchTestSize/2) {
+	if readCount < int64(benchTestSize/3) {
 		t.Fatal("Did not read enough documents")
 	}
-	if updateCount < int64(benchTestSize/5) {
+	if updateCount < int64(benchTestSize/8) {
 		t.Fatal("Did not update enough documents")
 	}
-	if delCount < int64(benchTestSize/5) {
+	if delCount < int64(benchTestSize/8) {
 		t.Fatal("Did not delete enough documents")
 	}
 }
