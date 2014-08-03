@@ -46,7 +46,6 @@ func mmap(length int, hfile uintptr) ([]byte, error) {
 }
 
 func unmap(addr, len uintptr) error {
-	flush(addr, len)
 	if err := syscall.UnmapViewOfFile(addr); err != nil {
 		return err
 	}
