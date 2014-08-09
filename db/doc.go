@@ -37,9 +37,9 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 }
 
 // Hash a string using sdbm algorithm.
-func StrHash(thing interface{}) int {
+func StrHash(str string) int {
 	var hash int
-	for _, c := range fmt.Sprint(thing) {
+	for _, c := range str {
 		hash = int(c) + (hash << 6) + (hash << 16) - hash
 	}
 	if hash < 0 {
