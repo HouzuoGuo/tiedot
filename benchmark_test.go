@@ -5,7 +5,7 @@ import (
 	"github.com/HouzuoGuo/tiedot/db"
 	"math/rand"
 	"os"
-	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -26,12 +26,10 @@ func averageTest(name string, fun func()) {
 
 // benchmark(1) written in test case style
 func TestBenchmark1(t *testing.T) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	rand.Seed(time.Now().UnixNano())
-
-	ids := make([]uint64, 0, benchTestSize)
+	ids := make([]uint64, 0, benchSize)
 	// Prepare a collection with two indexes
-	tmp := "/tmp/tiedot_test_bench1"
+	tmp := "/tmp/tiedot_bench" + strconv.Itoa(rand.Int())
 	defer os.RemoveAll(tmp)
 	benchDB, col := mkTmpDBAndCol(tmp, "tmp")
 	defer benchDB.Close()

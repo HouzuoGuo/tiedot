@@ -84,9 +84,10 @@ func sampleQuery() (js interface{}) {
 
 // Document CRUD benchmark (insert/read/query/update/delete), intended for catching performance regressions.
 func benchmark() {
+	rand.Seed(time.Now().UnixNano())
 	ids := make([]uint64, 0, benchSize)
 	// Prepare a collection with two indexes
-	tmp := "/tmp/tiedot_bench"
+	tmp := "/tmp/tiedot_bench" + strconv.Itoa(rand.Int())
 	if benchCleanup {
 		defer os.RemoveAll(tmp)
 	}
