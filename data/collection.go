@@ -15,10 +15,10 @@ import (
 const (
 	COL_FILE_GROWTH = 32 * 1048576 // Collection file initial size & size growth (32 MBytes)
 	DOC_MAX_ROOM    = 2 * 1048576  // Max document size (2 MBytes)
-	DOC_HEADER      = 1 + 10       // Document header size - validity (single byte), document room (int 10 bytes)
+	DOC_HEADER      = 1 + 8        // Document header size - validity (single byte), document room (uint64)
 	// Pre-compiled document padding (128 spaces)
 	PADDING     = "                                                                                                                                "
-	LEN_PADDING = len(PADDING)
+	LEN_PADDING = uint64(len(PADDING))
 )
 
 // Collection file contains document headers and document text data.
@@ -34,23 +34,23 @@ func OpenCollection(path string) (col *Collection, err error) {
 }
 
 // Find and retrieve a document by ID (physical document location). Return value is a copy of the document.
-func (col *Collection) Read(id int) []byte {
-	if id < 0 || id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
+func (col *Collection) Read(id uint64) []byte {
+	if id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
 		return nil
-	} else if room, _ := binary.Varint(col.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
+	} else if room := binary.LittleEndian.Uint64(col.Buf[id+1:]); room > DOC_MAX_ROOM {
 		return nil
-	} else if docEnd := id + DOC_HEADER + int(room); docEnd >= col.Size {
+	} else if docEnd := id + DOC_HEADER + room; docEnd >= col.Size {
 		return nil
 	} else {
 		docCopy := make([]byte, room)
-		copy(docCopy, col.Buf[id+DOC_HEADER:docEnd])
+		copy(docCopy, col.Buf[id+DOC_HEADER:])
 		return docCopy
 	}
 }
 
 // Insert a new document, return the new document ID.
-func (col *Collection) Insert(data []byte) (id int, err error) {
-	room := len(data) << 1
+func (col *Collection) Insert(data []byte) (id uint64, err error) {
+	room := uint64(len(data) << 1)
 	if room > DOC_MAX_ROOM {
 		return 0, errors.New("Document is too large")
 	}
@@ -62,9 +62,9 @@ func (col *Collection) Insert(data []byte) (id int, err error) {
 	col.Used += docSize
 	// Write validity, room, document data and padding
 	col.Buf[id] = 1
-	binary.PutVarint(col.Buf[id+1:id+11], int64(room))
+	binary.LittleEndian.PutUint64(col.Buf[id+1:], room)
 	copy(col.Buf[id+DOC_HEADER:col.Used], data)
-	for padding := id + DOC_HEADER + len(data); padding < col.Used; padding += LEN_PADDING {
+	for padding := id + DOC_HEADER + uint64(len(data)); padding < col.Used; padding += LEN_PADDING {
 		copySize := LEN_PADDING
 		if padding+LEN_PADDING >= col.Used {
 			copySize = col.Used - padding
@@ -75,18 +75,18 @@ func (col *Collection) Insert(data []byte) (id int, err error) {
 }
 
 // Overwrite or re-insert a document, return the new document ID if re-inserted.
-func (col *Collection) Update(id int, data []byte) (newID int, err error) {
+func (col *Collection) Update(id uint64, data []byte) (newID uint64, err error) {
 	if len(data) > DOC_MAX_ROOM {
 		return 0, errors.New("Document is too large")
 	} else if id < 0 || id >= col.Used-DOC_HEADER || col.Buf[id] != 1 {
 		return 0, errors.New("Document does not exist")
-	} else if room, _ := binary.Varint(col.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
+	} else if room := binary.LittleEndian.Uint64(col.Buf[id+1:]); room > DOC_MAX_ROOM {
 		return 0, errors.New("Document does not exist")
-	} else if docEnd := id + DOC_HEADER + int(room); docEnd >= col.Size {
+	} else if docEnd := id + DOC_HEADER + room; docEnd >= col.Size {
 		return 0, errors.New("Document does not exist")
 	} else if len(data) <= int(room) {
-		padding := id + DOC_HEADER + len(data)
-		paddingEnd := id + DOC_HEADER + int(room)
+		padding := id + DOC_HEADER + uint64(len(data))
+		paddingEnd := id + DOC_HEADER + room
 		// Overwrite data and then overwrite padding
 		copy(col.Buf[id+DOC_HEADER:padding], data)
 		for ; padding < paddingEnd; padding += LEN_PADDING {
@@ -105,7 +105,7 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 }
 
 // Delete a document by ID.
-func (col *Collection) Delete(id int) (err error) {
+func (col *Collection) Delete(id uint64) (err error) {
 	if id < 0 || id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
 		err = errors.New("Document does not exist")
 	} else if col.Buf[id] == 1 {
@@ -115,11 +115,11 @@ func (col *Collection) Delete(id int) (err error) {
 }
 
 // Run the function on every document; stop when the function returns false.
-func (col *Collection) ForEachDoc(fun func(id int, doc []byte) bool) {
-	for id := 0; id < col.Used-DOC_HEADER && id >= 0; {
+func (col *Collection) ForEachDoc(fun func(id uint64, doc []byte) bool) {
+	for id := uint64(0); id < col.Used-DOC_HEADER; {
 		validity := col.Buf[id]
-		room, _ := binary.Varint(col.Buf[id+1 : id+11])
-		docEnd := id + DOC_HEADER + int(room)
+		room := binary.LittleEndian.Uint64(col.Buf[id+1:])
+		docEnd := id + DOC_HEADER + room
 		if (validity == 0 || validity == 1) && room <= DOC_MAX_ROOM && docEnd > 0 && docEnd <= col.Used {
 			if validity == 1 && !fun(id, col.Buf[id+DOC_HEADER:docEnd]) {
 				break

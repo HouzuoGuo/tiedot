@@ -10,7 +10,7 @@ import (
 // Data file keeps track of the amount of total and used space.
 type DataFile struct {
 	Path               string
-	Size, Used, Growth int
+	Size, Used, Growth uint64
 	Fh                 *os.File
 	Buf                gommap.MMap
 }
@@ -30,7 +30,7 @@ func LooksEmpty(buf gommap.MMap) bool {
 }
 
 // Open a data file that grows by the specified size.
-func OpenDataFile(path string, growth int) (file *DataFile, err error) {
+func OpenDataFile(path string, growth uint64) (file *DataFile, err error) {
 	file = &DataFile{Path: path, Growth: growth}
 	if err = file.Reopen(); err != nil {
 		return
@@ -39,7 +39,7 @@ func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 }
 
 // Ensure there is enough room for that many bytes of data.
-func (file *DataFile) EnsureSize(more int) (err error) {
+func (file *DataFile) EnsureSize(more uint64) (err error) {
 	if file.Used+more <= file.Size {
 		return
 	}
@@ -56,15 +56,6 @@ func (file *DataFile) EnsureSize(more int) (err error) {
 	file.Size += file.Growth
 	tdlog.Infof("%s grown: %d -> %d bytes (%d bytes in-use)", file.Path, file.Size-file.Growth, file.Size, file.Used)
 	return file.EnsureSize(more)
-}
-
-// Synchronize file buffer onto underlying storage device.
-func (file *DataFile) Sync() (err error) {
-	if err = file.Buf.Unmap(); err != nil {
-		return
-	}
-	file.Buf, err = gommap.Map(file.Fh)
-	return
 }
 
 // Un-map the file buffer and close the file handle.
@@ -85,7 +76,7 @@ func (file *DataFile) Reopen() (err error) {
 		return
 	}
 	// Ensure the file is not smaller than file growth
-	if file.Size = int(size); file.Size < file.Growth {
+	if file.Size = uint64(size); file.Size < file.Growth {
 		if err = file.EnsureSize(file.Growth); err != nil {
 			return
 		}
@@ -94,7 +85,7 @@ func (file *DataFile) Reopen() (err error) {
 		file.Buf, err = gommap.Map(file.Fh)
 	}
 	// Bi-sect file buffer to find out how much space is in-use
-	for low, mid, high := 0, file.Size/2, file.Size; ; {
+	for low, mid, high := uint64(0), file.Size/2, file.Size; ; {
 		switch {
 		case high-mid == 1:
 			if LooksEmpty(file.Buf[mid:]) {

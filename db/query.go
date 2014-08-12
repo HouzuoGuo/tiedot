@@ -10,9 +10,9 @@ import (
 )
 
 // Calculate union of sub-query results.
-func EvalUnion(exprs []interface{}, src *Col, result *map[int]struct{}) (err error) {
+func EvalUnion(exprs []interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	for _, subExpr := range exprs {
-		if err = evalQuery(subExpr, src, result, false); err != nil {
+		if err = EvalQuery(subExpr, src, result); err != nil {
 			return
 		}
 	}
@@ -20,16 +20,16 @@ func EvalUnion(exprs []interface{}, src *Col, result *map[int]struct{}) (err err
 }
 
 // Put all document IDs into result.
-func EvalAllIDs(src *Col, result *map[int]struct{}) (err error) {
-	src.forEachDoc(func(id int, _ []byte) bool {
+func EvalAllIDs(src *Col, result *map[uint64]struct{}) (err error) {
+	src.ForEachDoc(func(id uint64, _ []byte) bool {
 		(*result)[id] = struct{}{}
 		return true
-	}, false)
+	})
 	return
 }
 
 // Value equity check ("attribute == value") using hash lookup.
-func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, result *map[int]struct{}) (err error) {
+func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	// Figure out lookup path - JSON array "in"
 	path, hasPath := expr["in"]
 	if !hasPath {
@@ -44,10 +44,10 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 		return errors.New(fmt.Sprintf("Expecting vector lookup path `in`, but %v given", path))
 	}
 	// Figure out result number limit
-	intLimit := int(0)
+	intLimit := uint64(0)
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
-			intLimit = int(floatLimit)
+			intLimit = uint64(floatLimit)
 		} else {
 			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
 		}
@@ -58,14 +58,11 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 	if _, indexed := src.indexPaths[scanPath]; !indexed {
 		return errors.New(fmt.Sprintf("Please index %v and retry query %v", scanPath, expr))
 	}
-	num := lookupValueHash % src.db.numParts
-	ht := src.hts[num][scanPath]
-	ht.Lock.RLock()
+	ht := src.hts[scanPath]
 	vals := ht.Get(lookupValueHash, intLimit)
-	ht.Lock.RUnlock()
 	for _, match := range vals {
 		// Filter result to avoid hash collision
-		if doc, err := src.read(match, false); err == nil {
+		if doc, err := src.Read(match); err == nil {
 			for _, v := range GetIn(doc, vecPath) {
 				if fmt.Sprint(v) == lookupStrValue {
 					(*result)[match] = struct{}{}
@@ -77,7 +74,7 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 }
 
 // Value existence check (value != nil) using hash lookup.
-func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, result *map[int]struct{}) (err error) {
+func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	// Figure out the path
 	vecPath := make([]string, 0)
 	if vecPathInterface, ok := hasPath.([]interface{}); ok {
@@ -88,10 +85,10 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 		return errors.New(fmt.Sprintf("Expecting vector path, but %v given", hasPath))
 	}
 	// Figure out result number limit
-	intLimit := 0
+	intLimit := uint64(0)
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
-			intLimit = int(floatLimit)
+			intLimit = uint64(floatLimit)
 		} else {
 			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
 		}
@@ -100,38 +97,33 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 	if _, indexed := src.indexPaths[jointPath]; !indexed {
 		return errors.New(fmt.Sprintf("Please index %v and retry query %v", vecPath, expr))
 	}
-	counter := 0
-	partDiv := src.approxDocCount(false) / src.db.numParts / 4000 // collect approx. 4k document IDs in each iteration
+	counter := uint64(0)
+	partDiv := src.ApproxDocCount() / 4000 // collect approx. 4k document IDs in each iteration
 	if partDiv == 0 {
 		partDiv++
 	}
-	for iteratePart := 0; iteratePart < src.db.numParts; iteratePart++ {
-		ht := src.hts[iteratePart][jointPath]
-		ht.Lock.RLock()
-		for i := 0; i < partDiv; i++ {
-			_, ids := ht.GetPartition(i, partDiv)
-			for _, id := range ids {
-				(*result)[id] = struct{}{}
-				counter++
-				if counter == intLimit {
-					ht.Lock.RUnlock()
-					return nil
-				}
+	ht := src.hts[jointPath]
+	for i := uint64(0); i < partDiv; i++ {
+		_, ids := ht.GetPartition(i, partDiv)
+		for _, id := range ids {
+			(*result)[id] = struct{}{}
+			counter++
+			if counter == intLimit {
+				return nil
 			}
 		}
-		ht.Lock.RUnlock()
 	}
 	return nil
 }
 
 // Calculate intersection of sub-query results.
-func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err error) {
+func Intersect(subExprs interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		first := true
 		for _, subExpr := range subExprVecs {
-			subResult := make(map[int]struct{})
-			intersection := make(map[int]struct{})
-			if err = evalQuery(subExpr, src, &subResult, false); err != nil {
+			subResult := make(map[uint64]struct{})
+			intersection := make(map[uint64]struct{})
+			if err = EvalQuery(subExpr, src, &subResult); err != nil {
 				return
 			}
 			if first {
@@ -153,12 +145,12 @@ func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err er
 }
 
 // Calculate complement of sub-query results.
-func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err error) {
+func Complement(subExprs interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		for _, subExpr := range subExprVecs {
-			subResult := make(map[int]struct{})
-			complement := make(map[int]struct{})
-			if err = evalQuery(subExpr, src, &subResult, false); err != nil {
+			subResult := make(map[uint64]struct{})
+			complement := make(map[uint64]struct{})
+			if err = EvalQuery(subExpr, src, &subResult); err != nil {
 				return
 			}
 			for k, _ := range subResult {
@@ -179,16 +171,12 @@ func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err e
 	return
 }
 
-func (col *Col) hashScan(idxName string, key, limit int) []int {
-	ht := col.hts[key%col.db.numParts][idxName]
-	ht.Lock.RLock()
-	vals := ht.Get(key, limit)
-	ht.Lock.RUnlock()
-	return vals
+func (col *Col) hashScan(idxName string, key, limit uint64) []uint64 {
+	return col.hts[idxName].Get(key, limit)
 }
 
 // Look for indexed integer values within the specified integer range.
-func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result *map[int]struct{}) (err error) {
+func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	path, hasPath := expr["in"]
 	if !hasPath {
 		return errors.New("Missing path `in`")
@@ -203,10 +191,10 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 		return errors.New(fmt.Sprintf("Expecting vector path `in`, but %v given", path))
 	}
 	// Figure out result number limit
-	intLimit := int(0)
+	intLimit := uint64(0)
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
-			intLimit = int(floatLimit)
+			intLimit = uint64(floatLimit)
 		} else {
 			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
 		}
@@ -236,7 +224,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 	if to > from && to-from > 1000 || from > to && from-to > 1000 {
 		tdlog.CritNoRepeat("Query %v involves index lookup on more than 1000 values, which can be very inefficient", expr)
 	}
-	counter := int(0) // Number of results already collected
+	counter := uint64(0) // Number of results already collected
 	htPath := strings.Join(vecPath, ",")
 	if _, indexScan := src.indexPaths[htPath]; !indexScan {
 		return errors.New(fmt.Sprintf("Please index %v and retry query %v", vecPath, expr))
@@ -244,9 +232,8 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 	if from < to {
 		// Forward scan - from low value to high value
 		for lookupValue := from; lookupValue <= to; lookupValue++ {
-			lookupStrValue := fmt.Sprint(lookupValue)
-			hashValue := StrHash(lookupStrValue)
-			vals := src.hashScan(htPath, hashValue, int(intLimit))
+			hashValue := StrHash(strconv.Itoa(lookupValue))
+			vals := src.hashScan(htPath, hashValue, intLimit)
 			for _, docID := range vals {
 				if intLimit > 0 && counter == intLimit {
 					break
@@ -258,9 +245,8 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 	} else {
 		// Backward scan - from high value to low value
 		for lookupValue := from; lookupValue >= to; lookupValue-- {
-			lookupStrValue := fmt.Sprint(lookupValue)
-			hashValue := StrHash(lookupStrValue)
-			vals := src.hashScan(htPath, hashValue, int(intLimit))
+			hashValue := StrHash(strconv.Itoa(lookupValue))
+			vals := src.hashScan(htPath, hashValue, intLimit)
 			for _, docID := range vals {
 				if intLimit > 0 && counter == intLimit {
 					break
@@ -273,11 +259,8 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 	return
 }
 
-func evalQuery(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLock bool) (err error) {
-	if placeSchemaLock {
-		src.db.schemaLock.RLock()
-		defer src.db.schemaLock.RUnlock()
-	}
+// Main entrance to query processor - evaluate a query and put result into result map (as map keys).
+func EvalQuery(q interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	switch expr := q.(type) {
 	case []interface{}: // [sub query 1, sub query 2, etc]
 		return EvalUnion(expr, src, result)
@@ -286,11 +269,11 @@ func evalQuery(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLoc
 			return EvalAllIDs(src, result)
 		} else {
 			// Might be single document number
-			docID, err := strconv.ParseInt(expr, 10, 64)
+			docID, err := strconv.ParseUint(expr, 10, 64)
 			if err != nil {
 				return errors.New(fmt.Sprintf("%s is not a document PK ID", expr))
 			}
-			(*result)[int(docID)] = struct{}{}
+			(*result)[docID] = struct{}{}
 		}
 	case map[string]interface{}:
 		if lookupValue, lookup := expr["eq"]; lookup { // eq - lookup
@@ -310,11 +293,6 @@ func evalQuery(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLoc
 		}
 	}
 	return nil
-}
-
-// Main entrance to query processor - evaluate a query and put result into result map (as map keys).
-func EvalQuery(q interface{}, src *Col, result *map[int]struct{}) (err error) {
-	return evalQuery(q, src, result, true)
 }
 
 // TODO: How to bring back regex matcher?

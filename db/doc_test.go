@@ -12,7 +12,7 @@ import (
 
 func StrHashTest(t *testing.T) {
 	strings := []string{"", " ", "abc", "123"}
-	hashes := []int{0, 32, 417419622498, 210861491250}
+	hashes := []uint64{0, 32, 417419622498, 210861491250}
 	for i := range strings {
 		if StrHash(strings[i]) != hashes[i] {
 			t.Fatalf("Hash of %s equals to %d, it should equal to %d", strings[i], StrHash(strings[i]), hashes[i])
@@ -82,20 +82,20 @@ func GetInTest(t *testing.T) {
 	}
 }
 
-func idxHas(col *Col, path []string, idxVal interface{}, docID int) error {
+func idxHas(col *Col, path []string, idxVal interface{}, docID uint64) error {
 	idxName := strings.Join(path, INDEX_PATH_SEP)
 	hashKey := StrHash(fmt.Sprint(idxVal))
-	vals := col.hts[hashKey%col.db.numParts][idxName].Get(hashKey, 0)
+	vals := col.hts[idxName].Get(hashKey, 0)
 	if len(vals) != 1 || vals[0] != docID {
-		return fmt.Errorf("Looking for %v (%v) docID %v in %v partition %d, but got result %v", idxVal, hashKey, docID, path, hashKey%col.db.numParts, vals)
+		return fmt.Errorf("Looking for %v (%v) docID %v in %v, but got result %v", idxVal, hashKey, docID, path, vals)
 	}
 	return nil
 }
 
-func idxHasNot(col *Col, path []string, idxVal, docID int) error {
+func idxHasNot(col *Col, path []string, idxVal, docID uint64) error {
 	idxName := strings.Join(path, INDEX_PATH_SEP)
 	hashKey := StrHash(fmt.Sprint(idxVal))
-	vals := col.hts[hashKey%col.db.numParts][idxName].Get(hashKey, 0)
+	vals := col.hts[idxName].Get(hashKey, 0)
 	for _, v := range vals {
 		if v == docID {
 			return fmt.Errorf("Looking for %v %v %v in %v (should not return any), but got result %v", idxVal, hashKey, docID, path, vals)
@@ -126,7 +126,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 		t.Fatal(err)
 	}
 	numDocs := 2011
-	docIDs := make([]int, numDocs)
+	docIDs := make([]uint64, numDocs)
 	// Insert documents
 	for i := 0; i < numDocs; i++ {
 		if docIDs[i], err = col.Insert(map[string]interface{}{"a": map[string]interface{}{"b": i}}); err != nil {
@@ -165,10 +165,10 @@ func TestDocCrudAndIdx(t *testing.T) {
 				t.Fatal(err)
 			}
 		} else {
-			if err = idxHasNot(col, []string{"a", "b"}, i, docID); err != nil {
+			if err = idxHasNot(col, []string{"a", "b"}, uint64(i), docID); err != nil {
 				t.Fatal(err)
 			}
-			if err = idxHas(col, []string{"a", "b"}, i*2, docID); err != nil {
+			if err = idxHas(col, []string{"a", "b"}, uint64(i*2), docID); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -192,7 +192,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 			if _, err := col.Read(docID); err == nil {
 				t.Fatal("Did not delete", i, docID)
 			}
-			if err = idxHasNot(col, []string{"a", "b"}, i*2, docID); err != nil {
+			if err = idxHasNot(col, []string{"a", "b"}, uint64(i*2), docID); err != nil {
 				t.Fatal(err)
 			}
 		} else {
@@ -244,7 +244,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 	// Iterate over all documents 10 times
 	start := time.Now().UnixNano()
 	for i := 0; i < 10; i++ {
-		col.ForEachDoc(func(_ int, _ []byte) bool {
+		col.ForEachDoc(func(_ uint64, _ []byte) bool {
 			return true
 		})
 	}
@@ -259,9 +259,9 @@ func TestDocCrudAndIdx(t *testing.T) {
 
 	// Read back all documents page by pabe
 	totalPage := col.ApproxDocCount() / 100
-	collectedIDs := make(map[int]struct{})
-	for page := 0; page < totalPage; page++ {
-		col.ForEachDocInPage(page, totalPage, func(id int, _ []byte) bool {
+	collectedIDs := make(map[uint64]struct{})
+	for page := uint64(0); page < totalPage; page++ {
+		col.ForEachDocInPage(page, totalPage, func(id uint64, _ []byte) bool {
 			collectedIDs[id] = struct{}{}
 			return true
 		})
@@ -270,12 +270,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 	if len(collectedIDs) != numDocs/2 {
 		t.Fatal("Wrong number of docs", len(collectedIDs))
 	}
-
-	if err = col.sync(); err != nil {
-		t.Fatal(err)
-	} else if err = db.Sync(); err != nil {
-		t.Fatal(err)
-	} else if err = db.Close(); err != nil {
+	if err = db.Close(); err != nil {
 		t.Fatal(err)
 	}
 }

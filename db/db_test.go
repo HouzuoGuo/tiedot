@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"runtime"
 	"testing"
 )
 
@@ -28,31 +27,13 @@ func TestOpenEmptyDB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if db.numParts != runtime.NumCPU() {
-		t.Fatal(db.numParts)
-	}
 	if err := db.Create("a"); err != nil {
 		t.Fatal(err)
 	}
-	if len(db.cols["a"].parts) != runtime.NumCPU() {
-		t.Fatal(err)
+	if len(db.cols) != 1 {
+		t.Fatal(db.cols)
 	}
 	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestOpenErrDB(t *testing.T) {
-	os.RemoveAll(TEST_DATA_DIR)
-	defer os.RemoveAll(TEST_DATA_DIR)
-	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
-		t.Fatal(err)
-	}
-	touchFile(TEST_DATA_DIR+"/ColA", "dat_0")
-	touchFile(TEST_DATA_DIR+"/ColA/a!b!c", "0")
-	if db, err := OpenDB(TEST_DATA_DIR); err == nil {
-		t.Fatal("Did not error")
-	} else if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -63,11 +44,8 @@ func TestOpenSyncCloseDB(t *testing.T) {
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(TEST_DATA_DIR+"/number_of_partitions", []byte("2"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	touchFile(TEST_DATA_DIR+"/ColA", "dat_0")
-	touchFile(TEST_DATA_DIR+"/ColA/a!b!c", "0")
+	touchFile(TEST_DATA_DIR+"/ColA", "dat")
+	touchFile(TEST_DATA_DIR+"/ColA", "a!b!c")
 	if err := os.MkdirAll(TEST_DATA_DIR+"/ColB", 0700); err != nil {
 		panic(err)
 	}
@@ -75,25 +53,19 @@ func TestOpenSyncCloseDB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if db.path != TEST_DATA_DIR || db.numParts != 2 || db.cols["ColA"] == nil || db.cols["ColB"] == nil {
+	if db.path != TEST_DATA_DIR || db.cols["ColA"] == nil || db.cols["ColB"] == nil {
 		t.Fatal(db.cols)
 	}
 	colA := db.cols["ColA"]
 	colB := db.cols["ColB"]
-	if len(colA.parts) != 2 || len(colA.hts) != 2 {
-		t.Fatal(colA)
-	}
 	if colA.indexPaths["a!b!c"][0] != "a" || colA.indexPaths["a!b!c"][1] != "b" || colA.indexPaths["a!b!c"][2] != "c" {
 		t.Fatal(colA.indexPaths)
 	}
-	if colA.hts[0]["a!b!c"] == nil || colA.hts[1]["a!b!c"] == nil {
+	if colA.hts["a!b!c"] == nil {
 		t.Fatal(colA.hts)
 	}
-	if len(colB.parts) != 2 || len(colB.hts) != 2 {
+	if len(colB.indexPaths) != 0 || len(colB.hts) != 0 {
 		t.Fatal(colB)
-	}
-	if err := db.Sync(); err != nil {
-		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
@@ -104,9 +76,6 @@ func TestColCrud(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := ioutil.WriteFile(TEST_DATA_DIR+"/number_of_partitions", []byte("2"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	db, err := OpenDB(TEST_DATA_DIR)
@@ -207,10 +176,6 @@ func TestColCrud(t *testing.T) {
 	if db.Use("d") != nil {
 		t.Fatal(db.cols)
 	}
-	// Sync & close
-	if err := db.Sync(); err != nil {
-		t.Fatal(err)
-	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -221,9 +186,6 @@ func TestDumpDB(t *testing.T) {
 	defer os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR + "bak")
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := ioutil.WriteFile(TEST_DATA_DIR+"/number_of_partitions", []byte("2"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	db, err := OpenDB(TEST_DATA_DIR)

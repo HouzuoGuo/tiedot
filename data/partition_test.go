@@ -52,19 +52,8 @@ func TestPartitionDocCRUD(t *testing.T) {
 	if err = part.Delete(123); err == nil {
 		t.Fatal("Did not error")
 	}
-	// Lock & unlock
-	if err = part.LockUpdate(123); err != nil {
-		t.Fatal(err)
-	}
-	if err = part.LockUpdate(123); err == nil {
-		t.Fatal("Did not error")
-	}
-	part.UnlockUpdate(123)
-	if err = part.LockUpdate(123); err != nil {
-		t.Fatal(err)
-	}
 	// Foreach
-	part.ForEachDoc(0, 1, func(id int, doc []byte) bool {
+	part.ForEachDoc(0, 1, func(id uint64, doc []byte) bool {
 		if id != 2 || string(doc) != "2 " {
 			t.Fatal("ID 2 should be the only remaining document")
 		}
@@ -72,9 +61,6 @@ func TestPartitionDocCRUD(t *testing.T) {
 	})
 	// Finish up
 	if err = part.Clear(); err != nil {
-		t.Fatal(err)
-	}
-	if err = part.Sync(); err != nil {
 		t.Fatal(err)
 	}
 	if err = part.Close(); err != nil {
@@ -97,7 +83,7 @@ func TestApproxDocCount(t *testing.T) {
 	defer part.Close()
 	// Insert 100 documents
 	for i := 0; i < 100; i++ {
-		if _, err = part.Insert(rand.Int(), []byte(strconv.Itoa(i))); err != nil {
+		if _, err = part.Insert(uint64(rand.Int63()), []byte(strconv.Itoa(i))); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -107,7 +93,7 @@ func TestApproxDocCount(t *testing.T) {
 	}
 	// Insert 900 documents
 	for i := 0; i < 900; i++ {
-		if _, err = part.Insert(rand.Int(), []byte(strconv.Itoa(i))); err != nil {
+		if _, err = part.Insert(uint64(rand.Int63()), []byte(strconv.Itoa(i))); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -117,7 +103,7 @@ func TestApproxDocCount(t *testing.T) {
 	}
 	// Insert another 2000 documents
 	for i := 0; i < 2000; i++ {
-		if _, err = part.Insert(rand.Int(), []byte(strconv.Itoa(i))); err != nil {
+		if _, err = part.Insert(uint64(rand.Int63()), []byte(strconv.Itoa(i))); err != nil {
 			t.Fatal(err)
 		}
 	}

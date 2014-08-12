@@ -19,7 +19,7 @@ func TestInsertRead(t *testing.T) {
 	docs := [][]byte{
 		[]byte("abc"),
 		[]byte("1234")}
-	ids := [2]int{}
+	ids := [2]uint64{}
 	if ids[0], err = col.Insert(docs[0]); ids[0] != 0 || err != nil {
 		t.Fatalf("Failed to insert: %d %v", ids[0], err)
 	}
@@ -49,14 +49,14 @@ func TestInsertUpdateRead(t *testing.T) {
 	docs := [][]byte{
 		[]byte("abc"),
 		[]byte("1234")}
-	ids := [2]int{}
+	ids := [2]uint64{}
 	if ids[0], err = col.Insert(docs[0]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	if ids[1], err = col.Insert(docs[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	updated := [2]int{}
+	updated := [2]uint64{}
 	if updated[0], err = col.Update(ids[0], []byte("abcdef")); err != nil || updated[0] != ids[0] {
 		t.Fatalf("Failed to update: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestInsertDeleteRead(t *testing.T) {
 		[]byte("abc"),
 		[]byte("1234"),
 		[]byte("2345")}
-	ids := [3]int{}
+	ids := [3]uint64{}
 	if ids[0], err = col.Insert(docs[0]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestInsertReadAll(t *testing.T) {
 		return
 	}
 	defer col.Close()
-	var ids [5]int
+	var ids [5]uint64
 	ids[0], err = col.Insert([]byte("abc"))
 	if err != nil {
 		t.Fatalf("Insert failed: %v", err)
@@ -148,7 +148,7 @@ func TestInsertReadAll(t *testing.T) {
 	}
 	successfullyRead := 0
 	t.Log(ids)
-	col.ForEachDoc(func(_ int, _ []byte) bool {
+	col.ForEachDoc(func(_ uint64, _ []byte) bool {
 		successfullyRead++
 		return true
 	})
@@ -159,7 +159,7 @@ func TestInsertReadAll(t *testing.T) {
 	// intentionally corrupt two docuemnts
 	col.Buf[ids[4]] = 3     // corrupted validity
 	col.Buf[ids[2]+1] = 255 // corrupted room
-	col.ForEachDoc(func(_ int, _ []byte) bool {
+	col.ForEachDoc(func(_ uint64, _ []byte) bool {
 		successfullyRead++
 		return true
 	})
@@ -193,7 +193,7 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	// Test UsedSize
-	calculatedUsedSize := (DOC_HEADER + 3*2) + (DOC_HEADER+4*2)*2
+	calculatedUsedSize := uint64((DOC_HEADER + 3*2) + (DOC_HEADER+4*2)*2)
 	if col.Used != calculatedUsedSize {
 		t.Fatalf("Invalid UsedSize")
 	}
@@ -237,7 +237,7 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 		t.Fatal("did not error")
 	}
 	// Insert - not enough room
-	count := 0
+	count := uint64(0)
 	for i := 0; i < COL_FILE_GROWTH; i += DOC_MAX_ROOM {
 		if _, err := col.Insert(make([]byte, DOC_MAX_ROOM/2)); err != nil {
 			t.Fatal(err)
@@ -254,9 +254,6 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 	}
 	if col.Size != COL_FILE_GROWTH+col.Growth {
 		t.Fatalf("Size changed?! %d %d %d", col.Size, COL_FILE_GROWTH, col.Growth)
-	}
-	if err = col.Sync(); err != nil {
-		t.Fatal(err)
 	}
 	if err = col.Close(); err != nil {
 		t.Fatal(err)

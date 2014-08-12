@@ -31,7 +31,7 @@ func Query(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Evaluate the query
-	queryResult := make(map[int]struct{})
+	queryResult := make(map[uint64]struct{})
 	if err := db.EvalQuery(qJson, dbcol, &queryResult); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 		return
@@ -42,7 +42,7 @@ func Query(w http.ResponseWriter, r *http.Request) {
 	for docID := range queryResult {
 		doc, _ := dbcol.Read(docID)
 		if doc != nil {
-			resultDocs[strconv.Itoa(docID)] = doc
+			resultDocs[strconv.FormatUint(docID, 10)] = doc
 			counter++
 		}
 	}
@@ -76,7 +76,7 @@ func Count(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	queryResult := make(map[int]struct{})
+	queryResult := make(map[uint64]struct{})
 	if err := db.EvalQuery(qJson, dbcol, &queryResult); err != nil {
 		http.Error(w, fmt.Sprint(err), 400)
 		return

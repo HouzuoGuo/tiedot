@@ -8,20 +8,17 @@ package data
 import (
 	"errors"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"sync"
 )
 
 // Partition associates a hash table with collection documents, allowing addressing of a document using an unchanging ID.
 type Partition struct {
-	col      *Collection
-	lookup   *HashTable
-	updating map[int]struct{}
-	Lock     *sync.RWMutex
+	col    *Collection
+	lookup *HashTable
 }
 
 // Open a collection partition.
 func OpenPartition(colPath, lookupPath string) (part *Partition, err error) {
-	part = &Partition{updating: make(map[int]struct{}), Lock: new(sync.RWMutex)}
+	part = &Partition{}
 	if part.col, err = OpenCollection(colPath); err != nil {
 		return
 	} else if part.lookup, err = OpenHashTable(lookupPath); err != nil {
@@ -31,7 +28,7 @@ func OpenPartition(colPath, lookupPath string) (part *Partition, err error) {
 }
 
 // Insert a document. The ID may be used to retrieve/update/delete the document later on.
-func (part *Partition) Insert(id int, data []byte) (physID int, err error) {
+func (part *Partition) Insert(id uint64, data []byte) (physID uint64, err error) {
 	physID, err = part.col.Insert(data)
 	if err != nil {
 		return
@@ -41,7 +38,7 @@ func (part *Partition) Insert(id int, data []byte) (physID int, err error) {
 }
 
 // Find and retrieve a document by ID.
-func (part *Partition) Read(id int) ([]byte, error) {
+func (part *Partition) Read(id uint64) ([]byte, error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
 		return nil, errors.New("Document does not exist")
@@ -53,7 +50,7 @@ func (part *Partition) Read(id int) ([]byte, error) {
 }
 
 // Update a document.
-func (part *Partition) Update(id int, data []byte) (err error) {
+func (part *Partition) Update(id uint64, data []byte) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
 		return errors.New("Document does not exist")
@@ -69,22 +66,8 @@ func (part *Partition) Update(id int, data []byte) (err error) {
 	return
 }
 
-// Lock a document for exclusive update.
-func (part *Partition) LockUpdate(id int) (err error) {
-	if _, alreadyLocked := part.updating[id]; alreadyLocked {
-		return errors.New("Document is already locked")
-	}
-	part.updating[id] = struct{}{}
-	return
-}
-
-// Unlock a document to make it ready for the next update.
-func (part *Partition) UnlockUpdate(id int) {
-	delete(part.updating, id)
-}
-
 // Delete a document.
-func (part *Partition) Delete(id int) (err error) {
+func (part *Partition) Delete(id uint64) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
 		return errors.New("Document does not exist")
@@ -95,7 +78,7 @@ func (part *Partition) Delete(id int) (err error) {
 }
 
 // Partition documents into roughly equally sized portions, and run the function on every document in the portion.
-func (part *Partition) ForEachDoc(partNum, totalPart int, fun func(id int, doc []byte) bool) (moveOn bool) {
+func (part *Partition) ForEachDoc(partNum, totalPart uint64, fun func(id uint64, doc []byte) bool) (moveOn bool) {
 	ids, physIDs := part.lookup.GetPartition(partNum, totalPart)
 	for i, id := range ids {
 		data := part.col.Read(physIDs[i])
@@ -109,8 +92,8 @@ func (part *Partition) ForEachDoc(partNum, totalPart int, fun func(id int, doc [
 }
 
 // Return approximate number of documents in the partition.
-func (part *Partition) ApproxDocCount() int {
-	totalPart := 32 // not magic; a larger number makes estimation less accurate, but improves performance
+func (part *Partition) ApproxDocCount() uint64 {
+	totalPart := uint64(32) // not magic; a larger number makes estimation less accurate, but improves performance
 	for {
 		keys, _ := part.lookup.GetPartition(0, totalPart)
 		if len(keys) == 0 {
@@ -120,7 +103,7 @@ func (part *Partition) ApproxDocCount() int {
 			// Try a larger partition size
 			totalPart = totalPart / 2
 		} else {
-			return int(float64(len(keys)) * float64(totalPart))
+			return uint64(float64(len(keys)) * float64(totalPart))
 		}
 	}
 }
@@ -134,23 +117,6 @@ func (part *Partition) Clear() (err error) {
 	}
 	if err = part.lookup.Clear(); err != nil {
 		tdlog.CritNoRepeat("Failed to clear %s: %v", part.lookup.Path, err)
-		failure = true
-	}
-	if failure {
-		err = errors.New("Operation did not complete successfully")
-	}
-	return
-}
-
-// Synchronize all file buffers.
-func (part *Partition) Sync() (err error) {
-	var failure bool
-	if err = part.col.Sync(); err != nil {
-		tdlog.CritNoRepeat("Failed to sync %s: %v", part.col.Path, err)
-		failure = true
-	}
-	if err = part.lookup.Sync(); err != nil {
-		tdlog.CritNoRepeat("Failed to sync %s: %v", part.lookup.Path, err)
 		failure = true
 	}
 	if failure {

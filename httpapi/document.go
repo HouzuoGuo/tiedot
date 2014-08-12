@@ -49,7 +49,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "id", &id) {
 		return
 	}
-	docID, err := strconv.Atoi(id)
+	docID, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
@@ -86,12 +86,12 @@ func GetPage(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "total", &total) {
 		return
 	}
-	pageNum, err := strconv.Atoi(page)
+	pageNum, err := strconv.ParseUint(page, 10, 64)
 	if err != nil || pageNum < 0 {
 		http.Error(w, fmt.Sprintf("Invalid page number '%v'.", page), 400)
 		return
 	}
-	totalPage, err := strconv.Atoi(total)
+	totalPage, err := strconv.ParseUint(total, 10, 64)
 	if err != nil || totalPage == 0 {
 		http.Error(w, fmt.Sprintf("Invalid total page number '%v'.", totalPage), 400)
 		return
@@ -102,10 +102,10 @@ func GetPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	docs := make(map[string]interface{})
-	dbcol.ForEachDocInPage(pageNum, totalPage, func(id int, doc []byte) bool {
+	dbcol.ForEachDocInPage(pageNum, totalPage, func(id uint64, doc []byte) bool {
 		var docObj map[string]interface{}
 		if err := json.Unmarshal(doc, &docObj); err == nil {
-			docs[strconv.Itoa(id)] = docObj
+			docs[strconv.FormatUint(id, 10)] = docObj
 		}
 		return true
 	})
@@ -131,7 +131,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "doc", &doc) {
 		return
 	}
-	docID, err := strconv.Atoi(id)
+	docID, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
@@ -164,7 +164,7 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "id", &id) {
 		return
 	}
-	docID, err := strconv.Atoi(id)
+	docID, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid document ID '%v'.", id), 400)
 		return
@@ -190,5 +190,5 @@ func ApproxDocCount(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
 		return
 	}
-	w.Write([]byte(strconv.Itoa(dbcol.ApproxDocCount())))
+	w.Write([]byte(strconv.FormatUint(dbcol.ApproxDocCount(), 10)))
 }

@@ -37,59 +37,44 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 }
 
 // Hash a string using sdbm algorithm.
-func StrHash(str string) int {
-	var hash int
+func StrHash(str string) uint64 {
+	var hash uint64
 	for _, c := range str {
-		hash = int(c) + (hash << 6) + (hash << 16) - hash
-	}
-	if hash < 0 {
-		return -hash
+		hash = uint64(c) + (hash << 6) + (hash << 16) - hash
 	}
 	return hash
 }
 
 // Put a document on all user-created indexes.
-func (col *Col) indexDoc(id int, doc map[string]interface{}) {
+func (col *Col) indexDoc(id uint64, doc map[string]interface{}) {
 	for idxName, idxPath := range col.indexPaths {
 		for _, idxVal := range GetIn(doc, idxPath) {
 			if idxVal != nil {
-				hashKey := StrHash(fmt.Sprint(idxVal))
-				partNum := hashKey % col.db.numParts
-				ht := col.hts[partNum][idxName]
-				ht.Lock.Lock()
-				ht.Put(hashKey, id)
-				ht.Lock.Unlock()
+				col.hts[idxName].Put(StrHash(fmt.Sprint(idxVal)), id)
 			}
 		}
 	}
 }
 
 // Remove a document from all user-created indexes.
-func (col *Col) unindexDoc(id int, doc map[string]interface{}) {
+func (col *Col) unindexDoc(id uint64, doc map[string]interface{}) {
 	for idxName, idxPath := range col.indexPaths {
 		for _, idxVal := range GetIn(doc, idxPath) {
 			if idxVal != nil {
-				hashKey := StrHash(fmt.Sprint(idxVal))
-				partNum := hashKey % col.db.numParts
-				ht := col.hts[partNum][idxName]
-				ht.Lock.Lock()
-				ht.Remove(hashKey, id)
-				ht.Lock.Unlock()
+				col.hts[idxName].Remove(StrHash(fmt.Sprint(idxVal)), id)
 			}
 		}
 	}
 }
 
-// Insert a document with the specified ID into the collection (incl. index). Does not place partition/schema lock.
-func (col *Col) InsertRecovery(id int, doc map[string]interface{}) (err error) {
+// Insert a document with the specified ID into the collection (incl. index).
+func (col *Col) InsertRecovery(id uint64, doc map[string]interface{}) (err error) {
 	docJS, err := json.Marshal(doc)
 	if err != nil {
 		return
 	}
-	partNum := id % col.db.numParts
-	part := col.parts[partNum]
 	// Put document data into collection
-	if _, err = part.Insert(id, []byte(docJS)); err != nil {
+	if _, err = col.part.Insert(id, []byte(docJS)); err != nil {
 		return
 	}
 	// Index the document
@@ -98,66 +83,33 @@ func (col *Col) InsertRecovery(id int, doc map[string]interface{}) (err error) {
 }
 
 // Insert a document into the collection.
-func (col *Col) Insert(doc map[string]interface{}) (id int, err error) {
+func (col *Col) Insert(doc map[string]interface{}) (id uint64, err error) {
 	docJS, err := json.Marshal(doc)
 	if err != nil {
 		return
 	}
-	id = rand.Int()
-	partNum := id % col.db.numParts
-	col.db.schemaLock.RLock()
-	part := col.parts[partNum]
+	id = uint64(rand.Int63())
 	// Put document data into collection
-	part.Lock.Lock()
-	if _, err = part.Insert(id, []byte(docJS)); err != nil {
-		part.Lock.Unlock()
-		col.db.schemaLock.RUnlock()
+	if _, err = col.part.Insert(id, []byte(docJS)); err != nil {
 		return
 	}
-	// If another thread is updating the document in the meanwhile, let it take over index maintenance
-	if err = part.LockUpdate(id); err != nil {
-		part.Lock.Unlock()
-		col.db.schemaLock.RUnlock()
-		return id, nil
-	}
-	part.Lock.Unlock()
 	// Index the document
 	col.indexDoc(id, doc)
-	part.Lock.Lock()
-	part.UnlockUpdate(id)
-	part.Lock.Unlock()
-	col.db.schemaLock.RUnlock()
-	return
-}
-
-func (col *Col) read(id int, placeSchemaLock bool) (doc map[string]interface{}, err error) {
-	if placeSchemaLock {
-		col.db.schemaLock.RLock()
-	}
-	part := col.parts[id%col.db.numParts]
-	part.Lock.RLock()
-	docB, err := part.Read(id)
-	part.Lock.RUnlock()
-	if err != nil {
-		if placeSchemaLock {
-			col.db.schemaLock.RUnlock()
-		}
-		return
-	}
-	err = json.Unmarshal(docB, &doc)
-	if placeSchemaLock {
-		col.db.schemaLock.RUnlock()
-	}
 	return
 }
 
 // Find and retrieve a document by ID.
-func (col *Col) Read(id int) (doc map[string]interface{}, err error) {
-	return col.read(id, true)
+func (col *Col) Read(id uint64) (doc map[string]interface{}, err error) {
+	docB, err := col.part.Read(id)
+	if err != nil {
+		return
+	}
+	err = json.Unmarshal(docB, &doc)
+	return
 }
 
 // Update a document.
-func (col *Col) Update(id int, doc map[string]interface{}) error {
+func (col *Col) Update(id uint64, doc map[string]interface{}) error {
 	if doc == nil {
 		return fmt.Errorf("Updating %d: input doc may not be nil", id)
 	}
@@ -165,82 +117,41 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	col.db.schemaLock.RLock()
-	part := col.parts[id%col.db.numParts]
-	part.Lock.Lock()
-	// Place lock, read back original document and update
-	if err := part.LockUpdate(id); err != nil {
-		part.Lock.Unlock()
-		col.db.schemaLock.RUnlock()
-		return fmt.Errorf("Document %d is locked for update, please try again later", id)
-	}
-	originalB, err := part.Read(id)
+	originalB, err := col.part.Read(id)
 	if err != nil {
-		part.UnlockUpdate(id)
-		part.Lock.Unlock()
-		col.db.schemaLock.RUnlock()
 		return fmt.Errorf("Cannot update %d: cannot read back original document - %v", id, err)
 	}
 	var original map[string]interface{}
 	if err = json.Unmarshal(originalB, &original); err != nil {
 		tdlog.Noticef("Will not attempt to unindex document %d during update", id)
 	}
-	if err = part.Update(id, []byte(docJS)); err != nil {
-		part.UnlockUpdate(id)
-		part.Lock.Unlock()
-		col.db.schemaLock.RUnlock()
+	if err = col.part.Update(id, []byte(docJS)); err != nil {
 		return err
 	}
 	// Done with the collection data, next is to maintain indexed values
-	part.Lock.Unlock()
 	if original != nil {
 		col.unindexDoc(id, original)
 	}
 	col.indexDoc(id, doc)
-	// Done with the document
-	part.Lock.Lock()
-	part.UnlockUpdate(id)
-	part.Lock.Unlock()
-	col.db.schemaLock.RUnlock()
 	return nil
 }
 
 // Delete a document.
-func (col *Col) Delete(id int) error {
-	col.db.schemaLock.RLock()
-	part := col.parts[id%col.db.numParts]
-	part.Lock.Lock()
-	// Place lock, read back original document and delete document
-	if err := part.LockUpdate(id); err != nil {
-		part.Lock.Unlock()
-		col.db.schemaLock.RUnlock()
-		return fmt.Errorf("Document %d is locked for update, please try again later", id)
-	}
-	originalB, err := part.Read(id)
+func (col *Col) Delete(id uint64) error {
+	originalB, err := col.part.Read(id)
 	if err != nil {
-		part.UnlockUpdate(id)
-		part.Lock.Unlock()
-		col.db.schemaLock.RUnlock()
 		return fmt.Errorf("Cannot delete %d: %v", id, err)
 	}
 	var original map[string]interface{}
 	if err = json.Unmarshal(originalB, &original); err != nil {
 		tdlog.Noticef("Will not attempt to unindex document %d during delete", id)
 	}
-	if err = part.Delete(id); err != nil {
-		part.UnlockUpdate(id)
-		part.Lock.Unlock()
-		col.db.schemaLock.RUnlock()
+	if err = col.part.Delete(id); err != nil {
 		return err
 	}
 	// Done with the collection data, next is to remove indexed values
-	part.Lock.Unlock()
 	if original != nil {
 		col.unindexDoc(id, original)
 	}
-	part.Lock.Lock()
-	part.UnlockUpdate(id)
-	part.Lock.Unlock()
-	col.db.schemaLock.RUnlock()
 	return nil
 }

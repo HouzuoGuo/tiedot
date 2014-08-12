@@ -1,7 +1,6 @@
 package db
 
 import (
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -11,9 +10,6 @@ func TestIdxCRUD(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := ioutil.WriteFile(TEST_DATA_DIR+"/number_of_partitions", []byte("2"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	db, err := OpenDB(TEST_DATA_DIR)
@@ -61,9 +57,6 @@ func TestIdxCRUD(t *testing.T) {
 	}
 	if len(col.AllIndexes()) != 0 {
 		t.Fatal(col.AllIndexes())
-	}
-	if err = col.sync(); err != nil {
-		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)

@@ -87,7 +87,7 @@ func embeddedExample() {
 	}
 
 	// Process all documents (note that document order is undetermined)
-	feeds.ForEachDoc(func(id int, docContent []byte) (willMoveOn bool) {
+	feeds.ForEachDoc(func(id uint64, docContent []byte) (willMoveOn bool) {
 		fmt.Println("Document", id, "is", string(docContent))
 		return true  // move on to the next document OR
 		return false // do not move on to the next document
@@ -130,7 +130,7 @@ func embeddedExample() {
 	var query interface{}
 	json.Unmarshal([]byte(`[{"eq": "New Go release", "in": ["Title"]}, {"eq": "slackware.com", "in": ["Source"]}]`), &query)
 
-	queryResult := make(map[int]struct{}) // query result (document IDs) goes into map keys
+	queryResult := make(map[uint64]struct{}) // query result (document IDs) goes into map keys
 
 	if err := db.EvalQuery(query, feeds, &queryResult); err != nil {
 		panic(err)
@@ -146,13 +146,7 @@ func embeddedExample() {
 		fmt.Printf("Query returned document %v\n", readBack)
 	}
 
-	// Make sure important transactions are persisted (very expensive call: do NOT invoke too often)
-	// (A background goroutine is already doing it for you every few seconds)
-	if err := myDB.Sync(); err != nil {
-		panic(err)
-	}
 	// Gracefully close database, you should call Close on all opened databases
-	// Otherwise background goroutines will prevent program shutdown
 	if err := myDB.Close(); err != nil {
 		panic(err)
 	}

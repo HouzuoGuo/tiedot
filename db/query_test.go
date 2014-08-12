@@ -3,12 +3,11 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 )
 
-func ensureMapHasKeys(m map[int]struct{}, keys ...int) bool {
+func ensureMapHasKeys(m map[uint64]struct{}, keys ...uint64) bool {
 	if len(m) != len(keys) {
 		return false
 	}
@@ -20,8 +19,8 @@ func ensureMapHasKeys(m map[int]struct{}, keys ...int) bool {
 	return true
 }
 
-func runQuery(query string, col *Col) (map[int]struct{}, error) {
-	result := make(map[int]struct{})
+func runQuery(query string, col *Col) (map[uint64]struct{}, error) {
+	result := make(map[uint64]struct{})
 	var jq interface{}
 	if err := json.Unmarshal([]byte(query), &jq); err != nil {
 		fmt.Println(err)
@@ -33,9 +32,6 @@ func TestQuery(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := ioutil.WriteFile(TEST_DATA_DIR+"/number_of_partitions", []byte("2"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	db, err := OpenDB(TEST_DATA_DIR)
@@ -57,7 +53,7 @@ func TestQuery(t *testing.T) {
 		`{"a": [{"b": 5}, {"b": 6}], "c": 4, "d": 1, "f": 5, "g": 5, "h": 2}`,
 		`{"a": [{"b": "val1"}, {"b": "val2"}]}`,
 		`{"a": [{"b": "val3"}, {"b": ["val4", "val5"]}]}`}
-	ids := make([]int, len(docs))
+	ids := make([]uint64, len(docs))
 	for i, doc := range docs {
 		var jsonDoc map[string]interface{}
 		if err := json.Unmarshal([]byte(doc), &jsonDoc); err != nil {

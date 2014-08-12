@@ -10,45 +10,35 @@ package data
 import (
 	"encoding/binary"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"sync"
 )
 
 const (
 	HT_FILE_GROWTH  = 32 * 1048576                          // Hash table file initial size & file growth
-	ENTRY_SIZE      = 1 + 10 + 10                           // Hash entry size: validity (single byte), key (int 10 bytes), value (int 10 bytes)
-	BUCKET_HEADER   = 10                                    // Bucket header size: next chained bucket number (int 10 bytes)
+	ENTRY_SIZE      = 1 + 8 + 8                             // Hash entry size: validity (single byte), key (uint64), value (uint64)
+	BUCKET_HEADER   = 8                                     // Bucket header size: next chained bucket number (int 10 bytes)
 	PER_BUCKET      = 16                                    // Entries per bucket
 	HASH_BITS       = 16                                    // Number of hash key bits
 	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE // Size of a bucket
-	INITIAL_BUCKETS = 65536                                 // Initial number of buckets == 2 ^ HASH_BITS
+	INITIAL_BUCKETS = uint64(65536)                         // Initial number of buckets == 2 ^ HASH_BITS
 )
 
 // Hash table file is a binary file containing buckets of hash entries.
 type HashTable struct {
 	*DataFile
-	numBuckets int
-	Lock       *sync.RWMutex
+	numBuckets uint64
 }
 
 // Smear the integer entry key and return the portion (first HASH_BITS bytes) used for allocating the entry.
-func HashKey(key int) int {
-	/*
-		tiedot should be compiled/run on x86-64 systems.
-		If you decide to compile tiedot on 32-bit systems, the following integer-smear algorithm will cause compilation failure
-		due to 32-bit interger overflow; therefore you must modify the algorithm.
-		Do not remove the integer-smear process, and remember to run test cases to verify your mods.
-	*/
-	// ========== Integer-smear start =======
+func HashKey(key uint64) uint64 {
 	key = key ^ (key >> 4)
 	key = (key ^ 0xdeadbeef) + (key << 5)
 	key = key ^ (key >> 11)
-	// ========== Integer-smear end =========
 	return key & ((1 << HASH_BITS) - 1) // Do not modify this line
 }
 
 // Open a hash table file.
 func OpenHashTable(path string) (ht *HashTable, err error) {
-	ht = &HashTable{Lock: new(sync.RWMutex)}
+	ht = &HashTable{}
 	if ht.DataFile, err = OpenDataFile(path, HT_FILE_GROWTH); err != nil {
 		return
 	}
@@ -60,7 +50,7 @@ func OpenHashTable(path string) (ht *HashTable, err error) {
 func (ht *HashTable) calculateNumBuckets() {
 	ht.numBuckets = ht.Size / BUCKET_SIZE
 	largestBucketNum := INITIAL_BUCKETS - 1
-	for i := 0; i < INITIAL_BUCKETS; i++ {
+	for i := uint64(0); i < INITIAL_BUCKETS; i++ {
 		lastBucket := ht.lastBucket(i)
 		if lastBucket > largestBucketNum && lastBucket < ht.numBuckets {
 			largestBucketNum = lastBucket
@@ -77,16 +67,15 @@ func (ht *HashTable) calculateNumBuckets() {
 }
 
 // Return number of the next chained bucket.
-func (ht *HashTable) nextBucket(bucket int) int {
+func (ht *HashTable) nextBucket(bucket uint64) uint64 {
 	if bucket >= ht.numBuckets {
 		return 0
 	}
 	bucketAddr := bucket * BUCKET_SIZE
-	nextUint, err := binary.Varint(ht.Buf[bucketAddr : bucketAddr+10])
-	next := int(nextUint)
+	next := binary.LittleEndian.Uint64(ht.Buf[bucketAddr:])
 	if next == 0 {
 		return 0
-	} else if err < 0 || next <= bucket || next >= ht.numBuckets || next < INITIAL_BUCKETS {
+	} else if next <= bucket || next >= ht.numBuckets || next < INITIAL_BUCKETS {
 		tdlog.CritNoRepeat("Bad hash table - repair ASAP %s", ht.Path)
 		return 0
 	} else {
@@ -95,7 +84,7 @@ func (ht *HashTable) nextBucket(bucket int) int {
 }
 
 // Return number of the last bucket in chain.
-func (ht *HashTable) lastBucket(bucket int) int {
+func (ht *HashTable) lastBucket(bucket uint64) uint64 {
 	for curr := bucket; ; {
 		next := ht.nextBucket(curr)
 		if next == 0 {
@@ -106,10 +95,10 @@ func (ht *HashTable) lastBucket(bucket int) int {
 }
 
 // Create and chain a new bucket.
-func (ht *HashTable) growBucket(bucket int) {
+func (ht *HashTable) growBucket(bucket uint64) {
 	ht.EnsureSize(BUCKET_SIZE)
 	lastBucketAddr := ht.lastBucket(bucket) * BUCKET_SIZE
-	binary.PutVarint(ht.Buf[lastBucketAddr:lastBucketAddr+10], int64(ht.numBuckets))
+	binary.LittleEndian.PutUint64(ht.Buf[lastBucketAddr:], ht.numBuckets)
 	ht.Used += BUCKET_SIZE
 	ht.numBuckets++
 }
@@ -124,13 +113,13 @@ func (ht *HashTable) Clear() (err error) {
 }
 
 // Store the entry into a vacant (invalidated or empty) place in the appropriate bucket.
-func (ht *HashTable) Put(key, val int) {
-	for bucket, entry := HashKey(key), 0; ; {
+func (ht *HashTable) Put(key, val uint64) {
+	for bucket, entry := HashKey(key), uint64(0); ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
 		if ht.Buf[entryAddr] != 1 {
 			ht.Buf[entryAddr] = 1
-			binary.PutVarint(ht.Buf[entryAddr+1:entryAddr+11], int64(key))
-			binary.PutVarint(ht.Buf[entryAddr+11:entryAddr+21], int64(val))
+			binary.LittleEndian.PutUint64(ht.Buf[entryAddr+1:], key)
+			binary.LittleEndian.PutUint64(ht.Buf[entryAddr+9:], val)
 			return
 		}
 		if entry++; entry == PER_BUCKET {
@@ -145,19 +134,19 @@ func (ht *HashTable) Put(key, val int) {
 }
 
 // Look up values by key.
-func (ht *HashTable) Get(key, limit int) (vals []int) {
+func (ht *HashTable) Get(key, limit uint64) (vals []uint64) {
 	if limit == 0 {
-		vals = make([]int, 0, 10)
+		vals = make([]uint64, 0, 16)
 	} else {
-		vals = make([]int, 0, limit)
+		vals = make([]uint64, 0, limit)
 	}
-	for count, entry, bucket := 0, 0, HashKey(key); ; {
+	for count, entry, bucket := uint64(0), uint64(0), HashKey(key); ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
-		entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
-		entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
+		entryKey := binary.LittleEndian.Uint64(ht.Buf[entryAddr+1:])
+		entryVal := binary.LittleEndian.Uint64(ht.Buf[entryAddr+9:])
 		if ht.Buf[entryAddr] == 1 {
-			if int(entryKey) == key {
-				vals = append(vals, int(entryVal))
+			if entryKey == key {
+				vals = append(vals, entryVal)
 				if count++; count == limit {
 					return
 				}
@@ -175,13 +164,13 @@ func (ht *HashTable) Get(key, limit int) (vals []int) {
 }
 
 // Flag an entry as invalid, so that Get will not return it later on.
-func (ht *HashTable) Remove(key, val int) {
-	for entry, bucket := 0, HashKey(key); ; {
+func (ht *HashTable) Remove(key, val uint64) {
+	for entry, bucket := uint64(0), HashKey(key); ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
-		entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
-		entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
+		entryKey := binary.LittleEndian.Uint64(ht.Buf[entryAddr+1:])
+		entryVal := binary.LittleEndian.Uint64(ht.Buf[entryAddr+9:])
 		if ht.Buf[entryAddr] == 1 {
-			if int(entryKey) == key && int(entryVal) == val {
+			if entryKey == key && entryVal == val {
 				ht.Buf[entryAddr] = 0
 				return
 			}
@@ -198,7 +187,7 @@ func (ht *HashTable) Remove(key, val int) {
 }
 
 // Divide the entire hash table into roughly equally sized partitions, and return the start/end key range of the chosen partition.
-func GetPartitionRange(partNum, totalParts int) (start int, end int) {
+func GetPartitionRange(partNum, totalParts uint64) (start uint64, end uint64) {
 	perPart := INITIAL_BUCKETS / totalParts
 	leftOver := INITIAL_BUCKETS % totalParts
 	start = partNum * perPart
@@ -220,17 +209,17 @@ func GetPartitionRange(partNum, totalParts int) (start int, end int) {
 }
 
 // Collect entries all the way from "head" bucket to the end of its chained buckets.
-func (ht *HashTable) collectEntries(head int) (keys, vals []int) {
-	keys = make([]int, 0, PER_BUCKET)
-	vals = make([]int, 0, PER_BUCKET)
-	var entry, bucket int = 0, head
+func (ht *HashTable) collectEntries(head uint64) (keys, vals []uint64) {
+	keys = make([]uint64, 0, PER_BUCKET)
+	vals = make([]uint64, 0, PER_BUCKET)
+	var entry, bucket uint64 = 0, head
 	for {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
-		entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
-		entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
+		entryKey := binary.LittleEndian.Uint64(ht.Buf[entryAddr+1:])
+		entryVal := binary.LittleEndian.Uint64(ht.Buf[entryAddr+9:])
 		if ht.Buf[entryAddr] == 1 {
-			keys = append(keys, int(entryKey))
-			vals = append(vals, int(entryVal))
+			keys = append(keys, entryKey)
+			vals = append(vals, entryVal)
 		} else if entryKey == 0 && entryVal == 0 {
 			return
 		}
@@ -244,11 +233,11 @@ func (ht *HashTable) collectEntries(head int) (keys, vals []int) {
 }
 
 // Return all entries in the chosen partition.
-func (ht *HashTable) GetPartition(partNum, partSize int) (keys, vals []int) {
+func (ht *HashTable) GetPartition(partNum, partSize uint64) (keys, vals []uint64) {
 	rangeStart, rangeEnd := GetPartitionRange(partNum, partSize)
 	prealloc := (rangeEnd - rangeStart) * PER_BUCKET
-	keys = make([]int, 0, prealloc)
-	vals = make([]int, 0, prealloc)
+	keys = make([]uint64, 0, prealloc)
+	vals = make([]uint64, 0, prealloc)
 	for head := rangeStart; head < rangeEnd; head++ {
 		k, v := ht.collectEntries(head)
 		keys = append(keys, k...)

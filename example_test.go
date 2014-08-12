@@ -72,7 +72,7 @@ func TestAll(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	feeds.ForEachDoc(func(id int, docContent []byte) (willMoveOn bool) {
+	feeds.ForEachDoc(func(_ uint64, docContent []byte) (willMoveOn bool) {
 		var doc map[string]interface{}
 		if json.Unmarshal(docContent, &doc) != nil {
 			t.Fatal("cannot deserialize")
@@ -122,7 +122,7 @@ func TestAll(t *testing.T) {
 	if json.Unmarshal([]byte(`[{"eq": "New Go release", "in": ["Title"]}, {"eq": "slackware.com", "in": ["Source"]}]`), &query) != nil {
 		t.Fatal("failure")
 	}
-	queryResult := make(map[int]struct{}) // query result (document IDs) goes into map keys
+	queryResult := make(map[uint64]struct{}) // query result (document IDs) goes into map keys
 	if err := db.EvalQuery(query, feeds, &queryResult); err != nil {
 		t.Fatal(err)
 	}
@@ -137,10 +137,6 @@ func TestAll(t *testing.T) {
 			!sameMap(readBack, map[string]interface{}{"Title": "Good Slackware", "Source": "slackware.com", "Age": 1}) {
 			t.Fatal(readBack)
 		}
-	}
-
-	if err := myDB.Sync(); err != nil {
-		t.Fatal(err)
 	}
 	if err := myDB.Close(); err != nil {
 		t.Fatal(err)
