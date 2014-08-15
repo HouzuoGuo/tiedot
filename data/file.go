@@ -32,42 +32,6 @@ func LooksEmpty(buf gommap.MMap) bool {
 // Open a data file that grows by the specified size.
 func OpenDataFile(path string, growth uint64) (file *DataFile, err error) {
 	file = &DataFile{Path: path, Growth: growth}
-	if err = file.Reopen(); err != nil {
-		return
-	}
-	return
-}
-
-// Ensure there is enough room for that many bytes of data.
-func (file *DataFile) EnsureSize(more uint64) (err error) {
-	if file.Used+more <= file.Size {
-		return
-	}
-	if file.Buf != nil {
-		if err = file.Buf.Unmap(); err != nil {
-			return
-		}
-	}
-	if err = os.Truncate(file.Path, int64(file.Size+file.Growth)); err != nil {
-		return
-	} else if file.Buf, err = gommap.Map(file.Fh); err != nil {
-		return
-	}
-	file.Size += file.Growth
-	tdlog.Infof("%s grown: %d -> %d bytes (%d bytes in-use)", file.Path, file.Size-file.Growth, file.Size, file.Used)
-	return file.EnsureSize(more)
-}
-
-// Un-map the file buffer and close the file handle.
-func (file *DataFile) Close() (err error) {
-	if err = file.Buf.Unmap(); err != nil {
-		return
-	}
-	return file.Fh.Close()
-}
-
-// Open file handle and map the file buffer. Calculate size and used space.
-func (file *DataFile) Reopen() (err error) {
 	if file.Fh, err = os.OpenFile(file.Path, os.O_CREATE|os.O_RDWR, 0600); err != nil {
 		return
 	}
@@ -110,20 +74,61 @@ func (file *DataFile) Reopen() (err error) {
 	return
 }
 
+// Ensure there is enough room for that many bytes of data.
+func (file *DataFile) EnsureSize(more uint64) (err error) {
+	if file.Used+more <= file.Size {
+		return
+	} else if file.Buf != nil {
+		if err = file.Buf.Unmap(); err != nil {
+			return
+		}
+	}
+	if err = os.Truncate(file.Path, int64(file.Size+file.Growth)); err != nil {
+		return
+	} else if file.Buf, err = gommap.Map(file.Fh); err != nil {
+		return
+	}
+	file.Size += file.Growth
+	tdlog.Infof("%s grown: %d -> %d bytes (%d bytes in-use)", file.Path, file.Size-file.Growth, file.Size, file.Used)
+	return file.EnsureSize(more)
+}
+
+// Synchronize modified file buffer back to file system.
+func (file *DataFile) Sync() (err error) {
+	if err = file.Close(); err != nil {
+		return
+	} else if file.Fh, err = os.OpenFile(file.Path, os.O_CREATE|os.O_RDWR, 0600); err != nil {
+		return
+	} else if file.Buf, err = gommap.Map(file.Fh); err != nil {
+		return
+	}
+	return
+}
+
+// Un-map the file buffer, synchronize modified file, and close the file handle.
+func (file *DataFile) Close() (err error) {
+	if err = file.Buf.Unmap(); err != nil {
+		return
+	} else if err = file.Fh.Sync(); err != nil {
+		return
+	}
+	return file.Fh.Close()
+}
+
 // Clear the entire file and resize it to initial size.
 func (file *DataFile) Clear() (err error) {
 	if err = file.Close(); err != nil {
 		return
-	}
-	if err = os.Truncate(file.Path, 0); err != nil {
+	} else if err = os.Truncate(file.Path, 0); err != nil {
+		return
+	} else if err = os.Truncate(file.Path, int64(file.Growth)); err != nil {
+		return
+	} else if file.Fh, err = os.OpenFile(file.Path, os.O_CREATE|os.O_RDWR, 0600); err != nil {
+		return
+	} else if file.Buf, err = gommap.Map(file.Fh); err != nil {
 		return
 	}
-	if err = os.Truncate(file.Path, int64(file.Growth)); err != nil {
-		return
-	}
-	if err = file.Reopen(); err != nil {
-		return
-	}
+	file.Used, file.Size = 0, file.Growth
 	tdlog.Infof("%s cleared: %d of %d bytes in-use", file.Path, file.Used, file.Size)
 	return
 }

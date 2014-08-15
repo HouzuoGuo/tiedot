@@ -12,11 +12,13 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
 // Database structures.
 type DB struct {
+	lock *sync.RWMutex
 	path string          // Root path of database directory
 	cols map[string]*Col // All collections
 }
@@ -24,7 +26,7 @@ type DB struct {
 // Open database and load all collections & indexes.
 func OpenDB(dbPath string) (*DB, error) {
 	rand.Seed(time.Now().UnixNano()) // document ID generation relies on this RNG
-	db := &DB{path: dbPath}
+	db := &DB{lock: new(sync.RWMutex), path: dbPath}
 	return db, db.load()
 }
 
@@ -50,22 +52,10 @@ func (db *DB) load() error {
 	return err
 }
 
-// Close all database files. Do not use the DB afterwards!
-func (db *DB) Close() error {
-	errs := make([]error, 0, 0)
-	for _, col := range db.cols {
-		if err := col.close(); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if len(errs) == 0 {
-		return nil
-	}
-	return fmt.Errorf("%v", errs)
-}
-
 // Create a new collection.
 func (db *DB) Create(name string) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
 	if _, exists := db.cols[name]; exists {
 		return fmt.Errorf("Collection %s already exists", name)
 	} else if err := os.MkdirAll(path.Join(db.path, name), 0700); err != nil {
@@ -78,6 +68,8 @@ func (db *DB) Create(name string) error {
 
 // Return all collection names.
 func (db *DB) AllCols() (ret []string) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 	ret = make([]string, 0, len(db.cols))
 	for name, _ := range db.cols {
 		ret = append(ret, name)
@@ -87,6 +79,8 @@ func (db *DB) AllCols() (ret []string) {
 
 // Use the return value to interact with collection. Return value may be nil if the collection does not exist.
 func (db *DB) Use(name string) *Col {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 	if col, exists := db.cols[name]; exists {
 		return col
 	}
@@ -95,6 +89,8 @@ func (db *DB) Use(name string) *Col {
 
 // Rename a collection.
 func (db *DB) Rename(oldName, newName string) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
 	if _, exists := db.cols[oldName]; !exists {
 		return fmt.Errorf("Collection %s does not exist", oldName)
 	} else if _, exists := db.cols[newName]; exists {
@@ -114,6 +110,8 @@ func (db *DB) Rename(oldName, newName string) error {
 
 // Truncate a collection - delete all documents and clear
 func (db *DB) Truncate(name string) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	}
@@ -131,6 +129,8 @@ func (db *DB) Truncate(name string) error {
 
 // Scrub a collection - fix corrupted documents and de-fragment free space.
 func (db *DB) Scrub(name string) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	}
@@ -181,6 +181,8 @@ func (db *DB) Scrub(name string) error {
 
 // Drop a collection and lose all of its documents and indexes.
 func (db *DB) Drop(name string) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	} else if err := db.cols[name].close(); err != nil {
@@ -192,8 +194,42 @@ func (db *DB) Drop(name string) error {
 	return nil
 }
 
+// Synchronize all database file buffers.
+func (db *DB) Sync() error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+	errs := make([]error, 0, 0)
+	for _, col := range db.cols {
+		if err := col.sync(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%v", errs)
+}
+
+// Close all database files. Do not use the DB afterwards!
+func (db *DB) Close() error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+	errs := make([]error, 0, 0)
+	for _, col := range db.cols {
+		if err := col.close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%v", errs)
+}
+
 // Copy this database into destination directory (for backup).
 func (db *DB) Dump(dest string) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
 	cpFun := func(currPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

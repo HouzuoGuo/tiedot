@@ -125,7 +125,16 @@ func (part *Partition) Clear() (err error) {
 	return
 }
 
-// Close all file handles.
+// Synchronize file buffers.
+func (part *Partition) Sync() (err error) {
+	if err = part.col.Sync(); err != nil {
+		return err
+	}
+	err = part.lookup.Sync()
+	return
+}
+
+// Synchronize file buffers and close file handles. Stop using the partition after the call!
 func (part *Partition) Close() (err error) {
 	var failure bool
 	if err = part.col.Close(); err != nil {

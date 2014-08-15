@@ -29,6 +29,9 @@ func TestPartitionDocCRUD(t *testing.T) {
 	if readback, err := part.Read(1); err != nil || string(readback) != "1 " {
 		t.Fatal(err, readback)
 	}
+	if err = part.Sync(); err != nil {
+		t.Fatal(err)
+	}
 	if readback, err := part.Read(2); err != nil || string(readback) != "2 " {
 		t.Fatal(err, readback)
 	}
@@ -49,6 +52,9 @@ func TestPartitionDocCRUD(t *testing.T) {
 	if _, err = part.Read(1); err == nil {
 		t.Fatal("Did not error")
 	}
+	if err = part.Sync(); err != nil {
+		t.Fatal(err)
+	}
 	if err = part.Delete(123); err == nil {
 		t.Fatal("Did not error")
 	}
@@ -61,6 +67,9 @@ func TestPartitionDocCRUD(t *testing.T) {
 	})
 	// Finish up
 	if err = part.Clear(); err != nil {
+		t.Fatal(err)
+	}
+	if err = part.Sync(); err != nil {
 		t.Fatal(err)
 	}
 	if err = part.Close(); err != nil {

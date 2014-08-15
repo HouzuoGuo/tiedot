@@ -204,6 +204,9 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 	if doc := col.Read(col.Used); doc != nil {
 		t.Fatalf("Read invalid location")
 	}
+	if err = col.Sync(); err != nil {
+		t.Fatal(err)
+	}
 	if doc := col.Read(col.Size); doc != nil {
 		t.Fatalf("Read invalid location")
 	}
@@ -219,6 +222,9 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 	}
 	if _, err := col.Update(col.Size, []byte{}); err == nil {
 		t.Fatalf("Update invalid location")
+	}
+	if err = col.Sync(); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := col.Update(999999999, []byte{}); err == nil {
 		t.Fatalf("Update invalid location")
@@ -236,6 +242,9 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 	if err = col.Delete(999999999); err == nil {
 		t.Fatal("did not error")
 	}
+	if err = col.Sync(); err != nil {
+		t.Fatal(err)
+	}
 	// Insert - not enough room
 	count := uint64(0)
 	for i := 0; i < COL_FILE_GROWTH; i += DOC_MAX_ROOM {
@@ -247,6 +256,9 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 	if _, err := col.Insert(make([]byte, DOC_MAX_ROOM/2)); err != nil {
 		t.Fatal(err)
 	}
+	if err = col.Sync(); err != nil {
+		t.Fatal(err)
+	}
 	count++
 	calculatedUsedSize += count * (DOC_HEADER + DOC_MAX_ROOM)
 	if col.Used != calculatedUsedSize {
@@ -254,6 +266,9 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 	}
 	if col.Size != COL_FILE_GROWTH+col.Growth {
 		t.Fatalf("Size changed?! %d %d %d", col.Size, COL_FILE_GROWTH, col.Growth)
+	}
+	if err = col.Sync(); err != nil {
+		t.Fatal(err)
 	}
 	if err = col.Close(); err != nil {
 		t.Fatal(err)

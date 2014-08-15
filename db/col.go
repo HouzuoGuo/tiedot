@@ -67,7 +67,24 @@ func (col *Col) load() error {
 	return nil
 }
 
-// Close all collection files. Do not use the collection afterwards!
+// Synchronize all collection file buffers.
+func (col *Col) sync() error {
+	errs := make([]error, 0, 0)
+	if err := col.part.Sync(); err != nil {
+		errs = append(errs, err)
+	}
+	for _, ht := range col.hts {
+		if err := ht.Sync(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%v", errs)
+}
+
+// Synchronize all collection file buffers and close collection files. Do not use the collection afterwards!
 func (col *Col) close() error {
 	errs := make([]error, 0, 0)
 	if err := col.part.Close(); err != nil {
