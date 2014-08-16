@@ -20,7 +20,7 @@ func sameMap(m1 map[string]interface{}, m2 map[string]interface{}) bool {
 }
 
 // example.go written in test case style
-func TestAll(t *testing.T) {
+func TestExampleGo(t *testing.T) {
 	myDBDir := "/tmp/tiedot_test_embeddedExample"
 	os.RemoveAll(myDBDir)
 	defer os.RemoveAll(myDBDir)

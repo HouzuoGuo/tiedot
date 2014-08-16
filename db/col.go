@@ -102,9 +102,9 @@ func (col *Col) close() error {
 }
 
 // Do fun for all documents in the collection.
-func (col *Col) ForEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
+func (col *Col) forEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
 	// Process approx.4k documents in each iteration
-	partDiv := col.ApproxDocCount()
+	partDiv := col.approxDocCount()
 	if partDiv == 0 {
 		partDiv++
 	}
@@ -115,19 +115,29 @@ func (col *Col) ForEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
 	}
 }
 
+// Do fun for all documents in the collection.
+func (col *Col) ForEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
+	col.db.lock.RLock()
+	col.forEachDoc(fun)
+	col.db.lock.RUnlock()
+}
+
 // Create an index on the path.
 func (col *Col) Index(idxPath []string) (err error) {
 	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
+	col.db.lock.Lock()
 	if _, exists := col.indexPaths[idxName]; exists {
+		col.db.lock.Unlock()
 		return fmt.Errorf("Path %v is already indexed", idxPath)
 	}
 	col.indexPaths[idxName] = idxPath
 	idxFileName := path.Join(col.db.path, col.name, idxName)
 	if col.hts[idxName], err = data.OpenHashTable(idxFileName); err != nil {
+		col.db.lock.Unlock()
 		return err
 	}
 	// Put all documents on the new index
-	col.ForEachDoc(func(id uint64, doc []byte) (moveOn bool) {
+	col.forEachDoc(func(id uint64, doc []byte) (moveOn bool) {
 		var docObj map[string]interface{}
 		if err := json.Unmarshal(doc, &docObj); err != nil {
 			// Skip corrupted document
@@ -141,11 +151,13 @@ func (col *Col) Index(idxPath []string) (err error) {
 		}
 		return true
 	})
+	col.db.lock.Unlock()
 	return
 }
 
 // Return all indexed paths.
 func (col *Col) AllIndexes() (ret [][]string) {
+	col.db.lock.RLock()
 	ret = make([][]string, 0, len(col.indexPaths))
 	for _, path := range col.indexPaths {
 		pathCopy := make([]string, len(path))
@@ -154,32 +166,44 @@ func (col *Col) AllIndexes() (ret [][]string) {
 		}
 		ret = append(ret, pathCopy)
 	}
+	col.db.lock.RUnlock()
 	return ret
 }
 
 // Remove an index.
-func (col *Col) Unindex(idxPath []string) error {
+func (col *Col) Unindex(idxPath []string) (err error) {
 	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
+	col.db.lock.Lock()
 	if _, exists := col.indexPaths[idxName]; !exists {
+		col.db.lock.Unlock()
 		return fmt.Errorf("Path %v is not indexed", idxPath)
 	}
 	delete(col.indexPaths, idxName)
 	col.hts[idxName].Close()
 	delete(col.hts, idxName)
-	if err := os.RemoveAll(path.Join(col.db.path, col.name, idxName)); err != nil {
-		return err
-	}
-	return nil
+	err = os.RemoveAll(path.Join(col.db.path, col.name, idxName))
+	col.db.lock.Unlock()
+	return
+}
+
+func (col *Col) approxDocCount() uint64 {
+	return col.part.ApproxDocCount()
 }
 
 // Return approximate number of documents in the collection.
-func (col *Col) ApproxDocCount() uint64 {
-	return col.part.ApproxDocCount()
+func (col *Col) ApproxDocCount() (ret uint64) {
+	col.db.lock.RLock()
+	ret = col.part.ApproxDocCount()
+	col.db.lock.RUnlock()
+	return
 }
 
 // Divide the collection into roughly equally sized pages, and do fun on all documents in the specified page.
 func (col *Col) ForEachDocInPage(page, total uint64, fun func(id uint64, doc []byte) bool) {
+	col.db.lock.RLock()
 	if !col.part.ForEachDoc(page, total, fun) {
+		col.db.lock.RUnlock()
 		return
 	}
+	col.db.lock.RUnlock()
 }

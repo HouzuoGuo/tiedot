@@ -151,13 +151,13 @@ func (db *DB) Scrub(name string) error {
 	if err != nil {
 		return err
 	}
-	db.cols[name].ForEachDoc(func(id uint64, doc []byte) bool {
+	db.cols[name].forEachDoc(func(id uint64, doc []byte) bool {
 		var docObj map[string]interface{}
 		if err := json.Unmarshal([]byte(doc), &docObj); err != nil {
 			// Skip corrupted document
 			return true
 		}
-		if err := tmpCol.InsertRecovery(id, docObj); err != nil {
+		if err := tmpCol.insertRecovery(id, docObj); err != nil {
 			tdlog.Noticef("Scrub %s: failed to insert back document %v", name, docObj)
 		}
 		return true
