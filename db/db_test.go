@@ -218,6 +218,7 @@ func TestColCrud(t *testing.T) {
 
 func TestDumpDB(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
+	os.RemoveAll(TEST_DATA_DIR + "bak")
 	defer os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR + "bak")
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {

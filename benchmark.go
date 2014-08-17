@@ -99,6 +99,7 @@ func benchmark() {
 	ids := make([]int, 0, benchSize)
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_bench"
+	os.RemoveAll(tmp)
 	if benchCleanup {
 		defer os.RemoveAll(tmp)
 	}
@@ -167,6 +168,7 @@ func benchmark2() {
 
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_bench2"
+	os.RemoveAll(tmp)
 	if benchCleanup {
 		defer os.RemoveAll(tmp)
 	}

@@ -43,6 +43,7 @@ func TestBenchmark1(t *testing.T) {
 	ids := make([]int, 0, benchTestSize)
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_test_bench1"
+	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
 	benchDB, col := mkTmpDBAndCol(tmp, "tmp")
 	defer benchDB.Close()
@@ -114,6 +115,7 @@ func TestBenchmark2(t *testing.T) {
 
 	// Prepare a collection with two indexes
 	tmp := "/tmp/tiedot_test_bench2"
+	os.RemoveAll(tmp)
 	defer os.RemoveAll(tmp)
 	benchdb, col := mkTmpDBAndCol(tmp, "tmp")
 	defer benchdb.Close()
@@ -230,6 +232,7 @@ func TestBenchmark2(t *testing.T) {
 				panic("Wrong collections in benchmark db")
 			}
 		}
+		os.RemoveAll("/tmp/tiedot_test_bench2_dump")
 		defer os.RemoveAll("/tmp/tiedot_test_bench2_dump")
 		if err := benchdb.Dump("/tmp/tiedot_test_bench2_dump"); err != nil {
 			panic(err)
