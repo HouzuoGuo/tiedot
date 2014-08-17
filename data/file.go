@@ -5,6 +5,7 @@ import (
 	"github.com/HouzuoGuo/tiedot/gommap"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"os"
+	"runtime"
 )
 
 // Data file keeps track of the amount of total and used space.
@@ -109,8 +110,16 @@ func (file *DataFile) Sync() (err error) {
 func (file *DataFile) Close() (err error) {
 	if err = file.Buf.Unmap(); err != nil {
 		return
-	} else if err = file.Fh.Sync(); err != nil {
-		return
+	}
+	if runtime.GOOS != "windows" {
+		/*
+			Thanks Microsoft - Fh.Sync loves to finish its work in an async manner.
+			Should database operations be carried out shortly after Fh.Sync call.
+			Everything from there will slow down to a claw.
+		*/
+		if err = file.Fh.Sync(); err != nil {
+			return
+		}
 	}
 	return file.Fh.Close()
 }
