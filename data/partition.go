@@ -110,7 +110,7 @@ func (part *Partition) ForEachDoc(partNum, totalPart int, fun func(id int, doc [
 
 // Return approximate number of documents in the partition.
 func (part *Partition) ApproxDocCount() int {
-	totalPart := 20 // not magic; a larger number makes estimation less accurate, but improves performance
+	totalPart := 24 // not magic; a larger number makes estimation less accurate, but improves performance
 	for {
 		keys, _ := part.lookup.GetPartition(0, totalPart)
 		if len(keys) == 0 {
