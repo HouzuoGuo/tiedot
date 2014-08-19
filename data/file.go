@@ -95,13 +95,6 @@ func (file *DataFile) EnsureSize(more int) (err error) {
 
 // Synchronize modified file buffer back to file system.
 func (file *DataFile) Sync() (err error) {
-	if err = file.Close(); err != nil {
-		return
-	} else if file.Fh, err = os.OpenFile(file.Path, os.O_CREATE|os.O_RDWR, 0600); err != nil {
-		return
-	} else if file.Buf, err = gommap.Map(file.Fh); err != nil {
-		return
-	}
 	return
 }
 
