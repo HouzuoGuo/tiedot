@@ -2,6 +2,7 @@ package binprot
 
 import (
 	"bufio"
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"net"
 )
@@ -22,23 +23,34 @@ const (
 
 	C_RELOAD   = 91
 	C_SHUTDOWN = 92
+	C_PING     = 93
+	C_PING_ERR = 94
+
+	C_US  = 31
+	C_RS  = 30
+	C_OK  = 0
+	C_ERR = 1
 )
 
 func (srv *BinProtSrv) Serve(conn net.Conn) {
 	in := bufio.NewReader(conn)
 	out := bufio.NewWriter(conn)
 	for {
-		cmd, err := in.ReadByte()
+		cmd, params, err := SrvReadCmd(in)
+		fmt.Println("CMD", cmd, params, err)
 		if err != nil {
 			tdlog.Noticef("Lost connection to client")
 			return
 		}
 		switch cmd {
-		case C_SHUTDOWN:
-			srv.Shutdown()
-			conn.Close()
-			return
+		case C_PING:
+			if err = SrvAnsOK(out); err != nil {
+				return
+			}
+		case C_PING_ERR:
+			if err = SrvAnsErr(out, "this is an error"); err != nil {
+				return
+			}
 		}
-		out.WriteByte(1)
 	}
 }

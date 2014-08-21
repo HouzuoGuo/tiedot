@@ -26,11 +26,11 @@ func NewServer(myRank, nProcs int, workspace string) (srv *BinProtSrv) {
 		nProcs:    nProcs,
 		workspace: workspace,
 		dbPath:    path.Join(workspace, strconv.Itoa(myRank)),
-		sockPath:  path.Join(workspace, strconv.Itoa(myRank), "sock")}
+		sockPath:  path.Join(workspace, strconv.Itoa(myRank), SOCK_FILE)}
 	return srv
 }
 
-func (srv *BinProtSrv) Start() (err error) {
+func (srv *BinProtSrv) Run() (err error) {
 	os.Remove(srv.sockPath)
 	if srv.db, err = db.OpenDB(srv.dbPath); err != nil {
 		return
@@ -40,7 +40,8 @@ func (srv *BinProtSrv) Start() (err error) {
 	for {
 		conn, err := srv.srvSock.Accept()
 		if err != nil {
-			tdlog.Noticef("Accept failed on socket, error %v", err)
+			tdlog.Noticef("Server is closing down: %v", err)
+			return nil
 		}
 		go srv.Serve(conn)
 	}
@@ -49,8 +50,5 @@ func (srv *BinProtSrv) Start() (err error) {
 func (srv *BinProtSrv) Shutdown() {
 	if err := srv.srvSock.Close(); err != nil {
 		tdlog.Noticef("Failed to close server socket: %v", err)
-	}
-	if err := os.Remove(srv.sockPath); err != nil {
-		tdlog.Noticef("Failed to remove closed server socket: %v", err)
 	}
 }
