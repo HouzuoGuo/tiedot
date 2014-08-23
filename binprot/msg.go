@@ -1,3 +1,5 @@
+// Message handling utility functions.
+
 package binprot
 
 import (
@@ -5,6 +7,7 @@ import (
 	"bytes"
 )
 
+// Server reads a "CMD-PARAM-US-PARAM-RS" command sent by client.
 func SrvReadCmd(in *bufio.Reader) (cmd byte, params [][]byte, err error) {
 	if cmd, err = in.ReadByte(); err != nil {
 		return
@@ -18,6 +21,7 @@ func SrvReadCmd(in *bufio.Reader) (cmd byte, params [][]byte, err error) {
 	return
 }
 
+// Server answers "OK-INFO-US-INFO-RS".
 func SrvAnsOK(out *bufio.Writer, moreInfo ...[]byte) (err error) {
 	if err = out.WriteByte(C_OK); err != nil {
 		return
@@ -35,6 +39,7 @@ func SrvAnsOK(out *bufio.Writer, moreInfo ...[]byte) (err error) {
 	return out.Flush()
 }
 
+// Server answers "ERR-MSG-RS".
 func SrvAnsErr(out *bufio.Writer, errMsg string) (err error) {
 	if err = out.WriteByte(C_ERR); err != nil {
 		return
@@ -47,6 +52,7 @@ func SrvAnsErr(out *bufio.Writer, errMsg string) (err error) {
 	return out.Flush()
 }
 
+// Client sends a "CMD-PARAM-US-PARAM-RS" command to server.
 func ClientWriteCmd(out *bufio.Writer, cmd byte, params ...[]byte) (err error) {
 	if err = out.WriteByte(cmd); err != nil {
 		return
@@ -64,6 +70,7 @@ func ClientWriteCmd(out *bufio.Writer, cmd byte, params ...[]byte) (err error) {
 	return out.Flush()
 }
 
+// Client reads server's response.
 func ClientReadAns(in *bufio.Reader) (moreInfo [][]byte, err error) {
 	status, err := in.ReadByte()
 	if err != nil {

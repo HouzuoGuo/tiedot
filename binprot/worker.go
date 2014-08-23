@@ -1,8 +1,11 @@
+// The IO loop for serving an incoming connection.
 package binprot
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"net"
 )
@@ -32,25 +35,58 @@ const (
 	C_ERR = 1
 )
 
+// Close and reopen database.
+func (srv *BinProtSrv) reload() (err error) {
+	if err = srv.db.Close(); err != nil {
+		return
+	}
+	srv.db, err = db.OpenDB(srv.dbPath)
+	return
+}
+
+// The IO loop of serving an incoming connection. Block until the connection is closed or server shuts down.
 func (srv *BinProtSrv) Serve(conn net.Conn) {
 	in := bufio.NewReader(conn)
 	out := bufio.NewWriter(conn)
+
+	var lastIOErr error
+
+	// Answer C_OK or C_ERR according to outcome of the function execution.
+	okOrErr := func(fun func() error) {
+		funErr := fun()
+		if funErr == nil {
+			lastIOErr = SrvAnsOK(out)
+		} else {
+			lastIOErr = SrvAnsErr(out, funErr.Error())
+		}
+	}
+
 	for {
+		if lastIOErr != nil {
+			tdlog.Noticef("Lost connection to client: %v", lastIOErr)
+		}
 		cmd, params, err := SrvReadCmd(in)
 		fmt.Println("CMD", cmd, params, err)
 		if err != nil {
-			tdlog.Noticef("Lost connection to client")
+			tdlog.Noticef("Lost connection to client: %v", err)
 			return
 		}
+		if srv.db == nil {
+			okOrErr(func() error {
+				return errors.New("Database is not opened yet")
+			})
+		}
 		switch cmd {
+		case C_RELOAD:
+			okOrErr(srv.reload)
 		case C_PING:
-			if err = SrvAnsOK(out); err != nil {
-				return
-			}
+			okOrErr(func() error {
+				return nil
+			})
 		case C_PING_ERR:
-			if err = SrvAnsErr(out, "this is an error"); err != nil {
-				return
-			}
+			okOrErr(func() error {
+				return errors.New("this is an error")
+			})
 		}
 	}
 }

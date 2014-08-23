@@ -1,3 +1,5 @@
+// Binary protocol over IPC - server.
+
 package binprot
 
 import (
@@ -10,9 +12,10 @@ import (
 )
 
 const (
-	SOCK_FILE = "sock"
+	SOCK_FILE = "sock" // name of server rank's Unix socket file
 )
 
+// Bin protocol server opens a database of its rank, and listens on a Unix domain socket.
 type BinProtSrv struct {
 	myRank, nProcs              int
 	workspace, dbPath, sockPath string
@@ -20,6 +23,7 @@ type BinProtSrv struct {
 	db                          *db.DB
 }
 
+// Create a server, but do not yet start serving incoming connections.
 func NewServer(myRank, nProcs int, workspace string) (srv *BinProtSrv) {
 	srv = &BinProtSrv{
 		myRank:    myRank,
@@ -30,6 +34,7 @@ func NewServer(myRank, nProcs int, workspace string) (srv *BinProtSrv) {
 	return srv
 }
 
+// Serve incoming connections. Block until server is told to shutdown.
 func (srv *BinProtSrv) Run() (err error) {
 	os.Remove(srv.sockPath)
 	if srv.db, err = db.OpenDB(srv.dbPath); err != nil {
@@ -47,6 +52,7 @@ func (srv *BinProtSrv) Run() (err error) {
 	}
 }
 
+// Stop serving new/existing connections and shut server down.
 func (srv *BinProtSrv) Shutdown() {
 	if err := srv.srvSock.Close(); err != nil {
 		tdlog.Noticef("Failed to close server socket: %v", err)

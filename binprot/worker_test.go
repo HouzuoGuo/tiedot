@@ -10,7 +10,7 @@ const (
 	WS = "/tmp/tiedot_binprot_test"
 )
 
-func TestPingPong(t *testing.T) {
+func TestPing(t *testing.T) {
 	os.RemoveAll(WS)
 	srv := NewServer(0, 0, WS)
 	go func() {

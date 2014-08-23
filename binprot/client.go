@@ -1,3 +1,5 @@
+// Binary protocol over IPC - client.
+
 package binprot
 
 import (
@@ -9,6 +11,7 @@ import (
 	"strconv"
 )
 
+// Bin protocol client connects to server via Unix domain socket.
 type BinProtClient struct {
 	rank                int
 	workspace, sockPath string
@@ -17,6 +20,7 @@ type BinProtClient struct {
 	out                 *bufio.Writer
 }
 
+// Create a client and immediately connect to server.
 func NewClient(rank int, workspace string) (client *BinProtClient, err error) {
 	client = &BinProtClient{
 		rank:      rank,
@@ -30,6 +34,7 @@ func NewClient(rank int, workspace string) (client *BinProtClient, err error) {
 	return
 }
 
+// Ping server to test server reachability.
 func (client *BinProtClient) Ping() (err error) {
 	if err = ClientWriteCmd(client.out, C_PING); err != nil {
 		return
@@ -38,6 +43,7 @@ func (client *BinProtClient) Ping() (err error) {
 	return
 }
 
+// Ping server and expect an ERR response (for test case only).
 func (client *BinProtClient) PingErr() (err error) {
 	if err = ClientWriteCmd(client.out, C_PING_ERR); err != nil {
 		return
@@ -48,6 +54,7 @@ func (client *BinProtClient) PingErr() (err error) {
 	return
 }
 
+// Disconnect from server, and render the client useless.
 func (client *BinProtClient) Shutdown() {
 	if err := client.sock.Close(); err != nil {
 		tdlog.Noticef("Failed to close client socket: %v", err)
