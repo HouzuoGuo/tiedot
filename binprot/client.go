@@ -9,54 +9,75 @@ import (
 	"net"
 	"path"
 	"strconv"
+	"time"
 )
 
-// Bin protocol client connects to server via Unix domain socket.
+// Bin protocol client connects to servers via Unix domain socket.
 type BinProtClient struct {
-	rank                int
-	workspace, sockPath string
-	sock                net.Conn
-	in                  *bufio.Reader
-	out                 *bufio.Writer
+	workspace string
+	sock      []net.Conn
+	in        []*bufio.Reader
+	out       []*bufio.Writer
 }
 
 // Create a client and immediately connect to server.
-func NewClient(rank int, workspace string) (client *BinProtClient, err error) {
+func NewClient(workspace string) (client *BinProtClient, err error) {
 	client = &BinProtClient{
-		rank:      rank,
 		workspace: workspace,
-		sockPath:  path.Join(workspace, strconv.Itoa(rank), SOCK_FILE)}
-	if client.sock, err = net.Dial("unix", client.sockPath); err != nil {
-		return
+		sock : make([]net.Conn, 0, 8),
+		in : make([]*bufio.Reader, 0, 8),
+		out: make([]*bufio.Writer, 0, 8)}
+	for i := 0; ; i++ {
+		connSuccessful := false
+		for attempt := 0; attempt < 5; attempt++ {
+			sockPath := path.Join(workspace, strconv.Itoa(i), SOCK_FILE)
+			sock, err := net.Dial("unix", sockPath)
+			if err != nil {
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
+			client.sock = append(client.sock, sock)
+			client.in = append(client.in, bufio.NewReader(client.sock[i]))
+			client.out = append(client.out, bufio.NewWriter(client.sock[i]))
+			connSuccessful = true
+		}
+		if !connSuccessful {
+			if i == 0 {
+					err = fmt.Errorf("No server seems to be running on %s", workspace)
+			} else {
+				tdlog.Noticef("Client successfully connected to %d server ranks", i)
+			}
+			return
+		}
 	}
-	client.in = bufio.NewReader(client.sock)
-	client.out = bufio.NewWriter(client.sock)
 	return
 }
 
-// Ping server to test server reachability.
+// (Only for test case) ping server 0 and expect an OK response.
 func (client *BinProtClient) Ping() (err error) {
-	if err = ClientWriteCmd(client.out, C_PING); err != nil {
+	if err = ClientWriteCmd(client.out[0], C_PING); err != nil {
 		return
 	}
-	_, err = ClientReadAns(client.in)
+	_, err = ClientReadAns(client.in[0])
 	return
 }
 
-// Ping server and expect an ERR response (for test case only).
+// (Only for test case) ping server 0 and expect an ERR response.
 func (client *BinProtClient) PingErr() (err error) {
-	if err = ClientWriteCmd(client.out, C_PING_ERR); err != nil {
+	if err = ClientWriteCmd(client.out[0], C_PING_ERR); err != nil {
 		return
 	}
-	if msg, err := ClientReadAns(client.in); err != nil || string(msg[0]) != "this is an error" {
+	if msg, err := ClientReadAns(client.in[0]); err != nil || string(msg[0]) != "this is an error" {
 		return fmt.Errorf("IO error or unexpected response: %v %v %v", msg[0], err, []byte("this is an error"))
 	}
 	return
 }
 
-// Disconnect from server, and render the client useless.
+// Disconnect from all servers, and render the client useless.
 func (client *BinProtClient) Shutdown() {
-	if err := client.sock.Close(); err != nil {
-		tdlog.Noticef("Failed to close client socket: %v", err)
+	for _, sock := range client.sock {
+		if err := sock.Close(); err != nil {
+			tdlog.Noticef("Failed to close client socket: %v", err)
+		}
 	}
 }

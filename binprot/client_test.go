@@ -3,7 +3,6 @@ package binprot
 import (
 	"os"
 	"testing"
-	"time"
 )
 
 const (
@@ -18,9 +17,8 @@ func TestPing(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	time.Sleep(100 * time.Millisecond)
 
-	client, err := NewClient(0, WS)
+	client, err := NewClient(WS)
 	if err != nil {
 		t.Fatal(err)
 	}

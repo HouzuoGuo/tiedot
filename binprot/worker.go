@@ -11,10 +11,6 @@ import (
 )
 
 const (
-	C_COL_CREATE = 1
-	C_COL_RENAME = 2
-	C_COL_DROP   = 3
-
 	C_DOC_INSERT = 11
 	C_DOC_READ   = 12
 	C_DOC_UPDATE = 13
