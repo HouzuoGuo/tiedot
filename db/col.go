@@ -24,11 +24,12 @@ type Col struct {
 	part       *data.Partition            // Collection partitions
 	hts        map[string]*data.HashTable // Index partitions
 	indexPaths map[string][]string        // Index names and paths
+	locked     map[uint64]bool            // (BinProt only) documents that are locked for update
 }
 
 // Open a collection and load all indexes.
 func OpenCol(db *DB, name string) (*Col, error) {
-	col := &Col{db: db, name: name}
+	col := &Col{db: db, name: name, locked: make(map[uint64]bool)}
 	return col, col.load()
 }
 

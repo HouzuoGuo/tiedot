@@ -73,6 +73,8 @@ func (srv *BinProtSrv) Serve(conn net.Conn) {
 			})
 		}
 		switch cmd {
+		case C_DOC_INSERT:
+
 		case C_RELOAD:
 			okOrErr(srv.reload)
 		case C_PING:

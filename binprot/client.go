@@ -24,9 +24,9 @@ type BinProtClient struct {
 func NewClient(workspace string) (client *BinProtClient, err error) {
 	client = &BinProtClient{
 		workspace: workspace,
-		sock : make([]net.Conn, 0, 8),
-		in : make([]*bufio.Reader, 0, 8),
-		out: make([]*bufio.Writer, 0, 8)}
+		sock:      make([]net.Conn, 0, 8),
+		in:        make([]*bufio.Reader, 0, 8),
+		out:       make([]*bufio.Writer, 0, 8)}
 	for i := 0; ; i++ {
 		connSuccessful := false
 		for attempt := 0; attempt < 5; attempt++ {
@@ -43,7 +43,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 		}
 		if !connSuccessful {
 			if i == 0 {
-					err = fmt.Errorf("No server seems to be running on %s", workspace)
+				err = fmt.Errorf("No server seems to be running on %s", workspace)
 			} else {
 				tdlog.Noticef("Client successfully connected to %d server ranks", i)
 			}
