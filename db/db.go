@@ -194,22 +194,6 @@ func (db *DB) Drop(name string) error {
 	return nil
 }
 
-// Synchronize all database file buffers.
-func (db *DB) Sync() error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
-	errs := make([]error, 0, 0)
-	for _, col := range db.cols {
-		if err := col.sync(); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if len(errs) == 0 {
-		return nil
-	}
-	return fmt.Errorf("%v", errs)
-}
-
 // Close all database files. Do not use the DB afterwards!
 func (db *DB) Close() error {
 	db.lock.Lock()

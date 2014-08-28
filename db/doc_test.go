@@ -133,9 +133,6 @@ func TestDocCrudAndIdx(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err = col.sync(); err != nil {
-		t.Fatal(err)
-	}
 	// Read documents and verify index
 	if _, err = col.Read(123456); err == nil {
 		t.Fatal("Did not error")
@@ -176,9 +173,6 @@ func TestDocCrudAndIdx(t *testing.T) {
 			}
 		}
 	}
-	if err = col.sync(); err != nil {
-		t.Fatal(err)
-	}
 	// Delete half of those documents
 	if err = col.Delete(654321); err == nil {
 		t.Fatal("Did not error")
@@ -190,9 +184,6 @@ func TestDocCrudAndIdx(t *testing.T) {
 		if err := col.Delete(docIDs[i]); err == nil {
 			t.Fatal("Did not error")
 		}
-	}
-	if err = db.Sync(); err != nil {
-		t.Fatal(err)
 	}
 
 	// After delete - verify
@@ -217,9 +208,6 @@ func TestDocCrudAndIdx(t *testing.T) {
 	}
 	// Recreate index and verify
 	if err = col.Unindex([]string{"a", "b"}); err != nil {
-		t.Fatal(err)
-	}
-	if err = col.sync(); err != nil {
 		t.Fatal(err)
 	}
 	if err = col.Index([]string{"a", "b"}); err != nil {
@@ -269,9 +257,6 @@ func TestDocCrudAndIdx(t *testing.T) {
 	if col.ApproxDocCount() < 600 || col.ApproxDocCount() > 1400 {
 		t.Fatal("Approximate is way off", col.ApproxDocCount())
 	}
-	if err = db.Sync(); err != nil {
-		t.Fatal(err)
-	}
 	// Read back all documents page by pabe
 	totalPage := col.ApproxDocCount() / 100
 	collectedIDs := make(map[uint64]struct{})
@@ -284,9 +269,6 @@ func TestDocCrudAndIdx(t *testing.T) {
 	}
 	if len(collectedIDs) != numDocs/2 {
 		t.Fatal("Wrong number of docs", len(collectedIDs))
-	}
-	if err = db.Sync(); err != nil {
-		t.Fatal(err)
 	}
 	if err = db.Close(); err != nil {
 		t.Fatal(err)

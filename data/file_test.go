@@ -27,9 +27,6 @@ func TestOpenFlushClose(t *testing.T) {
 	if tmpFile.Fh == nil || tmpFile.Buf == nil {
 		t.Fatal("Not mmapped")
 	}
-	if err := tmpFile.Sync(); err != nil {
-		t.Fatal(err)
-	}
 	if err := tmpFile.Close(); err != nil {
 		t.Fatalf("Failed to close: %v", err)
 	}
@@ -60,10 +57,7 @@ func TestFindingAppendAndClear(t *testing.T) {
 	if tmpFile.Used != 501 {
 		t.Fatal("Incorrect Used")
 	}
-	// Sync and then write
-	if err := tmpFile.Sync(); err != nil {
-		t.Fatal(err)
-	}
+	// Write again
 	for i := 750; i < 800; i++ {
 		tmpFile.Buf[i] = byte('a')
 	}
@@ -86,9 +80,6 @@ func TestFindingAppendAndClear(t *testing.T) {
 	}
 	// Can still write to the buffer?
 	tmpFile.Buf[999] = 1
-	if err := tmpFile.Sync(); err != nil {
-		t.Fatal(err)
-	}
 	tmpFile.Close()
 }
 
@@ -123,8 +114,5 @@ func TestFileGrow(t *testing.T) {
 	// Can write to the new (now larger) region
 	tmpFile.Buf[10] = 1
 	tmpFile.Buf[11] = 1
-	if err := tmpFile.Sync(); err != nil {
-		t.Fatal(err)
-	}
 	tmpFile.Close()
 }

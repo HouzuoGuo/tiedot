@@ -33,15 +33,12 @@ func TestOpenEmptyDB(t *testing.T) {
 	if len(db.cols) != 1 {
 		t.Fatal(db.cols)
 	}
-	if err = db.Sync(); err != nil {
-		t.Fatal(err)
-	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestOpenSyncCloseDB(t *testing.T) {
+func TestOpenCloseDB(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
@@ -58,9 +55,6 @@ func TestOpenSyncCloseDB(t *testing.T) {
 	}
 	if db.path != TEST_DATA_DIR || db.cols["ColA"] == nil || db.cols["ColB"] == nil {
 		t.Fatal(db.cols)
-	}
-	if err = db.Sync(); err != nil {
-		t.Fatal(err)
 	}
 	colA := db.cols["ColA"]
 	colB := db.cols["ColB"]
@@ -115,9 +109,6 @@ func TestColCrud(t *testing.T) {
 	if db.Rename("a", "b") == nil {
 		t.Fatal("Did not error")
 	}
-	if err = db.Sync(); err != nil {
-		t.Fatal(err)
-	}
 	if db.Rename("abc", "b") == nil {
 		t.Fatal("Did not error")
 	}
@@ -139,9 +130,6 @@ func TestColCrud(t *testing.T) {
 		t.Fatal("Did not error")
 	}
 	if err := db.Truncate("c"); err != nil {
-		t.Fatal(err)
-	}
-	if err = db.Sync(); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Truncate("d"); err != nil {
@@ -178,9 +166,6 @@ func TestColCrud(t *testing.T) {
 	}
 	if db.Use("d") == nil {
 		t.Fatal(db.cols)
-	}
-	if err = db.Sync(); err != nil {
-		t.Fatal(err)
 	}
 	if err := db.Drop("d"); err != nil {
 		t.Fatal(err)
@@ -222,9 +207,6 @@ func TestDumpDB(t *testing.T) {
 	// Open the new database
 	db2, err := OpenDB(TEST_DATA_DIR + "bak")
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err = db.Sync(); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {

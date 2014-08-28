@@ -146,12 +146,6 @@ func embeddedExample() {
 		fmt.Printf("Query returned document %v\n", readBack)
 	}
 
-	// Synchronize all file buffers to ensure immediate data durability
-	// Expensive operation - normally you do not have to call it manually.
-	if err := myDB.Sync(); err != nil {
-		panic(err)
-	}
-
 	// Gracefully close database, you should call Close on all opened databases
 	if err := myDB.Close(); err != nil {
 		panic(err)

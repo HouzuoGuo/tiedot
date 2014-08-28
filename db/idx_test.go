@@ -30,9 +30,6 @@ func TestIdxCRUD(t *testing.T) {
 	if col.Index([]string{"a", "b"}) == nil {
 		t.Fatal(col.indexPaths, "Did not error")
 	}
-	if err = col.sync(); err != nil {
-		t.Fatal(err)
-	}
 	if len(col.AllIndexes()) != 1 || col.AllIndexes()[0][0] != "a" || col.AllIndexes()[0][1] != "b" {
 		t.Fatal(col.AllIndexes())
 	}
@@ -58,14 +55,8 @@ func TestIdxCRUD(t *testing.T) {
 	if err = col.Unindex([]string{"a", "b"}); err != nil {
 		t.Fatal(err)
 	}
-	if err = col.sync(); err != nil {
-		t.Fatal(err)
-	}
 	if len(col.AllIndexes()) != 0 {
 		t.Fatal(col.AllIndexes())
-	}
-	if err = db.Sync(); err != nil {
-		t.Fatal(err)
 	}
 	if err = db.Close(); err != nil {
 		t.Fatal(err)
