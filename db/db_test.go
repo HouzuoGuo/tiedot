@@ -57,7 +57,7 @@ func TestOpenErrDB(t *testing.T) {
 	}
 }
 
-func TestOpenSyncCloseDB(t *testing.T) {
+func TestOpenCloseDB(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
@@ -91,9 +91,6 @@ func TestOpenSyncCloseDB(t *testing.T) {
 	}
 	if len(colB.parts) != 2 || len(colB.hts) != 2 {
 		t.Fatal(colB)
-	}
-	if err := db.Sync(); err != nil {
-		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
@@ -206,10 +203,6 @@ func TestColCrud(t *testing.T) {
 	}
 	if db.Use("d") != nil {
 		t.Fatal(db.cols)
-	}
-	// Sync & close
-	if err := db.Sync(); err != nil {
-		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)

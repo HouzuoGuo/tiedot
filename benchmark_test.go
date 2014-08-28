@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-var benchTestSize = 50000
+var benchTestSize = 100000
 
 func averageTest(name string, fun func()) {
 	numThreads := runtime.GOMAXPROCS(-1)
@@ -37,7 +37,6 @@ func averageTest(name string, fun func()) {
 
 // benchmark(1) written in test case style
 func TestBenchmark1(t *testing.T) {
-	return
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	rand.Seed(time.Now().UnixNano())
 
@@ -103,7 +102,6 @@ func TestBenchmark1(t *testing.T) {
 
 // benchmark2 written in test case style
 func TestBenchmark2(t *testing.T) {
-	return
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	rand.Seed(time.Now().UnixNano())
 

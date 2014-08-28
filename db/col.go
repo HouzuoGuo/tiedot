@@ -79,27 +79,6 @@ func (col *Col) load() error {
 	return nil
 }
 
-// Synchronize all data files to disk.
-func (col *Col) sync() error {
-	errs := make([]error, 0, 0)
-	for i := 0; i < col.db.numParts; i++ {
-		col.parts[i].Lock.Lock()
-		if err := col.parts[i].Sync(); err != nil {
-			errs = append(errs, err)
-		}
-		for _, ht := range col.hts[i] {
-			if err := ht.Sync(); err != nil {
-				errs = append(errs, err)
-			}
-		}
-		col.parts[i].Lock.Unlock()
-	}
-	if len(errs) == 0 {
-		return nil
-	}
-	return fmt.Errorf("%v", errs)
-}
-
 // Close all collection files. Do not use the collection afterwards!
 func (col *Col) close() error {
 	errs := make([]error, 0, 0)

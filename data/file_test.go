@@ -27,9 +27,6 @@ func TestOpenFlushClose(t *testing.T) {
 	if tmpFile.Fh == nil || tmpFile.Buf == nil {
 		t.Fatal("Not mmapped")
 	}
-	if err := tmpFile.Sync(); err != nil {
-		t.Fatalf("Failed to flush: %v", err)
-	}
 	if err := tmpFile.Close(); err != nil {
 		t.Fatalf("Failed to close: %v", err)
 	}

@@ -1,4 +1,4 @@
-// Common data file features - enlarge, close, sync, close, etc.
+// Common data file features - enlarge, close, close, etc.
 package data
 
 import (
@@ -93,12 +93,7 @@ func (file *DataFile) EnsureSize(more int) (err error) {
 	return file.EnsureSize(more)
 }
 
-// Synchronize modified file buffer back to file system.
-func (file *DataFile) Sync() (err error) {
-	return
-}
-
-// Un-map the file buffer, synchronize modified file, and close the file handle.
+// Un-map the file buffer and close the file handle.
 func (file *DataFile) Close() (err error) {
 	if err = file.Buf.Unmap(); err != nil {
 		return

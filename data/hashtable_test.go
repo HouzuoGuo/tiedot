@@ -65,9 +65,6 @@ func TestPutGetReopenClear(t *testing.T) {
 	if len(allKV) != 0 {
 		t.Fatal("Did not clear the hash table")
 	}
-	if err = reopened.Sync(); err != nil {
-		t.Fatal(err)
-	}
 	if err = reopened.Close(); err != nil {
 		t.Fatal(err)
 	}

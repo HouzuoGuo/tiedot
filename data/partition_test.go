@@ -74,9 +74,6 @@ func TestPartitionDocCRUD(t *testing.T) {
 	if err = part.Clear(); err != nil {
 		t.Fatal(err)
 	}
-	if err = part.Sync(); err != nil {
-		t.Fatal(err)
-	}
 	if err = part.Close(); err != nil {
 		t.Fatal(err)
 	}

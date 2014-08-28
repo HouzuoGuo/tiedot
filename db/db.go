@@ -19,24 +19,21 @@ import (
 )
 
 const (
-	PART_NUM_FILE      = "number_of_partitions" // DB-collection-partition-number-configuration file name
-	AUTO_SYNC_INTERVAL = 2000                   // Data file auto-save interval in milliseconds (do not set too small)
+	PART_NUM_FILE = "number_of_partitions" // DB-collection-partition-number-configuration file name
 )
 
 // Database structures.
 type DB struct {
-	path         string          // Root path of database directory
-	numParts     int             // Total number of partitions
-	cols         map[string]*Col // All collections
-	schemaLock   *sync.RWMutex   // Control access to collection instances.
-	autoSync     *time.Ticker    // Automatically synchronize all data files at regular interval
-	autoSyncStop chan struct{}   // Auto-sync routine stopper (on DB shutdown)
+	path       string          // Root path of database directory
+	numParts   int             // Total number of partitions
+	cols       map[string]*Col // All collections
+	schemaLock *sync.RWMutex   // Control access to collection instances.
 }
 
 // Open database and load all collections & indexes.
 func OpenDB(dbPath string) (*DB, error) {
 	rand.Seed(time.Now().UnixNano()) // document ID generation relies on this RNG
-	db := &DB{path: dbPath, schemaLock: new(sync.RWMutex), autoSyncStop: make(chan struct{})}
+	db := &DB{path: dbPath, schemaLock: new(sync.RWMutex)}
 	return db, db.load()
 }
 
@@ -80,52 +77,11 @@ func (db *DB) load() error {
 			return err
 		}
 	}
-	// Synchronize data files at regular interval
-	if db.autoSync == nil {
-		db.autoSync = time.NewTicker(AUTO_SYNC_INTERVAL * time.Millisecond)
-		go func() {
-			for {
-				select {
-				case <-db.autoSync.C:
-					if err := db.Sync(); err != nil {
-						tdlog.Noticef("Background Auto-Sync on %s: Failed with error: %v", db.path, err)
-					}
-				case <-db.autoSyncStop:
-					db.autoSync.Stop()
-					return
-				}
-			}
-		}()
-	}
 	return err
-}
-
-func (db *DB) sync(placeSchemaLock bool) error {
-	if placeSchemaLock {
-		// File buffers are replaced, therefore it requires exclusive locks
-		db.schemaLock.Lock()
-		defer db.schemaLock.Unlock()
-	}
-	errs := make([]error, 0, 0)
-	for _, col := range db.cols {
-		if err := col.sync(); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if len(errs) == 0 {
-		return nil
-	}
-	return fmt.Errorf("%v", errs)
-}
-
-// Synchronize all data files to disk.
-func (db *DB) Sync() error {
-	return db.sync(true)
 }
 
 // Close all database files. Do not use the DB afterwards!
 func (db *DB) Close() error {
-	close(db.autoSyncStop)
 	db.schemaLock.Lock()
 	defer db.schemaLock.Unlock()
 	errs := make([]error, 0, 0)
@@ -202,8 +158,6 @@ func (db *DB) Truncate(name string) error {
 	defer db.schemaLock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
-	} else if err := db.cols[name].sync(); err != nil {
-		return err
 	}
 	col := db.cols[name]
 	for i := 0; i < db.numParts; i++ {
@@ -225,8 +179,6 @@ func (db *DB) Scrub(name string) error {
 	defer db.schemaLock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
-	} else if err := db.cols[name].sync(); err != nil {
-		return err
 	}
 	// Prepare a temporary collection in file system
 	tmpColName := fmt.Sprintf("scrub-%s-%d", name, time.Now().UnixNano())
@@ -292,12 +244,6 @@ func (db *DB) Drop(name string) error {
 func (db *DB) Dump(dest string) error {
 	db.schemaLock.Lock()
 	defer db.schemaLock.Unlock()
-	db.sync(false)
-	for _, col := range db.cols {
-		if err := col.sync(); err != nil {
-			return err
-		}
-	}
 	cpFun := func(currPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

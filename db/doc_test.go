@@ -271,11 +271,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 		t.Fatal("Wrong number of docs", len(collectedIDs))
 	}
 
-	if err = col.sync(); err != nil {
-		t.Fatal(err)
-	} else if err = db.Sync(); err != nil {
-		t.Fatal(err)
-	} else if err = db.Close(); err != nil {
+	if err = db.Close(); err != nil {
 		t.Fatal(err)
 	}
 }

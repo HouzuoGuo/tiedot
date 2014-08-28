@@ -84,11 +84,9 @@ func Scrub(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-Synchronize all data files to disk.
-Note that HTTP service already does it automatically.
+Noop
 */
 func Sync(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
-	HttpDB.Sync()
 }

@@ -139,9 +139,6 @@ func TestAll(t *testing.T) {
 		}
 	}
 
-	if err := myDB.Sync(); err != nil {
-		t.Fatal(err)
-	}
 	if err := myDB.Close(); err != nil {
 		t.Fatal(err)
 	}

@@ -17,7 +17,7 @@ import (
 var benchCleanup = true
 
 // Size of benchmark sample
-var benchSize = 400000
+var benchSize = 100000
 
 // Run the benchmark function a number of times across multiple goroutines, and print out performance data.
 func average(name string, fun func()) {

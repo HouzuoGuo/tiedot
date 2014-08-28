@@ -142,23 +142,6 @@ func (part *Partition) Clear() (err error) {
 	return
 }
 
-// Synchronize all file buffers.
-func (part *Partition) Sync() (err error) {
-	var failure bool
-	if err = part.col.Sync(); err != nil {
-		tdlog.CritNoRepeat("Failed to sync %s: %v", part.col.Path, err)
-		failure = true
-	}
-	if err = part.lookup.Sync(); err != nil {
-		tdlog.CritNoRepeat("Failed to sync %s: %v", part.lookup.Path, err)
-		failure = true
-	}
-	if failure {
-		err = errors.New("Operation did not complete successfully")
-	}
-	return
-}
-
 // Close all file handles.
 func (part *Partition) Close() (err error) {
 	var failure bool
