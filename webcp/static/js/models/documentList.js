@@ -13,7 +13,7 @@ App.DocumentList = Backbone.Collection.extend({
 	},
 
 	initialize: function(models, options) {
-		if (options.page) {
+		if (options !== undefined && options.page) {
 			this.page = options.page;
 		} else {
 			this.page = 1;

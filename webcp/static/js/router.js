@@ -3,7 +3,7 @@ App.Router = Backbone.Router.extend({
 	routes: {
 		'': 'index',
 		'cols/:name(/:page)': 'collectionByName',
-		'cols/:name/indexes': 'collectionIndexes',
+		'indexes/:name': 'collectionIndexes',
 		'docs/new/:col': 'newDoc',
 		'docs/:col/:id': 'docById',
 		'query/:col/:q': 'docsByQuery'
