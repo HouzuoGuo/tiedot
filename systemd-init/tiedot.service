@@ -1,0 +1,10 @@
+[Unit]
+Description=tiedot database server (HTTP API service)
+Wants=network.target
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/tiedot -mode=httpd -port=19993 -dir=.tiedot/default-db
+ExecStop=/bin/sh -c 'curl -s "http://localhost:19993/shutdown" > /dev/null 2>&1 || true'
+
