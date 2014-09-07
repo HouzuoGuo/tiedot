@@ -39,12 +39,15 @@ func SrvAnsOK(out *bufio.Writer, moreInfo ...[]byte) (err error) {
 	return out.Flush()
 }
 
-// Server answers "ERR-MSG-RS".
-func SrvAnsErr(out *bufio.Writer, errMsg string) (err error) {
-	if err = out.WriteByte(C_ERR); err != nil {
+// Server answers "ERR-MSG-MSG-RS".
+func SrvAnsErr(out *bufio.Writer, errCode byte, errMsg ...string) (err error) {
+	if err = out.WriteByte(errCode); err != nil {
 		return
-	} else if _, err = out.WriteString(errMsg); err != nil {
-		return
+	}
+	for _, msg := range errMsg {
+		if _, err = out.WriteString(msg); err != nil {
+			return
+		}
 	}
 	if err = out.WriteByte(C_RS); err != nil {
 		return
@@ -71,7 +74,7 @@ func ClientWriteCmd(out *bufio.Writer, cmd byte, params ...[]byte) (err error) {
 }
 
 // Client reads server's response.
-func ClientReadAns(in *bufio.Reader) (moreInfo [][]byte, err error) {
+func ClientReadAns(in *bufio.Reader) (moreInfo [][]byte, errCode byte, err error) {
 	status, err := in.ReadByte()
 	if err != nil {
 		return
@@ -81,6 +84,7 @@ func ClientReadAns(in *bufio.Reader) (moreInfo [][]byte, err error) {
 	if status == C_OK {
 		moreInfo = bytes.Split(reply, []byte{C_US})
 	} else {
+		errCode = status
 		moreInfo = make([][]byte, 1)
 		moreInfo[0] = reply
 	}

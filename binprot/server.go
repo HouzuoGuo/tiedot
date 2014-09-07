@@ -21,16 +21,21 @@ type BinProtSrv struct {
 	workspace, dbPath, sockPath string
 	srvSock                     net.Listener
 	db                          *db.DB
+	clientIDSeq                 int64
+	maintBy                     int64
 }
 
 // Create a server, but do not yet start serving incoming connections.
 func NewServer(myRank, nProcs int, workspace string) (srv *BinProtSrv) {
 	srv = &BinProtSrv{
-		myRank:    myRank,
-		nProcs:    nProcs,
-		workspace: workspace,
-		dbPath:    path.Join(workspace, strconv.Itoa(myRank)),
-		sockPath:  path.Join(workspace, strconv.Itoa(myRank), SOCK_FILE)}
+		myRank:      myRank,
+		nProcs:      nProcs,
+		workspace:   workspace,
+		dbPath:      path.Join(workspace, strconv.Itoa(myRank)),
+		sockPath:    path.Join(workspace, strconv.Itoa(myRank), SOCK_FILE),
+		clientIDSeq: 1,
+		maintBy:     0}
+
 	return srv
 }
 

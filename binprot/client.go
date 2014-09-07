@@ -53,24 +53,18 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 	return
 }
 
-// (Only for test case) ping server 0 and expect an OK response.
+// Ping server 0 and expect an OK response.
 func (client *BinProtClient) Ping() (err error) {
 	if err = ClientWriteCmd(client.out[0], C_PING); err != nil {
 		return
 	}
-	_, err = ClientReadAns(client.in[0])
+	_, _, err = ClientReadAns(client.in[0])
 	return
 }
 
-// (Only for test case) ping server 0 and expect an ERR response.
-func (client *BinProtClient) PingErr() (err error) {
-	if err = ClientWriteCmd(client.out[0], C_PING_ERR); err != nil {
-		return
-	}
-	if msg, err := ClientReadAns(client.in[0]); err != nil || string(msg[0]) != "this is an error" {
-		return fmt.Errorf("IO error or unexpected response: %v %v %v", msg[0], err, []byte("this is an error"))
-	}
-	return
+// Put all servers into maintenance mode.
+func (client *BinProtClient) GoMaint() (err error) {
+	for i :=
 }
 
 // Disconnect from all servers, and render the client useless.
