@@ -2,12 +2,10 @@
 package binprot
 
 import (
-	"bufio"
+	"bytes"
+	"encoding/binary"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"net"
-	"sync/atomic"
 )
 
 const (
@@ -40,69 +38,111 @@ const (
 	C_LEAVE_MAINT = 96
 )
 
-// Close and reopen database.
-func (srv *BinProtSrv) reload() (err error) {
-	if err = srv.db.Close(); err != nil {
+// Server reads a "CMD-REV-PARAM-US-PARAM-RS" command sent by client.
+func (worker *BinProtWorker) readCmd() (cmd byte, rev uint32, params [][]byte, err error) {
+	cmdRev := make([]byte, 5)
+	if _, err = worker.in.Read(cmdRev); err != nil {
 		return
 	}
-	srv.db, err = db.OpenDB(srv.dbPath)
+	cmd = cmdRev[0]
+	rev = binary.LittleEndian.Uint32(cmdRev[1:5])
+	record, err := worker.in.ReadSlice(C_RS)
+	record = record[0 : len(record)-1]
+	if err != nil {
+		return
+	}
+	params = bytes.Split(record, []byte{C_US})
 	return
 }
 
-// The IO loop of serving an incoming connection. Block until the connection is closed or server shuts down.
-func (srv *BinProtSrv) Serve(conn net.Conn) {
-	clientID := atomic.AddInt64(&srv.clientIDSeq, 1)
-	in := bufio.NewReader(conn)
-	out := bufio.NewWriter(conn)
-
-	var lastIOErr error
-
-	for {
-		if lastIOErr != nil {
-			tdlog.Noticef("Lost connection to client %d: %v", clientID, lastIOErr)
+// Server answers "OK-INFO-US-INFO-RS".
+func (worker *BinProtWorker) ansOK(moreInfo ...[]byte) {
+	if err := worker.out.WriteByte(C_OK); err != nil {
+		worker.lastErr = err
+		return
+	}
+	for _, more := range moreInfo {
+		if _, err := worker.out.Write(more); err != nil {
+			worker.lastErr = err
+			return
+		} else if err := worker.out.WriteByte(C_US); err != nil {
+			worker.lastErr = err
 			return
 		}
+	}
+	if err := worker.out.WriteByte(C_RS); err != nil {
+		worker.lastErr = err
+		return
+	} else if err := worker.out.Flush(); err != nil {
+		worker.lastErr = err
+		return
+	}
+}
 
+// Server answers "ERR-INFO-RS".
+func (worker *BinProtWorker) ansErr(errCode byte, moreInfo []byte) {
+	if err := worker.out.WriteByte(errCode); err != nil {
+		worker.lastErr = err
+		return
+	} else if _, err := worker.out.Write(moreInfo); err != nil {
+		worker.lastErr = err
+		return
+	} else if err := worker.out.WriteByte(C_RS); err != nil {
+		worker.lastErr = err
+		return
+	} else if err := worker.out.Flush(); err != nil {
+		worker.lastErr = err
+		return
+	}
+}
+
+// The IO loop serving an incoming connection. Block until the connection is closed or server shuts down.
+func (worker *BinProtWorker) Run() {
+	tdlog.Noticef("Server %d: running worker for client %d", worker.srv.rank, worker.id)
+	for {
+		if worker.lastErr != nil {
+			tdlog.Noticef("Server %d: lost connection to client %d", worker.srv.rank, worker.id)
+			return
+		}
 		// Read a command from client
-		cmd, params, err := SrvReadCmd(in)
+		cmd, clientRev, params, err := worker.readCmd()
 		fmt.Println("CMD", cmd, params, err)
 		if err != nil {
-			tdlog.Noticef("Lost connection to client %d: %v", clientID, err)
+			// Client has disconnected
+			tdlog.Noticef("Server %d: lost connection with client %d - %v", worker.srv.rank, worker.id, err)
 			return
 		}
-
-		// Is server in maintenance mode?
-		if atomic.LoadInt64(&srv.maintBy) != clientID {
-			SrvAnsErr(out, C_ERR_MAINT)
-			continue
+		worker.srv.oneAtATime.Lock()
+		if clientRev != worker.srv.rev {
+			// Check client revision
+			mySchema := make([]byte, 4)
+			binary.LittleEndian.PutUint32(mySchema, worker.srv.rev)
+			worker.ansErr(C_ERR_SCHEMA, mySchema)
+		} else if worker.srv.maintByClient != 0 && worker.srv.maintByClient != worker.id {
+			// Check server maintenance access
+			worker.ansErr(C_ERR_SCHEMA, []byte{})
+		} else {
+			// Process the command
+			switch cmd {
+			case C_GO_MAINT:
+				worker.srv.maintByClient = worker.id
+				worker.ansOK()
+			case C_LEAVE_MAINT:
+				if worker.srv.maintByClient == worker.id {
+					worker.srv.maintByClient = 0
+					worker.srv.reload()
+					worker.ansOK()
+				} else {
+					worker.ansErr(C_ERR_MAINT, []byte{})
+				}
+			case C_PING:
+				worker.ansOK()
+			case C_SHUTDOWN:
+				worker.ansOK()
+				worker.srv.Shutdown()
+				return
+			}
 		}
-
-		// Process the command
-		switch cmd {
-		case C_GO_MAINT:
-			if atomic.CompareAndSwapInt64(&srv.maintBy, 0, clientID) {
-				lastIOErr = SrvAnsOK(out)
-			} else {
-				SrvAnsErr(out, C_ERR_MAINT)
-			}
-		case C_LEAVE_MAINT:
-			if atomic.CompareAndSwapInt64(&srv.maintBy, clientID, 0) {
-				lastIOErr = SrvAnsOK(out)
-			} else {
-				SrvAnsErr(out, C_ERR)
-			}
-		case C_RELOAD:
-			if err := srv.reload(); err == nil {
-				lastIOErr = SrvAnsOK(out)
-			} else {
-				panic(err)
-			}
-		case C_PING:
-			SrvAnsOK(out)
-		case C_SHUTDOWN:
-			SrvAnsOK(out)
-			srv.Shutdown()
-			return
-		}
+		worker.srv.oneAtATime.Unlock()
 	}
 }

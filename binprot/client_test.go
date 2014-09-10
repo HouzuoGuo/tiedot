@@ -10,34 +10,38 @@ const (
 )
 
 func TestTwoClientPingMaintShutdown(t *testing.T) {
+	var err error
 	os.RemoveAll(WS)
-	srv := NewServer(0, 0, WS)
+	// Run two servers
+	servers := []*BinProtSrv{NewServer(0, 2, WS), NewServer(1, 2, WS)}
 	go func() {
-		if err := srv.Run(); err != nil {
+		if err := servers[0].Run(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	go func() {
+		if err := servers[1].Run(); err != nil {
 			t.Fatal(err)
 		}
 	}()
 	// Connect two clients
-	client1, err := NewClient(WS)
-	if err != nil {
+	clients := [2]*BinProtClient{}
+	if clients[0], err = NewClient(WS); err != nil {
 		t.Fatal(err)
 	}
-	client2, err := NewClient(WS)
-	if err != nil {
+	if clients[1], err = NewClient(WS); err != nil {
 		t.Fatal(err)
 	}
 	// Ping both clients
-	if err = client1.Ping(); err != nil {
+	if err = clients[0].Ping(); err != nil {
 		t.Fatal(err)
 	}
-	if err = client2.Ping(); err != nil {
+	if err = clients[1].Ping(); err != nil {
 		t.Fatal(err)
 	}
-	// Request maintenance mode
-	if err = client2.(); err != nil {
-		t.Fatal(err)
-	}
-
-	client.Shutdown()
-	srv.Shutdown()
+	// Shutdown
+	clients[0].Shutdown()
+	clients[1].Shutdown()
+	servers[0].Shutdown()
+	servers[1].Shutdown()
 }
