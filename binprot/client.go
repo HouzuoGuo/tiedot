@@ -44,6 +44,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 			client.in = append(client.in, bufio.NewReader(client.sock[i]))
 			client.out = append(client.out, bufio.NewWriter(client.sock[i]))
 			connSuccessful = true
+			break
 		}
 		if !connSuccessful {
 			if i == 0 {
@@ -61,7 +62,6 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 func (client *BinProtClient) reload(srvRev uint32) {
 	tdlog.Noticef("Reload client schema, to match server revision %d", srvRev)
 	client.rev = srvRev
-	panic("boom")
 	return
 }
 
@@ -99,20 +99,9 @@ func (client *BinProtClient) readAns(rank int) (moreInfo [][]byte, retCode byte,
 	if err != nil {
 		return
 	}
-	fmt.Println(reply, len(reply), cap(reply))
-	noRS := reply[0 : len(reply)-1]
-	fmt.Println(noRS)
-	moreInfo = make([][]byte, 1)
-	moreInfo[0] = noRS
-
-	if status == C_OK {
-		moreInfo = bytes.Split(noRS, []byte{C_US})
-	} else {
-		moreInfo = make([][]byte, 1)
-		moreInfo[0] = noRS
-		fmt.Println("more info is", moreInfo[0][:], moreInfo[0][0:3])
-	}
+	moreInfo = bytes.Split(reply[:len(reply)-1], []byte{C_US})
 	retCode = status
+	//	fmt.Println("readAns", moreInfo, retCode, err)
 	return
 }
 
@@ -124,7 +113,6 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 		}
 		moreInfo, retCode, err = client.readAns(rank)
 		if retCode == C_ERR_SCHEMA {
-			fmt.Println("retcode ", retCode, moreInfo, moreInfo[0][0:4], binary.LittleEndian.Uint32(moreInfo[0][0:4]))
 			srvRev := moreInfo[0][0:4]
 			client.reload(binary.LittleEndian.Uint32(srvRev))
 			if retryOnSchemaRefresh {
@@ -156,12 +144,12 @@ func (client *BinProtClient) Ping() error {
 	return nil
 }
 
-// Request maintenance access from servers.
+// Request maintenance access from all servers.
 func (client *BinProtClient) GoMaint() error {
 	for goMaintSrv := range client.sock {
 		if _, _, err := client.sendCmd(goMaintSrv, true, C_GO_MAINT); err != nil {
 			for leaveMaintSrv := 0; leaveMaintSrv < goMaintSrv; leaveMaintSrv++ {
-				if _, _, err := client.sendCmd(leaveMaintSrv, true, C_GO_MAINT); err != nil {
+				if _, _, err := client.sendCmd(leaveMaintSrv, true, C_LEAVE_MAINT); err != nil {
 					tdlog.Noticef("Failed to leaveMaint on server %d", leaveMaintSrv)
 				}
 			}
@@ -171,18 +159,37 @@ func (client *BinProtClient) GoMaint() error {
 	return nil
 }
 
-// Put all servers into maintenance mode.
+// Remove maintenance access from all servers.
 func (client *BinProtClient) LeaveMaint() error {
 	for leaveMaintSrv := range client.sock {
-		if _, _, err := client.sendCmd(leaveMaintSrv, true, C_GO_MAINT); err != nil {
+		if _, _, err := client.sendCmd(leaveMaintSrv, true, C_LEAVE_MAINT); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// Disconnect from all servers, and render the client useless.
+// Shutdown all servers and then close this client.
 func (client *BinProtClient) Shutdown() {
+	for {
+		if err := client.GoMaint(); err == nil {
+			break
+		} else {
+			tdlog.Noticef("Servers are busy, cannot shutdown yet - will retry soon.")
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+	}
+	for i := range client.sock {
+		if _, _, err := client.sendCmd(i, true, C_SHUTDOWN); err != nil {
+			tdlog.Noticef("Failed to shutdown server %d: %v", i, err)
+		}
+	}
+	client.Close()
+}
+
+// Disconnect from all servers, and render the client useless.
+func (client *BinProtClient) Close() {
 	for _, sock := range client.sock {
 		if err := sock.Close(); err != nil {
 			tdlog.Noticef("Failed to close client socket: %v", err)

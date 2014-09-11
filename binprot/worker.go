@@ -106,7 +106,7 @@ func (worker *BinProtWorker) Run() {
 		}
 		// Read a command from client
 		cmd, clientRev, params, err := worker.readCmd()
-		fmt.Println("CMD", cmd, params, err)
+		fmt.Sprint("CMD", cmd, params, err)
 		if err != nil {
 			// Client has disconnected
 			tdlog.Noticef("Server %d: lost connection with client %d - %v", worker.srv.rank, worker.id, err)
@@ -121,7 +121,7 @@ func (worker *BinProtWorker) Run() {
 			worker.ansErr(C_ERR_SCHEMA, mySchema)
 		} else if worker.srv.maintByClient != 0 && worker.srv.maintByClient != worker.id {
 			// Check server maintenance access
-			worker.ansErr(C_ERR_SCHEMA, []byte{})
+			worker.ansErr(C_ERR_MAINT, []byte{})
 		} else {
 			// Process the command
 			switch cmd {
