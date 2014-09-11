@@ -30,7 +30,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 		sock:      make([]net.Conn, 0, 8),
 		in:        make([]*bufio.Reader, 0, 8),
 		out:       make([]*bufio.Writer, 0, 8),
-		rev:       0}
+		rev:       1}
 	for i := 0; ; i++ {
 		connSuccessful := false
 		for attempt := 0; attempt < 5; attempt++ {
@@ -60,6 +60,8 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 // Reload client's schema
 func (client *BinProtClient) reload(srvRev uint32) {
 	tdlog.Noticef("Reload client schema, to match server revision %d", srvRev)
+	client.rev = srvRev
+	panic("boom")
 	return
 }
 
@@ -97,33 +99,47 @@ func (client *BinProtClient) readAns(rank int) (moreInfo [][]byte, retCode byte,
 	if err != nil {
 		return
 	}
-	reply = reply[0 : len(reply)-1]
+	fmt.Println(reply, len(reply), cap(reply))
+	noRS := reply[0 : len(reply)-1]
+	fmt.Println(noRS)
+	moreInfo = make([][]byte, 1)
+	moreInfo[0] = noRS
+
 	if status == C_OK {
-		moreInfo = bytes.Split(reply, []byte{C_US})
+		moreInfo = bytes.Split(noRS, []byte{C_US})
 	} else {
 		moreInfo = make([][]byte, 1)
-		moreInfo[0] = reply
+		moreInfo[0] = noRS
+		fmt.Println("more info is", moreInfo[0][:], moreInfo[0][0:3])
 	}
 	retCode = status
 	return
 }
 
 // Client sends a command and reads server's response.
-func (client *BinProtClient) sendCmd(rank int, cmd byte, params ...[]byte) (moreInfo [][]byte, retCode byte, err error) {
-	if err = client.writeCmd(rank, cmd, params...); err != nil {
-		return
-	} else if retCode == C_ERR_SCHEMA {
-		srvRev := moreInfo[0][0:4]
-		client.reload(binary.LittleEndian.Uint32(srvRev))
-		err = fmt.Errorf("Server suggested schema mismatch")
-		return
-	} else if moreInfo, retCode, err = client.readAns(rank); err != nil {
-		return
-	} else if retCode != C_OK {
-		if len(moreInfo) > 0 {
-			err = fmt.Errorf("Server returned error: %s", string(moreInfo[0]))
-		} else {
-			err = fmt.Errorf("Server returned error, no details available.")
+func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (moreInfo [][]byte, retCode byte, err error) {
+	for {
+		if err = client.writeCmd(rank, cmd, params...); err != nil {
+			return
+		}
+		moreInfo, retCode, err = client.readAns(rank)
+		if retCode == C_ERR_SCHEMA {
+			fmt.Println("retcode ", retCode, moreInfo, moreInfo[0][0:4], binary.LittleEndian.Uint32(moreInfo[0][0:4]))
+			srvRev := moreInfo[0][0:4]
+			client.reload(binary.LittleEndian.Uint32(srvRev))
+			if retryOnSchemaRefresh {
+				continue
+			} else {
+				err = fmt.Errorf("Server suggested schema mismatch")
+				return
+			}
+		} else if retCode != C_OK {
+			if len(moreInfo) > 0 && len(moreInfo[0]) > 0 {
+				err = fmt.Errorf("Server returned error %d: %v", retCode, string(moreInfo[0]))
+			} else {
+				err = fmt.Errorf("Server returned error %d, no details available.", retCode)
+			}
+			return
 		}
 		return
 	}
@@ -133,7 +149,22 @@ func (client *BinProtClient) sendCmd(rank int, cmd byte, params ...[]byte) (more
 // Ping server 0 and expect an OK response.
 func (client *BinProtClient) Ping() error {
 	for i := range client.sock {
-		if _, _, err := client.sendCmd(i, C_PING); err != nil {
+		if _, _, err := client.sendCmd(i, true, C_PING); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Request maintenance access from servers.
+func (client *BinProtClient) GoMaint() error {
+	for goMaintSrv := range client.sock {
+		if _, _, err := client.sendCmd(goMaintSrv, true, C_GO_MAINT); err != nil {
+			for leaveMaintSrv := 0; leaveMaintSrv < goMaintSrv; leaveMaintSrv++ {
+				if _, _, err := client.sendCmd(leaveMaintSrv, true, C_GO_MAINT); err != nil {
+					tdlog.Noticef("Failed to leaveMaint on server %d", leaveMaintSrv)
+				}
+			}
 			return err
 		}
 	}
@@ -141,7 +172,12 @@ func (client *BinProtClient) Ping() error {
 }
 
 // Put all servers into maintenance mode.
-func (client *BinProtClient) GoMaint() error {
+func (client *BinProtClient) LeaveMaint() error {
+	for leaveMaintSrv := range client.sock {
+		if _, _, err := client.sendCmd(leaveMaintSrv, true, C_GO_MAINT); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

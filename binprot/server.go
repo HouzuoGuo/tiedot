@@ -48,7 +48,7 @@ func NewServer(rank, nProcs int, workspace string) (srv *BinProtSrv) {
 		sockPath:      path.Join(workspace, strconv.Itoa(rank), SOCK_FILE),
 		clientIDSeq:   0,
 		maintByClient: 0,
-		rev:           0,
+		rev:           1,
 		oneAtATime:    new(sync.Mutex)}
 
 	return srv

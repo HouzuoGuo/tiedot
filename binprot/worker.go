@@ -115,6 +115,7 @@ func (worker *BinProtWorker) Run() {
 		worker.srv.oneAtATime.Lock()
 		if clientRev != worker.srv.rev {
 			// Check client revision
+			tdlog.Noticef("Server %d: telling client %d (rev %d) to refresh schema revision to match %d", worker.srv.rank, worker.id, clientRev, worker.srv.rev)
 			mySchema := make([]byte, 4)
 			binary.LittleEndian.PutUint32(mySchema, worker.srv.rev)
 			worker.ansErr(C_ERR_SCHEMA, mySchema)

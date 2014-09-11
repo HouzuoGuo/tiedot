@@ -28,15 +28,25 @@ func TestTwoClientPingMaintShutdown(t *testing.T) {
 	clients := [2]*BinProtClient{}
 	if clients[0], err = NewClient(WS); err != nil {
 		t.Fatal(err)
-	}
-	if clients[1], err = NewClient(WS); err != nil {
+	} else if clients[1], err = NewClient(WS); err != nil {
 		t.Fatal(err)
 	}
 	// Ping both clients
 	if err = clients[0].Ping(); err != nil {
 		t.Fatal(err)
+	} else if err = clients[1].Ping(); err != nil {
+		t.Fatal(err)
 	}
-	if err = clients[1].Ping(); err != nil {
+	// Maintenance access
+	if err = clients[0].GoMaint(); err != nil {
+		t.Fatal(err)
+	} else if err = clients[1].GoMaint(); err == nil {
+		t.Fatal("did not error")
+	} else if err = clients[0].GoMaint(); err == nil {
+		t.Fatal("did not error")
+	} else if err = clients[0].LeaveMaint(); err != nil {
+		t.Fatal(err)
+	} else if err = clients[1].GoMaint(); err != nil {
 		t.Fatal(err)
 	}
 	// Shutdown
