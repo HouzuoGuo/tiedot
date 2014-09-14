@@ -4,7 +4,6 @@ package binprot
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
@@ -14,6 +13,7 @@ const (
 	C_ERR        = 1
 	C_ERR_SCHEMA = 2
 	C_ERR_MAINT  = 3
+	C_ERR_DOWN   = 4
 
 	// Command record structure
 	C_US = 31
@@ -105,11 +105,14 @@ func (worker *BinProtWorker) Run() {
 			return
 		}
 		// Read a command from client
-		cmd, clientRev, params, err := worker.readCmd()
-		fmt.Sprint("CMD", cmd, params, err)
+		cmd, clientRev, _, err := worker.readCmd()
 		if err != nil {
 			// Client has disconnected
 			tdlog.Noticef("Server %d: lost connection with client %d - %v", worker.srv.rank, worker.id, err)
+			return
+		} else if worker.srv.shutdown {
+			// Server has/is shutting down
+			worker.ansErr(C_ERR_DOWN, []byte{})
 			return
 		}
 		worker.srv.oneAtATime.Lock()
@@ -137,11 +140,12 @@ func (worker *BinProtWorker) Run() {
 					worker.ansErr(C_ERR_MAINT, []byte{})
 				}
 			case C_PING:
-				worker.ansOK()
+				clientID := make([]byte, 8)
+				binary.LittleEndian.PutUint64(clientID, uint64(worker.id))
+				worker.ansOK(clientID)
 			case C_SHUTDOWN:
-				worker.ansOK()
 				worker.srv.Shutdown()
-				return
+				worker.ansOK()
 			}
 		}
 		worker.srv.oneAtATime.Unlock()

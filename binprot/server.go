@@ -27,6 +27,7 @@ type BinProtSrv struct {
 	clientIDSeq, maintByClient  int64
 	rev                         uint32
 	oneAtATime                  *sync.Mutex
+	shutdown                    bool
 }
 
 // Serve incoming connection.
@@ -49,7 +50,8 @@ func NewServer(rank, nProcs int, workspace string) (srv *BinProtSrv) {
 		clientIDSeq:   0,
 		maintByClient: 0,
 		rev:           1,
-		oneAtATime:    new(sync.Mutex)}
+		oneAtATime:    new(sync.Mutex),
+		shutdown:      false}
 
 	return srv
 }
@@ -95,4 +97,5 @@ func (srv *BinProtSrv) Shutdown() {
 	if err := srv.srvSock.Close(); err != nil {
 		tdlog.Noticef("Server %d: failed to close server socket - %v", srv.rank, err)
 	}
+	srv.shutdown = true
 }
