@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sort"
 )
 
 const (
@@ -99,6 +100,13 @@ func (col *Col) forEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
 	}
 }
 
+func (col *Col) BPUseHT(jointPath string) *data.HashTable {
+	col.db.lock.RLock()
+	ret := col.hts[jointPath]
+	col.db.lock.RUnlock()
+	return ret
+}
+
 // Do fun for all documents in the collection.
 func (col *Col) ForEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
 	col.db.lock.RLock()
@@ -151,6 +159,16 @@ func (col *Col) AllIndexes() (ret [][]string) {
 		ret = append(ret, pathCopy)
 	}
 	col.db.lock.RUnlock()
+	return ret
+}
+
+// Return all indexed paths. Index path segments are joint.
+func (col *Col) AllIndexesJointPaths() (ret []string) {
+	ret = make([]string, 0, 0)
+	for _, path := range col.AllIndexes() {
+		ret = append(ret, strings.Join(path, INDEX_PATH_SEP))
+	}
+	sort.Strings(ret)
 	return ret
 }
 

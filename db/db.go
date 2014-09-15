@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"sort"
 )
 
 // Database structures.
@@ -74,6 +75,7 @@ func (db *DB) AllCols() (ret []string) {
 	for name, _ := range db.cols {
 		ret = append(ret, name)
 	}
+	sort.Strings(ret)
 	return
 }
 

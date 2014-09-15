@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/data"
+	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"net"
 	"path"
@@ -17,14 +19,20 @@ import (
 
 // Bin protocol client connects to servers via Unix domain socket.
 type BinProtClient struct {
-	workspace  string
-	id         uint64
-	sock       []net.Conn
-	in         []*bufio.Reader
-	out        []*bufio.Writer
-	rev        uint32
-	oneAtATime *sync.Mutex
-	closeLock  *sync.Mutex
+	workspace     string
+	id            uint64
+	sock          []net.Conn
+	in            []*bufio.Reader
+	out           []*bufio.Writer
+	rev           uint32
+	oneAtATime    *sync.Mutex
+	closeLock     *sync.Mutex
+	db            *db.DB
+	colLookup     map[int32]*db.Col
+	colNameLookup map[string]int32
+	htLookup      map[int32]*data.HashTable
+	htNameLookup  map[string]int32
+	dbPath        string
 }
 
 // Create a client and immediately connect to server.
@@ -35,9 +43,13 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 		sock:       make([]net.Conn, 0, 8),
 		in:         make([]*bufio.Reader, 0, 8),
 		out:        make([]*bufio.Writer, 0, 8),
-		rev:        1,
+		rev:        0,
 		oneAtATime: new(sync.Mutex),
-		closeLock:  new(sync.Mutex)}
+		closeLock:  new(sync.Mutex),
+		colLookup:  make(map[int32]*db.Col),
+		htLookup:   make(map[int32]*data.HashTable),
+		dbPath:     path.Join(workspace, "0")}
+	client.reload(0)
 	// Connect to servers, one at a time.
 	for i := 0; ; i++ {
 		connSuccessful := false
@@ -92,6 +104,18 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 
 // Reload client's schema
 func (client *BinProtClient) reload(srvRev uint32) {
+	var err error
+	if client.db != nil {
+		if err = client.db.Close(); err != nil {
+			tdlog.Noticef("Client %d: failed to close DB before reloading - %v", client.id, err)
+		}
+	}
+	if client.db, err = db.OpenDB(client.dbPath); err != nil {
+		panic(err)
+	}
+	// Support numeric lookup of collections and hash tables
+	client.colLookup, client.colNameLookup, client.htLookup, client.htNameLookup = mkSchemaLookupTables(client.db)
+
 	tdlog.Noticef("Client %d: reload schema to match server's schema revision %d", client.id, srvRev)
 	client.rev = srvRev
 	return
@@ -146,9 +170,10 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 		client.Close()
 		err = fmt.Errorf("Server is down")
 	case C_ERR_SCHEMA:
-		// May need to redo the command
+		// Always reload my schema
 		srvRev := moreInfo[0][0:4]
 		client.reload(binary.LittleEndian.Uint32(srvRev))
+		// May need to redo the command
 		if retryOnSchemaRefresh {
 			client.oneAtATime.Unlock()
 			return client.sendCmd(rank, retryOnSchemaRefresh, cmd, params...)
@@ -223,13 +248,13 @@ func (client *BinProtClient) Shutdown() {
 			client.Close()
 			client.closeLock.Unlock()
 			return
-		case C_SHUTDOWN:
+		case C_ERR_DOWN:
 			// Proceed with client shutdown
 			client.Close()
 			client.closeLock.Unlock()
 			return
 		default:
-			tdlog.Noticef("Client %d: servers are busy (%v), cannot shutdown yet - will retry soon.", err)
+			tdlog.Noticef("Client %d: servers are busy (%v), cannot shutdown yet - will retry soon.", client.id, err)
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
