@@ -87,9 +87,16 @@ func TestPingMaintShutdown(t *testing.T) {
 	} else if _, err = clients[1].GoMaint(); err != nil {
 		t.Fatal(err)
 	}
-	// Ping both clients, then leaveMaint
-	if err = clients[0].Ping(); err == nil {
-		t.Fatal("did not error")
+	// Ping both clients during maintenance access
+	if err = clients[0].Ping(); err != nil {
+		t.Fatal(err)
+	} else if err = clients[1].Ping(); err != nil {
+		t.Fatal(err)
+	}
+	// Wait several seconds then ping again
+	time.Sleep(2 * time.Second)
+	if err = clients[0].Ping(); err != nil {
+		t.Fatal(err)
 	} else if err = clients[1].Ping(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[1].LeaveMaint(); err != nil {

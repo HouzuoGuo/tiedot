@@ -76,7 +76,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 	go func() {
 		for {
 			client.closeLock.Lock()
-			if client.Ping() != nil {
+			if err := client.Ping(); err != nil {
 				tdlog.Noticef("Client %d: lost connection with servers", client.id)
 				client.Close()
 				client.closeLock.Unlock()
@@ -168,14 +168,15 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 	return
 }
 
-// Ping server 0 and expect an OK response.
+// Ping all servers, and expect OK or ERR_MAINT response.
 func (client *BinProtClient) Ping() error {
 	for i := range client.sock {
-		myID, _, err := client.sendCmd(i, true, C_PING)
-		if err != nil {
-			return err
+		myID, retCode, err := client.sendCmd(i, true, C_PING)
+		if err != nil && retCode != C_ERR_MAINT {
+			return fmt.Errorf("Ping error: code %d, err %v", retCode, err)
+		} else if err == nil {
+			client.id = binary.LittleEndian.Uint64(myID[0])
 		}
-		client.id = binary.LittleEndian.Uint64(myID[0])
 	}
 	return nil
 }
