@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+const C_ERR_IO = 255
+
 // Bin protocol client connects to servers via Unix domain socket.
 type BinProtClient struct {
 	workspace     string
@@ -25,30 +27,25 @@ type BinProtClient struct {
 	in            []*bufio.Reader
 	out           []*bufio.Writer
 	rev           uint32
-	oneAtATime    *sync.Mutex
-	closeLock     *sync.Mutex
-	db            *db.DB
+	opLock        *sync.Mutex
 	colLookup     map[int32]*db.Col
 	colNameLookup map[string]int32
 	htLookup      map[int32]*data.HashTable
 	htNameLookup  map[string]int32
-	dbPath        string
 }
 
 // Create a client and immediately connect to server.
 func NewClient(workspace string) (client *BinProtClient, err error) {
 	client = &BinProtClient{
-		id:         0,
-		workspace:  workspace,
-		sock:       make([]net.Conn, 0, 8),
-		in:         make([]*bufio.Reader, 0, 8),
-		out:        make([]*bufio.Writer, 0, 8),
-		rev:        0,
-		oneAtATime: new(sync.Mutex),
-		closeLock:  new(sync.Mutex),
-		colLookup:  make(map[int32]*db.Col),
-		htLookup:   make(map[int32]*data.HashTable),
-		dbPath:     path.Join(workspace, "0")}
+		id:        0,
+		workspace: workspace,
+		sock:      make([]net.Conn, 0, 8),
+		in:        make([]*bufio.Reader, 0, 8),
+		out:       make([]*bufio.Writer, 0, 8),
+		rev:       0,
+		opLock:    new(sync.Mutex),
+		colLookup: make(map[int32]*db.Col),
+		htLookup:  make(map[int32]*data.HashTable)}
 	client.reload(0)
 	// Connect to servers, one at a time.
 	for i := 0; ; i++ {
@@ -87,14 +84,16 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 	*/
 	go func() {
 		for {
-			client.closeLock.Lock()
-			if err := client.Ping(); err != nil {
-				tdlog.Noticef("Client %d: lost connection with servers", client.id)
-				client.Close()
-				client.closeLock.Unlock()
+			client.opLock.Lock()
+			if err := client.ping(); err != nil {
+				for _, sock := range client.sock {
+					sock.Close()
+				}
+				tdlog.Noticef("Client %d: lost connection with server(s) and this client is closed", client.id)
+				client.opLock.Unlock()
 				return
 			}
-			client.closeLock.Unlock()
+			client.opLock.Unlock()
 			time.Sleep(1 * time.Second)
 		}
 	}()
@@ -102,112 +101,93 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 	return
 }
 
-// Reload client's schema
-func (client *BinProtClient) reload(srvRev uint32) {
-	var err error
-	if client.db != nil {
-		if err = client.db.Close(); err != nil {
-			tdlog.Noticef("Client %d: failed to close DB before reloading - %v", client.id, err)
-		}
-	}
-	if client.db, err = db.OpenDB(client.dbPath); err != nil {
-		panic(err)
-	}
-	// Support numeric lookup of collections and hash tables
-	client.colLookup, client.colNameLookup, client.htLookup, client.htNameLookup = mkSchemaLookupTables(client.db)
-
-	tdlog.Noticef("Client %d: reload schema to match server's schema revision %d", client.id, srvRev)
-	client.rev = srvRev
-	return
-}
-
 // Client sends a command and reads server's response.
 func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (moreInfo [][]byte, retCode byte, err error) {
-	client.oneAtATime.Lock()
 	// Client sends a "CMD-REV-PARAM-US-PARAM-RS" command to server
 	rev := make([]byte, 4)
 	binary.LittleEndian.PutUint32(rev, client.rev)
 	if err = client.out[rank].WriteByte(cmd); err != nil {
-		client.oneAtATime.Unlock()
+		retCode = C_ERR_IO
 		return
 	} else if _, err = client.out[rank].Write(rev); err != nil {
-		client.oneAtATime.Unlock()
+		retCode = C_ERR_IO
 		return
 	}
 	for _, param := range params {
 		if _, err = client.out[rank].Write(param); err != nil {
-			client.oneAtATime.Unlock()
+			retCode = C_ERR_IO
 			return
 		} else if err = client.out[rank].WriteByte(C_US); err != nil {
-			client.oneAtATime.Unlock()
+			retCode = C_ERR_IO
 			return
 		}
 	}
 	if err = client.out[rank].WriteByte(C_RS); err != nil {
-		client.oneAtATime.Unlock()
+		retCode = C_ERR_IO
 		return
 	} else if err = client.out[rank].Flush(); err != nil {
-		client.oneAtATime.Unlock()
+		retCode = C_ERR_IO
 		return
 	}
 	// Client reads server's response
 	statusByte, err := client.in[rank].ReadByte()
 	if err != nil {
-		client.oneAtATime.Unlock()
+		retCode = C_ERR_IO
 		return
 	}
 	reply, err := client.in[rank].ReadSlice(C_RS)
 	if err != nil {
-		client.oneAtATime.Unlock()
+		retCode = C_ERR_IO
 		return
 	}
 	moreInfo = bytes.Split(reply[:len(reply)-1], []byte{C_US})
 	retCode = statusByte
 	// Determine what to do with the return code
 	switch retCode {
+	case C_OK:
+		// Request-response all OK
 	case C_ERR_DOWN:
 		// If server has already shut down, shut down client also
-		client.Close()
-		err = fmt.Errorf("Server is down")
+		for _, sock := range client.sock {
+			sock.Close()
+		}
+		tdlog.Noticef("Client %d: server shutdown has begun and this client is closed", client.id)
+		err = fmt.Errorf("Server is shutting down")
 	case C_ERR_SCHEMA:
 		// Always reload my schema
 		srvRev := moreInfo[0][0:4]
 		client.reload(binary.LittleEndian.Uint32(srvRev))
 		// May need to redo the command
 		if retryOnSchemaRefresh {
-			client.oneAtATime.Unlock()
 			return client.sendCmd(rank, retryOnSchemaRefresh, cmd, params...)
 		} else {
 			err = fmt.Errorf("Server suggested schema mismatch")
 		}
 	default:
-		if retCode != C_OK {
-			if len(moreInfo) > 0 && len(moreInfo[0]) > 0 {
-				err = fmt.Errorf("Server returned error %d: %v", retCode, string(moreInfo[0]))
-			} else {
-				err = fmt.Errorf("Server returned error %d, no details available.", retCode)
-			}
+		if len(moreInfo) > 0 && len(moreInfo[0]) > 0 {
+			err = fmt.Errorf("Server returned error %d: %v", retCode, string(moreInfo[0]))
+		} else {
+			err = fmt.Errorf("Server returned error %d, no more details available.", retCode)
 		}
 	}
-	client.oneAtATime.Unlock()
 	return
 }
 
-// Ping all servers, and expect OK or ERR_MAINT response.
-func (client *BinProtClient) Ping() error {
-	for i := range client.sock {
-		myID, retCode, err := client.sendCmd(i, true, C_PING)
-		if err != nil && retCode != C_ERR_MAINT {
-			return fmt.Errorf("Ping error: code %d, err %v", retCode, err)
-		} else if err == nil {
-			client.id = binary.LittleEndian.Uint64(myID[0])
-		}
+// Reload client's schema
+func (client *BinProtClient) reload(srvRev uint32) {
+	clientDB, err := db.OpenDB(path.Join(client.workspace, "0"))
+	if err != nil {
+		panic(err)
 	}
-	return nil
+	// Support numeric lookup of collections and hash tables
+	client.colLookup, client.colNameLookup, client.htLookup, client.htNameLookup = mkSchemaLookupTables(clientDB)
+	tdlog.Noticef("Client %d: schema has been reloaded to match server's schema revision %d", client.id, srvRev)
+	client.rev = srvRev
+	return
 }
 
 // Request maintenance access from all servers.
-func (client *BinProtClient) GoMaint() (retCode byte, err error) {
+func (client *BinProtClient) goMaint() (retCode byte, err error) {
 	for goMaintSrv := range client.sock {
 		if _, retCode, err = client.sendCmd(goMaintSrv, true, C_GO_MAINT); err != nil {
 			for leaveMaintSrv := 0; leaveMaintSrv < goMaintSrv; leaveMaintSrv++ {
@@ -222,7 +202,7 @@ func (client *BinProtClient) GoMaint() (retCode byte, err error) {
 }
 
 // Remove maintenance access from all servers.
-func (client *BinProtClient) LeaveMaint() error {
+func (client *BinProtClient) leaveMaint() error {
 	for leaveMaintSrv := range client.sock {
 		if _, _, err := client.sendCmd(leaveMaintSrv, true, C_LEAVE_MAINT); err != nil {
 			return err
@@ -231,43 +211,84 @@ func (client *BinProtClient) LeaveMaint() error {
 	return nil
 }
 
-// Shutdown all servers and then close this client.
-func (client *BinProtClient) Shutdown() {
-	client.closeLock.Lock()
+// Request maintenance access from servers, run the function, and finally remove maintenance access.
+func (client *BinProtClient) reqMaintAccess(fun func() error) error {
+	client.opLock.Lock()
+	defer client.opLock.Unlock()
 	for {
-		// Require maintenance access first
-		retCode, err := client.GoMaint()
+		retCode, err := client.goMaint()
 		switch retCode {
-		case C_OK:
-			// Proceed with server & client shutdown
-			for i := range client.sock {
-				if _, _, err := client.sendCmd(i, true, C_SHUTDOWN); err != nil {
-					tdlog.Noticef("Client %d: failed to shutdown server %d - %v", client.id, i, err)
-				}
-			}
-			client.Close()
-			client.closeLock.Unlock()
-			return
-		case C_ERR_DOWN:
-			// Proceed with client shutdown
-			client.Close()
-			client.closeLock.Unlock()
-			return
-		default:
-			tdlog.Noticef("Client %d: servers are busy (%v), cannot shutdown yet - will retry soon.", client.id, err)
+		case C_ERR_MAINT:
+			tdlog.Noticef("Client %d: servers are busy, will try again after a short delay - %v", client.id, err)
 			time.Sleep(100 * time.Millisecond)
 			continue
+		case C_ERR_DOWN:
+			fallthrough
+		case C_ERR_IO:
+			for _, sock := range client.sock {
+				sock.Close()
+			}
+			tdlog.Noticef("Client %d: IO error occured or servers are shutting down, this client is closed.", client.id)
+			return fmt.Errorf("Servers are down before maintenance operation can take place - %v", err)
+		case C_OK:
+			funResult := fun()
+			if err := client.leaveMaint(); err != nil {
+				return fmt.Errorf("Function error: %v, client LEAVE_MAINT error: %v", funResult, err)
+			}
+			return funResult
 		}
 	}
-	client.closeLock.Unlock()
+}
+
+func (client *BinProtClient) ping() error {
+	for i := range client.sock {
+		myID, retCode, err := client.sendCmd(i, true, C_PING)
+		switch retCode {
+		case C_OK:
+			// Server returns my client ID
+			// The client ID will not change in the next Ping call
+			client.id = binary.LittleEndian.Uint64(myID[0])
+		case C_ERR_MAINT:
+			// Server does not return my client ID, but server is alive.
+		default:
+			return fmt.Errorf("Ping error: code %d, err %v", retCode, err)
+		}
+	}
+	return nil
+}
+
+// Ping all servers, and expect OK or ERR_MAINT response.
+func (client *BinProtClient) Ping() error {
+	client.opLock.Lock()
+	result := client.ping()
+	client.opLock.Unlock()
+	return result
 }
 
 // Disconnect from all servers, and render the client useless.
 func (client *BinProtClient) Close() {
+	client.opLock.Lock()
+	defer client.opLock.Unlock()
 	for _, sock := range client.sock {
-		if err := sock.Close(); err != nil {
-			tdlog.Noticef("Client %d: failed to close client socket: %v", client.id, err)
-		}
+		sock.Close()
 	}
-	tdlog.Noticef("Client %d: closed", client.id)
+	tdlog.Noticef("Client %d: closed on request", client.id)
+}
+
+// Shutdown all servers and then close this client.
+func (client *BinProtClient) Shutdown() {
+	client.reqMaintAccess(func() error {
+		for i := range client.sock {
+			if _, _, err := client.sendCmd(i, true, C_SHUTDOWN); err != nil {
+				tdlog.Noticef("Client %d: failed to shutdown server %d - %v", client.id, i, err)
+			}
+		}
+		return nil
+	})
+	client.opLock.Lock()
+	defer client.opLock.Unlock()
+	for _, sock := range client.sock {
+		sock.Close()
+	}
+	tdlog.Noticef("Client %d: servers have been asked to shutdown, this client is closed.", client.id)
 }

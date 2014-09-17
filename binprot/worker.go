@@ -115,7 +115,7 @@ func (worker *BinProtWorker) Run() {
 			worker.ansErr(C_ERR_DOWN, []byte{})
 			return
 		}
-		worker.srv.oneAtATime.Lock()
+		worker.srv.opLock.Lock()
 		if clientRev != worker.srv.rev {
 			// Check client revision
 			tdlog.Noticef("Server %d: telling client %d (rev %d) to refresh schema revision to match %d", worker.srv.rank, worker.id, clientRev, worker.srv.rev)
@@ -148,6 +148,6 @@ func (worker *BinProtWorker) Run() {
 				worker.ansOK()
 			}
 		}
-		worker.srv.oneAtATime.Unlock()
+		worker.srv.opLock.Unlock()
 	}
 }

@@ -4,6 +4,7 @@ package binprot
 
 import (
 	"bufio"
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
@@ -31,7 +32,7 @@ type BinProtSrv struct {
 	htNameLookup                map[string]int32
 	clientIDSeq, maintByClient  int64
 	rev                         uint32
-	oneAtATime                  *sync.Mutex
+	opLock                      *sync.Mutex
 	shutdown                    bool
 }
 
@@ -57,7 +58,7 @@ func NewServer(rank, nProcs int, workspace string) (srv *BinProtSrv) {
 		clientIDSeq:   0,
 		maintByClient: 0,
 		rev:           0,
-		oneAtATime:    new(sync.Mutex),
+		opLock:        new(sync.Mutex),
 		shutdown:      false}
 
 	return srv
@@ -118,6 +119,7 @@ func (srv *BinProtSrv) reload() {
 	if srv.db, err = db.OpenDB(srv.dbPath); err != nil {
 		panic(err)
 	}
+	fmt.Println("Server has opened ", srv.dbPath, srv.db.AllCols())
 	srv.rev++
 	// Support numeric lookup of collections and hash tables
 	srv.colLookup, srv.colNameLookup, srv.htLookup, srv.htNameLookup = mkSchemaLookupTables(srv.db)
