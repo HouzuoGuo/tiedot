@@ -4,7 +4,6 @@ package binprot
 
 import (
 	"bufio"
-	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
@@ -119,7 +118,6 @@ func (srv *BinProtSrv) reload() {
 	if srv.db, err = db.OpenDB(srv.dbPath); err != nil {
 		panic(err)
 	}
-	fmt.Println("Server has opened ", srv.dbPath, srv.db.AllCols())
 	srv.rev++
 	// Support numeric lookup of collections and hash tables
 	srv.colLookup, srv.colNameLookup, srv.htLookup, srv.htNameLookup = mkSchemaLookupTables(srv.db)

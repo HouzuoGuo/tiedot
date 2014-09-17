@@ -5,10 +5,10 @@ import (
 	"github.com/HouzuoGuo/tiedot/db"
 	"os"
 	"os/signal"
+	"path"
 	"runtime/pprof"
 	"testing"
 	"time"
-	"path"
 )
 
 const (
