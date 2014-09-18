@@ -1,4 +1,4 @@
-// Binary protocol over IPC - client.
+// Binary protocol over IPC - client messaging.
 
 package binprot
 
@@ -181,6 +181,9 @@ func (client *BinProtClient) reload(srvRev uint32) {
 	}
 	// Support numeric lookup of collections and hash tables
 	client.colLookup, client.colNameLookup, client.htLookup, client.htNameLookup = mkSchemaLookupTables(clientDB)
+	if err = clientDB.Close(); err != nil {
+		tdlog.Noticef("Client %d: failed to close database after a reload - %v", client.id, err)
+	}
 	tdlog.Noticef("Client %d: schema has been reloaded to match server's schema revision %d", client.id, srvRev)
 	client.rev = srvRev
 	return

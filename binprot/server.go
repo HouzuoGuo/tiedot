@@ -1,4 +1,4 @@
-// Binary protocol over unix domain socket - server.
+// Binary protocol over unix domain socket - server messaging and IO loop.
 
 package binprot
 
