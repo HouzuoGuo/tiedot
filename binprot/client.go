@@ -31,7 +31,7 @@ type BinProtClient struct {
 	colLookup     map[int32]*db.Col
 	colNameLookup map[string]int32
 	htLookup      map[int32]*data.HashTable
-	htNameLookup  map[string]int32
+	htNameLookup  map[string]map[string]int32
 }
 
 // Create a client and immediately connect to server.

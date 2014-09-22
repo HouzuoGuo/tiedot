@@ -219,16 +219,16 @@ func TestSchemaLookup(t *testing.T) {
 		clients[1].colLookup[clients[1].colNameLookup["B"]] == nil {
 		t.Fatal(clients[0], clients[1])
 	}
-	if servers[0].htLookup[servers[0].htNameLookup["1"]] == nil ||
-		servers[0].htLookup[servers[0].htNameLookup["2"]] == nil ||
-		servers[1].htLookup[servers[1].htNameLookup["1"]] == nil ||
-		servers[1].htLookup[servers[1].htNameLookup["2"]] == nil {
+	if servers[0].htLookup[servers[0].htNameLookup["A"]["1"]] == nil ||
+		servers[0].htLookup[servers[0].htNameLookup["B"]["2"]] == nil ||
+		servers[1].htLookup[servers[1].htNameLookup["A"]["1"]] == nil ||
+		servers[1].htLookup[servers[1].htNameLookup["B"]["2"]] == nil {
 		t.Fatal(servers[0], servers[1])
 	}
-	if clients[0].htLookup[clients[0].htNameLookup["1"]] == nil ||
-		clients[0].htLookup[clients[0].htNameLookup["2"]] == nil ||
-		clients[1].htLookup[clients[1].htNameLookup["1"]] == nil ||
-		clients[1].htLookup[clients[1].htNameLookup["2"]] == nil {
+	if clients[0].htLookup[clients[0].htNameLookup["A"]["1"]] == nil ||
+		clients[0].htLookup[clients[0].htNameLookup["B"]["2"]] == nil ||
+		clients[1].htLookup[clients[1].htNameLookup["A"]["1"]] == nil ||
+		clients[1].htLookup[clients[1].htNameLookup["B"]["2"]] == nil {
 		t.Fatal(clients[0], clients[1])
 	}
 	clients[0].Shutdown()
