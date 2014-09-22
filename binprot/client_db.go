@@ -100,7 +100,7 @@ func (client *BinProtClient) Drop(colName string) error {
 }
 
 // Copy database into destination directory (for backup).
-func (client *BinProtClient) Dump(destDir string) error {
+func (client *BinProtClient) DumpDB(destDir string) error {
 	return client.reqMaintAccess(func() error {
 		for i := 0; i < len(client.sock); i++ {
 			destDirPerRank := path.Join(destDir, strconv.Itoa(i))
@@ -126,7 +126,7 @@ func (client *BinProtClient) Index(colName string, idxPath []string) error {
 				return err
 			} else if clientDB.Use(colName) == nil {
 				return fmt.Errorf("Collection does not exist")
-			} else if err = clientDB.Use(colName).Unindex(idxPath); err != nil {
+			} else if err = clientDB.Use(colName).Index(idxPath); err != nil {
 				return err
 			} else if err = clientDB.Close(); err != nil {
 				return err
@@ -142,13 +142,26 @@ func (client *BinProtClient) AllIndexes(colName string) (paths [][]string) {
 		tdlog.Noticef("Client %d: failed to ping before returning index paths - %v", client.id, err)
 	}
 	client.opLock.Lock()
-	paths = make([][]string, 0, len(client.htNameLookup[colName]))
-	counter := 0
-	for path, _ := range client.htNameLookup[colName] {
-		paths[counter] = strings.Split(path, db.INDEX_PATH_SEP)
-		counter++
+	jointPaths := make([]string, 0, len(client.htNameLookup[colName]))
+	for aPath := range client.htNameLookup[colName] {
+		jointPaths = append(jointPaths, aPath)
+	}
+	sort.Strings(jointPaths)
+	paths = make([][]string, len(client.htNameLookup[colName]))
+	for i, jointPath := range jointPaths {
+		paths[i] = strings.Split(jointPath, db.INDEX_PATH_SEP)
 	}
 	client.opLock.Unlock()
+	return
+}
+
+// Return all indexed paths. Index path segments are joint.
+func (client *BinProtClient) AllIndexesJointPaths(colName string) (paths []string) {
+	paths = make([]string, 0, 0)
+	for _, path := range client.AllIndexes(colName) {
+		paths = append(paths, strings.Join(path, db.INDEX_PATH_SEP))
+	}
+	sort.Strings(paths)
 	return
 }
 

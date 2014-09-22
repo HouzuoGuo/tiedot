@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	SOCK_FILE = "sock" // name of server rank's Unix socket file
+	SOCK_FILE_SUFFIX = "_sock" // name of server rank's Unix socket file
 )
 
 // Bin protocol server opens a database of its rank, and listens on a Unix domain socket.
@@ -51,9 +51,7 @@ func NewServer(rank, nProcs int, workspace string) (srv *BinProtSrv) {
 		nProcs:        nProcs,
 		workspace:     workspace,
 		dbPath:        path.Join(workspace, strconv.Itoa(rank)),
-		sockPath:      path.Join(workspace, strconv.Itoa(rank), SOCK_FILE),
-		colLookup:     make(map[int32]*db.Col),
-		htLookup:      make(map[int32]*data.HashTable),
+		sockPath:      path.Join(workspace, strconv.Itoa(rank)+SOCK_FILE_SUFFIX),
 		clientIDSeq:   0,
 		maintByClient: 0,
 		rev:           0,

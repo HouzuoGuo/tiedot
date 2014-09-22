@@ -43,15 +43,13 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 		in:        make([]*bufio.Reader, 0, 8),
 		out:       make([]*bufio.Writer, 0, 8),
 		rev:       0,
-		opLock:    new(sync.Mutex),
-		colLookup: make(map[int32]*db.Col),
-		htLookup:  make(map[int32]*data.HashTable)}
+		opLock:    new(sync.Mutex)}
 	client.reload(0)
 	// Connect to servers, one at a time.
 	for i := 0; ; i++ {
 		connSuccessful := false
 		for attempt := 0; attempt < 5; attempt++ {
-			sockPath := path.Join(workspace, strconv.Itoa(i), SOCK_FILE)
+			sockPath := path.Join(workspace, strconv.Itoa(i)+SOCK_FILE_SUFFIX)
 			sock, err := net.Dial("unix", sockPath)
 			if err != nil {
 				time.Sleep(50 * time.Millisecond)

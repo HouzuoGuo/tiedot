@@ -15,11 +15,9 @@ func TestColCrud(t *testing.T) {
 	// Create
 	if err := clients[0].Create("a"); err != nil {
 		t.Fatal(err)
-	}
-	if clients[1].Create("a") == nil {
+	} else if clients[1].Create("a") == nil {
 		t.Fatal("Did not error")
-	}
-	if err := clients[1].Create("b"); err != nil {
+	} else if err := clients[1].Create("b"); err != nil {
 		t.Fatal(err)
 	}
 	// Get all names
@@ -29,17 +27,13 @@ func TestColCrud(t *testing.T) {
 	// Rename
 	if clients[0].Rename("a", "a") == nil {
 		t.Fatal("Did not error")
-	}
-	if clients[0].Rename("a", "b") == nil {
+	} else if clients[0].Rename("a", "b") == nil {
 		t.Fatal("Did not error")
-	}
-	if clients[0].Rename("abc", "b") == nil {
+	} else if clients[0].Rename("abc", "b") == nil {
 		t.Fatal("Did not error")
-	}
-	if err := clients[1].Rename("a", "c"); err != nil {
+	} else if err := clients[1].Rename("a", "c"); err != nil {
 		t.Fatal(err)
-	}
-	if err := clients[1].Rename("b", "d"); err != nil {
+	} else if err := clients[1].Rename("b", "d"); err != nil {
 		t.Fatal(err)
 	}
 	// Rename - verify
@@ -49,11 +43,9 @@ func TestColCrud(t *testing.T) {
 	// Truncate
 	if clients[0].Truncate("a") == nil {
 		t.Fatal("Did not error")
-	}
-	if err := clients[0].Truncate("c"); err != nil {
+	} else if err := clients[0].Truncate("c"); err != nil {
 		t.Fatal(err)
-	}
-	if err := clients[0].Truncate("d"); err != nil {
+	} else if err := clients[0].Truncate("d"); err != nil {
 		t.Fatal(err)
 	}
 	// Truncate - verify
@@ -63,18 +55,87 @@ func TestColCrud(t *testing.T) {
 	// Drop
 	if clients[1].Drop("a") == nil {
 		t.Fatal("Did not error")
-	}
-	if err := clients[1].Drop("c"); err != nil {
+	} else if err := clients[1].Drop("c"); err != nil {
 		t.Fatal(err)
-	}
-	if allNames := clients[0].AllCols(); len(allNames) != 1 || allNames[0] != "d" {
+	} else if allNames := clients[0].AllCols(); len(allNames) != 1 || allNames[0] != "d" {
 		t.Fatal(allNames)
-	}
-	if err := clients[0].Drop("d"); err != nil {
+	} else if err := clients[0].Drop("d"); err != nil {
 		t.Fatal(err)
-	}
-	if allNames := clients[0].AllCols(); len(allNames) != 0 {
+	} else if allNames := clients[0].AllCols(); len(allNames) != 0 {
 		t.Fatal(allNames)
 	}
 	clients[0].Shutdown()
+}
+
+func TestDumpDB(t *testing.T) {
+	bak_dir := WS + "_bak"
+	os.RemoveAll(WS)
+	os.RemoveAll(bak_dir)
+	defer os.RemoveAll(WS)
+	defer os.RemoveAll(bak_dir)
+	_, clients := mkServersClients(2)
+	if err := clients[0].Create("a"); err != nil {
+		t.Fatal(err)
+	} else if err = clients[0].Index("a", []string{"1"}); err != nil {
+		t.Fatal(err)
+	} else if err := clients[1].Create("b"); err != nil {
+		t.Fatal(err)
+	} else if err = clients[1].Index("b", []string{"2"}); err != nil {
+		t.Fatal(err)
+	} else if err = clients[0].DumpDB(bak_dir); err != nil {
+		t.Fatal(err)
+	}
+	clients[1].Shutdown()
+	if err := os.RemoveAll(WS); err != nil {
+		t.Fatal(err)
+	} else if err = os.Rename(bak_dir, WS); err != nil {
+		t.Fatal(err)
+	}
+	_, clients = mkServersClients(2)
+	if clients[0].AllCols()[0] != "a" || clients[1].AllCols()[1] != "b" {
+		t.Fatal(clients[0].AllCols())
+	} else if _, exists := clients[0].htNameLookup["a"]["1"]; !exists {
+		t.Fatal(clients[0].htNameLookup)
+	} else if _, exists := clients[1].htNameLookup["b"]["2"]; !exists {
+		t.Fatal(clients[1].htNameLookup)
+	}
+	clients[0].Shutdown()
+}
+
+func TestIdxCrud(t *testing.T) {
+	os.RemoveAll(WS)
+	defer os.RemoveAll(WS)
+	_, clients := mkServersClients(2)
+
+	if err := clients[0].Create("col"); err != nil {
+		t.Fatal(err)
+	} else if len(clients[1].AllIndexes("col")) != 0 {
+		t.Fatal(clients[1].AllIndexes("col"))
+		// Create new indexe
+	} else if err = clients[0].Index("col", []string{"a", "b"}); err != nil {
+		t.Fatal(err)
+	} else if err = clients[1].Index("jiowefjiwae", []string{"a"}); err == nil {
+		t.Fatal("did not error")
+	} else if err = clients[0].Index("col", []string{"a", "b"}); err == nil {
+		t.Fatal("did not error")
+	} else if len(clients[1].AllIndexes("col")) != 1 || clients[1].AllIndexes("col")[0][0] != "a" || clients[1].AllIndexes("col")[0][1] != "b" {
+		t.Fatal(clients[1].AllIndexes("col"))
+		// Create more indexes
+	} else if err = clients[0].Index("col", []string{"c"}); err != nil {
+		t.Fatal(err)
+	} else if allIndexes := clients[1].AllIndexesJointPaths("col"); allIndexes[0] != "a!b" || allIndexes[1] != "c" {
+		t.Fatal(allIndexes)
+		// Unindex
+	} else if clients[0].Unindex("col", []string{"%&^*"}) == nil {
+		t.Fatal("Did not error")
+	} else if err = clients[1].Unindex("col", []string{"c"}); err != nil {
+		t.Fatal(err)
+	} else if len(clients[0].AllIndexes("col")) != 1 || clients[0].AllIndexes("col")[0][0] != "a" || clients[0].AllIndexes("col")[0][1] != "b" {
+		t.Fatal(clients[0].AllIndexes("col"))
+	} else if err = clients[1].Unindex("col", []string{"a", "b"}); err != nil {
+		t.Fatal(err)
+	} else if len(clients[0].AllIndexes("col")) != 0 {
+		t.Fatal(clients[0].AllIndexes("col"))
+	}
+	clients[1].Shutdown()
 }
