@@ -8,8 +8,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"strings"
 	"sort"
+	"strings"
 )
 
 const (

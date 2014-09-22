@@ -23,7 +23,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Get all names
-	if allNames := clients[1].AllCols(); len(allNames) != 2 || !(allNames[0] == "a" && allNames[1] == "b" || allNames[0] == "b" && allNames[1] == "a") {
+	if allNames := clients[1].AllCols(); len(allNames) != 2 || !(allNames[0] == "a" && allNames[1] == "b") {
 		t.Fatal(allNames)
 	}
 	// Rename
@@ -43,7 +43,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Rename - verify
-	if allNames := clients[1].AllCols(); len(allNames) != 2 || !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
+	if allNames := clients[1].AllCols(); len(allNames) != 2 || !(allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
 	// Truncate
@@ -57,7 +57,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Truncate - verify
-	if allNames := clients[1].AllCols(); len(allNames) != 2 || !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
+	if allNames := clients[1].AllCols(); len(allNames) != 2 || !(allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
 	// Drop

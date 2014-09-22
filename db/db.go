@@ -11,10 +11,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
-	"sort"
 )
 
 // Database structures.

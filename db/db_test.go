@@ -96,7 +96,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Get all names & use
-	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "a" && allNames[1] == "b" || allNames[0] == "b" && allNames[1] == "a") {
+	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "a" && allNames[1] == "b") {
 		t.Fatal(allNames)
 	}
 	if db.Use("a") == nil || db.Use("b") == nil || db.Use("abcde") != nil {
@@ -119,7 +119,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Rename - verify
-	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
+	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
 	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
@@ -136,7 +136,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Truncate - verify
-	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
+	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
 	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
@@ -147,7 +147,7 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Scrub - verify
-	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "d" && allNames[1] == "c" || allNames[0] == "c" && allNames[1] == "d") {
+	if allNames := db.AllCols(); len(allNames) != 2 || !(allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
 	if db.Use("c") == nil || db.Use("d") == nil || db.Use("a") != nil {
@@ -212,7 +212,7 @@ func TestDumpDB(t *testing.T) {
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if allCols := db2.AllCols(); !(allCols[0] == "a" && allCols[1] == "b" || allCols[0] == "b" && allCols[1] == "a") {
+	if allCols := db2.AllCols(); !(allCols[0] == "a" && allCols[1] == "b") {
 		t.Fatal(allCols)
 	}
 	if doc, err := db2.Use("a").Read(id1); err != nil || doc["whatever"].(string) != "1" {
