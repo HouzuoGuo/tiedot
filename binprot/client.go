@@ -26,12 +26,13 @@ type BinProtClient struct {
 	sock          []net.Conn
 	in            []*bufio.Reader
 	out           []*bufio.Writer
+	nProcs        int
 	rev           uint32
 	opLock        *sync.Mutex
 	colLookup     map[int32]*db.Col
 	colNameLookup map[string]int32
 	htLookup      map[int32]*data.HashTable
-	htNameLookup  map[string]map[string]int32
+	htNameLookup  map[int32]map[string]int32
 }
 
 // Create a client and immediately connect to server.
@@ -69,7 +70,8 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 				if err = client.Ping(); err != nil {
 					return
 				}
-				tdlog.Noticef("Client %d: successfully connected to %d server processes", client.id, i)
+				client.nProcs = i
+				tdlog.Noticef("Client %d: successfully connected to %d server processes", client.id, client.nProcs)
 			}
 			break
 		}
@@ -102,6 +104,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 // Client sends a command and reads server's response.
 func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (moreInfo [][]byte, retCode byte, err error) {
 	// Client sends a "CMD-REV-PARAM-US-PARAM-RS" command to server
+	fmt.Println("Client send ", cmd, client.rev, params)
 	rev := make([]byte, 4)
 	binary.LittleEndian.PutUint32(rev, client.rev)
 	if err = client.out[rank].WriteByte(cmd); err != nil {
@@ -140,6 +143,7 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 	}
 	moreInfo = bytes.Split(reply[:len(reply)-1], []byte{C_US})
 	retCode = statusByte
+	fmt.Println("Client read ", retCode, moreInfo)
 	// Determine what to do with the return code
 	switch retCode {
 	case C_OK:

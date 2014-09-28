@@ -137,17 +137,22 @@ func (client *BinProtClient) Index(colName string, idxPath []string) error {
 }
 
 // Return all collection names sorted in alphabetical order.
-func (client *BinProtClient) AllIndexes(colName string) (paths [][]string) {
+func (client *BinProtClient) AllIndexes(colName string) (paths [][]string, err error) {
 	if err := client.Ping(); err != nil {
 		tdlog.Noticef("Client %d: failed to ping before returning index paths - %v", client.id, err)
 	}
 	client.opLock.Lock()
-	jointPaths := make([]string, 0, len(client.htNameLookup[colName]))
-	for aPath := range client.htNameLookup[colName] {
+	colID, exists := client.colNameLookup[colName]
+	if !exists {
+		client.opLock.Unlock()
+		return nil, fmt.Errorf("Collection %s does not exist", colName)
+	}
+	jointPaths := make([]string, 0, len(client.htNameLookup[colID]))
+	for aPath := range client.htNameLookup[colID] {
 		jointPaths = append(jointPaths, aPath)
 	}
 	sort.Strings(jointPaths)
-	paths = make([][]string, len(client.htNameLookup[colName]))
+	paths = make([][]string, len(jointPaths))
 	for i, jointPath := range jointPaths {
 		paths[i] = strings.Split(jointPath, db.INDEX_PATH_SEP)
 	}
@@ -156,9 +161,13 @@ func (client *BinProtClient) AllIndexes(colName string) (paths [][]string) {
 }
 
 // Return all indexed paths. Index path segments are joint.
-func (client *BinProtClient) AllIndexesJointPaths(colName string) (paths []string) {
+func (client *BinProtClient) AllIndexesJointPaths(colName string) (paths []string, err error) {
 	paths = make([]string, 0, 0)
-	for _, path := range client.AllIndexes(colName) {
+	allIndexes, err := client.AllIndexes(colName)
+	if err != nil {
+		return
+	}
+	for _, path := range allIndexes {
 		paths = append(paths, strings.Join(path, db.INDEX_PATH_SEP))
 	}
 	sort.Strings(paths)

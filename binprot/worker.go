@@ -4,6 +4,7 @@ package binprot
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
@@ -21,9 +22,10 @@ const (
 
 	// Document commands
 	C_DOC_INSERT = 11
-	C_DOC_READ   = 12
-	C_DOC_UPDATE = 13
-	C_DOC_DELETE = 14
+	C_DOC_UNLOCK = 12
+	C_DOC_READ   = 13
+	C_DOC_UPDATE = 14
+	C_DOC_DELETE = 15
 
 	// Index commands
 	C_HT_PUT    = 21
@@ -105,7 +107,8 @@ func (worker *BinProtWorker) Run() {
 			return
 		}
 		// Read a command from client
-		cmd, clientRev, _, err := worker.readCmd()
+		cmd, clientRev, params, err := worker.readCmd()
+		fmt.Println("Server read ", cmd, clientRev, params)
 		if err != nil {
 			// Client has disconnected
 			tdlog.Noticef("Server %d: lost connection with client %d - %v", worker.srv.rank, worker.id, err)
@@ -128,6 +131,20 @@ func (worker *BinProtWorker) Run() {
 		} else {
 			// Process the command
 			switch cmd {
+			case C_DOC_INSERT:
+				colID := int32(binary.LittleEndian.Uint32(params[0]))
+				docID := binary.LittleEndian.Uint64(params[1])
+				doc := params[2]
+				if err := worker.srv.colLookup[colID].BPLockAndInsert(docID, doc); err == nil {
+					worker.ansOK()
+				} else {
+					worker.ansErr(C_ERR, []byte(err.Error()))
+				}
+			case C_DOC_UNLOCK:
+				colID := int32(binary.LittleEndian.Uint32(params[0]))
+				docID := binary.LittleEndian.Uint64(params[1])
+				worker.srv.colLookup[colID].BPUnlock(docID)
+				worker.ansOK()
 			case C_GO_MAINT:
 				worker.srv.maintByClient = worker.id
 				worker.ansOK()

@@ -28,7 +28,7 @@ type BinProtSrv struct {
 	colLookup                   map[int32]*db.Col
 	colNameLookup               map[string]int32
 	htLookup                    map[int32]*data.HashTable
-	htNameLookup                map[string]map[string]int32
+	htNameLookup                map[int32]map[string]int32
 	clientIDSeq, maintByClient  int64
 	rev                         uint32
 	opLock                      *sync.Mutex
@@ -86,21 +86,22 @@ func (srv *BinProtSrv) Run() (err error) {
 
 // To save bandwidth, both client and server refer collections and indexes by an int32.
 func mkSchemaLookupTables(dbInstance *db.DB) (colLookup map[int32]*db.Col, colNameLookup map[string]int32,
-	htLookup map[int32]*data.HashTable, htNameLookup map[string]map[string]int32) {
+	htLookup map[int32]*data.HashTable, htNameLookup map[int32]map[string]int32) {
 	colLookup = make(map[int32]*db.Col)
 	colNameLookup = make(map[string]int32)
 	htLookup = make(map[int32]*data.HashTable)
-	htNameLookup = make(map[string]map[string]int32)
+	htNameLookup = make(map[int32]map[string]int32)
 	seq := 0
 	for _, colName := range dbInstance.AllCols() {
 		col := dbInstance.Use(colName)
-		colLookup[int32(seq)] = col
-		colNameLookup[colName] = int32(seq)
-		htNameLookup[colName] = make(map[string]int32)
+		colID := int32(seq)
+		colLookup[colID] = col
+		colNameLookup[colName] = colID
+		htNameLookup[colID] = make(map[string]int32)
 		seq++
 		for _, idxName := range col.AllIndexesJointPaths() {
 			htLookup[int32(seq)] = col.BPUseHT(idxName)
-			htNameLookup[colName][idxName] = int32(seq)
+			htNameLookup[colID][idxName] = int32(seq)
 			seq++
 		}
 	}
