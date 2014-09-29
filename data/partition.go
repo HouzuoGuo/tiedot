@@ -6,9 +6,9 @@ The hash table stores the unchanging ID as entry key and the physical document l
 package data
 
 import (
-	"errors"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"sync"
+
+	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
 // Partition associates a hash table with collection documents, allowing addressing of a document using an unchanging ID.
@@ -44,9 +44,9 @@ func (part *Partition) Insert(id int, data []byte) (physID int, err error) {
 func (part *Partition) Read(id int) ([]byte, error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return nil, errors.New("Document does not exist")
+		return nil, ErrorNoDoc.Fault(id)
 	} else if data := part.col.Read(physID[0]); data == nil {
-		return nil, errors.New("Document does not exist")
+		return nil, ErrorNoDoc.Fault(id)
 	} else {
 		return data, nil
 	}
@@ -56,7 +56,7 @@ func (part *Partition) Read(id int) ([]byte, error) {
 func (part *Partition) Update(id int, data []byte) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return errors.New("Document does not exist")
+		return ErrorNoDoc.Fault(id)
 	}
 	newID, err := part.col.Update(physID[0], data)
 	if err != nil {
@@ -72,7 +72,7 @@ func (part *Partition) Update(id int, data []byte) (err error) {
 // Lock a document for exclusive update.
 func (part *Partition) LockUpdate(id int) (err error) {
 	if _, alreadyLocked := part.updating[id]; alreadyLocked {
-		return errors.New("Document is already locked")
+		return ErrorNoDoc.Fault(id)
 	}
 	part.updating[id] = struct{}{}
 	return
@@ -87,7 +87,7 @@ func (part *Partition) UnlockUpdate(id int) {
 func (part *Partition) Delete(id int) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return errors.New("Document does not exist")
+		return ErrorNoDoc.Fault(id)
 	}
 	part.col.Delete(physID[0])
 	part.lookup.Remove(id, physID[0])
@@ -137,7 +137,7 @@ func (part *Partition) Clear() (err error) {
 		failure = true
 	}
 	if failure {
-		err = errors.New("Operation did not complete successfully")
+		err = ErrorOpFailed
 	}
 	return
 }
@@ -154,7 +154,7 @@ func (part *Partition) Close() (err error) {
 		failure = true
 	}
 	if failure {
-		err = errors.New("Operation did not complete successfully")
+		err = ErrorOpFailed
 	}
 	return
 }

@@ -7,7 +7,7 @@ type Error struct {
 	WithDetails string
 }
 
-func (e *Error) With(details ...interface{}) *Error {
+func (e *Error) Fault(details ...interface{}) *Error {
 	e.WithDetails = fmt.Sprintf(e.Err, details...)
 	return e
 }
