@@ -4,9 +4,17 @@ package db
 import (
 	"errors"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"strconv"
 	"strings"
+
+	"github.com/HouzuoGuo/tiedot/tdlog"
+)
+
+var (
+	ErrorMissingLookUp  = Error{"Missing lookup path `in`", ""}
+	ErrorExpectedPath   = Error{"Expecting vector lookup path `in`, but %v given", ""}
+	ErrorExpectedNumber = Error{"Expecting `limit` as a number, but %v given", ""}
+	ErrorNeedIndex      = Error{"Please index %v and retry query %v", ""}
 )
 
 // Calculate union of sub-query results.
@@ -33,7 +41,7 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 	// Figure out lookup path - JSON array "in"
 	path, hasPath := expr["in"]
 	if !hasPath {
-		return errors.New("Missing lookup path `in`")
+		return ErrorMissingLookUp
 	}
 	vecPath := make([]string, 0)
 	if vecPathInterface, ok := path.([]interface{}); ok {
@@ -41,7 +49,7 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 			vecPath = append(vecPath, fmt.Sprint(v))
 		}
 	} else {
-		return errors.New(fmt.Sprintf("Expecting vector lookup path `in`, but %v given", path))
+		return ErrorExpectedPath.With(path)
 	}
 	// Figure out result number limit
 	intLimit := int(0)
@@ -49,14 +57,14 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 		if floatLimit, ok := limit.(float64); ok {
 			intLimit = int(floatLimit)
 		} else {
-			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
+			return ErrorExpectedNumber.With(limit)
 		}
 	}
 	lookupStrValue := fmt.Sprint(lookupValue) // the value to look for
 	lookupValueHash := StrHash(lookupStrValue)
 	scanPath := strings.Join(vecPath, INDEX_PATH_SEP)
 	if _, indexed := src.indexPaths[scanPath]; !indexed {
-		return errors.New(fmt.Sprintf("Please index %v and retry query %v", scanPath, expr))
+		return ErrorNeedIndex.With(scanPath, expr)
 	}
 	num := lookupValueHash % src.db.numParts
 	ht := src.hts[num][scanPath]
