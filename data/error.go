@@ -22,6 +22,6 @@ func (e Error) Error() string {
 var (
 	ErrorNoDoc       = Error{"Document `%d` does not exist", ""}
 	ErrorDocTooLarge = Error{"Document is too large. Max: `%d`, Given: `%d`", ""}
-	ErrorDocLocked   = Error{"Documenta `%d` is already locked", ""}
+	ErrorDocLocked   = Error{"Document `%d` is already locked", ""}
 	ErrorOpFailed    = Error{"OPeration did not complete successfully", ""}
 )
