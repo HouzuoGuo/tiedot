@@ -1,6 +1,7 @@
 package data
 
 import (
+	"github.com/HouzuoGuo/tiedot/dberr"
 	"math/rand"
 	"os"
 	"strconv"
@@ -36,7 +37,7 @@ func TestPartitionDocCRUD(t *testing.T) {
 	if err = part.Update(1, []byte("abcdef")); err != nil {
 		t.Fatal(err)
 	}
-	if err = part.Update(1234, []byte("abcdef")); err == nil {
+	if err := part.Update(1234, []byte("abcdef")); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatal("Did not error")
 	}
 	if readback, err := part.Read(1); err != nil || string(readback) != "abcdef      " {
@@ -46,17 +47,17 @@ func TestPartitionDocCRUD(t *testing.T) {
 	if err = part.Delete(1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = part.Read(1); err == nil {
+	if _, err = part.Read(1); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatal("Did not error")
 	}
-	if err = part.Delete(123); err == nil {
+	if err = part.Delete(123); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatal("Did not error")
 	}
 	// Lock & unlock
 	if err = part.LockUpdate(123); err != nil {
 		t.Fatal(err)
 	}
-	if err = part.LockUpdate(123); err == nil {
+	if err = part.LockUpdate(123); err.(dberr.Error).Code != dberr.DocIsLocked {
 		t.Fatal("Did not error")
 	}
 	part.UnlockUpdate(123)
