@@ -99,7 +99,8 @@ func embeddedExample() {
 		panic(err)
 	}
 
-	// More complicated error handing - for example, deleting a document which no longer exists..
+	// More complicated error handing - identify the error kind.
+	// In this example, the error code tells that the document no longer exists.
 	if err := feeds.Delete(docID); err.(dberr.Error).Code == dberr.DocDoesNotExist {
 		fmt.Println("The document was already deleted")
 	}

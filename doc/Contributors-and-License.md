@@ -12,6 +12,7 @@ I sincerely appreciate the following individuals and organizations for their con
 - "IFQ"
 - Nick Prestra
 - NoahShen
+- Omeid
 - Osman Bineev
 - Ross Albertson
 - Stefan Richter
