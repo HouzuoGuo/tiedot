@@ -8,38 +8,6 @@ import (
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
-const (
-	// Status replies
-	C_OK         = 0
-	C_ERR        = 1
-	C_ERR_SCHEMA = 2
-	C_ERR_MAINT  = 3
-	C_ERR_DOWN   = 4
-
-	// Command record structure
-	C_US = 31
-	C_RS = 30
-
-	// Document commands
-	C_DOC_INSERT = 11
-	C_DOC_UNLOCK = 12
-	C_DOC_READ   = 13
-	C_DOC_UPDATE = 14
-	C_DOC_DELETE = 15
-
-	// Index commands
-	C_HT_PUT    = 21
-	C_HT_GET    = 22
-	C_HT_REMOVE = 23
-
-	// Maintenance commands
-	C_RELOAD      = 91
-	C_SHUTDOWN    = 92
-	C_PING        = 93
-	C_GO_MAINT    = 95
-	C_LEAVE_MAINT = 96
-)
-
 // Server reads a "CMD-REV-PARAM-US-PARAM-RS" command sent by client.
 func (worker *BinProtWorker) readCmd() (cmd byte, rev uint32, params [][]byte, err error) {
 	cmdRev := make([]byte, 5)
@@ -48,18 +16,18 @@ func (worker *BinProtWorker) readCmd() (cmd byte, rev uint32, params [][]byte, e
 	}
 	cmd = cmdRev[0]
 	rev = binary.LittleEndian.Uint32(cmdRev[1:5])
-	record, err := worker.in.ReadSlice(C_RS)
+	record, err := worker.in.ReadSlice(REC_END)
 	record = record[0 : len(record)-1]
 	if err != nil {
 		return
 	}
-	params = bytes.Split(record, []byte{C_US})
+	params = bytes.Split(record, []byte{REC_PARAM})
 	return
 }
 
 // Server answers "OK-INFO-US-INFO-RS".
 func (worker *BinProtWorker) ansOK(moreInfo ...[]byte) {
-	if err := worker.out.WriteByte(C_OK); err != nil {
+	if err := worker.out.WriteByte(R_OK); err != nil {
 		worker.lastErr = err
 		return
 	}
@@ -67,12 +35,12 @@ func (worker *BinProtWorker) ansOK(moreInfo ...[]byte) {
 		if _, err := worker.out.Write(more); err != nil {
 			worker.lastErr = err
 			return
-		} else if err := worker.out.WriteByte(C_US); err != nil {
+		} else if err := worker.out.WriteByte(REC_PARAM); err != nil {
 			worker.lastErr = err
 			return
 		}
 	}
-	if err := worker.out.WriteByte(C_RS); err != nil {
+	if err := worker.out.WriteByte(REC_END); err != nil {
 		worker.lastErr = err
 		return
 	} else if err := worker.out.Flush(); err != nil {
@@ -89,7 +57,7 @@ func (worker *BinProtWorker) ansErr(errCode byte, moreInfo []byte) {
 	} else if _, err := worker.out.Write(moreInfo); err != nil {
 		worker.lastErr = err
 		return
-	} else if err := worker.out.WriteByte(C_RS); err != nil {
+	} else if err := worker.out.WriteByte(REC_END); err != nil {
 		worker.lastErr = err
 		return
 	} else if err := worker.out.Flush(); err != nil {
@@ -115,7 +83,7 @@ func (worker *BinProtWorker) Run() {
 			return
 		} else if worker.srv.shutdown {
 			// Server has/is shutting down
-			worker.ansErr(C_ERR_DOWN, []byte{})
+			worker.ansErr(R_ERR_DOWN, []byte{})
 			return
 		}
 		worker.srv.opLock.Lock()
@@ -124,10 +92,10 @@ func (worker *BinProtWorker) Run() {
 			tdlog.Noticef("Server %d: telling client %d (rev %d) to refresh schema revision to match %d", worker.srv.rank, worker.id, clientRev, worker.srv.rev)
 			mySchema := make([]byte, 4)
 			binary.LittleEndian.PutUint32(mySchema, worker.srv.rev)
-			worker.ansErr(C_ERR_SCHEMA, mySchema)
+			worker.ansErr(R_ERR_SCHEMA, mySchema)
 		} else if worker.srv.maintByClient != 0 && worker.srv.maintByClient != worker.id {
 			// Check server maintenance access
-			worker.ansErr(C_ERR_MAINT, []byte{})
+			worker.ansErr(R_ERR_MAINT, []byte{})
 		} else {
 			// Process the command
 			switch cmd {
@@ -138,7 +106,7 @@ func (worker *BinProtWorker) Run() {
 				if err := worker.srv.colLookup[colID].BPLockAndInsert(docID, doc); err == nil {
 					worker.ansOK()
 				} else {
-					worker.ansErr(C_ERR, []byte(err.Error()))
+					worker.ansErr(R_ERR, []byte(err.Error()))
 				}
 			case C_DOC_UNLOCK:
 				colID := int32(binary.LittleEndian.Uint32(params[0]))
@@ -154,7 +122,7 @@ func (worker *BinProtWorker) Run() {
 					worker.srv.reload()
 					worker.ansOK()
 				} else {
-					worker.ansErr(C_ERR_MAINT, []byte{})
+					worker.ansErr(R_ERR_MAINT, []byte{})
 				}
 			case C_PING:
 				clientID := make([]byte, 8)

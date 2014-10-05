@@ -17,8 +17,6 @@ import (
 	"time"
 )
 
-const C_ERR_IO = 255
-
 // Bin protocol client connects to servers via Unix domain socket.
 type BinProtClient struct {
 	workspace     string
@@ -108,54 +106,54 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 	rev := make([]byte, 4)
 	binary.LittleEndian.PutUint32(rev, client.rev)
 	if err = client.out[rank].WriteByte(cmd); err != nil {
-		retCode = C_ERR_IO
+		retCode = CLIENT_IO_ERR
 		return
 	} else if _, err = client.out[rank].Write(rev); err != nil {
-		retCode = C_ERR_IO
+		retCode = CLIENT_IO_ERR
 		return
 	}
 	for _, param := range params {
 		if _, err = client.out[rank].Write(param); err != nil {
-			retCode = C_ERR_IO
+			retCode = CLIENT_IO_ERR
 			return
-		} else if err = client.out[rank].WriteByte(C_US); err != nil {
-			retCode = C_ERR_IO
+		} else if err = client.out[rank].WriteByte(REC_PARAM); err != nil {
+			retCode = CLIENT_IO_ERR
 			return
 		}
 	}
-	if err = client.out[rank].WriteByte(C_RS); err != nil {
-		retCode = C_ERR_IO
+	if err = client.out[rank].WriteByte(REC_END); err != nil {
+		retCode = CLIENT_IO_ERR
 		return
 	} else if err = client.out[rank].Flush(); err != nil {
-		retCode = C_ERR_IO
+		retCode = CLIENT_IO_ERR
 		return
 	}
 	// Client reads server's response
 	statusByte, err := client.in[rank].ReadByte()
 	if err != nil {
-		retCode = C_ERR_IO
+		retCode = CLIENT_IO_ERR
 		return
 	}
-	reply, err := client.in[rank].ReadSlice(C_RS)
+	reply, err := client.in[rank].ReadSlice(REC_END)
 	if err != nil {
-		retCode = C_ERR_IO
+		retCode = CLIENT_IO_ERR
 		return
 	}
-	moreInfo = bytes.Split(reply[:len(reply)-1], []byte{C_US})
+	moreInfo = bytes.Split(reply[:len(reply)-1], []byte{REC_PARAM})
 	retCode = statusByte
 	fmt.Println("Client read ", retCode, moreInfo)
 	// Determine what to do with the return code
 	switch retCode {
-	case C_OK:
+	case R_OK:
 		// Request-response all OK
-	case C_ERR_DOWN:
+	case R_ERR_DOWN:
 		// If server has already shut down, shut down client also
 		for _, sock := range client.sock {
 			sock.Close()
 		}
 		tdlog.Noticef("Client %d: server shutdown has begun and this client is closed", client.id)
 		err = fmt.Errorf("Server is shutting down")
-	case C_ERR_SCHEMA:
+	case R_ERR_SCHEMA:
 		// Always reload my schema
 		srvRev := moreInfo[0][0:4]
 		client.reload(binary.LittleEndian.Uint32(srvRev))
@@ -223,19 +221,19 @@ func (client *BinProtClient) reqMaintAccess(fun func() error) error {
 	for {
 		retCode, err := client.goMaint()
 		switch retCode {
-		case C_ERR_MAINT:
+		case R_ERR_MAINT:
 			tdlog.Noticef("Client %d: servers are busy, will try again after a short delay - %v", client.id, err)
 			time.Sleep(100 * time.Millisecond)
 			continue
-		case C_ERR_DOWN:
+		case R_ERR_DOWN:
 			fallthrough
-		case C_ERR_IO:
+		case CLIENT_IO_ERR:
 			for _, sock := range client.sock {
 				sock.Close()
 			}
 			tdlog.Noticef("Client %d: IO error occured or servers are shutting down, this client is closed.", client.id)
 			return fmt.Errorf("Servers are down before maintenance operation can take place - %v", err)
-		case C_OK:
+		case R_OK:
 			funResult := fun()
 			if err := client.leaveMaint(); err != nil {
 				return fmt.Errorf("Function error: %v, client LEAVE_MAINT error: %v", funResult, err)
@@ -249,11 +247,11 @@ func (client *BinProtClient) ping() error {
 	for i := range client.sock {
 		myID, retCode, err := client.sendCmd(i, true, C_PING)
 		switch retCode {
-		case C_OK:
+		case R_OK:
 			// Server returns my client ID
 			// The client ID will not change in the next Ping call
 			client.id = binary.LittleEndian.Uint64(myID[0])
-		case C_ERR_MAINT:
+		case R_ERR_MAINT:
 			// Server does not return my client ID, but server is alive.
 		default:
 			return fmt.Errorf("Ping error: code %d, err %v", retCode, err)
