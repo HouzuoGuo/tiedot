@@ -28,7 +28,6 @@ func TestDocInsertBench(t *testing.T) {
 }
 
 func TestDocCrud(t *testing.T) {
-	return
 	os.RemoveAll(WS)
 	defer os.RemoveAll(WS)
 	_, clients := mkServersClients(2)

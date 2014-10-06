@@ -4,7 +4,6 @@ package binprot
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
@@ -102,48 +101,29 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 }
 
 // Client sends a command and reads server's response.
-func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (moreInfo [][]byte, retCode byte, err error) {
-	// Client sends a "CMD-REV-PARAM-US-PARAM-RS" command to server
-	fmt.Println("Client send ", cmd, client.rev, params)
+func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (retCode byte, moreInfo [][]byte, err error) {
+	allParams := make([][]byte, len(params)+1)
+	// Param 0 should be the client's schema revision
 	rev := make([]byte, 4)
 	binary.LittleEndian.PutUint32(rev, client.rev)
-	if err = client.out[rank].WriteByte(cmd); err != nil {
-		retCode = CLIENT_IO_ERR
-		return
-	} else if _, err = client.out[rank].Write(rev); err != nil {
+	allParams[0] = rev
+	// Copy down the remaining params
+	for i, param := range params {
+		allParams[i+1] = param
+	}
+	// Client sends command to server
+	//	fmt.Println("Client send ", cmd, client.rev, allParams)
+	if err = writeRec(client.out[rank], cmd, allParams...); err != nil {
 		retCode = CLIENT_IO_ERR
 		return
 	}
-	for _, param := range params {
-		if _, err = client.out[rank].Write(param); err != nil {
-			retCode = CLIENT_IO_ERR
-			return
-		} else if err = client.out[rank].WriteByte(REC_PARAM); err != nil {
-			retCode = CLIENT_IO_ERR
-			return
-		}
-	}
-	if err = client.out[rank].WriteByte(REC_END); err != nil {
-		retCode = CLIENT_IO_ERR
-		return
-	} else if err = client.out[rank].Flush(); err != nil {
-		retCode = CLIENT_IO_ERR
-		return
-	}
-	// Client reads server's response
-	statusByte, err := client.in[rank].ReadByte()
+	// Client reads server response
+	retCode, moreInfo, err = readRec(client.in[rank])
+	//	fmt.Println("Client read ", retCode, moreInfo)
 	if err != nil {
 		retCode = CLIENT_IO_ERR
 		return
 	}
-	reply, err := client.in[rank].ReadSlice(REC_END)
-	if err != nil {
-		retCode = CLIENT_IO_ERR
-		return
-	}
-	moreInfo = bytes.Split(reply[:len(reply)-1], []byte{REC_PARAM})
-	retCode = statusByte
-	fmt.Println("Client read ", retCode, moreInfo)
 	// Determine what to do with the return code
 	switch retCode {
 	case R_OK:
@@ -194,7 +174,7 @@ func (client *BinProtClient) reload(srvRev uint32) {
 // Request maintenance access from all servers.
 func (client *BinProtClient) goMaint() (retCode byte, err error) {
 	for goMaintSrv := range client.sock {
-		if _, retCode, err = client.sendCmd(goMaintSrv, true, C_GO_MAINT); err != nil {
+		if retCode, _, err = client.sendCmd(goMaintSrv, true, C_GO_MAINT); err != nil {
 			for leaveMaintSrv := 0; leaveMaintSrv < goMaintSrv; leaveMaintSrv++ {
 				if _, _, err := client.sendCmd(leaveMaintSrv, true, C_LEAVE_MAINT); err != nil {
 					tdlog.Noticef("Client %d: failed to call LEAVE_MAINT on server %d", client.id, leaveMaintSrv)
@@ -247,7 +227,7 @@ func (client *BinProtClient) reqMaintAccess(fun func() error) error {
 
 func (client *BinProtClient) ping() error {
 	for i := range client.sock {
-		myID, retCode, err := client.sendCmd(i, true, C_PING)
+		retCode, myID, err := client.sendCmd(i, true, C_PING)
 		switch retCode {
 		case R_OK:
 			// Server returns my client ID

@@ -7,13 +7,12 @@ import (
 	"os/signal"
 	"path"
 	"runtime/pprof"
+	"strconv"
 	"testing"
 	"time"
 )
 
-const (
-	WS = "/tmp/tiedot_binprot_test"
-)
+var WS string = "/tmp/tiedot_binprot_test" + strconv.FormatUint(uint64(time.Now().UnixNano()), 10)
 
 func dumpGoroutineOnInterrupt() {
 	c := make(chan os.Signal, 1)

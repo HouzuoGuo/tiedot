@@ -2,67 +2,32 @@
 package binprot
 
 import (
-	"bytes"
 	"encoding/binary"
-	"fmt"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
-// Server reads a "CMD-REV-PARAM-US-PARAM-RS" command sent by client.
+// Server reads a command sent from a client.
 func (worker *BinProtWorker) readCmd() (cmd byte, rev uint32, params [][]byte, err error) {
-	cmdRev := make([]byte, 5)
-	if _, err = worker.in.Read(cmdRev); err != nil {
-		return
-	}
-	cmd = cmdRev[0]
-	rev = binary.LittleEndian.Uint32(cmdRev[1:5])
-	record, err := worker.in.ReadSlice(REC_END)
-	record = record[0 : len(record)-1]
+	cmd, paramsInclRev, err := readRec(worker.in)
 	if err != nil {
 		return
 	}
-	params = bytes.Split(record, []byte{REC_PARAM})
+	rev = binary.LittleEndian.Uint32(paramsInclRev[0])
+	params = paramsInclRev[1:]
 	return
 }
 
-// Server answers "OK-INFO-US-INFO-RS".
+// Server answers OK with extra params.
 func (worker *BinProtWorker) ansOK(moreInfo ...[]byte) {
-	if err := worker.out.WriteByte(R_OK); err != nil {
+	if err := writeRec(worker.out, R_OK, moreInfo...); err != nil {
 		worker.lastErr = err
-		return
-	}
-	for _, more := range moreInfo {
-		if _, err := worker.out.Write(more); err != nil {
-			worker.lastErr = err
-			return
-		} else if err := worker.out.WriteByte(REC_PARAM); err != nil {
-			worker.lastErr = err
-			return
-		}
-	}
-	if err := worker.out.WriteByte(REC_END); err != nil {
-		worker.lastErr = err
-		return
-	} else if err := worker.out.Flush(); err != nil {
-		worker.lastErr = err
-		return
 	}
 }
 
-// Server answers "ERR-INFO-RS".
+// Server answers an error with optionally more info.
 func (worker *BinProtWorker) ansErr(errCode byte, moreInfo []byte) {
-	if err := worker.out.WriteByte(errCode); err != nil {
+	if err := writeRec(worker.out, errCode, moreInfo); err != nil {
 		worker.lastErr = err
-		return
-	} else if _, err := worker.out.Write(moreInfo); err != nil {
-		worker.lastErr = err
-		return
-	} else if err := worker.out.WriteByte(REC_END); err != nil {
-		worker.lastErr = err
-		return
-	} else if err := worker.out.Flush(); err != nil {
-		worker.lastErr = err
-		return
 	}
 }
 
@@ -76,7 +41,7 @@ func (worker *BinProtWorker) Run() {
 		}
 		// Read a command from client
 		cmd, clientRev, params, err := worker.readCmd()
-		fmt.Println("Server read ", cmd, clientRev, params)
+		//		fmt.Println("Server read ", cmd, clientRev, params)
 		if err != nil {
 			// Client has disconnected
 			tdlog.Noticef("Server %d: lost connection with client %d - %v", worker.srv.rank, worker.id, err)
