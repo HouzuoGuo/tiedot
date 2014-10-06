@@ -10,6 +10,7 @@ import (
 	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"math/rand"
 	"net"
 	"path"
 	"strconv"
@@ -95,6 +96,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 			time.Sleep(1 * time.Second)
 		}
 	}()
+	rand.Seed(time.Now().UnixNano())
 	tdlog.Noticef("Client %d: started", client.id)
 	return
 }

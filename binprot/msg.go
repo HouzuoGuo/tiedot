@@ -53,6 +53,7 @@ func readRec(in *bufio.Reader) (status byte, params [][]byte, err error) {
 		if tillEnd, err = in.ReadBytes(REC_END); err != nil {
 			return
 		}
+		bytes.Replace(tillEnd, []byte{REC_ESC, REC_ESC}, []byte{REC_ESC}, 0)
 		length := len(tillEnd)
 		last := true
 		// Is the record delimiter prefixed by an escape?
@@ -87,7 +88,7 @@ func readRec(in *bufio.Reader) (status byte, params [][]byte, err error) {
 		if b == REC_PARAM {
 			// Is the parameter delimiter prefixed by an escape?
 			if recTogether[i-1] == REC_ESC {
-				param = append(param, recTogether[paramPos: i-1]...)
+				param = append(param, recTogether[paramPos:i-1]...)
 				param = append(param, REC_PARAM)
 			} else {
 				param = append(param, recTogether[paramPos:i]...)
