@@ -7,11 +7,13 @@ import (
 )
 
 func TestDocInsertBench(t *testing.T) {
-	return
+	dumpGoroutineOnInterrupt()
 	os.RemoveAll(WS)
 	defer os.RemoveAll(WS)
 	_, clients := mkServersClients(2)
 	if err := clients[0].Create("col"); err != nil {
+		t.Fatal(err)
+	} else if err := clients[0].Index("col", []string{"a"}); err != nil {
 		t.Fatal(err)
 	}
 	total := int64(1000000)
@@ -36,14 +38,18 @@ func TestDocCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	id, err := clients[0].Insert("col", map[string]interface{}{"a": 1})
+	t.Log(id)
 	if err != nil {
 		t.Fatal(err)
+	} else if doc, err := clients[1].Read("col", id); err != nil || doc["a"].(float64) != 1 {
+		t.Fatal(doc, err)
 	}
+	id, err = clients[1].Insert("col", map[string]interface{}{"b": 2})
 	t.Log(id)
-	id, err = clients[0].Insert("col", map[string]interface{}{"b": 2})
 	if err != nil {
 		t.Fatal(err)
+	} else if doc, err := clients[0].Read("col", id); err != nil || doc["b"].(float64) != 2 {
+		t.Fatal(doc, err)
 	}
-	t.Log(id)
 	clients[0].Shutdown()
 }

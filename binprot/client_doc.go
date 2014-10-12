@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/db"
 	"math/rand"
 )
 
@@ -30,11 +31,43 @@ func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idByt
 	return
 }
 
-func (client *BinProtClient) indexDoc(colID string, docID uint64, doc map[string]interface{}) error {
+func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc map[string]interface{}) error {
+	docIDBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(docIDBytes, docID)
+	for htID, path := range client.indexPaths[colID] {
+		htIDBytes := make([]byte, 4)
+		binary.LittleEndian.PutUint32(htIDBytes, uint32(htID))
+		for _, val := range db.GetIn(doc, path) {
+			if val != nil {
+				htKey := db.StrHash(fmt.Sprint(val))
+				htKeyBytes := make([]byte, 8)
+				binary.LittleEndian.PutUint64(htKeyBytes, htKey)
+				if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_PUT, htIDBytes, htKeyBytes, docIDBytes); err != nil {
+					return err
+				}
+			}
+		}
+	}
 	return nil
 }
 
-func (client *BinProtClient) unindexDoc(colID string, docID uint64, doc map[string]interface{}) error {
+func (client *BinProtClient) unindexDoc(colID int32, docID uint64, doc map[string]interface{}) error {
+	docIDBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(docIDBytes, docID)
+	for htID, path := range client.indexPaths[colID] {
+		htIDBytes := make([]byte, 4)
+		binary.LittleEndian.PutUint32(htIDBytes, uint32(htID))
+		for _, val := range db.GetIn(doc, path) {
+			if val != nil {
+				htKey := db.StrHash(fmt.Sprint(val))
+				htKeyBytes := make([]byte, 8)
+				binary.LittleEndian.PutUint64(htKeyBytes, htKey)
+				if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_REMOVE, htIDBytes, htKeyBytes, docIDBytes); err != nil {
+					return err
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -44,24 +77,35 @@ func (client *BinProtClient) Insert(colName string, doc map[string]interface{}) 
 	if err != nil {
 		return
 	}
-	client.opLock.Lock()
 	rank, idBytes := client.docID2RankBytes(id)
+	client.opLock.Lock()
 	_, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {
+		client.opLock.Unlock()
 		return
 	} else if _, _, err = client.sendCmd(rank, true, C_DOC_INSERT, colIDBytes, idBytes, docBytes); err != nil {
-		client.opLock.Lock()
+		client.opLock.Unlock()
 		return
 	}
-	if _, _, err = client.sendCmd(rank, true, C_DOC_UNLOCK, colIDBytes, idBytes); err != nil {
-		client.opLock.Lock()
-		return
-	}
+	_, _, err = client.sendCmd(rank, true, C_DOC_UNLOCK, colIDBytes, idBytes)
 	client.opLock.Unlock()
 	return
 }
 
 func (client *BinProtClient) Read(colName string, id uint64) (doc map[string]interface{}, err error) {
+	rank, docIDBytes := client.docID2RankBytes(id)
+	client.opLock.Lock()
+	_, colIDBytes, err := client.colName2IDBytes(colName)
+	if err != nil {
+		client.opLock.Unlock()
+		return
+	}
+	_, resp, err := client.sendCmd(rank, true, C_DOC_READ, colIDBytes, docIDBytes)
+	client.opLock.Unlock()
+	if err != nil {
+		return
+	}
+	err = json.Unmarshal(resp[0], &doc)
 	return
 }
 
