@@ -15,7 +15,7 @@ import (
 const (
 	DOC_DATA_FILE   = "dat" // Prefix of partition collection data file name.
 	DOC_LOOKUP_FILE = "id"  // Prefix of partition hash table (ID lookup) file name.
-	INDEX_PATH_SEP  = "!"   // Separator between index keys in index directory name.
+	INDEX_PATH_SEP  = "!"   // Separator between index keys in index name, which is also the index file name.
 )
 
 // Collection has data partitions and some index meta information.

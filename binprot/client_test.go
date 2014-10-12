@@ -166,16 +166,11 @@ func TestSchemaLookup(t *testing.T) {
 	// Run two servers/clients
 	servers, clients := mkServersClients(2)
 	// Check schema
-	if len(servers[0].colLookup) != 1 || len(servers[1].colNameLookup) != 1 ||
-		len(servers[0].colNameLookup) != 1 || len(servers[1].colLookup) != 1 ||
-		len(servers[0].htLookup) != 1 || len(servers[1].htNameLookup) != 1 ||
-		len(servers[0].htNameLookup) != 1 || len(servers[1].htLookup) != 1 {
+	if len(servers[0].colLookup) != 1 || len(servers[1].colLookup) != 1 || len(servers[0].htLookup) != 1 || len(servers[1].htLookup) != 1 {
 		t.Fatal(servers[0], servers[1])
 	}
-	if len(clients[0].colLookup) != 1 || len(clients[1].colNameLookup) != 1 ||
-		len(clients[0].colNameLookup) != 1 || len(clients[1].colLookup) != 1 ||
-		len(clients[0].htLookup) != 1 || len(clients[1].htNameLookup) != 1 ||
-		len(clients[0].htNameLookup) != 1 || len(clients[1].htLookup) != 1 {
+	if len(clients[0].colLookup) != 1 || len(clients[1].colLookup) != 1 ||
+		len(clients[0].htLookup) != 1 || len(clients[1].htLookup) != 1 {
 		t.Fatal(clients[0], clients[1])
 	}
 	// Simulate a server maintenance event
@@ -195,41 +190,36 @@ func TestSchemaLookup(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Check schema
-	if len(servers[0].colLookup) != 2 || len(servers[1].colNameLookup) != 2 ||
-		len(servers[0].colNameLookup) != 2 || len(servers[1].colLookup) != 2 ||
-		len(servers[0].htLookup) != 2 || len(servers[1].htNameLookup) != 2 ||
-		len(servers[0].htNameLookup) != 2 || len(servers[1].htLookup) != 2 {
+	if len(servers[0].colLookup) != 2 || len(servers[1].colLookup) != 2 ||
+		len(servers[0].htLookup) != 2 || len(servers[1].htLookup) != 2 {
 		t.Fatal(servers[0], servers[1])
 	}
 	if len(clients[0].colLookup) != 2 || len(clients[1].colNameLookup) != 2 ||
 		len(clients[0].colNameLookup) != 2 || len(clients[1].colLookup) != 2 ||
-		len(clients[0].htLookup) != 2 || len(clients[1].htNameLookup) != 2 ||
-		len(clients[0].htNameLookup) != 2 || len(clients[1].htLookup) != 2 {
+		len(clients[0].htLookup) != 2 || len(clients[1].htLookup) != 2 {
 		t.Fatal(clients[0], clients[1])
 	}
-	if servers[0].colLookup[servers[0].colNameLookup["A"]] == nil ||
-		servers[0].colLookup[servers[0].colNameLookup["B"]] == nil ||
-		servers[1].colLookup[servers[1].colNameLookup["A"]] == nil ||
-		servers[1].colLookup[servers[1].colNameLookup["B"]] == nil {
-		t.Fatal(servers[0], servers[1])
-	}
-	if clients[0].colLookup[clients[0].colNameLookup["A"]] == nil ||
-		clients[0].colLookup[clients[0].colNameLookup["B"]] == nil ||
-		clients[1].colLookup[clients[1].colNameLookup["A"]] == nil ||
-		clients[1].colLookup[clients[1].colNameLookup["B"]] == nil {
-		t.Fatal(clients[0], clients[1])
-	}
-	if servers[0].htLookup[servers[0].htNameLookup[servers[1].colNameLookup["A"]]["1"]] == nil ||
-		servers[0].htLookup[servers[0].htNameLookup[servers[0].colNameLookup["B"]]["2"]] == nil ||
-		servers[1].htLookup[servers[1].htNameLookup[servers[0].colNameLookup["A"]]["1"]] == nil ||
-		servers[1].htLookup[servers[1].htNameLookup[servers[1].colNameLookup["B"]]["2"]] == nil {
-		t.Fatal(servers[0], servers[1])
-	}
-	if clients[0].htLookup[clients[0].htNameLookup[servers[0].colNameLookup["A"]]["1"]] == nil ||
-		clients[0].htLookup[clients[0].htNameLookup[servers[1].colNameLookup["B"]]["2"]] == nil ||
-		clients[1].htLookup[clients[1].htNameLookup[servers[1].colNameLookup["A"]]["1"]] == nil ||
-		clients[1].htLookup[clients[1].htNameLookup[servers[0].colNameLookup["B"]]["2"]] == nil {
-		t.Fatal(clients[0], clients[1])
+	for i := 0; i < 2; i++ {
+		for htID, idxPathSegs := range clients[i].indexPaths[clients[i].colNameLookup["A"]] {
+			if len(idxPathSegs) != 1 || idxPathSegs[0] != "1" {
+				t.Fatal(htID, idxPathSegs)
+			}
+			if servers[i].htLookup[htID] == nil {
+				t.Fatal(servers[i].htLookup)
+			} else if servers[i].htLookup[htID] == nil {
+				t.Fatal(servers[i].htLookup)
+			}
+		}
+		for htID, idxPathSegs := range clients[i].indexPaths[clients[i].colNameLookup["B"]] {
+			if len(idxPathSegs) != 1 || idxPathSegs[0] != "2" {
+				t.Fatal(htID, idxPathSegs)
+			}
+			if servers[i].htLookup[htID] == nil {
+				t.Fatal(servers[i].htLookup)
+			} else if servers[i].htLookup[htID] == nil {
+				t.Fatal(servers[i].htLookup)
+			}
+		}
 	}
 	clients[0].Shutdown()
 	clients[1].Shutdown()

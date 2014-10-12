@@ -92,14 +92,10 @@ func TestDumpDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, clients = mkServersClients(2)
-	colAID := clients[0].colNameLookup["a"]
-	colBID := clients[1].colNameLookup["b"]
 	if clients[0].AllCols()[0] != "a" || clients[1].AllCols()[1] != "b" {
 		t.Fatal(clients[0].AllCols())
-	} else if _, exists := clients[0].htNameLookup[colAID]["1"]; !exists {
-		t.Fatal(clients[0].htNameLookup)
-	} else if _, exists := clients[1].htNameLookup[colBID]["2"]; !exists {
-		t.Fatal(clients[1].htNameLookup)
+	} else if len(clients[0].indexPaths) != 2 || len(clients[1].indexPaths[0]) != 1 {
+		t.Fatal(clients[0].indexPaths, clients[1].indexPaths)
 	}
 	clients[0].Shutdown()
 }

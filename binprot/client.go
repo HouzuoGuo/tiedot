@@ -30,7 +30,7 @@ type BinProtClient struct {
 	colLookup     map[int32]*db.Col
 	colNameLookup map[string]int32
 	htLookup      map[int32]*data.HashTable
-	htNameLookup  map[int32]map[string]int32
+	indexPaths    map[int32]map[int32][]string
 }
 
 // Create a client and immediately connect to server.
@@ -162,7 +162,7 @@ func (client *BinProtClient) reload(srvRev uint32) {
 		panic(err)
 	}
 	// Support numeric lookup of collections and hash tables
-	client.colLookup, client.colNameLookup, client.htLookup, client.htNameLookup = mkSchemaLookupTables(clientDB)
+	client.colLookup, client.colNameLookup, client.htLookup, client.indexPaths = mkSchemaLookupTables(clientDB)
 	if err = clientDB.Close(); err != nil {
 		tdlog.Noticef("Client %d: failed to close database after a reload - %v", client.id, err)
 	}

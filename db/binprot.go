@@ -44,11 +44,3 @@ func (col *Col) BPUpdate(id uint64, newDoc []byte) (err error) {
 func (col *Col) BPDelete(id uint64) {
 	col.part.Delete(id)
 }
-
-func (col *Col) BPIndexKV(idxName string, key, val uint64) {
-	col.hts[idxName].Put(key, val)
-}
-
-func (col *Col) BPUnindexKV(idxName string, key, val uint64) {
-	col.hts[idxName].Remove(key, val)
-}

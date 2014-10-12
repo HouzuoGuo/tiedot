@@ -1,33 +1,10 @@
+// Binary protocol over IPC - handle message records.
 package binprot
 
 import (
 	"bufio"
 	"bytes"
 )
-
-/*
-
-\ -> REC_ESC
-\0 - REC_END
-\n - REC_PARAM
-
-String escape
-\ -> \\		A -> A A
-ESC -> ESC ESC
-
-\0 -> \\0	B -> A C
-END -> ESC END2
-
-\n -> \\n	D -> A E
-PARAM -> ESC PARAM2
-
-String reverse escape
-\\ -> \		A A -> A
-\\0 -> \0	A C -> B
-\\n -> \n	A E -> D
-
-
-*/
 
 const (
 	// Command/reply record structure
@@ -36,35 +13,6 @@ const (
 	REC_EPARAM = 253
 	REC_END    = 254 // END -> ESC EEND
 	REC_EEND   = 255
-
-	// Status reply from server
-	R_OK         = 0
-	R_ERR        = 1
-	R_ERR_SCHEMA = 2
-	R_ERR_MAINT  = 3
-	R_ERR_DOWN   = 4
-
-	// Client status - error (not a server reply)
-	CLIENT_IO_ERR = 5
-
-	// Document commands
-	C_DOC_INSERT = 11
-	C_DOC_UNLOCK = 12
-	C_DOC_READ   = 13
-	C_DOC_UPDATE = 14
-	C_DOC_DELETE = 15
-
-	// Index commands
-	C_HT_PUT    = 21
-	C_HT_GET    = 22
-	C_HT_REMOVE = 23
-
-	// Maintenance commands
-	C_RELOAD      = 91
-	C_SHUTDOWN    = 92
-	C_PING        = 93
-	C_GO_MAINT    = 95
-	C_LEAVE_MAINT = 96
 )
 
 var recEnd []byte = []byte{REC_END}

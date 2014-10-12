@@ -4,6 +4,7 @@ package binprot
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 )
 
@@ -14,18 +15,26 @@ func (client *BinProtClient) docID2RankBytes(id uint64) (rank int, idBytes []byt
 	return
 }
 
-func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idBytes []byte) {
-	colID = client.colNameLookup[colName]
+func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idBytes []byte, err error) {
+	colID, exists := client.colNameLookup[colName]
+	if !exists {
+		if err = client.ping(); err != nil {
+			return
+		} else if colID, exists = client.colNameLookup[colName]; !exists {
+			err = fmt.Errorf("Collection %s does not exist", colName)
+			return
+		}
+	}
 	idBytes = make([]byte, 4)
 	binary.LittleEndian.PutUint32(idBytes, uint32(colID))
 	return
 }
 
-func (client *BinProtClient) indexDoc(colName string, id uint64, doc map[string]interface{}) error {
+func (client *BinProtClient) indexDoc(colID string, docID uint64, doc map[string]interface{}) error {
 	return nil
 }
 
-func (client *BinProtClient) unindexDoc(colName string, id uint64, doc map[string]interface{}) error {
+func (client *BinProtClient) unindexDoc(colID string, docID uint64, doc map[string]interface{}) error {
 	return nil
 }
 
@@ -37,8 +46,10 @@ func (client *BinProtClient) Insert(colName string, doc map[string]interface{}) 
 	}
 	client.opLock.Lock()
 	rank, idBytes := client.docID2RankBytes(id)
-	_, colIDBytes := client.colName2IDBytes(colName)
-	if _, _, err = client.sendCmd(rank, true, C_DOC_INSERT, colIDBytes, idBytes, docBytes); err != nil {
+	_, colIDBytes, err := client.colName2IDBytes(colName)
+	if err != nil {
+		return
+	} else if _, _, err = client.sendCmd(rank, true, C_DOC_INSERT, colIDBytes, idBytes, docBytes); err != nil {
 		client.opLock.Lock()
 		return
 	}

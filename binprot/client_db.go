@@ -147,9 +147,9 @@ func (client *BinProtClient) AllIndexes(colName string) (paths [][]string, err e
 		client.opLock.Unlock()
 		return nil, fmt.Errorf("Collection %s does not exist", colName)
 	}
-	jointPaths := make([]string, 0, len(client.htNameLookup[colID]))
-	for aPath := range client.htNameLookup[colID] {
-		jointPaths = append(jointPaths, aPath)
+	jointPaths := make([]string, 0, len(client.indexPaths[colID]))
+	for _, pathSegs := range client.indexPaths[colID] {
+		jointPaths = append(jointPaths, strings.Join(pathSegs, db.INDEX_PATH_SEP))
 	}
 	sort.Strings(jointPaths)
 	paths = make([][]string, len(jointPaths))
