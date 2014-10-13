@@ -32,6 +32,7 @@ type BinProtSrv struct {
 	rev                         uint32
 	opLock                      *sync.Mutex
 	shutdown                    bool
+	pendingUpdates              int64
 }
 
 // Serve incoming connection.
@@ -46,16 +47,17 @@ type BinProtWorker struct {
 // Create a server, but do not yet start serving incoming connections.
 func NewServer(rank, nProcs int, workspace string) (srv *BinProtSrv) {
 	srv = &BinProtSrv{
-		rank:          rank,
-		nProcs:        nProcs,
-		workspace:     workspace,
-		dbPath:        path.Join(workspace, strconv.Itoa(rank)),
-		sockPath:      path.Join(workspace, strconv.Itoa(rank)+SOCK_FILE_SUFFIX),
-		clientIDSeq:   0,
-		maintByClient: 0,
-		rev:           0,
-		opLock:        new(sync.Mutex),
-		shutdown:      false}
+		rank:           rank,
+		nProcs:         nProcs,
+		workspace:      workspace,
+		dbPath:         path.Join(workspace, strconv.Itoa(rank)),
+		sockPath:       path.Join(workspace, strconv.Itoa(rank)+SOCK_FILE_SUFFIX),
+		clientIDSeq:    0,
+		maintByClient:  0,
+		rev:            0,
+		opLock:         new(sync.Mutex),
+		shutdown:       false,
+		pendingUpdates: 0}
 
 	return srv
 }
@@ -83,7 +85,7 @@ func (srv *BinProtSrv) Run() (err error) {
 	}
 }
 
-// To save bandwidth, both client and server refer collections and indexes by an int32 "ID".
+// To save bandwidth, both client and server refer collections and indexes by an int32 "ID", instead of using their string names.
 func mkSchemaLookupTables(dbInstance *db.DB) (colLookup map[int32]*db.Col,
 	colNameLookup map[string]int32,
 	htLookup map[int32]*data.HashTable,
@@ -94,6 +96,7 @@ func mkSchemaLookupTables(dbInstance *db.DB) (colLookup map[int32]*db.Col,
 	htLookup = make(map[int32]*data.HashTable)
 	indexPaths = make(map[int32]map[int32][]string)
 
+	// Both server and client run the same version of Go, therefore the order in which map keys are traversed is the same.
 	seq := 0
 	for _, colName := range dbInstance.AllCols() {
 		col := dbInstance.Use(colName)
@@ -123,7 +126,6 @@ func (srv *BinProtSrv) reload() {
 		panic(err)
 	}
 	srv.rev++
-	// Support numeric lookup of collections and hash tables
 	srv.colLookup, _, srv.htLookup, _ = mkSchemaLookupTables(srv.db)
 }
 

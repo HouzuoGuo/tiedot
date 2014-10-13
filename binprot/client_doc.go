@@ -9,6 +9,7 @@ import (
 	"math/rand"
 )
 
+// Given a document ID, calculate the server rank in which the document belongs, and also turn the ID into byte slice.
 func (client *BinProtClient) docID2RankBytes(id uint64) (rank int, idBytes []byte) {
 	rank = int(id % uint64(client.nProcs))
 	idBytes = make([]byte, 8)
@@ -16,6 +17,7 @@ func (client *BinProtClient) docID2RankBytes(id uint64) (rank int, idBytes []byt
 	return
 }
 
+// Lookup collection ID by name. If the collection name is not found, ping the server once and retry.
 func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idBytes []byte, err error) {
 	colID, exists := client.colNameLookup[colName]
 	if !exists {
@@ -31,6 +33,7 @@ func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idByt
 	return
 }
 
+// Put a document on all indexes.
 func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc map[string]interface{}) error {
 	docIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(docIDBytes, docID)
@@ -51,6 +54,7 @@ func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc map[string]
 	return nil
 }
 
+// Remove a document from all indexes.
 func (client *BinProtClient) unindexDoc(colID int32, docID uint64, doc map[string]interface{}) error {
 	docIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(docIDBytes, docID)
@@ -71,19 +75,23 @@ func (client *BinProtClient) unindexDoc(colID int32, docID uint64, doc map[strin
 	return nil
 }
 
-func (client *BinProtClient) Insert(colName string, doc map[string]interface{}) (id uint64, err error) {
-	id = uint64(rand.Int63())
+// Insert a document and put it onto all indexes.
+func (client *BinProtClient) Insert(colName string, doc map[string]interface{}) (docID uint64, err error) {
+	docID = uint64(rand.Int63())
 	docBytes, err := json.Marshal(doc)
 	if err != nil {
 		return
 	}
-	rank, idBytes := client.docID2RankBytes(id)
+	rank, idBytes := client.docID2RankBytes(docID)
 	client.opLock.Lock()
-	_, colIDBytes, err := client.colName2IDBytes(colName)
+	colID, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {
 		client.opLock.Unlock()
 		return
 	} else if _, _, err = client.sendCmd(rank, true, C_DOC_INSERT, colIDBytes, idBytes, docBytes); err != nil {
+		client.opLock.Unlock()
+		return
+	} else if err = client.indexDoc(colID, docID, doc); err != nil {
 		client.opLock.Unlock()
 		return
 	}
@@ -92,6 +100,7 @@ func (client *BinProtClient) Insert(colName string, doc map[string]interface{}) 
 	return
 }
 
+// Read a document by ID.
 func (client *BinProtClient) Read(colName string, id uint64) (doc map[string]interface{}, err error) {
 	rank, docIDBytes := client.docID2RankBytes(id)
 	client.opLock.Lock()

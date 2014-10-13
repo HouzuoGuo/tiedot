@@ -7,6 +7,7 @@ import (
 )
 
 func TestDocInsertBench(t *testing.T) {
+	return
 	dumpGoroutineOnInterrupt()
 	os.RemoveAll(WS)
 	defer os.RemoveAll(WS)

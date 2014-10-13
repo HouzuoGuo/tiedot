@@ -112,14 +112,12 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 		allParams[i+1] = param
 	}
 	// Client sends command to server
-	//	fmt.Println("Client send ", cmd, client.rev, allParams)
 	if err = writeRec(client.out[rank], cmd, allParams...); err != nil {
 		retCode = CLIENT_IO_ERR
 		return
 	}
 	// Client reads server response
 	retCode, moreInfo, err = readRec(client.in[rank])
-	//	fmt.Println("Client read ", retCode, moreInfo)
 	if err != nil {
 		retCode = CLIENT_IO_ERR
 		return
@@ -129,14 +127,14 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 	case R_OK:
 		// Request-response all OK
 	case R_ERR_DOWN:
-		// If server has already shut down, shut down client also
+		// If server has been instructed to shut down, shut down client also.
 		for _, sock := range client.sock {
 			sock.Close()
 		}
 		tdlog.Noticef("Client %d: server shutdown has begun and this client is closed", client.id)
 		err = fmt.Errorf("Server is shutting down")
 	case R_ERR_SCHEMA:
-		// Always reload my schema
+		// Reload my schema on reivison-mismatch
 		srvRev := moreInfo[0][0:4]
 		client.reload(binary.LittleEndian.Uint32(srvRev))
 		// May need to redo the command
@@ -161,7 +159,6 @@ func (client *BinProtClient) reload(srvRev uint32) {
 	if err != nil {
 		panic(err)
 	}
-	// Support numeric lookup of collections and hash tables
 	client.colLookup, client.colNameLookup, client.htLookup, client.indexPaths = mkSchemaLookupTables(clientDB)
 	if err = clientDB.Close(); err != nil {
 		tdlog.Noticef("Client %d: failed to close database after a reload - %v", client.id, err)

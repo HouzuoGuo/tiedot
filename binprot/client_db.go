@@ -16,7 +16,7 @@ import (
 // Create a new collection.
 func (client *BinProtClient) Create(colName string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < len(client.sock); i++ {
+		for i := 0; i < client.nProcs; i++ {
 			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
 				return err
 			} else if err = clientDB.Create(colName); err != nil {
@@ -47,7 +47,7 @@ func (client *BinProtClient) AllCols() (names []string) {
 // Rename a collection.
 func (client *BinProtClient) Rename(oldName, newName string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < len(client.sock); i++ {
+		for i := 0; i < client.nProcs; i++ {
 			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
 				return err
 			} else if err = clientDB.Rename(oldName, newName); err != nil {
@@ -63,7 +63,7 @@ func (client *BinProtClient) Rename(oldName, newName string) error {
 // Truncate a collection
 func (client *BinProtClient) Truncate(colName string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < len(client.sock); i++ {
+		for i := 0; i < client.nProcs; i++ {
 			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
 				return err
 			} else if err = clientDB.Truncate(colName); err != nil {
@@ -86,7 +86,7 @@ func (client *BinProtClient) Scrub(colName string) error {
 // Drop a collection.
 func (client *BinProtClient) Drop(colName string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < len(client.sock); i++ {
+		for i := 0; i < client.nProcs; i++ {
 			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
 				return err
 			} else if err = clientDB.Drop(colName); err != nil {
@@ -102,7 +102,7 @@ func (client *BinProtClient) Drop(colName string) error {
 // Copy database into destination directory (for backup).
 func (client *BinProtClient) DumpDB(destDir string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < len(client.sock); i++ {
+		for i := 0; i < client.nProcs; i++ {
 			destDirPerRank := path.Join(destDir, strconv.Itoa(i))
 			if err := os.MkdirAll(destDirPerRank, 0700); err != nil {
 				return err
@@ -121,7 +121,7 @@ func (client *BinProtClient) DumpDB(destDir string) error {
 // Create an index.
 func (client *BinProtClient) Index(colName string, idxPath []string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < len(client.sock); i++ {
+		for i := 0; i < client.nProcs; i++ {
 			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
 				return err
 			} else if clientDB.Use(colName) == nil {
@@ -136,8 +136,22 @@ func (client *BinProtClient) Index(colName string, idxPath []string) error {
 	})
 }
 
-// Return all collection names sorted in alphabetical order.
+// Return all indexed paths in a collection. Results are sorted in alphabetical order.
 func (client *BinProtClient) AllIndexes(colName string) (paths [][]string, err error) {
+	jointPath, err := client.AllIndexesJointPaths(colName)
+	if err != nil {
+		return
+	}
+	paths = make([][]string, len(jointPath))
+	for i, aPath := range jointPath {
+		paths[i] = strings.Split(aPath, db.INDEX_PATH_SEP)
+	}
+	return
+}
+
+// Return all indexed paths. Index path segments are joint together, and results are sorted in alphabetical order.
+func (client *BinProtClient) AllIndexesJointPaths(colName string) (paths []string, err error) {
+	paths = make([]string, 0, 0)
 	if err := client.Ping(); err != nil {
 		tdlog.Noticef("Client %d: failed to ping before returning index paths - %v", client.id, err)
 	}
@@ -147,37 +161,19 @@ func (client *BinProtClient) AllIndexes(colName string) (paths [][]string, err e
 		client.opLock.Unlock()
 		return nil, fmt.Errorf("Collection %s does not exist", colName)
 	}
-	jointPaths := make([]string, 0, len(client.indexPaths[colID]))
+	// Join and sort
 	for _, pathSegs := range client.indexPaths[colID] {
-		jointPaths = append(jointPaths, strings.Join(pathSegs, db.INDEX_PATH_SEP))
-	}
-	sort.Strings(jointPaths)
-	paths = make([][]string, len(jointPaths))
-	for i, jointPath := range jointPaths {
-		paths[i] = strings.Split(jointPath, db.INDEX_PATH_SEP)
-	}
-	client.opLock.Unlock()
-	return
-}
-
-// Return all indexed paths. Index path segments are joint.
-func (client *BinProtClient) AllIndexesJointPaths(colName string) (paths []string, err error) {
-	paths = make([]string, 0, 0)
-	allIndexes, err := client.AllIndexes(colName)
-	if err != nil {
-		return
-	}
-	for _, path := range allIndexes {
-		paths = append(paths, strings.Join(path, db.INDEX_PATH_SEP))
+		paths = append(paths, strings.Join(pathSegs, db.INDEX_PATH_SEP))
 	}
 	sort.Strings(paths)
+	client.opLock.Unlock()
 	return
 }
 
 // Remove an index.
 func (client *BinProtClient) Unindex(colName string, idxPath []string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < len(client.sock); i++ {
+		for i := 0; i < client.nProcs; i++ {
 			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
 				return err
 			} else if clientDB.Use(colName) == nil {

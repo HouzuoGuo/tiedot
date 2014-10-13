@@ -4,6 +4,7 @@ package binprot
 import (
 	"encoding/binary"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"sync/atomic"
 )
 
 const (
@@ -72,7 +73,6 @@ func (worker *BinProtWorker) Run() {
 		}
 		// Read a command from client
 		cmd, clientRev, params, err := worker.readCmd()
-		//		fmt.Println("Server read ", cmd, clientRev, params)
 		if err != nil {
 			// Client has disconnected
 			tdlog.Noticef("Server %d: lost connection with client %d - %v", worker.srv.rank, worker.id, err)
@@ -90,12 +90,13 @@ func (worker *BinProtWorker) Run() {
 			binary.LittleEndian.PutUint32(mySchema, worker.srv.rev)
 			worker.ansErr(R_ERR_SCHEMA, mySchema)
 		} else if worker.srv.maintByClient != 0 && worker.srv.maintByClient != worker.id {
-			// Check server maintenance access
+			// No matter what command comes in, if the server is being maintained by _another_ client, the command will get an error response.
 			worker.ansErr(R_ERR_MAINT, []byte{})
 		} else {
 			// Process the command
 			switch cmd {
 			case C_DOC_INSERT:
+				// Insert and lock a document - collection ID, new document ID, serialized document content
 				colID := int32(binary.LittleEndian.Uint32(params[0]))
 				docID := binary.LittleEndian.Uint64(params[1])
 				doc := params[2]
@@ -105,19 +106,24 @@ func (worker *BinProtWorker) Run() {
 				} else if err := col.BPLockAndInsert(docID, doc); err != nil {
 					worker.ansErr(R_ERR, []byte(err.Error()))
 				} else {
+					// Document insert is not finished until DOC_UNLOCK is called
+					atomic.AddInt64(&worker.srv.pendingUpdates, 1)
 					worker.ansOK()
 				}
 			case C_DOC_UNLOCK:
+				// Unlock a document to allow further updates - collection ID, document ID
 				colID := int32(binary.LittleEndian.Uint32(params[0]))
 				docID := binary.LittleEndian.Uint64(params[1])
 				col, exists := worker.srv.colLookup[colID]
 				if exists {
 					col.BPUnlock(docID)
+					atomic.AddInt64(&worker.srv.pendingUpdates, -1)
 					worker.ansOK()
 				} else {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				}
 			case C_DOC_READ:
+				// Read a document back to the client - collection ID, document ID
 				colID := int32(binary.LittleEndian.Uint32(params[0]))
 				docID := binary.LittleEndian.Uint64(params[1])
 				col, exists := worker.srv.colLookup[colID]
@@ -129,6 +135,7 @@ func (worker *BinProtWorker) Run() {
 					worker.ansErr(R_ERR, []byte(err.Error()))
 				}
 			case C_HT_GET:
+				// Lookup by key in a hash table - hash table ID, hash key, result limit
 				htID := int32(binary.LittleEndian.Uint32(params[0]))
 				htKey := binary.LittleEndian.Uint64(params[1])
 				limit := binary.LittleEndian.Uint64(params[2])
@@ -146,6 +153,7 @@ func (worker *BinProtWorker) Run() {
 					worker.ansErr(R_ERR_SCHEMA, []byte{})
 				}
 			case C_HT_PUT:
+				// Put a new entry into hash table - hash table ID, hash key, hash value
 				htID := int32(binary.LittleEndian.Uint32(params[0]))
 				htKey := binary.LittleEndian.Uint64(params[1])
 				htVal := binary.LittleEndian.Uint64(params[2])
@@ -157,6 +165,7 @@ func (worker *BinProtWorker) Run() {
 					worker.ansErr(R_ERR_SCHEMA, []byte{})
 				}
 			case C_HT_REMOVE:
+				// Remove an entry from hash table - hash table ID, hash key, hash value
 				htID := int32(binary.LittleEndian.Uint32(params[0]))
 				htKey := binary.LittleEndian.Uint64(params[1])
 				htVal := binary.LittleEndian.Uint64(params[2])
@@ -168,9 +177,16 @@ func (worker *BinProtWorker) Run() {
 					worker.ansErr(R_ERR_SCHEMA, []byte{})
 				}
 			case C_GO_MAINT:
-				worker.srv.maintByClient = worker.id
-				worker.ansOK()
+				// Go to maintenance mode to allow exclusive data file access by the client
+				if atomic.LoadInt64(&worker.srv.pendingUpdates) > 0 {
+					// Do not allow maintenance access if another client is in the middle of document update
+					worker.ansErr(R_ERR_MAINT, []byte{})
+				} else {
+					worker.srv.maintByClient = worker.id
+					worker.ansOK()
+				}
 			case C_LEAVE_MAINT:
+				// Leave maintenance mode, then reload my schema and increase schema revision number.
 				if worker.srv.maintByClient == worker.id {
 					worker.srv.maintByClient = 0
 					worker.srv.reload()
@@ -179,10 +195,12 @@ func (worker *BinProtWorker) Run() {
 					worker.ansErr(R_ERR_MAINT, []byte{})
 				}
 			case C_PING:
+				// Respond OK with the client's ID, unless the server is in maintenance mode.
 				clientID := make([]byte, 8)
 				binary.LittleEndian.PutUint64(clientID, uint64(worker.id))
 				worker.ansOK(clientID)
 			case C_SHUTDOWN:
+				// Stop accepting new client connections, and inform existing clients to close their connection.
 				worker.srv.Shutdown()
 				worker.ansOK()
 			}
