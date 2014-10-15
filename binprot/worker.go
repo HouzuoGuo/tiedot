@@ -19,11 +19,12 @@ const (
 	CLIENT_IO_ERR = 5
 
 	// Document commands
-	C_DOC_INSERT = 11
-	C_DOC_UNLOCK = 12
-	C_DOC_READ   = 13
-	C_DOC_UPDATE = 14
-	C_DOC_DELETE = 15
+	C_DOC_INSERT    = 11
+	C_DOC_UNLOCK    = 12
+	C_DOC_READ      = 13
+	C_DOC_LOCK_READ = 14
+	C_DOC_UPDATE    = 15
+	C_DOC_DELETE    = 16
 
 	// Index commands
 	C_HT_PUT    = 21
@@ -91,11 +92,12 @@ func (worker *BinProtWorker) Run() {
 			worker.ansErr(R_ERR_SCHEMA, mySchema)
 		} else if worker.srv.maintByClient != 0 && worker.srv.maintByClient != worker.id {
 			// No matter what command comes in, if the server is being maintained by _another_ client, the command will get an error response.
-			worker.ansErr(R_ERR_MAINT, []byte{})
+			worker.ansErr(R_ERR_MAINT, []byte("Server is being maintained by another client"))
 		} else {
 			// Process the command
 			switch cmd {
 			case C_DOC_INSERT:
+				// (Pending Update)
 				// Insert and lock a document - collection ID, new document ID, serialized document content
 				colID := int32(binary.LittleEndian.Uint32(params[0]))
 				docID := binary.LittleEndian.Uint64(params[1])
@@ -106,11 +108,11 @@ func (worker *BinProtWorker) Run() {
 				} else if err := col.BPLockAndInsert(docID, doc); err != nil {
 					worker.ansErr(R_ERR, []byte(err.Error()))
 				} else {
-					// Document insert is not finished until DOC_UNLOCK is called
 					atomic.AddInt64(&worker.srv.pendingUpdates, 1)
 					worker.ansOK()
 				}
 			case C_DOC_UNLOCK:
+				// (Decrease Pending Update)
 				// Unlock a document to allow further updates - collection ID, document ID
 				colID := int32(binary.LittleEndian.Uint32(params[0]))
 				docID := binary.LittleEndian.Uint64(params[1])
@@ -134,6 +136,43 @@ func (worker *BinProtWorker) Run() {
 				} else {
 					worker.ansErr(R_ERR, []byte(err.Error()))
 				}
+			case C_DOC_LOCK_READ:
+				// (Pending Update)
+				// Read a document back to the client, and lock the document for update - collection ID, document ID
+				colID := int32(binary.LittleEndian.Uint32(params[0]))
+				docID := binary.LittleEndian.Uint64(params[1])
+				col, exists := worker.srv.colLookup[colID]
+				if !exists {
+					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
+				} else if doc, err := col.BPLockAndRead(docID); err == nil {
+					atomic.AddInt64(&worker.srv.pendingUpdates, 1)
+					worker.ansOK(doc)
+				} else {
+					worker.ansErr(R_ERR, []byte(err.Error()))
+				}
+			case C_DOC_UPDATE:
+				// Overwrite document content - collection ID, document ID, new document content
+				colID := int32(binary.LittleEndian.Uint32(params[0]))
+				docID := binary.LittleEndian.Uint64(params[1])
+				doc := params[2]
+				col, exists := worker.srv.colLookup[colID]
+				if !exists {
+					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
+				} else if err := col.BPUpdate(docID, doc); err == nil {
+					worker.ansOK()
+				} else {
+					worker.ansErr(R_ERR, []byte(err.Error()))
+				}
+			case C_DOC_DELETE:
+				// Delete a document - collection ID, document ID, new document
+				colID := int32(binary.LittleEndian.Uint32(params[0]))
+				docID := binary.LittleEndian.Uint64(params[1])
+				col, exists := worker.srv.colLookup[colID]
+				if !exists {
+					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
+				}
+				col.BPDelete(docID)
+				worker.ansOK()
 			case C_HT_GET:
 				// Lookup by key in a hash table - hash table ID, hash key, result limit
 				htID := int32(binary.LittleEndian.Uint32(params[0]))
@@ -180,7 +219,7 @@ func (worker *BinProtWorker) Run() {
 				// Go to maintenance mode to allow exclusive data file access by the client
 				if atomic.LoadInt64(&worker.srv.pendingUpdates) > 0 {
 					// Do not allow maintenance access if another client is in the middle of document update
-					worker.ansErr(R_ERR_MAINT, []byte{})
+					worker.ansErr(R_ERR_MAINT, []byte("There are outstanding transactions"))
 				} else {
 					worker.srv.maintByClient = worker.id
 					worker.ansOK()
@@ -203,6 +242,8 @@ func (worker *BinProtWorker) Run() {
 				// Stop accepting new client connections, and inform existing clients to close their connection.
 				worker.srv.Shutdown()
 				worker.ansOK()
+			default:
+				worker.ansErr(R_ERR, []byte("Unknown command"))
 			}
 		}
 		worker.srv.opLock.Unlock()

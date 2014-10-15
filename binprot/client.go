@@ -202,7 +202,7 @@ func (client *BinProtClient) reqMaintAccess(fun func() error) error {
 		switch retCode {
 		case R_ERR_MAINT:
 			tdlog.Noticef("Client %d: servers are busy, will try again after a short delay - %v", client.id, err)
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(time.Duration(50+rand.Intn(100)) * time.Millisecond)
 			continue
 		case R_ERR_DOWN:
 			fallthrough

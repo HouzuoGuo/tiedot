@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math/rand"
 )
 
@@ -82,27 +83,27 @@ func (client *BinProtClient) Insert(colName string, doc map[string]interface{}) 
 	if err != nil {
 		return
 	}
-	rank, idBytes := client.docID2RankBytes(docID)
+	rank, docIDBytes := client.docID2RankBytes(docID)
 	client.opLock.Lock()
 	colID, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {
 		client.opLock.Unlock()
 		return
-	} else if _, _, err = client.sendCmd(rank, true, C_DOC_INSERT, colIDBytes, idBytes, docBytes); err != nil {
+	} else if _, _, err = client.sendCmd(rank, true, C_DOC_INSERT, colIDBytes, docIDBytes, docBytes); err != nil {
 		client.opLock.Unlock()
 		return
 	} else if err = client.indexDoc(colID, docID, doc); err != nil {
 		client.opLock.Unlock()
 		return
 	}
-	_, _, err = client.sendCmd(rank, true, C_DOC_UNLOCK, colIDBytes, idBytes)
+	_, _, err = client.sendCmd(rank, false, C_DOC_UNLOCK, colIDBytes, docIDBytes)
 	client.opLock.Unlock()
 	return
 }
 
 // Read a document by ID.
-func (client *BinProtClient) Read(colName string, id uint64) (doc map[string]interface{}, err error) {
-	rank, docIDBytes := client.docID2RankBytes(id)
+func (client *BinProtClient) Read(colName string, docID uint64) (doc map[string]interface{}, err error) {
+	rank, docIDBytes := client.docID2RankBytes(docID)
 	client.opLock.Lock()
 	_, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {
@@ -118,10 +119,168 @@ func (client *BinProtClient) Read(colName string, id uint64) (doc map[string]int
 	return
 }
 
-func (client *BinProtClient) Update(colName string, id uint64, doc map[string]interface{}) error {
-	return nil
+// Update a document by ID.
+func (client *BinProtClient) Update(colName string, docID uint64, doc map[string]interface{}) (err error) {
+	docBytes, err := json.Marshal(doc)
+	if err != nil {
+		return
+	}
+	rank, docIDBytes := client.docID2RankBytes(docID)
+	client.opLock.Lock()
+	colID, colIDBytes, err := client.colName2IDBytes(colName)
+	if err != nil {
+		client.opLock.Unlock()
+		return
+	}
+	// Lock and read original document
+	_, resp, err := client.sendCmd(rank, true, C_DOC_LOCK_READ, colIDBytes, docIDBytes)
+	if err != nil {
+		client.opLock.Unlock()
+		return
+	}
+	var originalDoc map[string]interface{}
+	if json.Unmarshal(resp[0], &originalDoc) != nil {
+		tdlog.Noticef("Will not attempt to unindex document %d during update", docID)
+	}
+	// Update the document content
+	if _, _, err = client.sendCmd(rank, false, C_DOC_UPDATE, colIDBytes, docIDBytes, docBytes); err != nil {
+		client.opLock.Unlock()
+		return
+	}
+	// Maintain indexed values and finally unlock the document
+	if originalDoc != nil {
+		if err = client.unindexDoc(colID, docID, originalDoc); err != nil {
+			client.opLock.Unlock()
+			return
+		}
+	}
+	if err = client.indexDoc(colID, docID, doc); err != nil {
+		client.opLock.Unlock()
+		return
+	}
+	_, _, err = client.sendCmd(rank, false, C_DOC_UNLOCK, colIDBytes, docIDBytes)
+	client.opLock.Unlock()
+	return
 }
 
-func (client *BinProtClient) Delete(colName string, id uint64) error {
-	return nil
+// Delete a document by ID
+func (client *BinProtClient) Delete(colName string, docID uint64) (err error) {
+	rank, docIDBytes := client.docID2RankBytes(docID)
+	client.opLock.Lock()
+	colID, colIDBytes, err := client.colName2IDBytes(colName)
+	if err != nil {
+		client.opLock.Unlock()
+		return
+	}
+	// Lock and read original document
+	_, resp, err := client.sendCmd(rank, true, C_DOC_LOCK_READ, colIDBytes, docIDBytes)
+	if err != nil {
+		client.opLock.Unlock()
+		return
+	}
+	var originalDoc map[string]interface{}
+	if json.Unmarshal(resp[0], &originalDoc) != nil {
+		tdlog.Noticef("Will not attempt to unindex document %d during delete", docID)
+	}
+	// Remove the document
+	if _, _, err = client.sendCmd(rank, false, C_DOC_DELETE, colIDBytes, docIDBytes); err != nil {
+		client.opLock.Unlock()
+		return
+	}
+	// Maintain indexed values and finally unlock the document
+	if originalDoc != nil {
+		if err = client.unindexDoc(colID, docID, originalDoc); err != nil {
+			client.opLock.Unlock()
+			return
+		}
+	}
+	_, _, err = client.sendCmd(rank, false, C_DOC_UNLOCK, colIDBytes, docIDBytes)
+	client.opLock.Unlock()
+	return
+}
+
+// Return an error if a value is not in index. Used only by test case.
+func (client *BinProtClient) valIsIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
+	colID, _, err := client.colName2IDBytes(colName)
+	if err != nil {
+		return err
+	}
+	for htID, htPath := range client.indexPaths[colID] {
+		if len(htPath) != len(idxPath) {
+			continue
+		}
+		pathMatch := true
+		for i, seg := range idxPath {
+			if htPath[i] != seg {
+				pathMatch = false
+			}
+		}
+		if !pathMatch {
+			continue
+		}
+		htIDBytes := make([]byte, 4)
+		binary.LittleEndian.PutUint32(htIDBytes, uint32(htID))
+		hashKey := db.StrHash(fmt.Sprint(val))
+		hashKeyBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(hashKeyBytes, uint64(hashKey))
+		limitBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(limitBytes, 0)
+		_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, htIDBytes, hashKeyBytes, limitBytes)
+		if err != nil {
+			return err
+		}
+		vals := make([]uint64, len(resp))
+		for i, aVal := range resp {
+			vals[i] = binary.LittleEndian.Uint64(aVal)
+		}
+		if len(vals) != 1 || vals[0] != docID {
+			return fmt.Errorf("Looking for %v (%v) docID %v in %v, but got result %v", val, hashKey, docID, idxPath, vals)
+		}
+		return nil
+	}
+	return fmt.Errorf("Index not found")
+}
+
+// Return an error if a value is in index. Used only by test case.
+func (client *BinProtClient) valIsNotIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
+	colID, _, err := client.colName2IDBytes(colName)
+	if err != nil {
+		return err
+	}
+	for htID, htPath := range client.indexPaths[colID] {
+		if len(htPath) != len(idxPath) {
+			continue
+		}
+		pathMatch := true
+		for i, seg := range idxPath {
+			if htPath[i] != seg {
+				pathMatch = false
+			}
+		}
+		if !pathMatch {
+			continue
+		}
+		htIDBytes := make([]byte, 4)
+		binary.LittleEndian.PutUint32(htIDBytes, uint32(htID))
+		hashKey := db.StrHash(fmt.Sprint(val))
+		hashKeyBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(hashKeyBytes, uint64(hashKey))
+		limitBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(limitBytes, 0)
+		_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, htIDBytes, hashKeyBytes, limitBytes)
+		if err != nil {
+			return err
+		}
+		vals := make([]uint64, len(resp))
+		for i, aVal := range resp {
+			vals[i] = binary.LittleEndian.Uint64(aVal)
+		}
+		for _, v := range vals {
+			if v == docID {
+				return fmt.Errorf("Looking for %v %v %v in %v (should not return any), but got result %v", val, hashKey, docID, idxPath, vals)
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("Index not found")
 }
