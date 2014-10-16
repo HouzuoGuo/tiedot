@@ -129,5 +129,12 @@ func TestDocCrud(t *testing.T) {
 			}
 		}
 	}
+
+	// Verify that there are approximately 1000 documents
+	if count, err := clients[0].ApproxDocCount("col"); err != nil {
+		t.Fatal(err)
+	} else if count < 600 || count > 1400 {
+		t.Fatal("Approximate is way off")
+	}
 	clients[0].Shutdown()
 }

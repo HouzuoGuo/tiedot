@@ -284,3 +284,17 @@ func (client *BinProtClient) valIsNotIndexed(colName string, idxPath []string, v
 	}
 	return fmt.Errorf("Index not found")
 }
+
+// Return an approximate number of documents in the collection.
+func (client *BinProtClient) ApproxDocCount(colName string) (count uint64, err error) {
+	client.opLock.Lock()
+	_, colIDBytes, err := client.colName2IDBytes(colName)
+	if err != nil {
+		client.opLock.Unlock()
+		return
+	}
+	_, resp, err := client.sendCmd(0, true, C_DOC_APPROX_COUNT, colIDBytes)
+	count = binary.LittleEndian.Uint64(resp[0]) * uint64(client.nProcs)
+	client.opLock.Unlock()
+	return
+}

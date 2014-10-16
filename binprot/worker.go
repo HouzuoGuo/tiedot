@@ -19,12 +19,13 @@ const (
 	CLIENT_IO_ERR = 5
 
 	// Document commands
-	C_DOC_INSERT    = 11
-	C_DOC_UNLOCK    = 12
-	C_DOC_READ      = 13
-	C_DOC_LOCK_READ = 14
-	C_DOC_UPDATE    = 15
-	C_DOC_DELETE    = 16
+	C_DOC_INSERT       = 11
+	C_DOC_UNLOCK       = 12
+	C_DOC_READ         = 13
+	C_DOC_LOCK_READ    = 14
+	C_DOC_UPDATE       = 15
+	C_DOC_DELETE       = 16
+	C_DOC_APPROX_COUNT = 17
 
 	// Index commands
 	C_HT_PUT    = 21
@@ -168,11 +169,24 @@ func (worker *BinProtWorker) Run() {
 				colID := int32(binary.LittleEndian.Uint32(params[0]))
 				docID := binary.LittleEndian.Uint64(params[1])
 				col, exists := worker.srv.colLookup[colID]
-				if !exists {
+				if exists {
+					col.BPDelete(docID)
+					worker.ansOK()
+				} else {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				}
-				col.BPDelete(docID)
-				worker.ansOK()
+			case C_DOC_APPROX_COUNT:
+				// Return approximate document count - collection ID
+				colID := int32(binary.LittleEndian.Uint32(params[0]))
+				col, exists := worker.srv.colLookup[colID]
+				if exists {
+					count := col.ApproxDocCount()
+					countBytes := make([]byte, 8)
+					binary.LittleEndian.PutUint64(countBytes, count)
+					worker.ansOK(countBytes)
+				} else {
+					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
+				}
 			case C_HT_GET:
 				// Lookup by key in a hash table - hash table ID, hash key, result limit
 				htID := int32(binary.LittleEndian.Uint32(params[0]))

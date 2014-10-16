@@ -44,3 +44,7 @@ func (col *Col) BPUpdate(id uint64, newDoc []byte) (err error) {
 func (col *Col) BPDelete(id uint64) {
 	col.part.Delete(id)
 }
+
+func (col *Col) BPApproxDocCount() uint64 {
+	return col.part.ApproxDocCount()
+}
