@@ -37,7 +37,7 @@ Let me know what you think about tiedot, I love to hear from you! Please [Email 
 
 tiedot is distributed under the [Simplified BSD license][Contributors and License].
 
-The newest version 3.0 (branch 3.0) is a complete re-write aiming to bring a much cleaner codebase. Please check out [Version History] for change logs and historical version information.
+The newest version 3.1.1 (branch 3.1, tag 3.1.1) introduces better error handling in embedded usage, and bug fixes in query processor. Please check out [Version History] for change logs and more version information.
 
 ### Project Story
 

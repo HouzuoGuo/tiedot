@@ -1,4 +1,10 @@
-### 3.1 (not released yet)
+### 3.1.1 (2014-10-18)
+
+Error handling is easier in embedded usage, see example.go for more details.
+
+Fix a bug which causes query processor to return incorrect intersection/complement result.
+
+### 3.1 (2014-09-01)
 
 New stable features:
 
