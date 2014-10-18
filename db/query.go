@@ -131,6 +131,7 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 
 // Calculate intersection of sub-query results.
 func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err error) {
+	myResult := make(map[int]struct{})
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		first := true
 		for _, subExpr := range subExprVecs {
@@ -140,16 +141,19 @@ func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err er
 				return
 			}
 			if first {
-				*result = subResult
+				myResult = subResult
 				first = false
 			} else {
 				for k, _ := range subResult {
-					if _, inBoth := (*result)[k]; inBoth {
+					if _, inBoth := myResult[k]; inBoth {
 						intersection[k] = struct{}{}
 					}
 				}
-				*result = intersection
+				myResult = intersection
 			}
+		}
+		for docID := range myResult {
+			(*result)[docID] = struct{}{}
 		}
 	} else {
 		return dberr.ErrorExpectingSubQuery.Fault(subExprs)
@@ -159,6 +163,7 @@ func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err er
 
 // Calculate complement of sub-query results.
 func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err error) {
+	myResult := make(map[int]struct{})
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		for _, subExpr := range subExprVecs {
 			subResult := make(map[int]struct{})
@@ -167,16 +172,19 @@ func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err e
 				return
 			}
 			for k, _ := range subResult {
-				if _, inBoth := (*result)[k]; !inBoth {
+				if _, inBoth := myResult[k]; !inBoth {
 					complement[k] = struct{}{}
 				}
 			}
-			for k, _ := range *result {
+			for k, _ := range myResult {
 				if _, inBoth := subResult[k]; !inBoth {
 					complement[k] = struct{}{}
 				}
 			}
-			*result = complement
+			myResult = complement
+		}
+		for docID := range myResult {
+			(*result)[docID] = struct{}{}
 		}
 	} else {
 		return dberr.ErrorExpectingSubQuery.Fault(subExprs)
