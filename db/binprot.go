@@ -1,7 +1,12 @@
-/* Document management for binprot. */
+/* Document and collection management features for binprot server. */
 package db
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/HouzuoGuo/tiedot/data"
+	"path"
+	"strings"
+)
 
 func (col *Col) BPLock(id uint64) error {
 	if _, locked := col.locked[id]; locked {
@@ -47,4 +52,16 @@ func (col *Col) BPDelete(id uint64) {
 
 func (col *Col) BPApproxDocCount() uint64 {
 	return col.part.ApproxDocCount()
+}
+
+// Install an index without reindexing documents.
+func (col *Col) BPIndex(idxPath []string) (err error) {
+	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
+	if _, exists := col.indexPaths[idxName]; exists {
+		return fmt.Errorf("Path %v is already indexed", idxPath)
+	}
+	col.indexPaths[idxName] = idxPath
+	idxFileName := path.Join(col.db.path, col.name, idxName)
+	col.hts[idxName], err = data.OpenHashTable(idxFileName)
+	return
 }

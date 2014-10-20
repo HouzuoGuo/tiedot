@@ -126,7 +126,7 @@ func (client *BinProtClient) Index(colName string, idxPath []string) error {
 				return err
 			} else if clientDB.Use(colName) == nil {
 				return fmt.Errorf("Collection does not exist")
-			} else if err = clientDB.Use(colName).Index(idxPath); err != nil {
+			} else if err = clientDB.Use(colName).BPIndex(idxPath); err != nil {
 				return err
 			} else if err = clientDB.Close(); err != nil {
 				return err

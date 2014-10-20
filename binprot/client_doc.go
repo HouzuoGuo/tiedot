@@ -201,6 +201,8 @@ func (client *BinProtClient) Delete(colName string, docID uint64) (err error) {
 
 // Return an error if a value is not in index. Used only by test case.
 func (client *BinProtClient) valIsIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
+	client.opLock.Lock()
+	defer client.opLock.Unlock()
 	colID, _, err := client.colName2IDBytes(colName)
 	if err != nil {
 		return err
@@ -243,6 +245,8 @@ func (client *BinProtClient) valIsIndexed(colName string, idxPath []string, val 
 
 // Return an error if a value is in index. Used only by test case.
 func (client *BinProtClient) valIsNotIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
+	client.opLock.Lock()
+	defer client.opLock.Unlock()
 	colID, _, err := client.colName2IDBytes(colName)
 	if err != nil {
 		return err
