@@ -136,5 +136,12 @@ func TestDocCrud(t *testing.T) {
 	} else if count < 600 || count > 1400 {
 		t.Fatal("Approximate is way off")
 	}
+
+	// If pendingUpdate counter is broken by error, server will refuse to go into maintenance mode
+	if _, err = clients[0].goMaintTest(); err != nil {
+		t.Fatal(err)
+	} else if err = clients[0].leaveMaintTest(); err != nil {
+		t.Fatal(err)
+	}
 	clients[0].Shutdown()
 }
