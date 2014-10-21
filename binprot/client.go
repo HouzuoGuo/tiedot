@@ -183,6 +183,13 @@ func (client *BinProtClient) goMaint() (retCode byte, err error) {
 	return
 }
 
+// Request maintenance access from all servers, acquire client lock. Used only by test case!
+func (client *BinProtClient) goMaintTest() (retCode byte, err error) {
+	client.opLock.Lock()
+	defer client.opLock.Unlock()
+	return client.goMaint()
+}
+
 // Remove maintenance access from all servers.
 func (client *BinProtClient) leaveMaint() error {
 	for leaveMaintSrv := range client.sock {
@@ -191,6 +198,13 @@ func (client *BinProtClient) leaveMaint() error {
 		}
 	}
 	return nil
+}
+
+// Request maintenance access from all servers, acquire client lock. Used only by test case!
+func (client *BinProtClient) leaveMaintTest() error {
+	client.opLock.Lock()
+	defer client.opLock.Unlock()
+	return client.leaveMaint()
 }
 
 // Request maintenance access from servers, run the function, and finally remove maintenance access.

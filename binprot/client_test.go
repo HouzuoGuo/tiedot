@@ -74,15 +74,15 @@ func TestPingMaintShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Maintenance access
-	if _, err = clients[0].goMaint(); err != nil {
+	if _, err = clients[0].goMaintTest(); err != nil {
 		t.Fatal(err)
-	} else if _, err = clients[1].goMaint(); err == nil {
+	} else if _, err = clients[1].goMaintTest(); err == nil {
 		t.Fatal("did not error")
-	} else if _, err = clients[0].goMaint(); err != nil {
+	} else if _, err = clients[0].goMaintTest(); err != nil {
 		t.Fatal(err)
-	} else if err = clients[0].leaveMaint(); err != nil {
+	} else if err = clients[0].leaveMaintTest(); err != nil {
 		t.Fatal(err)
-	} else if _, err = clients[1].goMaint(); err != nil {
+	} else if _, err = clients[1].goMaintTest(); err != nil {
 		t.Fatal(err)
 	}
 	// Ping both clients during maintenance access
@@ -97,24 +97,24 @@ func TestPingMaintShutdown(t *testing.T) {
 		t.Fatal(err)
 	} else if err = clients[1].Ping(); err != nil {
 		t.Fatal(err)
-	} else if err = clients[1].leaveMaint(); err != nil {
+	} else if err = clients[1].leaveMaintTest(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[0].Ping(); err != nil {
 		t.Fatal(err)
 	}
 	// Shutdown while maintenance op is in progress
-	if _, err = clients[1].goMaint(); err != nil {
+	if _, err = clients[1].goMaintTest(); err != nil {
 		t.Fatal(err)
 	}
 	go func() {
 		time.Sleep(1 * time.Second)
-		if err = clients[1].leaveMaint(); err != nil {
+		if err := clients[1].leaveMaintTest(); err != nil {
 			t.Fatal(err)
 		}
 	}()
 	fmt.Println("Client 1 shutdown")
 	clients[0].Shutdown()
-	if err = clients[0].Ping(); err == nil {
+	if err := clients[0].Ping(); err == nil {
 		t.Fatal("did not shutdown")
 	} else if err = clients[1].Ping(); err == nil {
 		t.Fatal("did not shutdown")
@@ -178,9 +178,9 @@ func TestSchemaLookup(t *testing.T) {
 	dbs[0].Use("B").Index([]string{"2"})
 	dbs[1].Create("B")
 	dbs[1].Use("B").Index([]string{"2"})
-	if _, err = clients[0].goMaint(); err != nil {
+	if _, err = clients[0].goMaintTest(); err != nil {
 		t.Fatal(err)
-	} else if err = clients[0].leaveMaint(); err != nil {
+	} else if err = clients[0].leaveMaintTest(); err != nil {
 		t.Fatal(err)
 	}
 	// Client should reload schema on the next ping
