@@ -7,6 +7,7 @@ I sincerely appreciate the following individuals and organizations for their con
 - Bryce Nyeggen
 - Cristian Echeverria
 - David Corona
+- dchapes
 - Evan Shaw
 - Freiheit.com
 - "IFQ"
