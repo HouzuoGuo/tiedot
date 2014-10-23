@@ -5,7 +5,7 @@
 // This file defines the common package interface and contains a little bit of
 // factored out logic.
 
-// Package mmap allows mapping files into memory. It tries to provide a simple, reasonably portable interface,
+// Package gommap allows mapping files into memory. It tries to provide a simple, reasonably portable interface,
 // but doesn't go out of its way to abstract away every little platform detail.
 // This specifically means:
 //	* forked processes may or may not inherit mappings
@@ -15,14 +15,10 @@
 package gommap
 
 import (
+	"errors"
 	"os"
 	"reflect"
 	"unsafe"
-)
-
-const (
-	// If the ANON flag is set, the mapped memory will not be backed by a file.
-	ANON = 1 << iota
 )
 
 // MMap represents a file mapped into memory.
@@ -31,7 +27,6 @@ type MMap []byte
 // Map maps an entire file into memory.
 // Note that because of runtime limitations, no file larger than about 2GB can
 // be completely mapped into memory.
-// If ANON is set in flags, f is ignored.
 func Map(f *os.File) (MMap, error) {
 	fd := uintptr(f.Fd())
 	fi, err := f.Stat()
@@ -39,8 +34,8 @@ func Map(f *os.File) (MMap, error) {
 		return nil, err
 	}
 	length := int(fi.Size())
-	if length < 0 {
-		panic("memory map file length overflow")
+	if int64(length) != fi.Size() {
+		return nil, errors.New("memory map file length overflow")
 	}
 	return mmap(length, fd)
 }
