@@ -2,7 +2,6 @@
 package binprot
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
@@ -13,8 +12,7 @@ import (
 // Given a document ID, calculate the server rank in which the document belongs, and also turn the ID into byte slice.
 func (client *BinProtClient) docID2RankBytes(id uint64) (rank int, idBytes []byte) {
 	rank = int(id % uint64(client.nProcs))
-	idBytes = make([]byte, 8)
-	binary.LittleEndian.PutUint64(idBytes, id)
+	idBytes = Buint64(id)
 	return
 }
 
@@ -29,24 +27,19 @@ func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idByt
 			return
 		}
 	}
-	idBytes = make([]byte, 4)
-	binary.LittleEndian.PutUint32(idBytes, uint32(colID))
+	idBytes = Bint32(colID)
 	return
 }
 
 // Put a document on all indexes.
 func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc map[string]interface{}) error {
-	docIDBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(docIDBytes, docID)
+	docIDBytes := Buint64(docID)
 	for htID, path := range client.indexPaths[colID] {
-		htIDBytes := make([]byte, 4)
-		binary.LittleEndian.PutUint32(htIDBytes, uint32(htID))
+		htIDBytes := Bint32(htID)
 		for _, val := range db.GetIn(doc, path) {
 			if val != nil {
 				htKey := db.StrHash(fmt.Sprint(val))
-				htKeyBytes := make([]byte, 8)
-				binary.LittleEndian.PutUint64(htKeyBytes, htKey)
-				if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_PUT, htIDBytes, htKeyBytes, docIDBytes); err != nil {
+				if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_PUT, htIDBytes, Buint64(htKey), docIDBytes); err != nil {
 					return err
 				}
 			}
@@ -57,17 +50,13 @@ func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc map[string]
 
 // Remove a document from all indexes.
 func (client *BinProtClient) unindexDoc(colID int32, docID uint64, doc map[string]interface{}) error {
-	docIDBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(docIDBytes, docID)
+	docIDBytes := Buint64(docID)
 	for htID, path := range client.indexPaths[colID] {
-		htIDBytes := make([]byte, 4)
-		binary.LittleEndian.PutUint32(htIDBytes, uint32(htID))
+		htIDBytes := Bint32(htID)
 		for _, val := range db.GetIn(doc, path) {
 			if val != nil {
 				htKey := db.StrHash(fmt.Sprint(val))
-				htKeyBytes := make([]byte, 8)
-				binary.LittleEndian.PutUint64(htKeyBytes, htKey)
-				if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_REMOVE, htIDBytes, htKeyBytes, docIDBytes); err != nil {
+				if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_REMOVE, htIDBytes, Buint64(htKey), docIDBytes); err != nil {
 					return err
 				}
 			}
@@ -220,20 +209,14 @@ func (client *BinProtClient) valIsIndexed(colName string, idxPath []string, val 
 		if !pathMatch {
 			continue
 		}
-		htIDBytes := make([]byte, 4)
-		binary.LittleEndian.PutUint32(htIDBytes, uint32(htID))
 		hashKey := db.StrHash(fmt.Sprint(val))
-		hashKeyBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(hashKeyBytes, uint64(hashKey))
-		limitBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(limitBytes, 0)
-		_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, htIDBytes, hashKeyBytes, limitBytes)
+		_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, Bint32(htID), Buint64(hashKey), Buint64(0))
 		if err != nil {
 			return err
 		}
 		vals := make([]uint64, len(resp))
 		for i, aVal := range resp {
-			vals[i] = binary.LittleEndian.Uint64(aVal)
+			vals[i] = Uint64(aVal)
 		}
 		if len(vals) != 1 || vals[0] != docID {
 			return fmt.Errorf("Looking for %v (%v) docID %v in %v, but got result %v", val, hashKey, docID, idxPath, vals)
@@ -264,20 +247,14 @@ func (client *BinProtClient) valIsNotIndexed(colName string, idxPath []string, v
 		if !pathMatch {
 			continue
 		}
-		htIDBytes := make([]byte, 4)
-		binary.LittleEndian.PutUint32(htIDBytes, uint32(htID))
 		hashKey := db.StrHash(fmt.Sprint(val))
-		hashKeyBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(hashKeyBytes, uint64(hashKey))
-		limitBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(limitBytes, 0)
-		_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, htIDBytes, hashKeyBytes, limitBytes)
+		_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, Bint32(htID), Buint64(hashKey), Buint64(0))
 		if err != nil {
 			return err
 		}
 		vals := make([]uint64, len(resp))
 		for i, aVal := range resp {
-			vals[i] = binary.LittleEndian.Uint64(aVal)
+			vals[i] = Uint64(aVal)
 		}
 		for _, v := range vals {
 			if v == docID {
@@ -298,7 +275,7 @@ func (client *BinProtClient) ApproxDocCount(colName string) (count uint64, err e
 		return
 	}
 	_, resp, err := client.sendCmd(0, true, C_DOC_APPROX_COUNT, colIDBytes)
-	count = binary.LittleEndian.Uint64(resp[0]) * uint64(client.nProcs)
+	count = Uint64(resp[0]) * uint64(client.nProcs)
 	client.opLock.Unlock()
 	return
 }
@@ -310,12 +287,13 @@ func (client *BinProtClient) getDocPage(colName string, page, total uint64) (doc
 		return
 	}
 	for i := 0; i < client.nProcs; i++ {
-		_, resp, err := client.sendCmd(i, true, C_DOC_GET_PAGE, colIDBytes)
+		var resp [][]byte
+		_, resp, err = client.sendCmd(i, true, C_DOC_GET_PAGE, colIDBytes, Buint64(page), Buint64(total))
 		if err != nil {
 			return
 		}
 		for i := 0; i < len(resp); i += 2 {
-			docID := binary.LittleEndian.Uint64(resp[i])
+			docID := Uint64(resp[i])
 			docBytes := resp[i+1]
 			var doc interface{}
 			if err = json.Unmarshal(docBytes, &doc); err == nil {
@@ -325,4 +303,13 @@ func (client *BinProtClient) getDocPage(colName string, page, total uint64) (doc
 			}
 		}
 	}
+	return
+}
+
+// Divide collection into roughly equally sized pages and return a page of documents.
+func (client *BinProtClient) GetDocPage(colName string, page, total uint64) (docs map[uint64]interface{}, err error) {
+	client.opLock.Lock()
+	docs, err = client.getDocPage(colName, page, total)
+	client.opLock.Unlock()
+	return
 }

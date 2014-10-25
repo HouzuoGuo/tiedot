@@ -103,7 +103,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (retCode byte, moreInfo [][]byte, err error) {
 	allParams := make([][]byte, len(params)+1)
 	// Param 0 should be the client's schema revision
-	allParams[0] = Uint32(rev)
+	allParams[0] = Buint32(client.rev)
 	// Copy down the remaining params
 	for i, param := range params {
 		allParams[i+1] = param

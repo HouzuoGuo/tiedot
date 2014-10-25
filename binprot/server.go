@@ -28,7 +28,7 @@ type BinProtSrv struct {
 	db                          *db.DB
 	colLookup                   map[int32]*db.Col
 	htLookup                    map[int32]*data.HashTable
-	clientIDSeq, maintByClient  int64
+	clientIDSeq, maintByClient  uint64
 	rev                         uint32
 	opLock                      *sync.Mutex
 	shutdown                    bool
@@ -38,7 +38,7 @@ type BinProtSrv struct {
 // Serve incoming connection.
 type BinProtWorker struct {
 	srv     *BinProtSrv
-	id      int64
+	id      uint64
 	in      *bufio.Reader
 	out     *bufio.Writer
 	lastErr error
@@ -78,7 +78,7 @@ func (srv *BinProtSrv) Run() (err error) {
 		}
 		worker := &BinProtWorker{
 			srv: srv,
-			id:  atomic.AddInt64(&srv.clientIDSeq, 1),
+			id:  atomic.AddUint64(&srv.clientIDSeq, 1),
 			in:  bufio.NewReader(conn),
 			out: bufio.NewWriter(conn)}
 		go worker.Run()

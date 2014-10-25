@@ -35,7 +35,7 @@ func Buint64(i uint64) (buf []byte) {
 func Uint32(buf []byte) uint32 {
 	return binary.LittleEndian.Uint32(buf)
 }
-func Buint32(i uint64) (buf []byte) {
+func Buint32(i uint32) (buf []byte) {
 	buf = make([]byte, 4)
 	binary.LittleEndian.PutUint32(buf, i)
 	return

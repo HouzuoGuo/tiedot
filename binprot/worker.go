@@ -2,7 +2,6 @@
 package binprot
 
 import (
-	"encoding/binary"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"sync/atomic"
 )
@@ -47,7 +46,7 @@ func (worker *BinProtWorker) readCmd() (cmd byte, rev uint32, params [][]byte, e
 	if err != nil {
 		return
 	}
-	rev = binary.LittleEndian.Uint32(paramsInclRev[0])
+	rev = Uint32(paramsInclRev[0])
 	params = paramsInclRev[1:]
 	return
 }
@@ -89,9 +88,7 @@ func (worker *BinProtWorker) Run() {
 		if clientRev != worker.srv.rev {
 			// Check client revision
 			tdlog.Noticef("Server %d: telling client %d (rev %d) to refresh schema revision to match %d", worker.srv.rank, worker.id, clientRev, worker.srv.rev)
-			mySchema := make([]byte, 4)
-			binary.LittleEndian.PutUint32(mySchema, worker.srv.rev)
-			worker.ansErr(R_ERR_SCHEMA, mySchema)
+			worker.ansErr(R_ERR_SCHEMA, Buint32(worker.srv.rev))
 		} else if worker.srv.maintByClient != 0 && worker.srv.maintByClient != worker.id {
 			// No matter what command comes in, if the server is being maintained by _another_ client, the command will get an error response.
 			worker.ansErr(R_ERR_MAINT, []byte("Server is being maintained by another client"))
@@ -99,10 +96,10 @@ func (worker *BinProtWorker) Run() {
 			// Process the command
 			switch cmd {
 			case C_DOC_INSERT:
-				// (Pending Update)
+				// (Increase pending-update counter)
 				// Insert and lock a document - collection ID, new document ID, serialized document content
-				colID := int32(binary.LittleEndian.Uint32(params[0]))
-				docID := binary.LittleEndian.Uint64(params[1])
+				colID := Int32(params[0])
+				docID := Uint64(params[1])
 				doc := params[2]
 				col, exists := worker.srv.colLookup[colID]
 				if !exists {
@@ -114,10 +111,10 @@ func (worker *BinProtWorker) Run() {
 					worker.ansOK()
 				}
 			case C_DOC_UNLOCK:
-				// (Decrease Pending Update)
+				// (Decrease pending-update counter)
 				// Unlock a document to allow further updates - collection ID, document ID
-				colID := int32(binary.LittleEndian.Uint32(params[0]))
-				docID := binary.LittleEndian.Uint64(params[1])
+				colID := Int32(params[0])
+				docID := Uint64(params[1])
 				col, exists := worker.srv.colLookup[colID]
 				if exists {
 					col.BPUnlock(docID)
@@ -128,8 +125,8 @@ func (worker *BinProtWorker) Run() {
 				}
 			case C_DOC_READ:
 				// Read a document back to the client - collection ID, document ID
-				colID := int32(binary.LittleEndian.Uint32(params[0]))
-				docID := binary.LittleEndian.Uint64(params[1])
+				colID := Int32(params[0])
+				docID := Uint64(params[1])
 				col, exists := worker.srv.colLookup[colID]
 				if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
@@ -139,10 +136,10 @@ func (worker *BinProtWorker) Run() {
 					worker.ansErr(R_ERR, []byte(err.Error()))
 				}
 			case C_DOC_LOCK_READ:
-				// (Pending Update)
+				// (Increase pending-update counter)
 				// Read a document back to the client, and lock the document for update - collection ID, document ID
-				colID := int32(binary.LittleEndian.Uint32(params[0]))
-				docID := binary.LittleEndian.Uint64(params[1])
+				colID := Int32(params[0])
+				docID := Uint64(params[1])
 				col, exists := worker.srv.colLookup[colID]
 				if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
@@ -154,8 +151,8 @@ func (worker *BinProtWorker) Run() {
 				}
 			case C_DOC_UPDATE:
 				// Overwrite document content - collection ID, document ID, new document content
-				colID := int32(binary.LittleEndian.Uint32(params[0]))
-				docID := binary.LittleEndian.Uint64(params[1])
+				colID := Int32(params[0])
+				docID := Uint64(params[1])
 				doc := params[2]
 				col, exists := worker.srv.colLookup[colID]
 				if !exists {
@@ -167,8 +164,8 @@ func (worker *BinProtWorker) Run() {
 				}
 			case C_DOC_DELETE:
 				// Delete a document - collection ID, document ID, new document
-				colID := int32(binary.LittleEndian.Uint32(params[0]))
-				docID := binary.LittleEndian.Uint64(params[1])
+				colID := Int32(params[0])
+				docID := Uint64(params[1])
 				col, exists := worker.srv.colLookup[colID]
 				if exists {
 					col.BPDelete(docID)
@@ -178,30 +175,25 @@ func (worker *BinProtWorker) Run() {
 				}
 			case C_DOC_APPROX_COUNT:
 				// Return approximate document count - collection ID
-				colID := int32(binary.LittleEndian.Uint32(params[0]))
+				colID := Int32(params[0])
 				col, exists := worker.srv.colLookup[colID]
 				if exists {
-					count := col.ApproxDocCount()
-					countBytes := make([]byte, 8)
-					binary.LittleEndian.PutUint64(countBytes, count)
-					worker.ansOK(countBytes)
+					worker.ansOK(Buint64(col.ApproxDocCount()))
 				} else {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				}
 			case C_DOC_GET_PAGE:
-				// Divide partition into roughly equally sized pages and return a page of documents - collectionID, page number, page total
-				colID := int32(binary.LittleEndian.Uint32(params[0]))
-				page := binary.LittleEndian.Uint64(params[1])
-				total := binary.LittleEndian.Uint64(params[2])
+				// Divide collection into roughly equally sized pages and return a page of documents - collectionID, page number, page total
+				colID := Int32(params[0])
+				page := Uint64(params[1])
+				total := Uint64(params[2])
 				col, exists := worker.srv.colLookup[colID]
 				if exists {
 					approxCount := col.ApproxDocCount()
 					// id1, doc1, id2, doc2, id3, doc3 ...
 					resp := make([][]byte, 0, approxCount/total*page*2)
 					col.ForEachDocInPage(page, total, func(id uint64, doc []byte) (moveOn bool) {
-						idBytes := make([]byte, 8)
-						binary.LittleEndian.PutUint64(idBytes, id)
-						resp = append(resp, idBytes, doc)
+						resp = append(resp, Buint64(id), doc)
 						return true
 					})
 					worker.ansOK(resp...)
@@ -210,17 +202,15 @@ func (worker *BinProtWorker) Run() {
 				}
 			case C_HT_GET:
 				// Lookup by key in a hash table - hash table ID, hash key, result limit
-				htID := int32(binary.LittleEndian.Uint32(params[0]))
-				htKey := binary.LittleEndian.Uint64(params[1])
-				limit := binary.LittleEndian.Uint64(params[2])
+				htID := Int32(params[0])
+				htKey := Uint64(params[1])
+				limit := Uint64(params[2])
 				ht, exists := worker.srv.htLookup[htID]
 				if exists {
 					vals := ht.Get(htKey, limit)
 					resp := make([][]byte, len(vals))
 					for i := range vals {
-						valBytes := make([]byte, 8)
-						binary.LittleEndian.PutUint64(valBytes, vals[i])
-						resp[i] = valBytes
+						resp[i] = Buint64(vals[i])
 					}
 					worker.ansOK(resp...)
 				} else {
@@ -228,9 +218,9 @@ func (worker *BinProtWorker) Run() {
 				}
 			case C_HT_PUT:
 				// Put a new entry into hash table - hash table ID, hash key, hash value
-				htID := int32(binary.LittleEndian.Uint32(params[0]))
-				htKey := binary.LittleEndian.Uint64(params[1])
-				htVal := binary.LittleEndian.Uint64(params[2])
+				htID := Int32(params[0])
+				htKey := Uint64(params[1])
+				htVal := Uint64(params[2])
 				ht, exists := worker.srv.htLookup[htID]
 				if exists {
 					ht.Put(htKey, htVal)
@@ -240,9 +230,9 @@ func (worker *BinProtWorker) Run() {
 				}
 			case C_HT_REMOVE:
 				// Remove an entry from hash table - hash table ID, hash key, hash value
-				htID := int32(binary.LittleEndian.Uint32(params[0]))
-				htKey := binary.LittleEndian.Uint64(params[1])
-				htVal := binary.LittleEndian.Uint64(params[2])
+				htID := Int32(params[0])
+				htKey := Uint64(params[1])
+				htVal := Uint64(params[2])
 				ht, exists := worker.srv.htLookup[htID]
 				if exists {
 					ht.Remove(htKey, htVal)
@@ -270,9 +260,7 @@ func (worker *BinProtWorker) Run() {
 				}
 			case C_PING:
 				// Respond OK with the client's ID, unless the server is in maintenance mode.
-				clientID := make([]byte, 8)
-				binary.LittleEndian.PutUint64(clientID, uint64(worker.id))
-				worker.ansOK(clientID)
+				worker.ansOK(Buint64(worker.id))
 			case C_SHUTDOWN:
 				// Stop accepting new client connections, and inform existing clients to close their connection.
 				worker.srv.Shutdown()
