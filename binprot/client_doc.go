@@ -302,3 +302,27 @@ func (client *BinProtClient) ApproxDocCount(colName string) (count uint64, err e
 	client.opLock.Unlock()
 	return
 }
+
+func (client *BinProtClient) getDocPage(colName string, page, total uint64) (docs map[uint64]interface{}, err error) {
+	docs = make(map[uint64]interface{})
+	_, colIDBytes, err := client.colName2IDBytes(colName)
+	if err != nil {
+		return
+	}
+	for i := 0; i < client.nProcs; i++ {
+		_, resp, err := client.sendCmd(i, true, C_DOC_GET_PAGE, colIDBytes)
+		if err != nil {
+			return
+		}
+		for i := 0; i < len(resp); i += 2 {
+			docID := binary.LittleEndian.Uint64(resp[i])
+			docBytes := resp[i+1]
+			var doc interface{}
+			if err = json.Unmarshal(docBytes, &doc); err == nil {
+				docs[docID] = doc
+			} else {
+				tdlog.CritNoRepeat("Client %d: found document corruption in collection %s ID %d while going through docs", client.id, colName, docID)
+			}
+		}
+	}
+}

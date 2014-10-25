@@ -4,7 +4,6 @@ package binprot
 
 import (
 	"bufio"
-	"encoding/binary"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/db"
@@ -104,9 +103,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (retCode byte, moreInfo [][]byte, err error) {
 	allParams := make([][]byte, len(params)+1)
 	// Param 0 should be the client's schema revision
-	rev := make([]byte, 4)
-	binary.LittleEndian.PutUint32(rev, client.rev)
-	allParams[0] = rev
+	allParams[0] = Uint32(rev)
 	// Copy down the remaining params
 	for i, param := range params {
 		allParams[i+1] = param
@@ -136,7 +133,7 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 	case R_ERR_SCHEMA:
 		// Reload my schema on reivison-mismatch
 		srvRev := moreInfo[0][0:4]
-		client.reload(binary.LittleEndian.Uint32(srvRev))
+		client.reload(Uint32(srvRev))
 		// May need to redo the command
 		if retryOnSchemaRefresh {
 			return client.sendCmd(rank, retryOnSchemaRefresh, cmd, params...)
@@ -215,7 +212,7 @@ func (client *BinProtClient) reqMaintAccess(fun func() error) error {
 		retCode, err := client.goMaint()
 		switch retCode {
 		case R_ERR_MAINT:
-			tdlog.Noticef("Client %d: servers are busy, will try again after a short delay - %v", client.id, err)
+			tdlog.Infof("Client %d: servers are busy, will try again after a short delay - %v", client.id, err)
 			time.Sleep(time.Duration(50+rand.Intn(100)) * time.Millisecond)
 			continue
 		case R_ERR_DOWN:
@@ -243,7 +240,7 @@ func (client *BinProtClient) ping() error {
 		case R_OK:
 			// Server returns my client ID
 			// The client ID will not change in the next Ping call
-			client.id = binary.LittleEndian.Uint64(myID[0])
+			client.id = Uint64(myID[0])
 		case R_ERR_MAINT:
 			// Server does not return my client ID, but server is alive.
 		default:

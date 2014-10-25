@@ -26,6 +26,7 @@ const (
 	C_DOC_UPDATE       = 15
 	C_DOC_DELETE       = 16
 	C_DOC_APPROX_COUNT = 17
+	C_DOC_GET_PAGE     = 18
 
 	// Index commands
 	C_HT_PUT    = 21
@@ -184,6 +185,26 @@ func (worker *BinProtWorker) Run() {
 					countBytes := make([]byte, 8)
 					binary.LittleEndian.PutUint64(countBytes, count)
 					worker.ansOK(countBytes)
+				} else {
+					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
+				}
+			case C_DOC_GET_PAGE:
+				// Divide partition into roughly equally sized pages and return a page of documents - collectionID, page number, page total
+				colID := int32(binary.LittleEndian.Uint32(params[0]))
+				page := binary.LittleEndian.Uint64(params[1])
+				total := binary.LittleEndian.Uint64(params[2])
+				col, exists := worker.srv.colLookup[colID]
+				if exists {
+					approxCount := col.ApproxDocCount()
+					// id1, doc1, id2, doc2, id3, doc3 ...
+					resp := make([][]byte, 0, approxCount/total*page*2)
+					col.ForEachDocInPage(page, total, func(id uint64, doc []byte) (moveOn bool) {
+						idBytes := make([]byte, 8)
+						binary.LittleEndian.PutUint64(idBytes, id)
+						resp = append(resp, idBytes, doc)
+						return true
+					})
+					worker.ansOK(resp...)
 				} else {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				}

@@ -4,6 +4,7 @@ package binprot
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 )
 
 const (
@@ -21,6 +22,32 @@ var recParam []byte = []byte{REC_PARAM}
 var rEscapeRecParam []byte = []byte{REC_ESC, REC_EPARAM}
 var recEsc []byte = []byte{REC_ESC}
 var rEscapeRecEsc []byte = []byte{REC_ESC, REC_ESC}
+
+func Uint64(buf []byte) uint64 {
+	return binary.LittleEndian.Uint64(buf)
+}
+
+func Buint64(i uint64) (buf []byte) {
+	buf = make([]byte, 8)
+	binary.LittleEndian.PutUint64(buf, i)
+	return
+}
+func Uint32(buf []byte) uint32 {
+	return binary.LittleEndian.Uint32(buf)
+}
+func Buint32(i uint64) (buf []byte) {
+	buf = make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, i)
+	return
+}
+func Int32(buf []byte) int32 {
+	return int32(binary.LittleEndian.Uint32(buf))
+}
+func Bint32(i int32) (buf []byte) {
+	buf = make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, uint32(i))
+	return
+}
 
 func readRec(in *bufio.Reader) (status byte, params [][]byte, err error) {
 	// Read byte 0 - status
