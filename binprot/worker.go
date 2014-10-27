@@ -260,7 +260,7 @@ func (worker *BinProtWorker) Run() {
 				}
 			case C_PING:
 				// Respond OK with the client's ID, unless the server is in maintenance mode.
-				worker.ansOK(Buint64(worker.id))
+				worker.ansOK(Buint64(uint64(worker.srv.nProcs)), Buint64(worker.id))
 			case C_SHUTDOWN:
 				// Stop accepting new client connections, and inform existing clients to close their connection.
 				worker.srv.Shutdown()

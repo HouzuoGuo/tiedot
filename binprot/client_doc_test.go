@@ -8,7 +8,6 @@ import (
 
 func TestDocInsertBench(t *testing.T) {
 	return
-	dumpGoroutineOnInterrupt()
 	os.RemoveAll(WS)
 	defer os.RemoveAll(WS)
 	_, clients := mkServersClients(2)
@@ -36,7 +35,6 @@ func TestDocInsertBench(t *testing.T) {
 
 func TestDocCrud(t *testing.T) {
 	var err error
-	dumpGoroutineOnInterrupt()
 	os.RemoveAll(WS)
 	defer os.RemoveAll(WS)
 	_, clients := mkServersClients(2)

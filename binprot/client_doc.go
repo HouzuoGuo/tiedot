@@ -20,7 +20,7 @@ func (client *BinProtClient) docID2RankBytes(id uint64) (rank int, idBytes []byt
 func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idBytes []byte, err error) {
 	colID, exists := client.colNameLookup[colName]
 	if !exists {
-		if err = client.ping(); err != nil {
+		if err = client.pingServer(0); err != nil {
 			return
 		} else if colID, exists = client.colNameLookup[colName]; !exists {
 			err = fmt.Errorf("Collection %s does not exist", colName)

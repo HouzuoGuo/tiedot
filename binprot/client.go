@@ -42,11 +42,31 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 		out:       make([]*bufio.Writer, 0, 8),
 		rev:       0,
 		opLock:    new(sync.Mutex)}
-	client.reload(0)
-	// Connect to servers, one at a time.
-	for i := 0; ; i++ {
+	// Connect to server 0
+	for attempt := 0; attempt < 10; attempt++ {
+		sockPath := path.Join(workspace, "0"+SOCK_FILE_SUFFIX)
+		sock, err := net.Dial("unix", sockPath)
+		if err != nil {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		client.sock = append(client.sock, sock)
+		client.in = append(client.in, bufio.NewReader(sock))
+		client.out = append(client.out, bufio.NewWriter(sock))
+		// Ping server to know my client ID and server nProcs
+		if err = client.pingServer(0); err != nil {
+			return nil, err
+		}
+		break
+	}
+	if client.nProcs == 0 {
+		return nil, fmt.Errorf("Client %d: failed to get number of server processes", client.id)
+	}
+	// Connect to remaining server processes
+	for i := 1; i < client.nProcs; i++ {
 		connSuccessful := false
 		for attempt := 0; attempt < 5; attempt++ {
+			tdlog.Noticef("Connection attempt %d on %d from client %d", attempt, i, client.id)
 			sockPath := path.Join(workspace, strconv.Itoa(i)+SOCK_FILE_SUFFIX)
 			sock, err := net.Dial("unix", sockPath)
 			if err != nil {
@@ -60,19 +80,10 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 			break
 		}
 		if !connSuccessful {
-			if i == 0 {
-				err = fmt.Errorf("No server seems to be running on %s", workspace)
-			} else {
-				// First test
-				if err = client.Ping(); err != nil {
-					return
-				}
-				client.nProcs = i
-				tdlog.Noticef("Client %d: successfully connected to %d server processes", client.id, client.nProcs)
-			}
-			break
+			return nil, fmt.Errorf("Client %d: failed to connect to server no.%d of %d", client.id, i, client.nProcs)
 		}
 	}
+	tdlog.Noticef("Client %d: successfully connected to %d server processes", client.id, client.nProcs)
 	/*
 		Server does not track connected clients in a central structure. Sending shutdown command to server merely sets
 		a state flag and stops it from accepting new connections; existing workers (one per each client) remain running.
@@ -82,7 +93,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 	go func() {
 		for {
 			client.opLock.Lock()
-			if err := client.ping(); err != nil {
+			if err := client.pingAllServers(); err != nil {
 				for _, sock := range client.sock {
 					sock.Close()
 				}
@@ -132,8 +143,7 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 		err = fmt.Errorf("Server is shutting down")
 	case R_ERR_SCHEMA:
 		// Reload my schema on reivison-mismatch
-		srvRev := moreInfo[0][0:4]
-		client.reload(Uint32(srvRev))
+		client.reload(Uint32(moreInfo[0]))
 		// May need to redo the command
 		if retryOnSchemaRefresh {
 			return client.sendCmd(rank, retryOnSchemaRefresh, cmd, params...)
@@ -233,18 +243,26 @@ func (client *BinProtClient) reqMaintAccess(fun func() error) error {
 	}
 }
 
-func (client *BinProtClient) ping() error {
+func (client *BinProtClient) pingServer(rank int) error {
+	retCode, status, err := client.sendCmd(rank, true, C_PING)
+	switch retCode {
+	case R_OK:
+		// Server returns (number of server processes, my client ID)
+		// The return values will not change in consecutive pings
+		client.nProcs = int(Uint64(status[0]))
+		client.id = Uint64(status[1])
+	case R_ERR_MAINT:
+		// Server does not return my client ID, but server is alive.
+	default:
+		return fmt.Errorf("Ping error: server %d, code %d, err %v", rank, retCode, err)
+	}
+	return nil
+}
+
+func (client *BinProtClient) pingAllServers() (err error) {
 	for i := range client.sock {
-		retCode, myID, err := client.sendCmd(i, true, C_PING)
-		switch retCode {
-		case R_OK:
-			// Server returns my client ID
-			// The client ID will not change in the next Ping call
-			client.id = Uint64(myID[0])
-		case R_ERR_MAINT:
-			// Server does not return my client ID, but server is alive.
-		default:
-			return fmt.Errorf("Ping error: code %d, err %v", retCode, err)
+		if err = client.pingServer(i); err != nil {
+			return
 		}
 	}
 	return nil
@@ -253,7 +271,7 @@ func (client *BinProtClient) ping() error {
 // Ping all servers, and expect OK or ERR_MAINT response.
 func (client *BinProtClient) Ping() error {
 	client.opLock.Lock()
-	result := client.ping()
+	result := client.pingAllServers()
 	client.opLock.Unlock()
 	return result
 }
