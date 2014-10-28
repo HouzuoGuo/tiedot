@@ -20,7 +20,7 @@ func (client *BinProtClient) docID2RankBytes(id uint64) (rank int, idBytes []byt
 func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idBytes []byte, err error) {
 	colID, exists := client.colNameLookup[colName]
 	if !exists {
-		if err = client.pingServer(0); err != nil {
+		if err = client.pingServer(0, false); err != nil {
 			return
 		} else if colID, exists = client.colNameLookup[colName]; !exists {
 			err = fmt.Errorf("Collection %s does not exist", colName)
@@ -266,18 +266,21 @@ func (client *BinProtClient) valIsNotIndexed(colName string, idxPath []string, v
 	return fmt.Errorf("Index not found")
 }
 
-// Return an approximate number of documents in the collection.
-func (client *BinProtClient) ApproxDocCount(colName string) (count uint64, err error) {
-	client.opLock.Lock()
+func (client *BinProtClient) approxDocCount(colName string) (count uint64, err error) {
 	_, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {
-		client.opLock.Unlock()
 		return
 	}
 	_, resp, err := client.sendCmd(0, true, C_DOC_APPROX_COUNT, colIDBytes)
 	count = Uint64(resp[0]) * uint64(client.nProcs)
-	client.opLock.Unlock()
 	return
+}
+
+// Return an approximate number of documents in the collection.
+func (client *BinProtClient) ApproxDocCount(colName string) (count uint64, err error) {
+	client.opLock.Lock()
+	defer client.opLock.Unlock()
+	return client.approxDocCount(colName)
 }
 
 func (client *BinProtClient) getDocPage(colName string, page, total uint64) (docs map[uint64]interface{}, err error) {

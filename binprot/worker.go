@@ -249,15 +249,15 @@ func (worker *BinProtWorker) Run() {
 					worker.srv.maintByClient = worker.id
 					worker.ansOK()
 				}
+			case C_RELOAD:
+				// Reload my schema and increase schema revision number
+				worker.srv.reload()
+				worker.ansOK()
 			case C_LEAVE_MAINT:
 				// Leave maintenance mode, then reload my schema and increase schema revision number.
-				if worker.srv.maintByClient == worker.id {
-					worker.srv.maintByClient = 0
-					worker.srv.reload()
-					worker.ansOK()
-				} else {
-					worker.ansErr(R_ERR_MAINT, []byte{})
-				}
+				worker.srv.maintByClient = 0
+				worker.srv.reload()
+				worker.ansOK()
 			case C_PING:
 				// Respond OK with the client's ID, unless the server is in maintenance mode.
 				worker.ansOK(Buint64(uint64(worker.srv.nProcs)), Buint64(worker.id))

@@ -78,6 +78,8 @@ func TestPingMaintShutdown(t *testing.T) {
 		t.Fatal(err)
 	} else if _, err = clients[1].goMaintTest(); err == nil {
 		t.Fatal("did not error")
+	} else if err = clients[1].reloadServerTest(); err == nil {
+		t.Fatal("did not error")
 	} else if _, err = clients[0].goMaintTest(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[0].leaveMaintTest(); err != nil {
@@ -85,11 +87,15 @@ func TestPingMaintShutdown(t *testing.T) {
 	} else if _, err = clients[1].goMaintTest(); err != nil {
 		t.Fatal(err)
 	}
-	// Ping both clients during maintenance access
+	// Ping both clients during maintenance access, then ask server to reload
 	if err = clients[0].Ping(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[1].Ping(); err != nil {
 		t.Fatal(err)
+	} else if err = clients[1].reloadServerTest(); err != nil {
+		t.Fatal(err)
+	} else if err = clients[0].reloadServerTest(); err == nil {
+		t.Fatal("did not error")
 	}
 	// Wait several seconds then ping again
 	time.Sleep(2 * time.Second)
@@ -187,6 +193,14 @@ func TestSchemaLookup(t *testing.T) {
 	if err = clients[0].Ping(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[1].Ping(); err != nil {
+		t.Fatal(err)
+	}
+	// Try reload again
+	if _, err = clients[1].goMaintTest(); err != nil {
+		t.Fatal(err)
+	} else if err = clients[1].reloadServerTest(); err != nil {
+		t.Fatal(err)
+	} else if err = clients[1].leaveMaintTest(); err != nil {
 		t.Fatal(err)
 	}
 	// Check schema

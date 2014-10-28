@@ -54,7 +54,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 		client.in = append(client.in, bufio.NewReader(sock))
 		client.out = append(client.out, bufio.NewWriter(sock))
 		// Ping server to know my client ID and server nProcs
-		if err = client.pingServer(0); err != nil {
+		if err = client.pingServer(0, true); err != nil {
 			return nil, err
 		}
 		break
@@ -93,7 +93,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 	go func() {
 		for {
 			client.opLock.Lock()
-			if err := client.pingAllServers(); err != nil {
+			if err := client.pingAllServers(false); err != nil {
 				for _, sock := range client.sock {
 					sock.Close()
 				}
@@ -175,6 +175,26 @@ func (client *BinProtClient) reload(srvRev uint32) {
 	return
 }
 
+// Reload server's schema, then reload my schema via ping.
+func (client *BinProtClient) reloadServer() error {
+	for i := 0; i < client.nProcs; i++ {
+		_, _, err := client.sendCmd(i, true, C_RELOAD)
+		if err != nil {
+			return err
+		}
+	}
+	if err := client.pingServer(0, false); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (client *BinProtClient) reloadServerTest() error {
+	client.opLock.Lock()
+	defer client.opLock.Unlock()
+	return client.reloadServer()
+}
+
 // Request maintenance access from all servers.
 func (client *BinProtClient) goMaint() (retCode byte, err error) {
 	for goMaintSrv := range client.sock {
@@ -243,14 +263,16 @@ func (client *BinProtClient) reqMaintAccess(fun func() error) error {
 	}
 }
 
-func (client *BinProtClient) pingServer(rank int) error {
+func (client *BinProtClient) pingServer(rank int, updateClientInfo bool) error {
 	retCode, status, err := client.sendCmd(rank, true, C_PING)
 	switch retCode {
 	case R_OK:
 		// Server returns (number of server processes, my client ID)
 		// The return values will not change in consecutive pings
-		client.nProcs = int(Uint64(status[0]))
-		client.id = Uint64(status[1])
+		if updateClientInfo {
+			client.nProcs = int(Uint64(status[0]))
+			client.id = Uint64(status[1])
+		}
 	case R_ERR_MAINT:
 		// Server does not return my client ID, but server is alive.
 	default:
@@ -259,9 +281,9 @@ func (client *BinProtClient) pingServer(rank int) error {
 	return nil
 }
 
-func (client *BinProtClient) pingAllServers() (err error) {
+func (client *BinProtClient) pingAllServers(updateClientInfo bool) (err error) {
 	for i := range client.sock {
-		if err = client.pingServer(i); err != nil {
+		if err = client.pingServer(i, updateClientInfo); err != nil {
 			return
 		}
 	}
@@ -271,7 +293,7 @@ func (client *BinProtClient) pingAllServers() (err error) {
 // Ping all servers, and expect OK or ERR_MAINT response.
 func (client *BinProtClient) Ping() error {
 	client.opLock.Lock()
-	result := client.pingAllServers()
+	result := client.pingAllServers(false)
 	client.opLock.Unlock()
 	return result
 }

@@ -132,6 +132,46 @@ func (client *BinProtClient) Index(colName string, idxPath []string) error {
 				return err
 			}
 		}
+		// Refresh schema on server and myself
+		if err := client.reloadServer(); err != nil {
+			return err
+		}
+		// Figure out the hash table ID
+		var newHTID int32 = -1
+		for htID, htPath := range client.indexPaths[client.colNameLookup[colName]] {
+			if strings.Join(idxPath, db.INDEX_PATH_SEP) == strings.Join(htPath, db.INDEX_PATH_SEP) {
+				newHTID = htID
+				break
+			}
+		}
+		if newHTID == -1 {
+			return fmt.Errorf("New hash table is missing?!")
+		}
+		htIDBytes := Bint32(newHTID)
+		// Reindex documents - 10k at a time
+		docCount, err := client.approxDocCount(colName)
+		if err != nil {
+			return err
+		}
+		total := docCount/10000 + 1
+		for page := uint64(0); page < total; page++ {
+			docs, err := client.getDocPage(colName, page, total)
+			if err != nil {
+				return err
+			}
+			// A simplified client.indexDoc
+			for docID, doc := range docs {
+				docIDBytes := Buint64(docID)
+				for _, val := range db.GetIn(doc, idxPath) {
+					if val != nil {
+						htKey := db.StrHash(fmt.Sprint(val))
+						if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_PUT, htIDBytes, Buint64(htKey), docIDBytes); err != nil {
+							return err
+						}
+					}
+				}
+			}
+		}
 		return nil
 	})
 }
