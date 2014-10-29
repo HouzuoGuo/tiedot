@@ -18,11 +18,11 @@ func (client *BinProtClient) docID2RankBytes(id uint64) (rank int, idBytes []byt
 
 // Lookup collection ID by name. If the collection name is not found, ping the server once and retry.
 func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idBytes []byte, err error) {
-	colID, exists := client.colNameLookup[colName]
+	colID, exists := client.schema.colNameLookup[colName]
 	if !exists {
 		if err = client.ping(); err != nil {
 			return
-		} else if colID, exists = client.colNameLookup[colName]; !exists {
+		} else if colID, exists = client.schema.colNameLookup[colName]; !exists {
 			err = fmt.Errorf("Collection %s does not exist", colName)
 			return
 		}
@@ -34,7 +34,7 @@ func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idByt
 // Put a document on all indexes.
 func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc map[string]interface{}) error {
 	docIDBytes := Buint64(docID)
-	for htID, path := range client.indexPaths[colID] {
+	for htID, path := range client.schema.indexPaths[colID] {
 		htIDBytes := Bint32(htID)
 		for _, val := range db.GetIn(doc, path) {
 			if val != nil {
@@ -51,7 +51,7 @@ func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc map[string]
 // Remove a document from all indexes.
 func (client *BinProtClient) unindexDoc(colID int32, docID uint64, doc map[string]interface{}) error {
 	docIDBytes := Buint64(docID)
-	for htID, path := range client.indexPaths[colID] {
+	for htID, path := range client.schema.indexPaths[colID] {
 		htIDBytes := Bint32(htID)
 		for _, val := range db.GetIn(doc, path) {
 			if val != nil {
@@ -196,7 +196,7 @@ func (client *BinProtClient) valIsIndexed(colName string, idxPath []string, val 
 	if err != nil {
 		return err
 	}
-	for htID, htPath := range client.indexPaths[colID] {
+	for htID, htPath := range client.schema.indexPaths[colID] {
 		if len(htPath) != len(idxPath) {
 			continue
 		}
@@ -234,7 +234,7 @@ func (client *BinProtClient) valIsNotIndexed(colName string, idxPath []string, v
 	if err != nil {
 		return err
 	}
-	for htID, htPath := range client.indexPaths[colID] {
+	for htID, htPath := range client.schema.indexPaths[colID] {
 		if len(htPath) != len(idxPath) {
 			continue
 		}

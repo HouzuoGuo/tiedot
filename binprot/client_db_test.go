@@ -94,8 +94,8 @@ func TestDumpDB(t *testing.T) {
 	_, clients = mkServersClients(2)
 	if clients[0].AllCols()[0] != "a" || clients[1].AllCols()[1] != "b" {
 		t.Fatal(clients[0].AllCols())
-	} else if len(clients[0].indexPaths) != 2 || len(clients[1].indexPaths[0]) != 1 {
-		t.Fatal(clients[0].indexPaths, clients[1].indexPaths)
+	} else if len(clients[0].schema.indexPaths) != 2 || len(clients[1].schema.indexPaths[0]) != 1 {
+		t.Fatal(clients[0].schema.indexPaths, clients[1].schema.indexPaths)
 	}
 	clients[0].Shutdown()
 }

@@ -4,14 +4,12 @@ package binprot
 
 import (
 	"bufio"
-	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"net"
 	"os"
 	"path"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -26,13 +24,11 @@ type BinProtSrv struct {
 	workspace, dbPath, sockPath string
 	srvSock                     net.Listener
 	db                          *db.DB
-	colLookup                   map[int32]*db.Col
-	htLookup                    map[int32]*data.HashTable
 	clientIDSeq, maintByClient  uint64
-	rev                         uint32
 	opLock                      *sync.Mutex
 	shutdown                    bool
 	pendingUpdates              int64
+	schema                      *Schema
 }
 
 // Serve incoming connection.
@@ -46,7 +42,7 @@ type BinProtWorker struct {
 
 // Create a server, but do not yet start serving incoming connections.
 func NewServer(rank, nProcs int, workspace string) (srv *BinProtSrv) {
-	srv = &BinProtSrv{
+	return &BinProtSrv{
 		rank:           rank,
 		nProcs:         nProcs,
 		workspace:      workspace,
@@ -54,12 +50,10 @@ func NewServer(rank, nProcs int, workspace string) (srv *BinProtSrv) {
 		sockPath:       path.Join(workspace, strconv.Itoa(rank)+SOCK_FILE_SUFFIX),
 		clientIDSeq:    0,
 		maintByClient:  0,
-		rev:            0,
 		opLock:         new(sync.Mutex),
 		shutdown:       false,
-		pendingUpdates: 0}
-
-	return srv
+		pendingUpdates: 0,
+		schema:         new(Schema)}
 }
 
 // Serve incoming connections. Block until server is told to shutdown.
@@ -85,35 +79,6 @@ func (srv *BinProtSrv) Run() (err error) {
 	}
 }
 
-// To save bandwidth, both client and server refer collections and indexes by an int32 "ID", instead of using their string names.
-func mkSchemaLookupTables(dbInstance *db.DB) (colLookup map[int32]*db.Col,
-	colNameLookup map[string]int32,
-	htLookup map[int32]*data.HashTable,
-	indexPaths map[int32]map[int32][]string) {
-
-	colLookup = make(map[int32]*db.Col)
-	colNameLookup = make(map[string]int32)
-	htLookup = make(map[int32]*data.HashTable)
-	indexPaths = make(map[int32]map[int32][]string)
-
-	// Both server and client run the same version of Go, therefore the order in which map keys are traversed is the same.
-	seq := 0
-	for _, colName := range dbInstance.AllCols() {
-		col := dbInstance.Use(colName)
-		colID := int32(seq)
-		colLookup[colID] = col
-		colNameLookup[colName] = colID
-		indexPaths[colID] = make(map[int32][]string)
-		seq++
-		for _, idxPath := range col.AllIndexes() {
-			htLookup[int32(seq)] = col.BPUseHT(strings.Join(idxPath, db.INDEX_PATH_SEP))
-			indexPaths[colID][int32(seq)] = idxPath
-			seq++
-		}
-	}
-	return
-}
-
 // Close and reopen database.
 func (srv *BinProtSrv) reload() {
 	var err error
@@ -125,8 +90,7 @@ func (srv *BinProtSrv) reload() {
 	if srv.db, err = db.OpenDB(srv.dbPath); err != nil {
 		panic(err)
 	}
-	srv.rev++
-	srv.colLookup, _, srv.htLookup, _ = mkSchemaLookupTables(srv.db)
+	srv.schema.refresh(srv.db)
 }
 
 // Stop serving new/existing connections and shut server down.

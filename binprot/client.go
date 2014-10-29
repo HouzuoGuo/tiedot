@@ -5,7 +5,6 @@ package binprot
 import (
 	"bufio"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math/rand"
@@ -18,18 +17,14 @@ import (
 
 // Bin protocol client connects to servers via Unix domain socket.
 type BinProtClient struct {
-	workspace     string
-	id            uint64
-	sock          []net.Conn
-	in            []*bufio.Reader
-	out           []*bufio.Writer
-	nProcs        int
-	rev           uint32
-	opLock        *sync.Mutex
-	colLookup     map[int32]*db.Col
-	colNameLookup map[string]int32
-	htLookup      map[int32]*data.HashTable
-	indexPaths    map[int32]map[int32][]string
+	workspace string
+	id        uint64
+	sock      []net.Conn
+	in        []*bufio.Reader
+	out       []*bufio.Writer
+	nProcs    int
+	opLock    *sync.Mutex
+	schema    *Schema
 }
 
 // Create a client and immediately connect to server.
@@ -40,8 +35,8 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 		sock:      make([]net.Conn, 0, 8),
 		in:        make([]*bufio.Reader, 0, 8),
 		out:       make([]*bufio.Writer, 0, 8),
-		rev:       0,
-		opLock:    new(sync.Mutex)}
+		opLock:    new(sync.Mutex),
+		schema:    new(Schema)}
 	// Connect to server 0
 	for attempt := 0; attempt < 10; attempt++ {
 		sockPath := path.Join(workspace, "0"+SOCK_FILE_SUFFIX)
@@ -114,7 +109,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (retCode byte, moreInfo [][]byte, err error) {
 	allParams := make([][]byte, len(params)+1)
 	// Param 0 should be the client's schema revision
-	allParams[0] = Buint32(client.rev)
+	allParams[0] = Buint32(client.schema.rev)
 	// Copy down the remaining params
 	for i, param := range params {
 		allParams[i+1] = param
@@ -166,12 +161,11 @@ func (client *BinProtClient) reload(srvRev uint32) {
 	if err != nil {
 		panic(err)
 	}
-	client.colLookup, client.colNameLookup, client.htLookup, client.indexPaths = mkSchemaLookupTables(clientDB)
+	client.schema.refreshToRev(clientDB, srvRev)
 	if err = clientDB.Close(); err != nil {
 		tdlog.Noticef("Client %d: failed to close database after a reload - %v", client.id, err)
 	}
 	tdlog.Noticef("Client %d: schema has been reloaded to match server's schema revision %d", client.id, srvRev)
-	client.rev = srvRev
 	return
 }
 

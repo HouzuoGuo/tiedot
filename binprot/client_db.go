@@ -35,8 +35,8 @@ func (client *BinProtClient) AllCols() (names []string) {
 		tdlog.Noticef("Client %d: failed to ping before returning collection names - %v", client.id, err)
 	}
 	client.opLock.Lock()
-	names = make([]string, 0, len(client.colNameLookup))
-	for name := range client.colNameLookup {
+	names = make([]string, 0, len(client.schema.colNameLookup))
+	for name := range client.schema.colNameLookup {
 		names = append(names, name)
 	}
 	client.opLock.Unlock()
@@ -137,13 +137,7 @@ func (client *BinProtClient) Index(colName string, idxPath []string) error {
 			return err
 		}
 		// Figure out the hash table ID
-		var newHTID int32 = -1
-		for htID, htPath := range client.indexPaths[client.colNameLookup[colName]] {
-			if strings.Join(idxPath, db.INDEX_PATH_SEP) == strings.Join(htPath, db.INDEX_PATH_SEP) {
-				newHTID = htID
-				break
-			}
-		}
+		newHTID := client.schema.GetHTIDByPath(colName, idxPath)
 		if newHTID == -1 {
 			return fmt.Errorf("New hash table is missing?!")
 		}
@@ -196,13 +190,13 @@ func (client *BinProtClient) AllIndexesJointPaths(colName string) (paths []strin
 		tdlog.Noticef("Client %d: failed to ping before returning index paths - %v", client.id, err)
 	}
 	client.opLock.Lock()
-	colID, exists := client.colNameLookup[colName]
+	colID, exists := client.schema.colNameLookup[colName]
 	if !exists {
 		client.opLock.Unlock()
 		return nil, fmt.Errorf("Collection %s does not exist", colName)
 	}
 	// Join and sort
-	for _, pathSegs := range client.indexPaths[colID] {
+	for _, pathSegs := range client.schema.indexPaths[colID] {
 		paths = append(paths, strings.Join(pathSegs, db.INDEX_PATH_SEP))
 	}
 	sort.Strings(paths)

@@ -85,10 +85,11 @@ func (worker *BinProtWorker) Run() {
 			return
 		}
 		worker.srv.opLock.Lock()
-		if clientRev != worker.srv.rev {
+		srvRev := worker.srv.schema.rev
+		if clientRev != srvRev {
 			// Check client revision
-			tdlog.Noticef("Server %d: telling client %d (rev %d) to refresh schema revision to match %d", worker.srv.rank, worker.id, clientRev, worker.srv.rev)
-			worker.ansErr(R_ERR_SCHEMA, Buint32(worker.srv.rev))
+			tdlog.Noticef("Server %d: telling client %d (rev %d) to refresh schema revision to match %d", worker.srv.rank, worker.id, clientRev, srvRev)
+			worker.ansErr(R_ERR_SCHEMA, Buint32(srvRev))
 		} else if worker.srv.maintByClient != 0 && worker.srv.maintByClient != worker.id {
 			// No matter what command comes in, if the server is being maintained by _another_ client, the command will get an error response.
 			worker.ansErr(R_ERR_MAINT, []byte("Server is being maintained by another client"))
@@ -101,7 +102,7 @@ func (worker *BinProtWorker) Run() {
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
 				doc := params[2]
-				col, exists := worker.srv.colLookup[colID]
+				col, exists := worker.srv.schema.colLookup[colID]
 				if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				} else if err := col.BPLockAndInsert(docID, doc); err != nil {
@@ -115,7 +116,7 @@ func (worker *BinProtWorker) Run() {
 				// Unlock a document to allow further updates - collection ID, document ID
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
-				col, exists := worker.srv.colLookup[colID]
+				col, exists := worker.srv.schema.colLookup[colID]
 				if exists {
 					col.BPUnlock(docID)
 					atomic.AddInt64(&worker.srv.pendingUpdates, -1)
@@ -127,7 +128,7 @@ func (worker *BinProtWorker) Run() {
 				// Read a document back to the client - collection ID, document ID
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
-				col, exists := worker.srv.colLookup[colID]
+				col, exists := worker.srv.schema.colLookup[colID]
 				if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				} else if doc, err := col.BPRead(docID); err == nil {
@@ -140,7 +141,7 @@ func (worker *BinProtWorker) Run() {
 				// Read a document back to the client, and lock the document for update - collection ID, document ID
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
-				col, exists := worker.srv.colLookup[colID]
+				col, exists := worker.srv.schema.colLookup[colID]
 				if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				} else if doc, err := col.BPLockAndRead(docID); err == nil {
@@ -154,7 +155,7 @@ func (worker *BinProtWorker) Run() {
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
 				doc := params[2]
-				col, exists := worker.srv.colLookup[colID]
+				col, exists := worker.srv.schema.colLookup[colID]
 				if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				} else if err := col.BPUpdate(docID, doc); err == nil {
@@ -166,7 +167,7 @@ func (worker *BinProtWorker) Run() {
 				// Delete a document - collection ID, document ID, new document
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
-				col, exists := worker.srv.colLookup[colID]
+				col, exists := worker.srv.schema.colLookup[colID]
 				if exists {
 					col.BPDelete(docID)
 					worker.ansOK()
@@ -176,7 +177,7 @@ func (worker *BinProtWorker) Run() {
 			case C_DOC_APPROX_COUNT:
 				// Return approximate document count - collection ID
 				colID := Int32(params[0])
-				col, exists := worker.srv.colLookup[colID]
+				col, exists := worker.srv.schema.colLookup[colID]
 				if exists {
 					worker.ansOK(Buint64(col.ApproxDocCount()))
 				} else {
@@ -187,7 +188,7 @@ func (worker *BinProtWorker) Run() {
 				colID := Int32(params[0])
 				page := Uint64(params[1])
 				total := Uint64(params[2])
-				col, exists := worker.srv.colLookup[colID]
+				col, exists := worker.srv.schema.colLookup[colID]
 				if exists {
 					approxCount := col.ApproxDocCount()
 					// id1, doc1, id2, doc2, id3, doc3 ...
@@ -205,7 +206,7 @@ func (worker *BinProtWorker) Run() {
 				htID := Int32(params[0])
 				htKey := Uint64(params[1])
 				limit := Uint64(params[2])
-				ht, exists := worker.srv.htLookup[htID]
+				ht, exists := worker.srv.schema.htLookup[htID]
 				if exists {
 					vals := ht.Get(htKey, limit)
 					resp := make([][]byte, len(vals))
@@ -221,7 +222,7 @@ func (worker *BinProtWorker) Run() {
 				htID := Int32(params[0])
 				htKey := Uint64(params[1])
 				htVal := Uint64(params[2])
-				ht, exists := worker.srv.htLookup[htID]
+				ht, exists := worker.srv.schema.htLookup[htID]
 				if exists {
 					ht.Put(htKey, htVal)
 					worker.ansOK()
@@ -233,7 +234,7 @@ func (worker *BinProtWorker) Run() {
 				htID := Int32(params[0])
 				htKey := Uint64(params[1])
 				htVal := Uint64(params[2])
-				ht, exists := worker.srv.htLookup[htID]
+				ht, exists := worker.srv.schema.htLookup[htID]
 				if exists {
 					ht.Remove(htKey, htVal)
 					worker.ansOK()
