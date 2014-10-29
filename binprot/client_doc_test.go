@@ -127,7 +127,58 @@ func TestDocCrud(t *testing.T) {
 			}
 		}
 	}
-
+	// Recreate index and verify documents & index
+	if err = clients[0].Unindex("col", []string{"a", "b"}); err != nil {
+		t.Fatal(err)
+	} else if indexes, err := clients[1].AllIndexes("col"); err != nil || len(indexes) != 0 {
+		t.Fatal("did not remove index")
+	} else if err = clients[1].Index("col", []string{"a", "b"}); err != nil {
+		t.Fatal(err)
+	}
+	for i, docID := range docIDs {
+		if i < numDocs/2+1 {
+			if _, err := clients[i%1].Read("col", docID); err == nil {
+				t.Fatal("Did not delete", i, docID)
+			}
+			if err = clients[i%1].valIsNotIndexed("col", []string{"a", "b"}, uint64(i*2), docID); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			if doc, err := clients[i%1].Read("col", docID); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i*2) {
+				t.Fatal(docID, doc)
+			}
+			if err = clients[i%1].valIsIndexed("col", []string{"a", "b"}, i*2, docID); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	// Verify that there are approximately 1000 documents
+	if count, err := clients[0].ApproxDocCount("col"); err != nil {
+		t.Fatal(err)
+	} else if count < 600 || count > 1400 {
+		t.Fatal("Approximate is way off")
+	}
+	// Scrub and verify documents & index (same verification as the two above)
+	if err = clients[1].Scrub("col"); err != nil {
+		t.Fatal(err)
+	}
+	for i, docID := range docIDs {
+		if i < numDocs/2+1 {
+			if _, err := clients[i%1].Read("col", docID); err == nil {
+				t.Fatal("Did not delete", i, docID)
+			}
+			if err = clients[i%1].valIsNotIndexed("col", []string{"a", "b"}, uint64(i*2), docID); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			if doc, err := clients[i%1].Read("col", docID); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i*2) {
+				t.Fatal(docID, doc)
+			}
+			if err = clients[i%1].valIsIndexed("col", []string{"a", "b"}, i*2, docID); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
 	// Verify that there are approximately 1000 documents
 	if count, err := clients[0].ApproxDocCount("col"); err != nil {
 		t.Fatal(err)

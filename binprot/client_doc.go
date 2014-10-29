@@ -32,7 +32,7 @@ func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idByt
 }
 
 // Put a document on all indexes.
-func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc map[string]interface{}) error {
+func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc interface{}) error {
 	docIDBytes := Buint64(docID)
 	for htID, path := range client.schema.indexPaths[colID] {
 		htIDBytes := Bint32(htID)
@@ -49,7 +49,7 @@ func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc map[string]
 }
 
 // Remove a document from all indexes.
-func (client *BinProtClient) unindexDoc(colID int32, docID uint64, doc map[string]interface{}) error {
+func (client *BinProtClient) unindexDoc(colID int32, docID uint64, doc interface{}) error {
 	docIDBytes := Buint64(docID)
 	for htID, path := range client.schema.indexPaths[colID] {
 		htIDBytes := Bint32(htID)
@@ -61,6 +61,25 @@ func (client *BinProtClient) unindexDoc(colID int32, docID uint64, doc map[strin
 				}
 			}
 		}
+	}
+	return nil
+}
+
+// Insert a document with the specified ID and put it onto all indexes. Used by Scrub for document recovery.
+func (client *BinProtClient) insertRecovery(colID int32, docID uint64, doc interface{}) error {
+	docBytes, err := json.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	colIDBytes := Bint32(colID)
+	docIDBytes := Buint64(docID)
+	rank := int(docID % uint64(client.nProcs))
+	if _, _, err := client.sendCmd(rank, false, C_DOC_INSERT, colIDBytes, docIDBytes, docBytes); err != nil {
+		return err
+	} else if err = client.indexDoc(colID, docID, doc); err != nil {
+		return err
+	} else if _, _, err = client.sendCmd(rank, false, C_DOC_UNLOCK, colIDBytes, docIDBytes); err != nil {
+		return err
 	}
 	return nil
 }

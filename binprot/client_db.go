@@ -11,21 +11,29 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
+
+func (client *BinProtClient) forAllDBsDo(fun func(*db.DB) error) error {
+	for i := 0; i < client.nProcs; i++ {
+		clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i)))
+		if err != nil {
+			return err
+		} else if err = fun(clientDB); err != nil {
+			return err
+		} else if err = clientDB.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // Create a new collection.
 func (client *BinProtClient) Create(colName string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < client.nProcs; i++ {
-			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
-				return err
-			} else if err = clientDB.Create(colName); err != nil {
-				return err
-			} else if err = clientDB.Close(); err != nil {
-				return err
-			}
-		}
-		return nil
+		return client.forAllDBsDo(func(clientDB *db.DB) error {
+			return clientDB.Create(colName)
+		})
 	})
 }
 
@@ -47,38 +55,88 @@ func (client *BinProtClient) AllCols() (names []string) {
 // Rename a collection.
 func (client *BinProtClient) Rename(oldName, newName string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < client.nProcs; i++ {
-			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
-				return err
-			} else if err = clientDB.Rename(oldName, newName); err != nil {
-				return err
-			} else if err = clientDB.Close(); err != nil {
-				return err
-			}
-		}
-		return nil
+		return client.forAllDBsDo(func(clientDB *db.DB) error {
+			return clientDB.Rename(oldName, newName)
+		})
 	})
 }
 
 // Truncate a collection
 func (client *BinProtClient) Truncate(colName string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < client.nProcs; i++ {
-			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
-				return err
-			} else if err = clientDB.Truncate(colName); err != nil {
-				return err
-			} else if err = clientDB.Close(); err != nil {
-				return err
-			}
-		}
-		return nil
+		return client.forAllDBsDo(func(clientDB *db.DB) error {
+			return clientDB.Truncate(colName)
+		})
 	})
 }
 
 // Compact a collection and recover corrupted documents.
 func (client *BinProtClient) Scrub(colName string) error {
 	return client.reqMaintAccess(func() error {
+		// Remember existing indexes
+		existingIndexes := make([][]string, 0, 0)
+		colID, exists := client.schema.colNameLookup[colName]
+		if !exists {
+			return fmt.Errorf("Collection does not exist")
+		}
+		for _, existingIndex := range client.schema.indexPaths[colID] {
+			existingIndexes = append(existingIndexes, existingIndex)
+		}
+		// Create a temporary collection for holding good&clean documents
+		tmpColName := fmt.Sprintf("scrub-%s-%d", colName, time.Now().UnixNano())
+		err := client.forAllDBsDo(func(clientDB *db.DB) error {
+			if err := clientDB.Create(tmpColName); err != nil {
+				return err
+			}
+			// Recreate all indexes
+			for _, existingIndex := range existingIndexes {
+				if err := clientDB.Use(tmpColName).BPIndex(existingIndex); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		// Reload schema so that servers & client know the temp collection
+		if err != nil {
+			return err
+		} else if err = client.reloadServer(); err != nil {
+			return err
+		}
+		tmpColID, exists := client.schema.colNameLookup[tmpColName]
+		if !exists {
+			return fmt.Errorf("TmpCol went missing?!")
+		}
+		// Put documents back in - 10k at a time
+		docCount, err := client.approxDocCount(colName)
+		if err != nil {
+			return err
+		}
+		total := docCount/10000 + 1
+		for page := uint64(0); page < total; page++ {
+			docs, err := client.getDocPage(colName, page, total)
+			if err != nil {
+				return err
+			}
+			for docID, doc := range docs {
+				if err := client.insertRecovery(tmpColID, docID, doc); err != nil {
+					return err
+				}
+			}
+		}
+		// Replace the original collection by the good&clean one
+		err = client.forAllDBsDo(func(clientDB *db.DB) error {
+			if err := clientDB.Drop(colName); err != nil {
+				return err
+			} else if err := clientDB.Rename(tmpColName, colName); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		} else if err = client.reloadServer(); err != nil {
+			return err
+		}
 		return nil
 	})
 }

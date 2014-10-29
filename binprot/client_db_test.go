@@ -36,7 +36,7 @@ func TestColCrud(t *testing.T) {
 	} else if err := clients[1].Rename("b", "d"); err != nil {
 		t.Fatal(err)
 	}
-	// Rename - verify
+	// Rename - verify (the remaining collections are c and d)
 	if allNames := clients[1].AllCols(); len(allNames) != 2 || !(allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
@@ -49,6 +49,18 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Truncate - verify
+	if allNames := clients[1].AllCols(); len(allNames) != 2 || !(allNames[0] == "c" && allNames[1] == "d") {
+		t.Fatal(allNames)
+	}
+	// Scrub
+	if clients[1].Scrub("a") == nil {
+		t.Fatal("Did not error")
+	} else if err := clients[0].Scrub("c"); err != nil {
+		t.Fatal(err)
+	} else if err := clients[1].Scrub("d"); err != nil {
+		t.Fatal(err)
+	}
+	// Scrub - verify (more scrub tests are in client_doc_test.go)
 	if allNames := clients[1].AllCols(); len(allNames) != 2 || !(allNames[0] == "c" && allNames[1] == "d") {
 		t.Fatal(allNames)
 	}
