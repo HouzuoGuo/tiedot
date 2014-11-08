@@ -4,7 +4,7 @@ Keywords: Golang, go, document database, NoSQL, JSON
 
 ### tiedot - Your NoSQL database powered by Golang
 
-[![Build Status](https://travis-ci.org/HouzuoGuo/tiedot.svg?branch=master)](https://travis-ci.org/HouzuoGuo/tiedot)
+[![Build Status](https://travis-ci.org/HouzuoGuo/tiedot.svg?branch=master)](https://travis-ci.org/HouzuoGuo/tiedot) [![GoDoc](https://godoc.org/github.com/HouzuoGuo/tiedot?status.svg)](https://godoc.org/github.com/HouzuoGuo/tiedot) 
 
 tiedot is a document database engine that uses __JSON__ as document notation; it has a powerful query processor that supports advanced set operations; it can be __embedded__ into your program, or run a stand-alone server using __HTTP__ for an API. It runs on *nix and Windows operating systems.
 
