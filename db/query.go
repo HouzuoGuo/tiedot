@@ -2,26 +2,12 @@
 package db
 
 import (
+	"errors"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/dberr"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 	"strconv"
 	"strings"
-
-	"github.com/HouzuoGuo/tiedot/tdlog"
-)
-
-var (
-	ErrorMissingLookUp     = Error{"Missing lookup path `in`.", ""}
-	ErrorExpectingLookup   = Error{"Expecting vector lookup path `in`, but %v given.", ""}
-	ErrorExpectingNumber   = Error{"Expecting `limit` as a number, but %v given.", ""}
-	ErrorNeedIndex         = Error{"Please index %v and retry query %v.", ""}
-	ErrorExpectingPath     = Error{"Expecting vector path, but %v given.", ""}
-	ErrorExpectingPathIn   = Error{"Expecting vector path `in`, but %v given.", ""}
-	ErrorExpectingSubQuery = Error{"Expecting a vector of sub-queries, but %v given.", ""}
-	ErrorMissingPath       = Error{"Mising path `in`", ""}
-	ErrorExpectingInt      = Error{"Expecting `%s` as an integer, but %v given.", ""}
-	ErrorMissing           = Error{"Missing `%s`", ""}
-	ErrorInvalidPKID       = Error{"%s is not a document PK ID.", ""}
-	ErrorNoOP              = Error{"Query %v does not contain any operation (lookup/union/etc)", ""}
 )
 
 // Calculate union of sub-query results.
@@ -48,7 +34,7 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 	// Figure out lookup path - JSON array "in"
 	path, hasPath := expr["in"]
 	if !hasPath {
-		return ErrorMissingLookUp
+		return errors.New("Missing lookup path `in`")
 	}
 	vecPath := make([]string, 0)
 	if vecPathInterface, ok := path.([]interface{}); ok {
@@ -56,22 +42,24 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 			vecPath = append(vecPath, fmt.Sprint(v))
 		}
 	} else {
-		return ErrorExpectingLookup.Fault(path)
+		return errors.New(fmt.Sprintf("Expecting vector lookup path `in`, but %v given", path))
 	}
 	// Figure out result number limit
 	intLimit := int(0)
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
 			intLimit = int(floatLimit)
+		} else if _, ok := limit.(int); ok {
+			intLimit = limit.(int)
 		} else {
-			return ErrorExpectingNumber.Fault(limit)
+			return dberr.ErrorExpectingInt.Fault("limit", limit)
 		}
 	}
 	lookupStrValue := fmt.Sprint(lookupValue) // the value to look for
 	lookupValueHash := StrHash(lookupStrValue)
 	scanPath := strings.Join(vecPath, INDEX_PATH_SEP)
 	if _, indexed := src.indexPaths[scanPath]; !indexed {
-		return ErrorNeedIndex.Fault(scanPath, expr)
+		return dberr.ErrorNeedIndex.Fault(scanPath, expr)
 	}
 	num := lookupValueHash % src.db.numParts
 	ht := src.hts[num][scanPath]
@@ -100,21 +88,22 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 			vecPath = append(vecPath, fmt.Sprint(v))
 		}
 	} else {
-		return ErrorExpectingPath.Fault(hasPath)
-
+		return errors.New(fmt.Sprintf("Expecting vector path, but %v given", hasPath))
 	}
 	// Figure out result number limit
 	intLimit := 0
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
 			intLimit = int(floatLimit)
+		} else if _, ok := limit.(int); ok {
+			intLimit = limit.(int)
 		} else {
-			return ErrorExpectingNumber.Fault(limit)
+			return dberr.ErrorExpectingInt.Fault("limit", limit)
 		}
 	}
 	jointPath := strings.Join(vecPath, INDEX_PATH_SEP)
 	if _, indexed := src.indexPaths[jointPath]; !indexed {
-		return ErrorNeedIndex.Fault(vecPath, expr)
+		return dberr.ErrorNeedIndex.Fault(vecPath, expr)
 	}
 	counter := 0
 	partDiv := src.approxDocCount(false) / src.db.numParts / 4000 // collect approx. 4k document IDs in each iteration
@@ -142,6 +131,7 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 
 // Calculate intersection of sub-query results.
 func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err error) {
+	myResult := make(map[int]struct{})
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		first := true
 		for _, subExpr := range subExprVecs {
@@ -151,25 +141,29 @@ func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err er
 				return
 			}
 			if first {
-				*result = subResult
+				myResult = subResult
 				first = false
 			} else {
 				for k, _ := range subResult {
-					if _, inBoth := (*result)[k]; inBoth {
+					if _, inBoth := myResult[k]; inBoth {
 						intersection[k] = struct{}{}
 					}
 				}
-				*result = intersection
+				myResult = intersection
 			}
 		}
+		for docID := range myResult {
+			(*result)[docID] = struct{}{}
+		}
 	} else {
-		return ErrorExpectingSubQuery.Fault(subExprs)
+		return dberr.ErrorExpectingSubQuery.Fault(subExprs)
 	}
 	return
 }
 
 // Calculate complement of sub-query results.
 func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err error) {
+	myResult := make(map[int]struct{})
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		for _, subExpr := range subExprVecs {
 			subResult := make(map[int]struct{})
@@ -178,19 +172,22 @@ func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err e
 				return
 			}
 			for k, _ := range subResult {
-				if _, inBoth := (*result)[k]; !inBoth {
+				if _, inBoth := myResult[k]; !inBoth {
 					complement[k] = struct{}{}
 				}
 			}
-			for k, _ := range *result {
+			for k, _ := range myResult {
 				if _, inBoth := subResult[k]; !inBoth {
 					complement[k] = struct{}{}
 				}
 			}
-			*result = complement
+			myResult = complement
+		}
+		for docID := range myResult {
+			(*result)[docID] = struct{}{}
 		}
 	} else {
-		return ErrorExpectingSubQuery.Fault(subExprs)
+		return dberr.ErrorExpectingSubQuery.Fault(subExprs)
 	}
 	return
 }
@@ -207,7 +204,7 @@ func (col *Col) hashScan(idxName string, key, limit int) []int {
 func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result *map[int]struct{}) (err error) {
 	path, hasPath := expr["in"]
 	if !hasPath {
-		return ErrorMissingPath
+		return errors.New("Missing path `in`")
 	}
 	// Figure out the path
 	vecPath := make([]string, 0)
@@ -216,38 +213,46 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 			vecPath = append(vecPath, fmt.Sprint(v))
 		}
 	} else {
-		return ErrorExpectingPathIn.Fault(path)
+		return errors.New(fmt.Sprintf("Expecting vector path `in`, but %v given", path))
 	}
 	// Figure out result number limit
 	intLimit := int(0)
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
 			intLimit = int(floatLimit)
+		} else if _, ok := limit.(int); ok {
+			intLimit = limit.(int)
 		} else {
-			return ErrorExpectingNumber.Fault(limit)
+			return dberr.ErrorExpectingInt.Fault(limit)
 		}
 	}
 	// Figure out the range ("from" value & "to" value)
 	from, to := int(0), int(0)
 	if floatFrom, ok := intFrom.(float64); ok {
 		from = int(floatFrom)
+	} else if _, ok := intFrom.(int); ok {
+		from = intFrom.(int)
 	} else {
-		return ErrorExpectingInt.Fault("int-from", from)
+		return dberr.ErrorExpectingInt.Fault("int-from", from)
 	}
 	if intTo, ok := expr["int-to"]; ok {
 		if floatTo, ok := intTo.(float64); ok {
 			to = int(floatTo)
+		} else if _, ok := intTo.(int); ok {
+			to = intTo.(int)
 		} else {
-			return ErrorExpectingInt.Fault("int-to", to)
+			return dberr.ErrorExpectingInt.Fault("int-to", to)
 		}
 	} else if intTo, ok := expr["int to"]; ok {
 		if floatTo, ok := intTo.(float64); ok {
 			to = int(floatTo)
+		} else if _, ok := intTo.(int); ok {
+			to = intTo.(int)
 		} else {
-			return ErrorExpectingInt.Fault("int-to", to)
+			return dberr.ErrorExpectingInt.Fault("int to", to)
 		}
 	} else {
-		return ErrorMissing.Fault("int-to")
+		return dberr.ErrorMissing.Fault("int-to")
 	}
 	if to > from && to-from > 1000 || from > to && from-to > 1000 {
 		tdlog.CritNoRepeat("Query %v involves index lookup on more than 1000 values, which can be very inefficient", expr)
@@ -255,7 +260,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 	counter := int(0) // Number of results already collected
 	htPath := strings.Join(vecPath, ",")
 	if _, indexScan := src.indexPaths[htPath]; !indexScan {
-		return ErrorNeedIndex.Fault(vecPath, expr)
+		return dberr.ErrorNeedIndex.Fault(vecPath, expr)
 	}
 	if from < to {
 		// Forward scan - from low value to high value
@@ -304,7 +309,7 @@ func evalQuery(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLoc
 			// Might be single document number
 			docID, err := strconv.ParseInt(expr, 10, 64)
 			if err != nil {
-				return ErrorInvalidPKID.Fault(expr)
+				return dberr.ErrorExpectingInt.Fault("Single Document ID", docID)
 			}
 			(*result)[int(docID)] = struct{}{}
 		}
@@ -322,7 +327,7 @@ func evalQuery(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLoc
 		} else if intFrom, htRange := expr["int from"]; htRange { // "int from, "int to" - integer range query - same as above, just without dash
 			return IntRange(intFrom, expr, src, result)
 		} else {
-			return ErrorNoOP.Fault(expr)
+			return errors.New(fmt.Sprintf("Query %v does not contain any operation (lookup/union/etc)", expr))
 		}
 	}
 	return nil

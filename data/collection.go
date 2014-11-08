@@ -7,7 +7,10 @@ original document is marked as deleted and the updated document is inserted as a
 */
 package data
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"github.com/HouzuoGuo/tiedot/dberr"
+)
 
 const (
 	COL_FILE_GROWTH = 32 * 1048576 // Collection file initial size & size growth (32 MBytes)
@@ -49,7 +52,7 @@ func (col *Collection) Read(id int) []byte {
 func (col *Collection) Insert(data []byte) (id int, err error) {
 	room := len(data) << 1
 	if room > DOC_MAX_ROOM {
-		return 0, ErrorDocTooLarge.Fault(DOC_MAX_ROOM, room)
+		return 0, dberr.ErrorDocTooLarge.Fault(DOC_MAX_ROOM, room)
 	}
 	id = col.Used
 	docSize := DOC_HEADER + room
@@ -74,13 +77,13 @@ func (col *Collection) Insert(data []byte) (id int, err error) {
 // Overwrite or re-insert a document, return the new document ID if re-inserted.
 func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 	if room := len(data); room > DOC_MAX_ROOM {
-		return 0, ErrorDocTooLarge.Fault(DOC_MAX_ROOM, room)
+		return 0, dberr.ErrorDocTooLarge.Fault(DOC_MAX_ROOM, room)
 	} else if id < 0 || id >= col.Used-DOC_HEADER || col.Buf[id] != 1 {
-		return 0, ErrorNoDoc.Fault(id)
+		return 0, dberr.ErrorNoDoc.Fault(id)
 	} else if room, _ := binary.Varint(col.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
-		return 0, ErrorNoDoc.Fault(id)
+		return 0, dberr.ErrorNoDoc.Fault(id)
 	} else if docEnd := id + DOC_HEADER + int(room); docEnd >= col.Size {
-		return 0, ErrorNoDoc.Fault(id)
+		return 0, dberr.ErrorNoDoc.Fault(id)
 	} else if len(data) <= int(room) {
 		padding := id + DOC_HEADER + len(data)
 		paddingEnd := id + DOC_HEADER + int(room)
@@ -104,7 +107,7 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 // Delete a document by ID.
 func (col *Collection) Delete(id int) (err error) {
 	if id < 0 || id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
-		err = ErrorNoDoc.Fault(id)
+		err = dberr.ErrorNoDoc.Fault(id)
 	} else if col.Buf[id] == 1 {
 		col.Buf[id] = 0
 	}

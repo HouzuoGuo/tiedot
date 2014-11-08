@@ -172,14 +172,14 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	if err := part.LockUpdate(id); err != nil {
 		part.Lock.Unlock()
 		col.db.schemaLock.RUnlock()
-		return fmt.Errorf("Document %d is locked for update, please try again later", id)
+		return err
 	}
 	originalB, err := part.Read(id)
 	if err != nil {
 		part.UnlockUpdate(id)
 		part.Lock.Unlock()
 		col.db.schemaLock.RUnlock()
-		return fmt.Errorf("Cannot update %d: cannot read back original document - %v", id, err)
+		return err
 	}
 	var original map[string]interface{}
 	if err = json.Unmarshal(originalB, &original); err != nil {
@@ -214,14 +214,14 @@ func (col *Col) Delete(id int) error {
 	if err := part.LockUpdate(id); err != nil {
 		part.Lock.Unlock()
 		col.db.schemaLock.RUnlock()
-		return fmt.Errorf("Document %d is locked for update, please try again later", id)
+		return err
 	}
 	originalB, err := part.Read(id)
 	if err != nil {
 		part.UnlockUpdate(id)
 		part.Lock.Unlock()
 		col.db.schemaLock.RUnlock()
-		return fmt.Errorf("Cannot delete %d: %v", id, err)
+		return err
 	}
 	var original map[string]interface{}
 	if err = json.Unmarshal(originalB, &original); err != nil {

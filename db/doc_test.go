@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/dberr"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -134,7 +135,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 		}
 	}
 	// Read documents and verify index
-	if _, err = col.Read(123456); err == nil {
+	if _, err = col.Read(123456); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatal("Did not error")
 	}
 	for i, docID := range docIDs {
@@ -146,7 +147,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 		}
 	}
 	// Update document
-	if err = col.Update(654321, map[string]interface{}{}); err == nil {
+	if err = col.Update(654321, map[string]interface{}{}); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatal("Did not error")
 	}
 	for i, docID := range docIDs {
@@ -174,14 +175,14 @@ func TestDocCrudAndIdx(t *testing.T) {
 		}
 	}
 	// Delete half of those documents
-	if err = col.Delete(654321); err == nil {
+	if err = col.Delete(654321); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatal("Did not error")
 	}
 	for i := 0; i < numDocs/2+1; i++ {
 		if err := col.Delete(docIDs[i]); err != nil {
 			t.Fatal(err)
 		}
-		if err := col.Delete(docIDs[i]); err == nil {
+		if err := col.Delete(docIDs[i]); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 			t.Fatal("Did not error")
 		}
 	}
@@ -189,7 +190,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 	for i, docID := range docIDs {
 		if i < numDocs/2+1 {
 			// After delete - verify deleted documents and index
-			if _, err := col.Read(docID); err == nil {
+			if _, err := col.Read(docID); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 				t.Fatal("Did not delete", i, docID)
 			}
 			if err = idxHasNot(col, []string{"a", "b"}, i*2, docID); err != nil {
