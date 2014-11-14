@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	    <meta name="mobile-web-app-capable" content="yes">
+		<title>Jwt Control Panel</title>
+	    <script src="/{{.root}}/bower_components/webcomponentsjs/webcomponents.js"></script>
+	    <link rel="import" href="/{{.root}}/bower_components/polymer/polymer.html">
+	    <link rel="import" href="/{{.root}}/bower_components/font-roboto/roboto.html">
+		<link rel="import" href="/{{.root}}/bower_components/paper-input/paper-input.html">
+	    <link rel="import" href="/{{.root}}/bower_components/paper-fab/paper-fab.html">
+		<link rel="import" href="/{{.root}}/bower_components/core-drawer-panel/core-drawer-panel.html">
+		<link rel="import" href="/{{.root}}/bower_components/core-toolbar/core-toolbar.html">
+	    <link rel="import" href="/{{.root}}/bower_components/core-icon-button/core-icon-button.html">
+	    <link rel="import" href="/{{.root}}/bower_components/core-localstorage/core-localstorage.html">
+		<link rel="import" href="/{{.root}}/html/jwt-tiedot.html">
+	    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+		<link href="/{{.root}}/css/bootstrap.css" rel="stylesheet" type="text/css" />
+		<link href="/{{.root}}/css/main.css" rel="stylesheet" type="text/css" />
+		<script src="/{{.root}}/js/lib/jquery-2.1.1.min.js"></script>
+		<script src="/{{.root}}/js/lib/bootstrap.min.js"></script>
+		<script src="/{{.root}}/js/lib/underscore-min.js"></script>
+		<script src="/{{.root}}/js/lib/backbone-min.js"></script>
+		<script src="/{{.root}}/js/lib/numeral.js"></script>
+		<script src="/{{.root}}/js/lib/ace/ace.js"></script>
+		<script type="text/javascript">var App = { root: {{.root}} };</script>
+	</head>
+
+	<body>
+		<template is="auto-binding">
+
+			<core-drawer-panel drawerWidth="180px" rightDrawer forceNarrow selected="{{.panelSelected}}">
+	  			<div drawer style="background:white;">
+					<core-toolbar>
+				  		<div flex>Login</div>
+				  		<core-icon-button icon="perm-identity" on-tap="{{.login}}"></core-icon-button>
+					</core-toolbar>
+					<jwt-tiedot></jwt-tiedot>
+				</div>
+				<div main>
+				
+				<core-toolbar>
+			  		<div flex><a class="navbar-brand" href="#">Tiedot</a></div>
+			  		<core-icon-button icon="perm-identity" on-tap="{{.login}}"></core-icon-button>
+				</core-toolbar>
+
+	<div class="container-fluid">
+		<div id="query-box" class="query-box row">
+			<div class="col-sm-12">
+				<div id="query-box-editor">&nbsp;</div>
+				<p class="pull-right">
+					<button type="button" class="btn btn-danger btn-lg cancel">Close</button>
+					<button type="button" class="btn btn-success btn-lg query">Execute</button>
+				</p>
+				<a href="https://github.com/HouzuoGuo/tiedot/wiki/Query-processor-and-index" target="_blank">Query Help</a>
+			</div>
+		</div>
+		<div class="row">
+			<div id="main" class="col-sm-12 main">
+				<div id="app">&nbsp;</div>
+			</div>
+		</div>
+	</div>
+	
+	<div id="modal" class="modal fade" role="dialog" aria-hidden="true">
+		<div class="modal-dialog modal-sm">
+		    <div id="modal-content" class="modal-content">&nbsp;</div>
+    	</div>
+	</div>
+
+	{{.templates}}
+	
+	<script src="/{{.root}}/js/models/collection.js"></script>
+	<script src="/{{.root}}/js/models/collectionList.js"></script>
+	<script src="/{{.root}}/js/models/document.js"></script>
+	<script src="/{{.root}}/js/models/documentList.js"></script>
+	<script src="/{{.root}}/js/models/index.js"></script>
+	<script src="/{{.root}}/js/models/indexList.js"></script>
+	<script src="/{{.root}}/js/views/collectionListView.js"></script>
+	<script src="/{{.root}}/js/views/collectionView.js"></script>
+	<script src="/{{.root}}/js/views/documentView.js"></script>
+	<script src="/{{.root}}/js/views/queryResultView.js"></script>
+	<script src="/{{.root}}/js/views/queryBoxView.js"></script>
+	<script src="/{{.root}}/js/views/indexesView.js"></script>
+	<script src="/{{.root}}/js/router.js"></script>
+	<script src="/{{.root}}/js/modal.js"></script>
+	<script src="/{{.root}}/js/app.js"></script>
+	
+				</div>
+			</core-drawer-panel>
+		</template>
+		
+		<script>
+		    var jwt=""
+		    var t = document.querySelector('template');
+		    t.login = function(e) {
+		      document.querySelector('core-drawer-panel').togglePanel()
+		    }
+			t.panelSelectedChanged=function(){
+             console.log('panelSelectedChange', this.panelSelected)
+			}
+			t.addEventListener('template-bound', function() {
+    			document.querySelector('core-drawer-panel').addEventListener('core-select', function(e) {
+					if (!e.detail.isSelected) return
+					if (e.target.selected!='main') return
+					var j=document.querySelector('jwt-tiedot')
+			  		j.submit(function(j){
+						jwt=j
+						window.location='#'
+						tiedotApp.initialize()
+						tiedotApp.router.index()
+					})
+			  		jwt=j.jwt
+    			})
+  			})
+			t.addEventListener('template-bound', function () {
+			    	document.querySelector('core-drawer-panel').togglePanel()
+			});
+			
+		</script>
+		
+
+		
+	</body>
+</html>

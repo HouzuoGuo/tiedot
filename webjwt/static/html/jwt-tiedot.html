@@ -1,0 +1,77 @@
+<polymer-element name="jwt-tiedot" attributes="jwt">
+	<template>
+        <style>
+		    body{
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+                font-family: 'RobotoDraft', sans-serif;
+            }
+		</style>
+		<core-localstorage name="id" value="{{id2}}"></core-localstorage>
+		<core-localstorage name="password" value="{{password}}"></core-localstorage>
+		<core-localstorage name="jwt" value="{{jwt}}"></core-localstorage>
+		<section style="margin:0px 10px;">
+	        <paper-input label="ID" value="{{id2}}"></paper-input> <br/>
+	        <paper-input label="Password" value="{{password}}" type="password"></paper-input> <br/>
+			<!--paper-fab style="margin-left:100px" icon="send" on-tap="{{submit}}"></paper-fab-->
+		</section>
+    </template>
+    <script>
+        Polymer('jwt-tiedot', {
+			
+			id2:"",
+			password:"",
+			jwt:"",
+			
+			getJwt : function (data, fn) {
+			    var xhr = new XMLHttpRequest()
+			    xhr.open('POST', '/getJwt', true)
+			    xhr.responseType = 'json'
+			    xhr.onload = function(e) {
+					  if (e.target.status == 200) {
+						  this.jwt=e.target.getResponseHeader("Authorization")
+						  fn(this.jwt)
+					  }
+			    }.bind(this)
+			    xhr.send(data)
+			},
+			
+			checkJwt : function () {
+			    var xhr = new XMLHttpRequest()
+			    xhr.open('GET', '/checkJwt', true)
+			    xhr.setRequestHeader ("Authorization", this.jwt)
+			    xhr.responseType = 'json'
+			    xhr.onload = function(e) {
+					if (this.status == 200) {
+						//console.log(this.getResponseHeader("Authorization"))
+					}
+			    }.bind(this)
+			    xhr.send();
+			},
+			
+			jwTiedot : function () {
+			    var xhr = new XMLHttpRequest();
+			    xhr.open('GET', '/all', true)
+			    xhr.setRequestHeader ("Authorization", this.jwt)
+			    xhr.responseType = 'json'
+			    xhr.onload = function(e) {
+				    if (this.status == 200) {
+				        //console.log(this.getResponseHeader("Authorization"))
+				    }
+			    }
+			    xhr.send()
+			},
+					
+			submit:function(fn){
+				if(this.shadowRoot.querySelector('.invalid')) return
+                var data = new FormData();
+                data.append("id",this.id2)
+			    data.append("password",this.password)
+                this.getJwt(data, fn)	
+            }
+		        
+		})
+    </script>
+</polymer-element>

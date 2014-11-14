@@ -7,7 +7,7 @@ import (
 	"github.com/HouzuoGuo/tiedot/httpapi"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"github.com/HouzuoGuo/tiedot/webcp"
-	"log"
+	"github.com/HouzuoGuo/tiedot/webjwt"
 	"os"
 	"os/signal"
 	"runtime"
@@ -25,17 +25,19 @@ func main() {
 	// Parse CLI parameters
 	var mode, dir string
 	var port, maxprocs int
-	var profile, debug bool
+	var profile, debug, jwt bool
 	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|example]")
 	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
 	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
 	flag.StringVar(&webcp.WebCp, "webcp", "admin", "(HTTP API) web control panel route (without leading slash)")
+	flag.StringVar(&webjwt.WebCp, "webjwt", "admin", "(HTTP API) web control panel route (without leading slash)")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
 	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
 	flag.BoolVar(&profile, "profile", false, "Write profiler results to prof.out")
 	flag.BoolVar(&debug, "debug", false, "Dump goroutine stack traces upon receiving interrupt signal")
 	flag.BoolVar(&tdlog.VerboseLog, "verbose", false, "Turn verbose logging on/off")
 	flag.BoolVar(&benchCleanup, "benchcleanup", true, "Whether to clean up (delete benchmark DB) after benchmark")
+	flag.BoolVar(&jwt, "jwt", false, "Enable JWT validation")
 	flag.Parse()
 
 	// User must specify a mode to run
@@ -55,7 +57,8 @@ func main() {
 	if profile {
 		resultFile, err := os.Create("perf.out")
 		if err != nil {
-			log.Panicf("Cannot create profiler result file %s", resultFile)
+			tdlog.Noticef("Cannot create profiler result file %s", resultFile)
+			return
 		}
 		pprof.StartCPUProfile(resultFile)
 		defer pprof.StopCPUProfile()
@@ -75,16 +78,18 @@ func main() {
 	switch mode {
 	case "httpd": // Run HTTP API server
 		if dir == "" {
-			tdlog.Panicf("Please specify database directory, for example -dir=/tmp/db")
+			tdlog.Notice("Please specify database directory, for example -dir=/tmp/db")
+			return
 		}
 		if port == 0 {
-			tdlog.Panicf("Please specify port number, for example -port=8080")
+			tdlog.Notice("Please specify port number, for example -port=8080")
+			return
 		}
 		db, err := db.OpenDB(dir)
 		if err != nil {
 			panic(err)
 		}
-		httpapi.Start(db, port)
+		httpapi.Start(db, port, jwt)
 	case "example": // Run embedded usage examples
 		embeddedExample()
 	case "bench": // Benchmark scenarios

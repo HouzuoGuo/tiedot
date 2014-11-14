@@ -1,0 +1,53 @@
+/* Move down content because we have a fixed navbar that is 50px tall */
+body {
+  padding-top: 50px;
+}
+
+/*
+ * Main content
+ */
+.main {
+	margin-top: 20px;
+}
+.search-link {
+	margin: 5px;
+}
+#app {
+	width: 100%;
+}
+#json {
+	font-size: 16px;
+}
+#query-box {
+	height: 0px;
+	overflow: hidden;
+	transition: height .4s;
+	border-bottom: 1px solid #cccccc;
+}
+#query-box button {
+	margin: 10px 0 0 10px;
+}
+#query-box-editor {
+	margin-top: 10px;
+	font-size: 16px;
+	border: 1px solid #cccccc;
+}
+
+.collection-list .collection {
+	background-color: #eaeaea;
+	margin: 4px;
+	padding: 10px 20px;
+	width: 24%;
+	min-height: 100px;
+	display: inline-block;
+	color: #1863A3;
+	border: 1px solid #ccc;
+	border-radius: 6px;
+}
+.collection-list .collection:hover {
+	text-decoration: none;
+	background-color: #f0f0f0;
+}
+.collection-list .collection span {
+	color: #666666;
+}
