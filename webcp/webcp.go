@@ -16,7 +16,12 @@ import (
 	"time"
 )
 
-var WebCp string
+var (
+	WebCp string
+	HttpDB     *db.DB
+	privateKey []byte //openssl genrsa -out rsa 1024
+	publicKey  []byte //openssl rsa -in rsa -pubout > rsa.pub
+)
 
 func RegisterWebCp(db *db.DB) {
 	HttpDB = db
@@ -65,20 +70,6 @@ func handleWebCp(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 	}
 }
-
-type security struct {
-	user        string
-	group       string
-	roles       []string
-	permissions []string
-	secret      string
-}
-
-var (
-	HttpDB     *db.DB
-	privateKey []byte //openssl genrsa -out rsa 1024
-	publicKey  []byte //openssl rsa -in rsa -pubout > rsa.pub
-)
 
 func getJwt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
@@ -170,6 +161,10 @@ func Wrap(fn http.HandlerFunc, jwtFlag bool) http.HandlerFunc {
 			return
 		}
 		if !t.Valid {
+			return
+		}
+		if t.Claims["user"]=="admin" {
+			fn(w, r)
 			return
 		}
 		if test(t.Claims["groups"], "group1") &&
