@@ -24,18 +24,18 @@ func RegisterWebCp(db *db.DB) {
 		tdlog.Noticef("Web control panel is disabled on your request")
 		return
 	}
-	
+
 	http.HandleFunc("/"+WebCp, handleWebCp)
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		w.Write(rice.MustFindBox("static/img").MustBytes("favicon.ico"))
 	})
-	
+
 	http.Handle("/"+WebCp+"/bower_components/", http.StripPrefix("/"+WebCp+"/bower_components/", http.FileServer(rice.MustFindBox("static/bower_components").HTTPBox())))
 	http.Handle("/"+WebCp+"/html/", http.StripPrefix("/"+WebCp+"/html/", http.FileServer(rice.MustFindBox("static/html").HTTPBox())))
 	http.Handle("/"+WebCp+"/css/", http.StripPrefix("/"+WebCp+"/css/", http.FileServer(rice.MustFindBox("static/css").HTTPBox())))
 	http.Handle("/"+WebCp+"/js/", http.StripPrefix("/"+WebCp+"/js/", http.FileServer(rice.MustFindBox("static/js").HTTPBox())))
 	tdlog.Noticef("Web control panel is accessible at /%s", WebCp)
-	
+
 	http.HandleFunc("/getJwt", getJwt)
 	http.HandleFunc("/checkJwt", checkJwt)
 }
@@ -59,12 +59,9 @@ func handleWebCp(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	if err := tmpl.Execute(w, map[string]interface{}{
-			"root": WebCp, 
-			"templates": template.HTML(templatesString), 
-			"login":"{{login}}",
-			"submit":"{{submit}}",
-			"panelSelected":"{{panelSelected}}",
-			"jwt":"{{jwt}}" }); err != nil {
+			"root": WebCp,
+			"templates": template.HTML(templatesString),
+			"login":"{{login}}" }); err != nil {
 			panic(err)
 	}
 }

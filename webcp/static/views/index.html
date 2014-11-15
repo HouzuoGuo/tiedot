@@ -30,7 +30,7 @@
 	<body>
 		<template is="auto-binding">
 
-			<core-drawer-panel drawerWidth="180px" rightDrawer forceNarrow selected="{{.panelSelected}}">
+			<core-drawer-panel drawerWidth="180px" rightDrawer forceNarrow>
 	  			<div drawer style="background:white;">
 					<core-toolbar>
 				  		<div flex>Login</div>
@@ -39,67 +39,64 @@
 					<jwt-tiedot></jwt-tiedot>
 				</div>
 				<div main>
-				
-				<core-toolbar>
-			  		<div flex><a class="navbar-brand" href="#">Tiedot</a></div>
-			  		<core-icon-button icon="perm-identity" on-tap="{{.login}}"></core-icon-button>
-				</core-toolbar>
 
-	<div class="container-fluid">
-		<div id="query-box" class="query-box row">
-			<div class="col-sm-12">
-				<div id="query-box-editor">&nbsp;</div>
-				<p class="pull-right">
-					<button type="button" class="btn btn-danger btn-lg cancel">Close</button>
-					<button type="button" class="btn btn-success btn-lg query">Execute</button>
-				</p>
-				<a href="https://github.com/HouzuoGuo/tiedot/wiki/Query-processor-and-index" target="_blank">Query Help</a>
-			</div>
-		</div>
-		<div class="row">
-			<div id="main" class="col-sm-12 main">
-				<div id="app">&nbsp;</div>
-			</div>
-		</div>
-	</div>
-	
-	<div id="modal" class="modal fade" role="dialog" aria-hidden="true">
-		<div class="modal-dialog modal-sm">
-		    <div id="modal-content" class="modal-content">&nbsp;</div>
-    	</div>
-	</div>
+					<core-toolbar>
+				  		<div flex><a class="navbar-brand" href="#">Tiedot</a></div>
+				  		<core-icon-button icon="perm-identity" on-tap="{{.login}}"></core-icon-button>
+					</core-toolbar>
 
-	{{.templates}}
-	
-	<script src="/{{.root}}/js/models/collection.js"></script>
-	<script src="/{{.root}}/js/models/collectionList.js"></script>
-	<script src="/{{.root}}/js/models/document.js"></script>
-	<script src="/{{.root}}/js/models/documentList.js"></script>
-	<script src="/{{.root}}/js/models/index.js"></script>
-	<script src="/{{.root}}/js/models/indexList.js"></script>
-	<script src="/{{.root}}/js/views/collectionListView.js"></script>
-	<script src="/{{.root}}/js/views/collectionView.js"></script>
-	<script src="/{{.root}}/js/views/documentView.js"></script>
-	<script src="/{{.root}}/js/views/queryResultView.js"></script>
-	<script src="/{{.root}}/js/views/queryBoxView.js"></script>
-	<script src="/{{.root}}/js/views/indexesView.js"></script>
-	<script src="/{{.root}}/js/router.js"></script>
-	<script src="/{{.root}}/js/modal.js"></script>
-	<script src="/{{.root}}/js/app.js"></script>
-	
+					<div class="container-fluid">
+						<div id="query-box" class="query-box row">
+							<div class="col-sm-12">
+								<div id="query-box-editor">&nbsp;</div>
+								<p class="pull-right">
+									<button type="button" class="btn btn-danger btn-lg cancel">Close</button>
+									<button type="button" class="btn btn-success btn-lg query">Execute</button>
+								</p>
+								<a href="https://github.com/HouzuoGuo/tiedot/wiki/Query-processor-and-index" target="_blank">Query Help</a>
+							</div>
+						</div>
+						<div class="row">
+							<div id="main" class="col-sm-12 main">
+								<div id="app">&nbsp;</div>
+							</div>
+						</div>
+					</div>
+
+					<div id="modal" class="modal fade" role="dialog" aria-hidden="true">
+						<div class="modal-dialog modal-sm">
+						    <div id="modal-content" class="modal-content">&nbsp;</div>
+				    	</div>
+					</div>
+
+					{{.templates}}
+
+					<script src="/{{.root}}/js/models/collection.js"></script>
+					<script src="/{{.root}}/js/models/collectionList.js"></script>
+					<script src="/{{.root}}/js/models/document.js"></script>
+					<script src="/{{.root}}/js/models/documentList.js"></script>
+					<script src="/{{.root}}/js/models/index.js"></script>
+					<script src="/{{.root}}/js/models/indexList.js"></script>
+					<script src="/{{.root}}/js/views/collectionListView.js"></script>
+					<script src="/{{.root}}/js/views/collectionView.js"></script>
+					<script src="/{{.root}}/js/views/documentView.js"></script>
+					<script src="/{{.root}}/js/views/queryResultView.js"></script>
+					<script src="/{{.root}}/js/views/queryBoxView.js"></script>
+					<script src="/{{.root}}/js/views/indexesView.js"></script>
+					<script src="/{{.root}}/js/router.js"></script>
+					<script src="/{{.root}}/js/modal.js"></script>
+					<script src="/{{.root}}/js/app.js"></script>
+
 				</div>
 			</core-drawer-panel>
 		</template>
-		
+
 		<script>
 		    var jwt=""
 		    var t = document.querySelector('template');
 		    t.login = function(e) {
 		      document.querySelector('core-drawer-panel').togglePanel()
 		    }
-			t.panelSelectedChanged=function(){
-             console.log('panelSelectedChange', this.panelSelected)
-			}
 			t.addEventListener('template-bound', function() {
     			document.querySelector('core-drawer-panel').addEventListener('core-select', function(e) {
 					if (!e.detail.isSelected) return
@@ -117,10 +114,10 @@
 			t.addEventListener('template-bound', function () {
 			    	document.querySelector('core-drawer-panel').togglePanel()
 			});
-			
-		</script>
-		
 
-		
+		</script>
+
+
+
 	</body>
 </html>
