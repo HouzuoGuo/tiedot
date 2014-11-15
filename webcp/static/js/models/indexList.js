@@ -8,7 +8,8 @@ App.IndexList = Backbone.Collection.extend({
 		var self = this;
 		
 		Backbone.ajax({
-			url: this.url()
+			url: this.url(),
+			headers: {'Authorization':jwt}
 		})
 		.done(function(res) {
 			var data = res;

@@ -10,7 +10,8 @@ App.Index = Backbone.Model.extend({
 	
 	save: function() {
 		Backbone.ajax({
-			url: this.createUrl()
+			url: this.createUrl(),
+			headers: {'Authorization':jwt}
 		})
 		.done(function(res) {
 			tiedotApp.notify('success', 'Index created successfully!');
@@ -24,7 +25,8 @@ App.Index = Backbone.Model.extend({
 		var self = this;
 		
 		Backbone.ajax({
-			url: this.removeUrl()
+			url: this.removeUrl(),
+			headers: {'Authorization':jwt}
 		})
 		.done(function(res) {
 			tiedotApp.notify('success', 'Index deleted successfully!');

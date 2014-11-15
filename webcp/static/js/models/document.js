@@ -16,13 +16,14 @@ App.Document = Backbone.Model.extend({
 	deleteUrl: function() {
 		return '/delete?col=' + this.collectionName + '&id=' + this.id;
 	},
-	
+
 	save: function(json) {
 		var self = this;
 		
 		if (this.id) {
 			Backbone.ajax({
-				url: this.saveUrl(JSON.stringify(json))
+				url: this.saveUrl(JSON.stringify(json)),
+				headers: {'Authorization':jwt}
 			})
 			.done(function(res) {
 				tiedotApp.notify('success', 'Document updated successfully!');
@@ -32,7 +33,8 @@ App.Document = Backbone.Model.extend({
 			});
 		} else {
 			Backbone.ajax({
-				url: this.insertUrl(JSON.stringify(json))
+				url: this.insertUrl(JSON.stringify(json)),
+				headers: {'Authorization':jwt}
 			})
 			.done(function(res) {
 				tiedotApp.router.navigate('docs/' + self.collectionName + '/' + res, { trigger: true });
@@ -43,12 +45,13 @@ App.Document = Backbone.Model.extend({
 			});
 		}
 	},
-
+    
 	destroy: function() {
 		var self = this;
 		
 		Backbone.ajax({
-			url: this.deleteUrl()
+			url: this.deleteUrl(),
+			headers: {'Authorization':jwt}
 		})
 		.done(function(res) {
 			tiedotApp.router.navigate('cols/' + self.collectionName, { trigger: true });

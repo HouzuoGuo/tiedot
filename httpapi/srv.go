@@ -6,7 +6,6 @@ import (
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"github.com/HouzuoGuo/tiedot/webcp"
-	"github.com/HouzuoGuo/tiedot/webjwt"
 	"net/http"
 )
 
@@ -29,45 +28,39 @@ func Start(db *db.DB, port int, jwtFlag bool) {
 	HttpDB = db
 
 	// collection management (stop-the-world)
-	http.HandleFunc("/create", webjwt.Wrap(Create, jwtFlag))
-	http.HandleFunc("/rename", webjwt.Wrap(Rename, jwtFlag))
-	http.HandleFunc("/drop", webjwt.Wrap(Drop, jwtFlag))
-	http.HandleFunc("/all", webjwt.Wrap(All, jwtFlag))
-	http.HandleFunc("/scrub", webjwt.Wrap(Scrub, jwtFlag))
-	http.HandleFunc("/sync", webjwt.Wrap(Sync, jwtFlag))
-
+	http.HandleFunc("/create", webcp.Wrap(Create, jwtFlag))
+	http.HandleFunc("/rename", webcp.Wrap(Rename, jwtFlag))
+	http.HandleFunc("/drop", webcp.Wrap(Drop, jwtFlag))
+	http.HandleFunc("/all", webcp.Wrap(All, jwtFlag))
+	http.HandleFunc("/scrub", webcp.Wrap(Scrub, jwtFlag))
+	http.HandleFunc("/sync", webcp.Wrap(Sync, jwtFlag))
 	// query
-	http.HandleFunc("/query", webjwt.Wrap(Query, jwtFlag))
-	http.HandleFunc("/count", webjwt.Wrap(Count, jwtFlag))
-
+	http.HandleFunc("/query", webcp.Wrap(Query, jwtFlag))
+	http.HandleFunc("/count", webcp.Wrap(Count, jwtFlag))
 	// document management
-	http.HandleFunc("/insert", webjwt.Wrap(Insert, jwtFlag))
-	http.HandleFunc("/get", webjwt.Wrap(Get, jwtFlag))
-	http.HandleFunc("/getpage", webjwt.Wrap(GetPage, jwtFlag))
-	http.HandleFunc("/update", webjwt.Wrap(Update, jwtFlag))
-	http.HandleFunc("/delete", webjwt.Wrap(Delete, jwtFlag))
-	http.HandleFunc("/approxdoccount", webjwt.Wrap(ApproxDocCount, jwtFlag))
-
+	http.HandleFunc("/insert", webcp.Wrap(Insert, jwtFlag))
+	http.HandleFunc("/get", webcp.Wrap(Get, jwtFlag))
+	http.HandleFunc("/getpage", webcp.Wrap(GetPage, jwtFlag))
+	http.HandleFunc("/update", webcp.Wrap(Update, jwtFlag))
+	http.HandleFunc("/delete", webcp.Wrap(Delete, jwtFlag))
+	http.HandleFunc("/approxdoccount", webcp.Wrap(ApproxDocCount, jwtFlag))
 	// index management (stop-the-world)
-	http.HandleFunc("/index", webjwt.Wrap(Index, jwtFlag))
-	http.HandleFunc("/indexes", webjwt.Wrap(Indexes, jwtFlag))
-	http.HandleFunc("/unindex", webjwt.Wrap(Unindex, jwtFlag))
-
+	http.HandleFunc("/index", webcp.Wrap(Index, jwtFlag))
+	http.HandleFunc("/indexes", webcp.Wrap(Indexes, jwtFlag))
+	http.HandleFunc("/unindex", webcp.Wrap(Unindex, jwtFlag))
 	// misc (stop-the-world)
-	http.HandleFunc("/shutdown", webjwt.Wrap(Shutdown, jwtFlag))
-	http.HandleFunc("/dump", webjwt.Wrap(Dump, jwtFlag))
-
+	http.HandleFunc("/shutdown", webcp.Wrap(Shutdown, jwtFlag))
+	http.HandleFunc("/dump", webcp.Wrap(Dump, jwtFlag))
 	// misc
-	http.HandleFunc("/version", webjwt.Wrap(Version, jwtFlag))
-	http.HandleFunc("/memstats", webjwt.Wrap(MemStats, jwtFlag))
-
+	http.HandleFunc("/version", webcp.Wrap(Version, jwtFlag))
+	http.HandleFunc("/memstats", webcp.Wrap(MemStats, jwtFlag))
 	// web control panel
+	webcp.RegisterWebCp(HttpDB)
+	
 	tdlog.Noticef("Will listen on all interfaces, port %d", port)
 	if jwtFlag == false {
-		webcp.RegisterWebCp()
 		http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	} else {
-		webjwt.RegisterWebJwt(HttpDB)
 		//openssl req -new -key rsa -out rsa.crt -x509 -days 3650 -subj "/C=/ST=/L=Earth/O=Tiedot/OU=IT/CN=localhost/emailAddress=admin@tiedot"
 		if e := http.ListenAndServeTLS(fmt.Sprintf(":%d", port), "rsa.crt", "rsa", nil); e != nil {
 			tdlog.Noticef("%s", e)

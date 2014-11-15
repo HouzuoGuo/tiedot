@@ -7,7 +7,6 @@ import (
 	"github.com/HouzuoGuo/tiedot/httpapi"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"github.com/HouzuoGuo/tiedot/webcp"
-	"github.com/HouzuoGuo/tiedot/webjwt"
 	"os"
 	"os/signal"
 	"runtime"
@@ -30,7 +29,6 @@ func main() {
 	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
 	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
 	flag.StringVar(&webcp.WebCp, "webcp", "admin", "(HTTP API) web control panel route (without leading slash)")
-	flag.StringVar(&webjwt.WebCp, "webjwt", "admin", "(HTTP API) web control panel route (without leading slash)")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
 	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
 	flag.BoolVar(&profile, "profile", false, "Write profiler results to prof.out")

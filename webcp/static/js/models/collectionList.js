@@ -8,7 +8,8 @@ App.CollectionList = Backbone.Collection.extend({
 		var self = this;
 		
 		Backbone.ajax({
-			url: this.url()
+			url: this.url(),
+			headers: {'Authorization':jwt}
 		})
 		.done(function(data) {
 			var cols = [];
@@ -28,7 +29,8 @@ App.CollectionList = Backbone.Collection.extend({
 	
 	setDocumentCount: function(col, el) {
 		Backbone.ajax({
-			url: '/approxdoccount?col=' + col
+			url: '/approxdoccount?col=' + col,
+			headers: {'Authorization':jwt}
 		})
 		.done(function(data) {
 			$(el).html(numeral(data).format('0,0') + ' documents (approx.)');

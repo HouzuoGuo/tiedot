@@ -15,6 +15,7 @@ App.AppView = Backbone.View.extend({
 		
 		$.ajax({
 			url: "/version",
+			headers: {'Authorization':jwt}
 		})
 		.done(function(res) {
 			$('.navbar-brand').html('Tiedot (API version ' + res + ')');

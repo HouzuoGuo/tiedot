@@ -34,7 +34,8 @@ App.DocumentList = Backbone.Collection.extend({
 			}
 
 			Backbone.ajax({
-				url: self.url()
+				url: self.url(),
+				headers: {'Authorization':jwt}
 			})
 			.done(function(res) {
 				var documents = [];
@@ -58,7 +59,8 @@ App.DocumentList = Backbone.Collection.extend({
 		var self = this;
 		
 		Backbone.ajax({
-			url: this.queryUrl(query)
+			url: this.queryUrl(query),
+			headers: {'Authorization':jwt}
 		})
 		.done(function(res) {
 			var documents = [];
@@ -81,7 +83,8 @@ App.DocumentList = Backbone.Collection.extend({
 		var self = this;
 
 		Backbone.ajax({
-			url: this.countUrl()
+			url: this.countUrl(),
+			headers: {'Authorization':jwt}
 		})
 		.done(function(res) {
 			callback(res);

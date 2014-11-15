@@ -20,7 +20,7 @@ App.DocumentView = Backbone.View.extend({
 		this.model.collectionName = this.col;
 		
 		if (this.model.id) {
-			this.model.fetch();
+			this.model.fetch({ headers: {'Authorization':jwt} })
 		} else {
 			this.renderNew();
 			this.delegateEvents();

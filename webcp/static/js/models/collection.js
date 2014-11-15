@@ -20,7 +20,8 @@ App.Collection = Backbone.Model.extend({
 		var self = this;
 		
 		Backbone.ajax({
-			url: this.saveUrl()
+			url: this.saveUrl(),
+			headers: {'Authorization':jwt}
 		})
 		.done(function(res) {
 			tiedotApp.router.navigate('cols/' + self.id, { trigger: true });
@@ -35,7 +36,8 @@ App.Collection = Backbone.Model.extend({
 		var self = this;
 
 		Backbone.ajax({
-			url: this.scrubUrl()
+			url: this.scrubUrl(),
+			headers: {'Authorization':jwt}
 		})
 		.done(function(res) {
 			tiedotApp.router.navigate('cols/' + self.id, { trigger: true });
@@ -52,7 +54,8 @@ App.Collection = Backbone.Model.extend({
 		var self = this;
 		
 		Backbone.ajax({
-			url: this.renameUrl(name)
+			url: this.renameUrl(name),
+			headers: {'Authorization':jwt}
 		})
 		.done(function(res) {
 			self.set('id', name);
@@ -69,7 +72,8 @@ App.Collection = Backbone.Model.extend({
 		var self = this;
 		
 		Backbone.ajax({
-			url: this.deleteUrl()
+			url: this.deleteUrl(),
+			headers: {'Authorization':jwt}
 		})
 		.done(function(res) {
 			tiedotApp.router.navigate('/', { trigger: true });
