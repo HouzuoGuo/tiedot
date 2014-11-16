@@ -28,40 +28,42 @@ func Start(db *db.DB, port int, jwtFlag bool) {
 	HttpDB = db
 
 	// collection management (stop-the-world)
-	http.HandleFunc("/create", webcp.Wrap(Create, jwtFlag))
-	http.HandleFunc("/rename", webcp.Wrap(Rename, jwtFlag))
-	http.HandleFunc("/drop", webcp.Wrap(Drop, jwtFlag))
-	http.HandleFunc("/all", webcp.Wrap(All, jwtFlag))
-	http.HandleFunc("/scrub", webcp.Wrap(Scrub, jwtFlag))
-	http.HandleFunc("/sync", webcp.Wrap(Sync, jwtFlag))
+	http.HandleFunc("/create", wrap(Create, jwtFlag))
+	http.HandleFunc("/rename", wrap(Rename, jwtFlag))
+	http.HandleFunc("/drop", wrap(Drop, jwtFlag))
+	http.HandleFunc("/all", wrap(All, jwtFlag))
+	http.HandleFunc("/scrub", wrap(Scrub, jwtFlag))
+	http.HandleFunc("/sync", wrap(Sync, jwtFlag))
 	// query
-	http.HandleFunc("/query", webcp.Wrap(Query, jwtFlag))
-	http.HandleFunc("/count", webcp.Wrap(Count, jwtFlag))
+	http.HandleFunc("/query", wrap(Query, jwtFlag))
+	http.HandleFunc("/count", wrap(Count, jwtFlag))
 	// document management
-	http.HandleFunc("/insert", webcp.Wrap(Insert, jwtFlag))
-	http.HandleFunc("/get", webcp.Wrap(Get, jwtFlag))
-	http.HandleFunc("/getpage", webcp.Wrap(GetPage, jwtFlag))
-	http.HandleFunc("/update", webcp.Wrap(Update, jwtFlag))
-	http.HandleFunc("/delete", webcp.Wrap(Delete, jwtFlag))
-	http.HandleFunc("/approxdoccount", webcp.Wrap(ApproxDocCount, jwtFlag))
+	http.HandleFunc("/insert", wrap(Insert, jwtFlag))
+	http.HandleFunc("/get", wrap(Get, jwtFlag))
+	http.HandleFunc("/getpage", wrap(GetPage, jwtFlag))
+	http.HandleFunc("/update", wrap(Update, jwtFlag))
+	http.HandleFunc("/delete", wrap(Delete, jwtFlag))
+	http.HandleFunc("/approxdoccount", wrap(ApproxDocCount, jwtFlag))
 	// index management (stop-the-world)
-	http.HandleFunc("/index", webcp.Wrap(Index, jwtFlag))
-	http.HandleFunc("/indexes", webcp.Wrap(Indexes, jwtFlag))
-	http.HandleFunc("/unindex", webcp.Wrap(Unindex, jwtFlag))
+	http.HandleFunc("/index", wrap(Index, jwtFlag))
+	http.HandleFunc("/indexes", wrap(Indexes, jwtFlag))
+	http.HandleFunc("/unindex", wrap(Unindex, jwtFlag))
 	// misc (stop-the-world)
-	http.HandleFunc("/shutdown", webcp.Wrap(Shutdown, jwtFlag))
-	http.HandleFunc("/dump", webcp.Wrap(Dump, jwtFlag))
+	http.HandleFunc("/shutdown", wrap(Shutdown, jwtFlag))
+	http.HandleFunc("/dump", wrap(Dump, jwtFlag))
 	// misc
-	http.HandleFunc("/version", webcp.Wrap(Version, jwtFlag))
-	http.HandleFunc("/memstats", webcp.Wrap(MemStats, jwtFlag))
+	http.HandleFunc("/version", wrap(Version, jwtFlag))
+	http.HandleFunc("/memstats", wrap(MemStats, jwtFlag))
 	// web control panel
-	webcp.RegisterWebCp(HttpDB)
-	
+	webcp.RegisterWebCp()
+
 	tdlog.Noticef("Will listen on all interfaces, port %d", port)
 	if jwtFlag == false {
 		http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	} else {
 		//openssl req -new -key rsa -out rsa.crt -x509 -days 3650 -subj "/C=/ST=/L=Earth/O=Tiedot/OU=IT/CN=localhost/emailAddress=admin@tiedot"
+		http.HandleFunc("/getJwt", getJwt)
+	    http.HandleFunc("/checkJwt", checkJwt)
 		if e := http.ListenAndServeTLS(fmt.Sprintf(":%d", port), "rsa.crt", "rsa", nil); e != nil {
 			tdlog.Noticef("%s", e)
 		}
