@@ -13,6 +13,6 @@ func RegisterWebCp() {
 		tdlog.Noticef("Web control panel is disabled on your request")
 		return
 	}
-    http.Handle("/"+WebCp+"/", http.StripPrefix("/"+WebCp, http.FileServer(rice.MustFindBox("static").HTTPBox())))
+	http.Handle("/"+WebCp+"/", http.StripPrefix("/"+WebCp, http.FileServer(rice.MustFindBox("static").HTTPBox())))
 	tdlog.Noticef("Web control panel is accessible at /%s/", WebCp)
 }

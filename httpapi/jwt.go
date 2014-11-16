@@ -1,3 +1,18 @@
+/*
+{
+    "collections": [
+        "jwt",
+        "test"
+    ],
+    "paths": [
+        "all",
+        "update"
+    ],
+    "secret": "2jmj7l5rSw0yVb_vlWAYkK_YBwk=",
+    "user": "admin"
+}
+*/
+
 package httpapi
 
 import (
@@ -10,6 +25,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -41,19 +57,18 @@ func getJwt(w http.ResponseWriter, r *http.Request) {
 
 	sha := sha1.Sum([]byte(r.FormValue("password")))
 	secret := base64.URLEncoding.EncodeToString(sha[:20])
-	//tdlog.Noticef("%s", secret)
+	//tdlog.Notice(secret)
 	if doc["secret"] != secret {
 		http.Error(w, fmt.Sprint("Password invalid."), 404)
 		return
 	}
 
-	//tdlog.Noticef("%v", doc)
+	//tdlog.Notice(doc)
 
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 	token.Claims["user"] = doc["user"]
-	token.Claims["groups"] = doc["groups"]
-	token.Claims["roles"] = doc["roles"]
-	token.Claims["permissions"] = doc["permissions"]
+	token.Claims["collections"] = doc["collections"]
+	token.Claims["paths"] = doc["paths"]
 	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
 	var tokenString string
 	var e error
@@ -110,15 +125,19 @@ func wrap(fn http.HandlerFunc, jwtFlag bool) http.HandlerFunc {
 		if !t.Valid {
 			return
 		}
-		if t.Claims["user"]=="admin" {
+		if t.Claims["user"] == "admin" {
 			fn(w, r)
 			return
 		}
-		if test(t.Claims["groups"], "group1") &&
-			test(t.Claims["roles"], "role1") &&
-			test(t.Claims["permissions"], "permission1") {
-			tdlog.Noticef("%v", t)
+
+		var url = strings.TrimPrefix(r.URL.Path, "/")
+		var col = r.FormValue("col")
+
+		if test(t.Claims["paths"], url) &&
+			test(t.Claims["collections"], col) {
 			fn(w, r)
+			//tdlog.Notice(url, " ", col)
+			//tdlog.Notice(t)
 		}
 	}
 }

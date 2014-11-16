@@ -3,8 +3,8 @@ package main
 import (
 	jwt "github.com/dgrijalva/jwt-go"
 	"io/ioutil"
-	"time"
 	"testing"
+	"time"
 )
 
 var (
@@ -35,7 +35,7 @@ func check(t *testing.T, ts string) {
 	var token *jwt.Token
 	if token, err = jwt.Parse(ts, func(ts *jwt.Token) (interface{}, error) {
 		return publicKey, nil
-	}); err !=nil { 
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if token.Valid {
