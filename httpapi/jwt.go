@@ -135,13 +135,13 @@ func wrap(fn http.HandlerFunc, jwtFlag bool) http.HandlerFunc {
 		var url = strings.TrimPrefix(r.URL.Path, "/")
 		if !test(t.Claims["paths"], url) {
 			return
-			//tdlog.Notice(url, " ", col)
-			//tdlog.Notice(t)
 		}
 		var col = r.FormValue("col")
 		if col != "" && !test(t.Claims["collections"], col) {
 			return
 		}
+		//tdlog.Notice(t)
+		//tdlog.Notice(url, " ", col)
 		fn(w, r)
 	}
 }
