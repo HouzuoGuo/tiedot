@@ -1,4 +1,7 @@
 /*
+Login with the id (integer) of the document saved in the jwt collection.
+User admin has root access.
+
 {
     "collections": [
         "jwt",
@@ -6,7 +9,7 @@
     ],
     "paths": [
         "all",
-        "update"
+        "version"
     ],
     "secret": "2jmj7l5rSw0yVb_vlWAYkK_YBwk=",
     "user": "admin"
@@ -129,16 +132,17 @@ func wrap(fn http.HandlerFunc, jwtFlag bool) http.HandlerFunc {
 			fn(w, r)
 			return
 		}
-
 		var url = strings.TrimPrefix(r.URL.Path, "/")
-		var col = r.FormValue("col")
-
-		if test(t.Claims["paths"], url) &&
-			test(t.Claims["collections"], col) {
-			fn(w, r)
+		if !test(t.Claims["paths"], url) {
+			return
 			//tdlog.Notice(url, " ", col)
 			//tdlog.Notice(t)
 		}
+		var col = r.FormValue("col")
+		if col != "" && !test(t.Claims["collections"], col) {
+			return
+		}
+		fn(w, r)
 	}
 }
 
