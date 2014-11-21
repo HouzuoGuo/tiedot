@@ -1,5 +1,5 @@
 Name:		tiedot
-Version:	3.1
+Version:	3.1.1
 Release:	1%{?dist}
 License:	BSD-2-Clause
 Summary:	A NoSQL document database engine powered by Go
