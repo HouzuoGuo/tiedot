@@ -61,6 +61,7 @@ func Start(db *db.DB, port int, jwtFlag bool) {
 	if jwtFlag == false {
 		http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	} else {
+		jwtInitSetup()
 		//openssl req -new -key rsa -out rsa.crt -x509 -days 3650 -subj "/C=/ST=/L=Earth/O=Tiedot/OU=IT/CN=localhost/emailAddress=admin@tiedot"
 		http.HandleFunc("/getJwt", getJwt)
 		http.HandleFunc("/checkJwt", checkJwt)
