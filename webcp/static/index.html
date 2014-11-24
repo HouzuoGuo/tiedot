@@ -25,19 +25,19 @@
 		<script src="js/lib/backbone-min.js"></script>
 		<script src="js/lib/numeral.js"></script>
 		<script src="js/lib/ace/ace.js"></script>
+		<script src="js/lib/sha512.js"></script>
 		<script type="text/javascript">var App = {}</script>
 	</head>
 
 	<body>
 		<template is="auto-binding">
-
 			<core-drawer-panel drawerWidth="180px" rightDrawer forceNarrow>
 	  			<div drawer style="background:white;">
 					<core-toolbar>
 				  		<div flex>Login</div>
 				  		<core-icon-button icon="perm-identity" on-tap="{{login}}"></core-icon-button>
 					</core-toolbar>
-					<jwt-tiedot></jwt-tiedot>
+					<jwt-tiedot enc=""></jwt-tiedot>
 				</div>
 				<div main>
 

@@ -33,8 +33,8 @@ The special user identity "admin" allows access to all features and collection d
 package httpapi
 
 import (
-	"crypto/sha1"
-	"encoding/base64"
+	//"crypto/sha1"
+	//"encoding/base64"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
@@ -93,7 +93,7 @@ func jwtInitSetup() {
 	if len(adminQueryResult) == 0 {
 		if _, err := jwtCol.Insert(map[string]interface{}{
 			JWT_ID_ATTR:   JWT_ADMIN_ID,
-			JWT_PASS_ATTR: "2jmj7l5rSw0yVb_vlWAYkK_YBwk="}); err != nil { // Pass is empty string
+			JWT_PASS_ATTR: "z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="}); err != nil { // Pass is empty string
 			tdlog.Panicf("JWT: failed to create default admin user - %v", err)
 		}
 	}
@@ -124,13 +124,15 @@ func getJwt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Verify password
-	sha := sha1.Sum([]byte(r.FormValue("password")))
-	pass := base64.URLEncoding.EncodeToString(sha[:20])
+	// sha := sha1.Sum([]byte(r.FormValue("password")))
+	// pass := base64.URLEncoding.EncodeToString(sha[:20])
+	pass := r.FormValue("password")
 	for recID, _ := range idQueryResult {
 		rec, err := jwtCol.Read(recID)
 		if err != nil {
 			break
-		} else if rec[JWT_PASS_ATTR] != pass {
+		}
+		if rec[JWT_PASS_ATTR] != pass {
 			tdlog.CritNoRepeat("JWT: identitify verification failed from request sent by %s", r.RemoteAddr)
 			break
 		}
@@ -160,10 +162,10 @@ func checkJwt(w http.ResponseWriter, r *http.Request) {
 		return publicKey, nil
 	})
 	if token.Valid {
-		//log.Printf("%v", token)
+		//log.Print(token)
 		//fmt.Fprintf(w, "{\"object\": %v}", token)
 	} else {
-		tdlog.Noticef("%v", err)
+		tdlog.Notice(err)
 		fmt.Fprintf(w, "{\"error\": \"%s %s\"}", "JWT not valid,", err)
 	}
 }
