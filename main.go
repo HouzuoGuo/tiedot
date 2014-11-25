@@ -3,10 +3,8 @@ package main
 
 import (
 	"flag"
-	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/httpapi"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"github.com/HouzuoGuo/tiedot/webcp"
 	"os"
 	"os/signal"
 	"runtime"
@@ -22,26 +20,43 @@ func main() {
 	}
 
 	// Parse CLI parameters
-	var mode, dir string
-	var port, maxprocs int
-	var profile, debug, jwt bool
+
+	// General params
+	var mode string
+	var maxprocs int
 	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|example]")
-	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
-	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
-	flag.StringVar(&webcp.WebCp, "webcp", "admin", "(HTTP API) web control panel route (without leading slash)")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
-	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
+	// Debug params
+	var profile, debug bool
+	flag.BoolVar(&tdlog.VerboseLog, "verbose", false, "Turn verbose logging on/off")
 	flag.BoolVar(&profile, "profile", false, "Write profiler results to prof.out")
 	flag.BoolVar(&debug, "debug", false, "Dump goroutine stack traces upon receiving interrupt signal")
-	flag.BoolVar(&tdlog.VerboseLog, "verbose", false, "Turn verbose logging on/off")
+	// HTTP mode params
+	var dir string
+	var port int
+	var webcpRoute, sslCrt, sslKey string
+	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
+	flag.StringVar(&webcpRoute, "webcp", "admin", "(HTTP API) web control panel route (without leading slash), 'no' to disable.")
+	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
+	flag.StringVar(&sslCrt, "sslcrt", "", "(HTTP API) SSL certificate (SSL is optional, empty to disable).")
+	flag.StringVar(&sslKey, "sslkey", "", "(HTTP API) SSL certificate key (SSL is optional, empty to disable).")
+
+	// HTTP + JWT params
+	var enableJWT bool
+	var jwtPubKey, jwtPrivateKey string
+	flag.BoolVar(&enableJWT, "jwt", false, "(HTTP with JWT) Enable JSON Web Token on all API endpoints along with HTTP SSL.")
+	flag.StringVar(&jwtPubKey, "jwtpubkey", "", "(HTTP with JWT) Public key for signing tokens")
+	flag.StringVar(&jwtPrivateKey, "jwtprivatekey", "", "(HTTP with JWT) Private key for decoding tokens")
+
+	// Benchmark mode params
+	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
 	flag.BoolVar(&benchCleanup, "benchcleanup", true, "Whether to clean up (delete benchmark DB) after benchmark")
-	flag.BoolVar(&jwt, "jwt", false, "Enable JWT validation")
 	flag.Parse()
 
 	// User must specify a mode to run
 	if mode == "" {
 		flag.PrintDefaults()
-		return
+		os.Exit(1)
 	}
 
 	// Set appropriate GOMAXPROCS
@@ -56,7 +71,7 @@ func main() {
 		resultFile, err := os.Create("perf.out")
 		if err != nil {
 			tdlog.Noticef("Cannot create profiler result file %s", resultFile)
-			return
+			os.Exit(1)
 		}
 		pprof.StartCPUProfile(resultFile)
 		defer pprof.StopCPUProfile()
@@ -74,23 +89,27 @@ func main() {
 	}
 
 	switch mode {
-	case "httpd": // Run HTTP API server
+	case "httpd":
+		// Run HTTP API server
 		if dir == "" {
 			tdlog.Notice("Please specify database directory, for example -dir=/tmp/db")
-			return
-		}
-		if port == 0 {
+			os.Exit(1)
+		} else if port == 0 {
 			tdlog.Notice("Please specify port number, for example -port=8080")
-			return
+			os.Exit(1)
+		} else if sslCrt != "" && sslKey == "" {
+			tdlog.Notice("To enable HTTP SSL, please specify both SSL certificate and key file.")
+			os.Exit(1)
+		} else if enableJWT && (sslCrt == "" || sslKey == "" || jwtPrivateKey == "" || jwtPubKey == "") {
+			tdlog.Notice("To enable JWT, please specify HTTP SSL certificate/key, as well as JWT private/public key.")
+			os.Exit(1)
 		}
-		db, err := db.OpenDB(dir)
-		if err != nil {
-			panic(err)
-		}
-		httpapi.Start(db, port, jwt)
-	case "example": // Run embedded usage examples
+		httpapi.Start(dir, port, sslCrt, sslKey, webcpRoute, enableJWT, jwtPubKey, jwtPrivateKey)
+	case "example":
+		// Run embedded usage examples
 		embeddedExample()
-	case "bench": // Benchmark scenarios
+	case "bench":
+		// Benchmark scenarios
 		benchmark()
 	case "bench2":
 		benchmark2()

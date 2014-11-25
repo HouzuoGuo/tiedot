@@ -5,7 +5,7 @@ The package creates, serves, and verifies JWT used by HTTP clients.
 JWT authentication identities are stored in documents of collection "jwt", each document record should look like:
 {
 	"id": "the_login_identity",
-	"password": "plain_text_password",
+	"password": "hashed_password_sha512",
 	"endpoints": [
 		"create",
 		"drop",
@@ -41,7 +41,6 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 	"strings"
 	"time"
 )
@@ -92,10 +91,14 @@ func jwtInitSetup() {
 	}
 	if len(adminQueryResult) == 0 {
 		if _, err := jwtCol.Insert(map[string]interface{}{
-			JWT_ID_ATTR:   JWT_ADMIN_ID,
-			JWT_PASS_ATTR: "z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="}); err != nil { // Pass is empty string
+			JWT_ID_ATTR: JWT_ADMIN_ID,
+			// Pass is SHA512 of empty string
+			JWT_PASS_ATTR:        "z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
+			JWT_COLLECTIONS_ATTR: []interface{}{},
+			JWT_ENDPOINTS_ATTR:   []interface{}{}}); err != nil {
 			tdlog.Panicf("JWT: failed to create default admin user - %v", err)
 		}
+		tdlog.Notice("JWT: initialization ran successfully, the default user 'admin' has been created.")
 	}
 }
 
@@ -106,12 +109,12 @@ func getJwt(w http.ResponseWriter, r *http.Request) {
 	// Verify identity
 	id := r.FormValue(JWT_ID_ATTR)
 	if id == "" {
-		http.Error(w, "Please pass JWT 'id' parameter", 400)
+		http.Error(w, "Please pass JWT 'id' parameter", http.StatusBadRequest)
 		return
 	}
 	jwtCol := HttpDB.Use(JWT_COL_NAME)
 	if jwtCol == nil {
-		http.Error(w, "Server is missing JWT identity collection, please restart the server.", 500)
+		http.Error(w, "Server is missing JWT identity collection, please restart the server.", http.StatusInternalServerError)
 		return
 	}
 	idQuery := map[string]interface{}{
@@ -120,7 +123,7 @@ func getJwt(w http.ResponseWriter, r *http.Request) {
 	idQueryResult := make(map[int]struct{})
 	if err := db.EvalQuery(idQuery, jwtCol, &idQueryResult); err != nil {
 		tdlog.CritNoRepeat("JWT identity collection query failed: %v", err)
-		http.Error(w, "JWT identity collection query failed", 500)
+		http.Error(w, "JWT identity collection query failed", http.StatusInternalServerError)
 		return
 	}
 	// Verify password
@@ -152,9 +155,10 @@ func getJwt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// ... password mismatch
-	http.Error(w, "Invalid password", 401)
+	http.Error(w, "Invalid password", http.StatusUnauthorized)
 }
 
+// Verify user's JWT.
 func checkJwt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -162,70 +166,98 @@ func checkJwt(w http.ResponseWriter, r *http.Request) {
 		return publicKey, nil
 	})
 	if token.Valid {
-		//log.Print(token)
-		//fmt.Fprintf(w, "{\"object\": %v}", token)
+		w.WriteHeader(http.StatusOK)
 	} else {
-		tdlog.Notice(err)
-		fmt.Fprintf(w, "{\"error\": \"%s %s\"}", "JWT not valid,", err)
+		http.Error(w, fmt.Sprintf("{\"error\": \"%s %s\"}", "JWT not valid,", err), http.StatusUnauthorized)
 	}
 }
 
-func wrap(fn http.HandlerFunc, jwtFlag bool) http.HandlerFunc {
-	if jwtFlag == false {
-		return fn
-	}
-	var e error
-	if privateKey, e = ioutil.ReadFile("rsa"); e != nil {
-		tdlog.Panicf("%s", e)
-	}
-	if publicKey, e = ioutil.ReadFile("rsa.pub"); e != nil {
-		tdlog.Panicf("%s", e)
-	}
+// Enable JWT authorization check on the handler function.
+func jwtWrap(originalHandler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if origin := r.Header.Get("Origin"); origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
-		//w.Header().Set("Access-Control-Allow-Credentials", "true")
-		//w.Header().Set("Content-Type", "application/json")
 		t, _ := jwt.ParseFromRequest(r, func(token *jwt.Token) (interface{}, error) {
 			return publicKey, nil
 		})
 		if t == nil {
+			//			http.Error(w, "", http.StatusUnauthorized)
 			return
-		}
-		if !t.Valid {
+		} else if !t.Valid {
+			//			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
 		if t.Claims[JWT_ADMIN_ID] == JWT_ADMIN_ID {
-			fn(w, r)
+			originalHandler(w, r)
 			return
 		}
 		var url = strings.TrimPrefix(r.URL.Path, "/")
-		if !test(t.Claims[JWT_ENDPOINTS_ATTR], url) {
+		if !sliceContainsStr(t.Claims[JWT_ENDPOINTS_ATTR], url) {
+			//			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
 		var col = r.FormValue("col")
-		if col != "" && !test(t.Claims[JWT_COLLECTIONS_ATTR], col) {
+		if col != "" && !sliceContainsStr(t.Claims[JWT_COLLECTIONS_ATTR], col) {
+			//			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
-		//tdlog.Notice(t)
-		//tdlog.Notice(url, " ", col)
-		fn(w, r)
+		originalHandler(w, r)
 	}
 }
 
-func test(t interface{}, v string) bool {
-	switch reflect.TypeOf(t).Kind() {
-	case reflect.Slice:
-		s := reflect.ValueOf(t)
-		for i := 0; i < s.Len(); i++ {
-			if s.Index(i).Interface() == v {
+// Return true if the string appears in string slice.
+func sliceContainsStr(possibleSlice interface{}, str string) bool {
+	switch possibleSlice.(type) {
+	case []string:
+		for _, elem := range possibleSlice.([]string) {
+			if elem == str {
 				return true
 			}
 		}
 	}
-	tdlog.Noticef("Test fails for %s.", v)
 	return false
+}
+
+func ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey string) {
+	var e error
+	if publicKey, e = ioutil.ReadFile(jwtPubKey); e != nil {
+		tdlog.Panicf("JWT: Failed to read public key file - %s", e)
+	}
+	if privateKey, e = ioutil.ReadFile(jwtPrivateKey); e != nil {
+		tdlog.Panicf("JWT: Failed to read private key file - %s", e)
+	}
+
+	jwtInitSetup()
+
+	// collection management (stop-the-world)
+	http.HandleFunc("/create", jwtWrap(Create))
+	http.HandleFunc("/rename", jwtWrap(Rename))
+	http.HandleFunc("/drop", jwtWrap(Drop))
+	http.HandleFunc("/all", jwtWrap(All))
+	http.HandleFunc("/scrub", jwtWrap(Scrub))
+	http.HandleFunc("/sync", jwtWrap(Sync))
+	// query
+	http.HandleFunc("/query", jwtWrap(Query))
+	http.HandleFunc("/count", jwtWrap(Count))
+	// document management
+	http.HandleFunc("/insert", jwtWrap(Insert))
+	http.HandleFunc("/get", jwtWrap(Get))
+	http.HandleFunc("/getpage", jwtWrap(GetPage))
+	http.HandleFunc("/update", jwtWrap(Update))
+	http.HandleFunc("/delete", jwtWrap(Delete))
+	http.HandleFunc("/approxdoccount", jwtWrap(ApproxDocCount))
+	// index management (stop-the-world)
+	http.HandleFunc("/index", jwtWrap(Index))
+	http.HandleFunc("/indexes", jwtWrap(Indexes))
+	http.HandleFunc("/unindex", jwtWrap(Unindex))
+	// misc
+	http.HandleFunc("/shutdown", jwtWrap(Shutdown))
+	http.HandleFunc("/dump", jwtWrap(Dump))
+	http.HandleFunc("/getJwt", getJwt)
+	http.HandleFunc("/checkJwt", checkJwt)
+
+	tdlog.Noticef("JWT is enabled. API endpoints will require JWT authorization and HTTP SSL.")
 }

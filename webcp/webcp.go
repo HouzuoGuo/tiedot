@@ -6,13 +6,7 @@ import (
 	"net/http"
 )
 
-var WebCp string
-
-func RegisterWebCp() {
-	if WebCp == "" || WebCp == "none" || WebCp == "no" || WebCp == "false" {
-		tdlog.Noticef("Web control panel is disabled on your request")
-		return
-	}
-	http.Handle("/"+WebCp+"/", http.StripPrefix("/"+WebCp, http.FileServer(rice.MustFindBox("static").HTTPBox())))
-	tdlog.Noticef("Web control panel is accessible at /%s/", WebCp)
+func RegisterWebCp(routeName string) {
+	http.Handle("/"+routeName+"/", http.StripPrefix("/"+routeName, http.FileServer(rice.MustFindBox("static").HTTPBox())))
+	tdlog.Noticef("Web control panel is accessible at /%s/", routeName)
 }

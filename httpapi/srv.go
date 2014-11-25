@@ -10,8 +10,7 @@ import (
 )
 
 var (
-	HttpDB  *db.DB
-	jwtFlag bool
+	HttpDB *db.DB
 )
 
 // Store form parameter value of specified key to *val and return true; if key does not exist, set HTTP status 400 and return false.
@@ -24,49 +23,61 @@ func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bo
 	return true
 }
 
-func Start(db *db.DB, port int, jwtFlag bool) {
-	HttpDB = db
+func Start(dir string, port int, sslCrt, sslKey, webcpRoute string, enableJWT bool, jwtPubKey, jwtPrivateKey string) {
+	var err error
+	HttpDB, err = db.OpenDB(dir)
+	if err != nil {
+		panic(err)
+	}
 
-	// collection management (stop-the-world)
-	http.HandleFunc("/create", wrap(Create, jwtFlag))
-	http.HandleFunc("/rename", wrap(Rename, jwtFlag))
-	http.HandleFunc("/drop", wrap(Drop, jwtFlag))
-	http.HandleFunc("/all", wrap(All, jwtFlag))
-	http.HandleFunc("/scrub", wrap(Scrub, jwtFlag))
-	http.HandleFunc("/sync", wrap(Sync, jwtFlag))
-	// query
-	http.HandleFunc("/query", wrap(Query, jwtFlag))
-	http.HandleFunc("/count", wrap(Count, jwtFlag))
-	// document management
-	http.HandleFunc("/insert", wrap(Insert, jwtFlag))
-	http.HandleFunc("/get", wrap(Get, jwtFlag))
-	http.HandleFunc("/getpage", wrap(GetPage, jwtFlag))
-	http.HandleFunc("/update", wrap(Update, jwtFlag))
-	http.HandleFunc("/delete", wrap(Delete, jwtFlag))
-	http.HandleFunc("/approxdoccount", wrap(ApproxDocCount, jwtFlag))
-	// index management (stop-the-world)
-	http.HandleFunc("/index", wrap(Index, jwtFlag))
-	http.HandleFunc("/indexes", wrap(Indexes, jwtFlag))
-	http.HandleFunc("/unindex", wrap(Unindex, jwtFlag))
-	// misc (stop-the-world)
-	http.HandleFunc("/shutdown", wrap(Shutdown, jwtFlag))
-	http.HandleFunc("/dump", wrap(Dump, jwtFlag))
-	// misc
-	http.HandleFunc("/version", wrap(Version, jwtFlag))
-	http.HandleFunc("/memstats", wrap(MemStats, jwtFlag))
 	// web control panel
-	webcp.RegisterWebCp()
-
-	tdlog.Noticef("Will listen on all interfaces, port %d", port)
-	if jwtFlag == false {
-		http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	if webcpRoute == "" || webcpRoute == "none" || webcpRoute == "no" || webcpRoute == "false" {
+		tdlog.Noticef("Web control panel is disabled.")
 	} else {
-		jwtInitSetup()
-		//openssl req -new -key rsa -out rsa.crt -x509 -days 3650 -subj "/C=/ST=/L=Earth/O=Tiedot/OU=IT/CN=localhost/emailAddress=admin@tiedot"
-		http.HandleFunc("/getJwt", getJwt)
-		http.HandleFunc("/checkJwt", checkJwt)
-		if e := http.ListenAndServeTLS(fmt.Sprintf(":%d", port), "rsa.crt", "rsa", nil); e != nil {
-			tdlog.Noticef("%s", e)
+		webcp.RegisterWebCp(webcpRoute)
+	}
+
+	http.HandleFunc("/version", Version)
+	http.HandleFunc("/memstats", MemStats)
+
+	if enableJWT {
+		// JWT support
+		ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey)
+	} else {
+		// No JWT
+		// collection management (stop-the-world)
+		http.HandleFunc("/create", Create)
+		http.HandleFunc("/rename", Rename)
+		http.HandleFunc("/drop", Drop)
+		http.HandleFunc("/all", All)
+		http.HandleFunc("/scrub", Scrub)
+		http.HandleFunc("/sync", Sync)
+		// query
+		http.HandleFunc("/query", Query)
+		http.HandleFunc("/count", Count)
+		// document management
+		http.HandleFunc("/insert", Insert)
+		http.HandleFunc("/get", Get)
+		http.HandleFunc("/getpage", GetPage)
+		http.HandleFunc("/update", Update)
+		http.HandleFunc("/delete", Delete)
+		http.HandleFunc("/approxdoccount", ApproxDocCount)
+		// index management (stop-the-world)
+		http.HandleFunc("/index", Index)
+		http.HandleFunc("/indexes", Indexes)
+		http.HandleFunc("/unindex", Unindex)
+		// misc (stop-the-world)
+		http.HandleFunc("/shutdown", Shutdown)
+		http.HandleFunc("/dump", Dump)
+	}
+
+	if enableJWT || sslCrt != "" {
+		tdlog.Noticef("Will listen on all interfaces (HTTPS), port %d.", port)
+		if err := http.ListenAndServeTLS(fmt.Sprintf(":%d", port), sslCrt, sslKey, nil); err != nil {
+			tdlog.Panicf("Failed to start HTTPS service - %s", err)
 		}
+	} else {
+		tdlog.Noticef("Will listen on all interfaces (HTTP), port %d.", port)
+		http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	}
 }
