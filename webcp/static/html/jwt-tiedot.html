@@ -69,12 +69,12 @@
 				var shaObj = new jsSHA(this.password, "TEXT")
 				var hash = shaObj.getHash("SHA-512", "B64")
 				console.log("login:", this.id2, hash)
-                var data = new FormData();
-                data.append("id",this.id2)
-			    data.append("password",hash)
+                var data = new FormData()
+                data.append("id", this.id2)
+			    data.append("password", hash)
                 this.getJwt(data, fn)	
             }
-		        
+
 		})
     </script>
 </polymer-element>

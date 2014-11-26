@@ -129,10 +129,12 @@ func getJwt(w http.ResponseWriter, r *http.Request) {
 	// Verify password
 	// sha := sha1.Sum([]byte(r.FormValue("password")))
 	// pass := base64.URLEncoding.EncodeToString(sha[:20])
-	pass := r.FormValue("password")
+	pass := r.FormValue(JWT_PASS_ATTR)
+	// tdlog.Notice(pass)
 	for recID, _ := range idQueryResult {
 		rec, err := jwtCol.Read(recID)
 		if err != nil {
+			//tdlog.Notice(rec)
 			break
 		}
 		if rec[JWT_PASS_ATTR] != pass {
@@ -184,10 +186,10 @@ func jwtWrap(originalHandler http.HandlerFunc) http.HandlerFunc {
 			return publicKey, nil
 		})
 		if t == nil {
-			//			http.Error(w, "", http.StatusUnauthorized)
+			http.Error(w, "", http.StatusUnauthorized)
 			return
 		} else if !t.Valid {
-			//			http.Error(w, "", http.StatusUnauthorized)
+			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
 		if t.Claims[JWT_ADMIN_ID] == JWT_ADMIN_ID {
@@ -196,12 +198,12 @@ func jwtWrap(originalHandler http.HandlerFunc) http.HandlerFunc {
 		}
 		var url = strings.TrimPrefix(r.URL.Path, "/")
 		if !sliceContainsStr(t.Claims[JWT_ENDPOINTS_ATTR], url) {
-			//			http.Error(w, "", http.StatusUnauthorized)
+			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
 		var col = r.FormValue("col")
 		if col != "" && !sliceContainsStr(t.Claims[JWT_COLLECTIONS_ATTR], col) {
-			//			http.Error(w, "", http.StatusUnauthorized)
+			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
 		originalHandler(w, r)
@@ -259,5 +261,5 @@ func ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey string) {
 	http.HandleFunc("/getJwt", getJwt)
 	http.HandleFunc("/checkJwt", checkJwt)
 
-	tdlog.Noticef("JWT is enabled. API endpoints will require JWT authorization and HTTP SSL.")
+	tdlog.Noticef("JWT is enabled. API endpoints will require JWT authorization.")
 }

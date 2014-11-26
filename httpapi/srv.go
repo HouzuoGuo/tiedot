@@ -23,7 +23,7 @@ func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bo
 	return true
 }
 
-func Start(dir string, port int, sslCrt, sslKey, webcpRoute string, enableJWT bool, jwtPubKey, jwtPrivateKey string) {
+func Start(dir string, port int, tlsCrt, tlsKey, webcpRoute string, jwtPubKey, jwtPrivateKey string) {
 	var err error
 	HttpDB, err = db.OpenDB(dir)
 	if err != nil {
@@ -40,11 +40,26 @@ func Start(dir string, port int, sslCrt, sslKey, webcpRoute string, enableJWT bo
 	http.HandleFunc("/version", Version)
 	http.HandleFunc("/memstats", MemStats)
 
-	if enableJWT {
+	if jwtPrivateKey != "" {
 		// JWT support
 		ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey)
 	} else {
 		// No JWT
+		ServeEndpoints()
+	}
+
+	if tlsCrt != "" {
+		tdlog.Noticef("Will listen on all interfaces (HTTPS), port %d.", port)
+		if err := http.ListenAndServeTLS(fmt.Sprintf(":%d", port), tlsCrt, tlsKey, nil); err != nil {
+			tdlog.Panicf("Failed to start HTTPS service - %s", err)
+		}
+	} else {
+		tdlog.Noticef("Will listen on all interfaces (HTTP), port %d.", port)
+		http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	}
+}
+
+func ServeEndpoints(){
 		// collection management (stop-the-world)
 		http.HandleFunc("/create", Create)
 		http.HandleFunc("/rename", Rename)
@@ -69,15 +84,4 @@ func Start(dir string, port int, sslCrt, sslKey, webcpRoute string, enableJWT bo
 		// misc (stop-the-world)
 		http.HandleFunc("/shutdown", Shutdown)
 		http.HandleFunc("/dump", Dump)
-	}
-
-	if enableJWT || sslCrt != "" {
-		tdlog.Noticef("Will listen on all interfaces (HTTPS), port %d.", port)
-		if err := http.ListenAndServeTLS(fmt.Sprintf(":%d", port), sslCrt, sslKey, nil); err != nil {
-			tdlog.Panicf("Failed to start HTTPS service - %s", err)
-		}
-	} else {
-		tdlog.Noticef("Will listen on all interfaces (HTTP), port %d.", port)
-		http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
-	}
 }

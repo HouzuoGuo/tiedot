@@ -34,17 +34,15 @@ func main() {
 	// HTTP mode params
 	var dir string
 	var port int
-	var webcpRoute, sslCrt, sslKey string
+	var webcpRoute, tlsCrt, tlsKey string
 	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
 	flag.StringVar(&webcpRoute, "webcp", "admin", "(HTTP API) web control panel route (without leading slash), 'no' to disable.")
 	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
-	flag.StringVar(&sslCrt, "sslcrt", "", "(HTTP API) SSL certificate (SSL is optional, empty to disable).")
-	flag.StringVar(&sslKey, "sslkey", "", "(HTTP API) SSL certificate key (SSL is optional, empty to disable).")
+	flag.StringVar(&tlsCrt, "tlscrt", "", "(HTTP API) TLS certificate (TLS is optional, empty to disable).")
+	flag.StringVar(&tlsKey, "tlskey", "", "(HTTP API) TLS certificate key (TLS is optional, empty to disable).")
 
 	// HTTP + JWT params
-	var enableJWT bool
 	var jwtPubKey, jwtPrivateKey string
-	flag.BoolVar(&enableJWT, "jwt", false, "(HTTP with JWT) Enable JSON Web Token on all API endpoints along with HTTP SSL.")
 	flag.StringVar(&jwtPubKey, "jwtpubkey", "", "(HTTP with JWT) Public key for signing tokens")
 	flag.StringVar(&jwtPrivateKey, "jwtprivatekey", "", "(HTTP with JWT) Private key for decoding tokens")
 
@@ -94,17 +92,20 @@ func main() {
 		if dir == "" {
 			tdlog.Notice("Please specify database directory, for example -dir=/tmp/db")
 			os.Exit(1)
-		} else if port == 0 {
+		}
+		if port == 0 {
 			tdlog.Notice("Please specify port number, for example -port=8080")
 			os.Exit(1)
-		} else if sslCrt != "" && sslKey == "" {
-			tdlog.Notice("To enable HTTP SSL, please specify both SSL certificate and key file.")
-			os.Exit(1)
-		} else if enableJWT && (sslCrt == "" || sslKey == "" || jwtPrivateKey == "" || jwtPubKey == "") {
-			tdlog.Notice("To enable JWT, please specify HTTP SSL certificate/key, as well as JWT private/public key.")
+		}
+		if tlsCrt != "" && tlsKey == "" {
+			tdlog.Notice("To enable HTTPS, please specify both RSA certificate and key file.")
 			os.Exit(1)
 		}
-		httpapi.Start(dir, port, sslCrt, sslKey, webcpRoute, enableJWT, jwtPubKey, jwtPrivateKey)
+		if jwtPrivateKey != "" && jwtPubKey == "" {
+			tdlog.Notice("To enable JWT, please specify RSA private and public key.")
+			os.Exit(1)
+		}
+		httpapi.Start(dir, port, tlsCrt, tlsKey, webcpRoute, jwtPubKey, jwtPrivateKey)
 	case "example":
 		// Run embedded usage examples
 		embeddedExample()
