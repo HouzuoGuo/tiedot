@@ -192,7 +192,7 @@ func jwtWrap(originalHandler http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
-		if t.Claims[JWT_ADMIN_ID] == JWT_ADMIN_ID {
+		if t.Claims[JWT_ID_ATTR] == JWT_ADMIN_ID {
 			originalHandler(w, r)
 			return
 		}
