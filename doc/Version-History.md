@@ -1,3 +1,7 @@
+### 3.1.3 (2014-12-01)
+
+Sorry - I messed up a file in 3.1.2. This release fixes it.
+
 ### 3.1.2 (2014-12-01)
 
 Improved RPM spec and systemd unit file to properly build on Open Build Service.
