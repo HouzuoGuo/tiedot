@@ -1,0 +1,2 @@
+HTTP_PORT=19993
+HTTP_DB_DIR=/var/lib/tiedot/default_db
