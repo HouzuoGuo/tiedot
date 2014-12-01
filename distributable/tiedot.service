@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 EnvironmentFile=/etc/tiedot
-ExecStart=/usr/bin/tiedot -mode=httpd -port=${HTTP_PORT} -dir=${HTTP_DB_DIR}
+ExecStart=/usr/bin/tiedot -mode=httpd -port=${HTTP_PORT} -dir=${HTTP_DB_DIR} ${HTTP_EXTRA_ARGS}
 ExecStop=/bin/sh -c 'curl -s "http://localhost:${HTTP_PORT}/shutdown" > /dev/null 2>&1 || true'
 
 [Install]

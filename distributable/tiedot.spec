@@ -27,10 +27,11 @@ go build -o %{name} .
 %install
 install -d %{buildroot}%{_bindir}
 install -p -m 0755 prjsrc/%{name} %{buildroot}%{_bindir}/%{name}
+install -d %{buildroot}%{_sysconfdir}
+install -p -m 0644 prjsrc/distributable/etc/%{name} %{buildroot}%{_sysconfdir}
 install -d %{buildroot}%_unitdir
-install -p -m 0644 prjsrc/systemd-init/%{name}.service %{buildroot}%_unitdir/%{name}.service
+install -p -m 0644 prjsrc/distributable/%{name}.service %{buildroot}%_unitdir/%{name}.service
 install -d %{buildroot}%{_sbindir}
-ls %{buildroot}%{_sbindir}
 ln -s /usr/sbin/service %{buildroot}%{_sbindir}/rc%{name}
 
 %check
