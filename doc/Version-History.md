@@ -1,3 +1,7 @@
+### 3.1.2 (2014-12-01)
+
+Improved RPM spec and systemd unit file to properly build on Open Build Service.
+
 ### 3.1.1 (2014-10-18)
 
 Error handling is easier in embedded usage, see example.go for more details.
