@@ -131,7 +131,7 @@ func (col *Col) Update(id uint64, doc map[string]interface{}) error {
 	originalB, err := col.part.Read(id)
 	if err != nil {
 		col.db.lock.Unlock()
-		return fmt.Errorf("Cannot update %d: cannot read back original document - %v", id, err)
+		return err
 	}
 	var original map[string]interface{}
 	if err = json.Unmarshal(originalB, &original); err != nil {
@@ -156,7 +156,7 @@ func (col *Col) Delete(id uint64) error {
 	originalB, err := col.part.Read(id)
 	if err != nil {
 		col.db.lock.Unlock()
-		return fmt.Errorf("Cannot delete %d: %v", id, err)
+		return err
 	}
 	var original map[string]interface{}
 	if err = json.Unmarshal(originalB, &original); err != nil {

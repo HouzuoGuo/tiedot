@@ -1,3 +1,11 @@
+### 3.1.3 (2014-12-01)
+
+Sorry - I messed up a file in 3.1.2. This release fixes it.
+
+### 3.1.2 (2014-12-01)
+
+Improved RPM spec and systemd unit file to properly build on Open Build Service.
+
 ### 3.1.1 (2014-10-18)
 
 Error handling is easier in embedded usage, see example.go for more details.
@@ -10,15 +18,18 @@ New stable features:
 
 - A beautiful web control panel application runs along with ordinary HTTP APIs.
 - Easily scan through large collections using new HTTP and embedded APIs.
+- To package tiedot into RPM package, there is now a RPM spec pre-cooked for you.
+- To run tiedot as a daemon, simply use the systemd user unit file.
 
 Improvements:
 
-- Significantly improved startup performance thanks to Smart File Scan.
+- Significantly improved startup performance, thanks to Smart File Scan.
 - Other improvements in error handling, locking, logging, and embedded usage examples.
 
 Bug fix:
 
 - Fix a bug that may cause inaccurate lookup query result to be returned.
+- Fix a bug that may cause severely degraded performance in certain usages.
 
 ### 3.0 (2014-05-31)
 

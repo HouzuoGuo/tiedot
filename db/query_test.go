@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/dberr"
 	"os"
 	"testing"
 )
@@ -112,7 +113,7 @@ func TestQuery(t *testing.T) {
 	}
 	// collection scan
 	q, err = runQuery(`{"eq": 1, "in": ["c"]}`, col)
-	if err == nil {
+	if err.(dberr.Error).Code != dberr.QueryNeedIndex {
 		t.Fatal("Collection scan should not happen")
 	}
 	// lookup on "special" (null)
@@ -154,16 +155,34 @@ func TestQuery(t *testing.T) {
 	if !ensureMapHasKeys(q, ids[0], ids[2]) && !ensureMapHasKeys(q, ids[2], ids[5]) && !ensureMapHasKeys(q, ids[5], ids[0]) {
 		t.Fatal(q, ids[0], ids[1], ids[2])
 	}
+	// existence test with incorrect input
+	q, err = runQuery(`{"has": ["c"], "limit": "a"}`, col)
+	if err.(dberr.Error).Code != dberr.QueryMalformedInt {
+		t.Fatal(err)
+	}
 	// existence test, collection scan & PK
 	q, err = runQuery(`{"has": ["c"], "limit": 2}`, col)
-	if err == nil {
+	if err.(dberr.Error).Code != dberr.QueryNeedIndex {
 		t.Fatal("Existence test should return error")
 	}
 	q, err = runQuery(`{"has": ["@id"], "limit": 2}`, col)
-	if err == nil {
+	if err.(dberr.Error).Code != dberr.QueryNeedIndex {
 		t.Fatal("Existence test should return error")
 	}
-	// int hash scan
+	// int range scan with incorrect input
+	q, err = runQuery(`{"int-from": "a", "int-to": 4, "in": ["f"], "limit": 1}`, col)
+	if err.(dberr.Error).Code != dberr.QueryMalformedInt {
+		t.Fatal(err)
+	}
+	q, err = runQuery(`{"int-from": 1, "int-to": "a", "in": ["f"], "limit": 1}`, col)
+	if err.(dberr.Error).Code != dberr.QueryMalformedInt {
+		t.Fatal(err)
+	}
+	q, err = runQuery(`{"int-from": 1, "int-to": 2, "in": ["f"], "limit": "a"}`, col)
+	if err.(dberr.Error).Code != dberr.QueryMalformedInt {
+		t.Fatal(err)
+	}
+	// int range scan
 	q, err = runQuery(`{"int-from": 2, "int-to": 4, "in": ["f"]}`, col)
 	if err != nil {
 		t.Fatal(err)
@@ -219,6 +238,11 @@ func TestQuery(t *testing.T) {
 	if !ensureMapHasKeys(q, ids[1], ids[3]) {
 		t.Fatal(q)
 	}
+	// intersection with incorrect input
+	q, err = runQuery(`{"c": null}`, col)
+	if err.(dberr.Error).Code != dberr.QueryMissingSubQuery {
+		t.Fatal(err)
+	}
 	// complement
 	q, err = runQuery(`{"c": [{"eq": 4,  "in": ["c"]}, {"eq": 2, "in": ["d"]}, "all"]}`, col)
 	if err != nil {
@@ -226,6 +250,11 @@ func TestQuery(t *testing.T) {
 	}
 	if !ensureMapHasKeys(q, ids[0], ids[2], ids[6], ids[7]) {
 		t.Fatal(q)
+	}
+	// complement with incorrect input
+	q, err = runQuery(`{"c": null}`, col)
+	if err.(dberr.Error).Code != dberr.QueryMissingSubQuery {
+		t.Fatal(err)
 	}
 	// union of intersection
 	q, err = runQuery(`[{"n": [{"eq": 3, "in": ["c"]}]}, {"n": [{"eq": 2, "in": ["c"]}]}]`, col)

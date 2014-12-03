@@ -10,9 +10,11 @@ I sincerely appreciate the following individuals and organizations for their con
 - dchapes
 - Evan Shaw
 - Freiheit.com
+- Gert Cuykens
 - "IFQ"
 - Nick Prestra
 - NoahShen
+- Omeid
 - Osman Bineev
 - Ross Albertson
 - Stefan Richter

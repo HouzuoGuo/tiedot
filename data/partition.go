@@ -6,7 +6,7 @@ The hash table stores the unchanging ID as entry key and the physical document l
 package data
 
 import (
-	"errors"
+	"github.com/HouzuoGuo/tiedot/dberr"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
@@ -41,9 +41,9 @@ func (part *Partition) Insert(id uint64, data []byte) (physID uint64, err error)
 func (part *Partition) Read(id uint64) ([]byte, error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return nil, errors.New("Document does not exist")
+		return nil, dberr.ErrorNoDoc.Fault(id)
 	} else if data := part.col.Read(physID[0]); data == nil {
-		return nil, errors.New("Document does not exist")
+		return nil, dberr.ErrorNoDoc.Fault(id)
 	} else {
 		return data, nil
 	}
@@ -53,7 +53,7 @@ func (part *Partition) Read(id uint64) ([]byte, error) {
 func (part *Partition) Update(id uint64, data []byte) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return errors.New("Document does not exist")
+		return dberr.ErrorNoDoc.Fault(id)
 	}
 	newID, err := part.col.Update(physID[0], data)
 	if err != nil {
@@ -70,7 +70,7 @@ func (part *Partition) Update(id uint64, data []byte) (err error) {
 func (part *Partition) Delete(id uint64) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return errors.New("Document does not exist")
+		return dberr.ErrorNoDoc.Fault(id)
 	}
 	part.col.Delete(physID[0])
 	part.lookup.Remove(id, physID[0])
@@ -120,7 +120,7 @@ func (part *Partition) Clear() (err error) {
 		failure = true
 	}
 	if failure {
-		err = errors.New("Operation did not complete successfully")
+		err = dberr.ErrorIO
 	}
 	return
 }
@@ -137,7 +137,7 @@ func (part *Partition) Close() (err error) {
 		failure = true
 	}
 	if failure {
-		err = errors.New("Operation did not complete successfully")
+		err = dberr.ErrorIO
 	}
 	return
 }

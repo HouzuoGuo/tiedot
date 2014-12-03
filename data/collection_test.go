@@ -1,6 +1,7 @@
 package data
 
 import (
+	"github.com/HouzuoGuo/tiedot/dberr"
 	"os"
 	"strings"
 	"testing"
@@ -110,7 +111,7 @@ func TestInsertDeleteRead(t *testing.T) {
 		t.Fatalf("Failed to read")
 	}
 	// it shall not panic
-	if err = col.Delete(col.Size); err == nil {
+	if err = col.Delete(col.Size); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatal("did not error")
 	}
 }
@@ -211,29 +212,29 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 		t.Fatalf("Read invalid location")
 	}
 	// Update invalid location
-	if _, err := col.Update(1, []byte{}); err == nil {
+	if _, err := col.Update(1, []byte{}); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatalf("Update invalid location")
 	}
-	if _, err := col.Update(col.Used, []byte{}); err == nil {
+	if _, err := col.Update(col.Used, []byte{}); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatalf("Update invalid location")
 	}
-	if _, err := col.Update(col.Size, []byte{}); err == nil {
+	if _, err := col.Update(col.Size, []byte{}); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatalf("Update invalid location")
 	}
-	if _, err := col.Update(999999999, []byte{}); err == nil {
+	if _, err := col.Update(999999999, []byte{}); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatalf("Update invalid location")
 	}
 	// Delete invalid location
-	if err = col.Delete(1); err == nil {
+	if err = col.Delete(1); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatal("did not error")
 	}
-	if err = col.Delete(col.Used); err == nil {
+	if err = col.Delete(col.Used); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatal("did not error")
 	}
-	if err = col.Delete(col.Size); err == nil {
+	if err = col.Delete(col.Size); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatal("did not error")
 	}
-	if err = col.Delete(999999999); err == nil {
+	if err = col.Delete(999999999); err.(dberr.Error).Code != dberr.DocDoesNotExist {
 		t.Fatal("did not error")
 	}
 	// Insert - not enough room

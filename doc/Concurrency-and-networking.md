@@ -2,9 +2,9 @@
 
 Similar to many other popular NoSQL solutions, tiedot does not provide ACID transactions. However, atomic operations are possible within the scope of a single document.
 
-Associated with every database instance is a background goroutine, it automatically synchronize all file buffers every 2 seconds.
+At the moment tiedot does not use a journal file, therefore it relies on operating system to periodically synchronize mapped file buffer with underlying storage device; this means, that in case of a system crash, you may lose several most recent document updates.
 
-Both HTTP API and embedded usage support manual buffer synchronization for immediate guaranteed durability.
+But tiedot data structures are extremely resilient to system crashes, making it really really difficult for any system crash to corrupt data files.
 
 ## Concurrency of document operations
 

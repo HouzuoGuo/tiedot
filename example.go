@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/dberr"
 	"os"
 )
 
@@ -96,6 +97,12 @@ func embeddedExample() {
 	// Delete document
 	if err := feeds.Delete(docID); err != nil {
 		panic(err)
+	}
+
+	// More complicated error handing - identify the error kind.
+	// In this example, the error code tells that the document no longer exists.
+	if err := feeds.Delete(docID); err.(dberr.Error).Code == dberr.DocDoesNotExist {
+		fmt.Println("The document was already deleted")
 	}
 
 	// ****************** Index Management ******************

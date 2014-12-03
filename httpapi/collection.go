@@ -82,3 +82,11 @@ func Scrub(w http.ResponseWriter, r *http.Request) {
 		HttpDB.Scrub(col)
 	}
 }
+
+/*
+Noop
+*/
+func Sync(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "text/plain")
+}

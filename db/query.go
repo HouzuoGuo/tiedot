@@ -4,6 +4,7 @@ package db
 import (
 	"errors"
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/dberr"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"strconv"
 	"strings"
@@ -48,15 +49,17 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
 			intLimit = uint64(floatLimit)
+		} else if _, ok := limit.(int); ok {
+			intLimit = uint64(limit.(int))
 		} else {
-			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
+			return dberr.ErrorExpectingInt.Fault("limit", limit)
 		}
 	}
 	lookupStrValue := fmt.Sprint(lookupValue) // the value to look for
 	lookupValueHash := StrHash(lookupStrValue)
 	scanPath := strings.Join(vecPath, INDEX_PATH_SEP)
 	if _, indexed := src.indexPaths[scanPath]; !indexed {
-		return errors.New(fmt.Sprintf("Please index %v and retry query %v", scanPath, expr))
+		return dberr.ErrorNeedIndex.Fault(scanPath, expr)
 	}
 	ht := src.hts[scanPath]
 	vals := ht.Get(lookupValueHash, intLimit)
@@ -89,13 +92,15 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
 			intLimit = uint64(floatLimit)
+		} else if _, ok := limit.(int); ok {
+			intLimit = uint64(limit.(int))
 		} else {
-			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
+			return dberr.ErrorExpectingInt.Fault("limit", limit)
 		}
 	}
 	jointPath := strings.Join(vecPath, INDEX_PATH_SEP)
 	if _, indexed := src.indexPaths[jointPath]; !indexed {
-		return errors.New(fmt.Sprintf("Please index %v and retry query %v", vecPath, expr))
+		return dberr.ErrorNeedIndex.Fault(vecPath, expr)
 	}
 	counter := uint64(0)
 	partDiv := src.approxDocCount() / 4000 // collect approx. 4k document IDs in each iteration
@@ -143,7 +148,7 @@ func Intersect(subExprs interface{}, src *Col, result *map[uint64]struct{}) (err
 			(*result)[docID] = struct{}{}
 		}
 	} else {
-		return errors.New(fmt.Sprintf("Expecting a vector of sub-queries, but %v given", subExprs))
+		return dberr.ErrorExpectingSubQuery.Fault(subExprs)
 	}
 	return
 }
@@ -174,7 +179,7 @@ func Complement(subExprs interface{}, src *Col, result *map[uint64]struct{}) (er
 			(*result)[docID] = struct{}{}
 		}
 	} else {
-		return errors.New(fmt.Sprintf("Expecting a vector of sub-queries, but %v given", subExprs))
+		return dberr.ErrorExpectingSubQuery.Fault(subExprs)
 	}
 	return
 }
@@ -203,31 +208,39 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 	if limit, hasLimit := expr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
 			intLimit = uint64(floatLimit)
+		} else if _, ok := limit.(int); ok {
+			intLimit = uint64(limit.(int))
 		} else {
-			return errors.New(fmt.Sprintf("Expecting `limit` as a number, but %v given", limit))
+			return dberr.ErrorExpectingInt.Fault(limit)
 		}
 	}
 	// Figure out the range ("from" value & "to" value)
 	from, to := int(0), int(0)
 	if floatFrom, ok := intFrom.(float64); ok {
 		from = int(floatFrom)
+	} else if _, ok := intFrom.(int); ok {
+		from = intFrom.(int)
 	} else {
-		return errors.New(fmt.Sprintf("Expecting `int-from` as an integer, but %v given", from))
+		return dberr.ErrorExpectingInt.Fault("int-from", from)
 	}
 	if intTo, ok := expr["int-to"]; ok {
 		if floatTo, ok := intTo.(float64); ok {
 			to = int(floatTo)
+		} else if _, ok := intTo.(int); ok {
+			to = intTo.(int)
 		} else {
-			return errors.New(fmt.Sprintf("Expecting `int-to` as an integer, but %v given", to))
+			return dberr.ErrorExpectingInt.Fault("int-to", to)
 		}
 	} else if intTo, ok := expr["int to"]; ok {
 		if floatTo, ok := intTo.(float64); ok {
 			to = int(floatTo)
+		} else if _, ok := intTo.(int); ok {
+			to = intTo.(int)
 		} else {
-			return errors.New(fmt.Sprintf("Expecting `int-to` as an integer, but %v given", to))
+			return dberr.ErrorExpectingInt.Fault("int to", to)
 		}
 	} else {
-		return errors.New(fmt.Sprintf("Missing `int-to`"))
+		return dberr.ErrorMissing.Fault("int-to")
 	}
 	if to > from && to-from > 1000 || from > to && from-to > 1000 {
 		tdlog.CritNoRepeat("Query %v involves index lookup on more than 1000 values, which can be very inefficient", expr)
@@ -235,7 +248,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 	counter := uint64(0) // Number of results already collected
 	htPath := strings.Join(vecPath, ",")
 	if _, indexScan := src.indexPaths[htPath]; !indexScan {
-		return errors.New(fmt.Sprintf("Please index %v and retry query %v", vecPath, expr))
+		return dberr.ErrorNeedIndex.Fault(vecPath, expr)
 	}
 	if from < to {
 		// Forward scan - from low value to high value
@@ -278,7 +291,7 @@ func evalQuery(q interface{}, src *Col, result *map[uint64]struct{}) (err error)
 			// Might be single document number
 			docID, err := strconv.ParseUint(expr, 10, 64)
 			if err != nil {
-				return errors.New(fmt.Sprintf("%s is not a document PK ID", expr))
+				return dberr.ErrorExpectingInt.Fault("Single Document ID", docID)
 			}
 			(*result)[docID] = struct{}{}
 		}
