@@ -2,52 +2,46 @@ package dberr
 
 import "fmt"
 
-type Error struct {
-	Code        int
-	Err         string
-	WithDetails string
+type errorType string
+
+const (
+	ErrorNil       errorType = ""
+	ErrorUndefined errorType = "Unknown Error."
+
+	// IO error
+	// Document errors
+	// Query input errors
+	ErrorIO          errorType = "IO error has occured, see log for more details."
+	ErrorNoDoc       errorType = "Document `%d` does not exist"
+	ErrorDocTooLarge errorType = "Document is too large. Max: `%d`, Given: `%d`"
+	ErrorDocLocked   errorType = "Document `%d` is locked for update - try again later"
+
+	ErrorNeedIndex         errorType = "Please index %v and retry query %v."
+	ErrorExpectingSubQuery errorType = "Expecting a vector of sub-queries, but %v given."
+	ErrorExpectingInt      errorType = "Expecting `%s` as an integer, but %v given."
+	ErrorMissing           errorType = "Missing `%s`"
+)
+
+func Make(err errorType, details ...interface{}) Error {
+	return Error{err, details}
 }
 
-func (e Error) Fault(details ...interface{}) Error {
-	e.WithDetails = fmt.Sprintf(e.Err, details...)
-	return e
+type Error struct {
+	err     errorType
+	details []interface{}
 }
 
 func (e Error) Error() string {
-	if e.WithDetails != "" {
-		return e.WithDetails
-	}
-	return e.Err
+	return fmt.Sprintf(string(e.err), e.details...)
 }
 
-const (
-	// IO error
-	GeneralError = iota
+func Type(e error) errorType {
+	if e == nil {
+		return ErrorNil
+	}
 
-	// Document errors
-	DocDoesNotExist = iota
-	DocTooLarge     = iota
-	DocIsLocked     = iota
-
-	// Query input errors
-	QueryNeedIndex       = iota
-	QueryMissingSubQuery = iota
-	QueryMalformedInt    = iota
-	QueryMissingParam    = iota
-)
-
-var (
-	// IO error
-	ErrorIO = Error{GeneralError, "IO error has occured, see log for more details.", ""}
-
-	// Document errors
-	ErrorNoDoc       = Error{DocDoesNotExist, "Document `%d` does not exist", ""}
-	ErrorDocTooLarge = Error{DocTooLarge, "Document is too large. Max: `%d`, Given: `%d`", ""}
-	ErrorDocLocked   = Error{DocIsLocked, "Document `%d` is locked for update - try again later", ""}
-
-	// Query input errors
-	ErrorNeedIndex         = Error{QueryNeedIndex, "Please index %v and retry query %v.", ""}
-	ErrorExpectingSubQuery = Error{QueryMissingSubQuery, "Expecting a vector of sub-queries, but %v given.", ""}
-	ErrorExpectingInt      = Error{QueryMalformedInt, "Expecting `%s` as an integer, but %v given.", ""}
-	ErrorMissing           = Error{QueryMissingParam, "Missing `%s`", ""}
-)
+	if err, ok := e.(Error); ok {
+		return err.err
+	}
+	return ErrorUndefined
+}

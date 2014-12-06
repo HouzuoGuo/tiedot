@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/HouzuoGuo/tiedot/dberr"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/dberr"
 )
 
 func sameMap(m1 map[string]interface{}, m2 map[string]interface{}) bool {
@@ -88,7 +89,7 @@ func TestAll(t *testing.T) {
 	if err := feeds.Delete(docID); err != nil {
 		t.Fatal(err)
 	}
-	if err := feeds.Delete(docID); err.(dberr.Error).Code != dberr.DocDoesNotExist {
+	if err := feeds.Delete(docID); dberr.Type(err) != dberr.ErrorNoDoc {
 		t.Fatal(err)
 	}
 

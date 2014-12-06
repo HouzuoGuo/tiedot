@@ -3,10 +3,11 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/dberr"
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/HouzuoGuo/tiedot/dberr"
 )
 
 func ensureMapHasKeys(m map[int]struct{}, keys ...int) bool {
@@ -117,7 +118,7 @@ func TestQuery(t *testing.T) {
 	}
 	// collection scan
 	q, err = runQuery(`{"eq": 1, "in": ["c"]}`, col)
-	if err.(dberr.Error).Code != dberr.QueryNeedIndex {
+	if dberr.Type(err) != dberr.ErrorNeedIndex {
 		t.Fatal("Collection scan should not happen")
 	}
 	// lookup on "special" (null)
@@ -161,29 +162,29 @@ func TestQuery(t *testing.T) {
 	}
 	// existence test with incorrect input
 	q, err = runQuery(`{"has": ["c"], "limit": "a"}`, col)
-	if err.(dberr.Error).Code != dberr.QueryMalformedInt {
+	if dberr.Type(err) != dberr.ErrorExpectingInt {
 		t.Fatal(err)
 	}
 	// existence test, collection scan & PK
 	q, err = runQuery(`{"has": ["c"], "limit": 2}`, col)
-	if err.(dberr.Error).Code != dberr.QueryNeedIndex {
+	if dberr.Type(err) != dberr.ErrorNeedIndex {
 		t.Fatal("Existence test should return error")
 	}
 	q, err = runQuery(`{"has": ["@id"], "limit": 2}`, col)
-	if err.(dberr.Error).Code != dberr.QueryNeedIndex {
+	if dberr.Type(err) != dberr.ErrorNeedIndex {
 		t.Fatal("Existence test should return error")
 	}
 	// int range scan with incorrect input
 	q, err = runQuery(`{"int-from": "a", "int-to": 4, "in": ["f"], "limit": 1}`, col)
-	if err.(dberr.Error).Code != dberr.QueryMalformedInt {
+	if dberr.Type(err) != dberr.ErrorExpectingInt {
 		t.Fatal(err)
 	}
 	q, err = runQuery(`{"int-from": 1, "int-to": "a", "in": ["f"], "limit": 1}`, col)
-	if err.(dberr.Error).Code != dberr.QueryMalformedInt {
+	if dberr.Type(err) != dberr.ErrorExpectingInt {
 		t.Fatal(err)
 	}
 	q, err = runQuery(`{"int-from": 1, "int-to": 2, "in": ["f"], "limit": "a"}`, col)
-	if err.(dberr.Error).Code != dberr.QueryMalformedInt {
+	if dberr.Type(err) != dberr.ErrorExpectingInt {
 		t.Fatal(err)
 	}
 	// int range scan
@@ -244,7 +245,7 @@ func TestQuery(t *testing.T) {
 	}
 	// intersection with incorrect input
 	q, err = runQuery(`{"c": null}`, col)
-	if err.(dberr.Error).Code != dberr.QueryMissingSubQuery {
+	if dberr.Type(err) != dberr.ErrorExpectingSubQuery {
 		t.Fatal(err)
 	}
 	// complement
@@ -257,7 +258,7 @@ func TestQuery(t *testing.T) {
 	}
 	// complement with incorrect input
 	q, err = runQuery(`{"c": null}`, col)
-	if err.(dberr.Error).Code != dberr.QueryMissingSubQuery {
+	if dberr.Type(err) != dberr.ErrorExpectingSubQuery {
 		t.Fatal(err)
 	}
 	// union of intersection
