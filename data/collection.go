@@ -77,27 +77,23 @@ func (col *Collection) Insert(data []byte) (id int, err error) {
 
 // Overwrite or re-insert a document, return the new document ID if re-inserted.
 func (col *Collection) Update(id int, data []byte) (newID int, err error) {
-	room := len(data)
-
-	if room > DOC_MAX_ROOM {
-		return 0, dberr.Make(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, room)
+	dataLen := len(data)
+	if dataLen > DOC_MAX_ROOM {
+		return 0, dberr.Make(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, dataLen)
 	}
-
 	if id < 0 || id >= col.Used-DOC_HEADER || col.Buf[id] != 1 {
 		return 0, dberr.Make(dberr.ErrorNoDoc, id)
 	}
-
-	if room, _ := binary.Varint(col.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
+	currentDocRoom, _ := binary.Varint(col.Buf[id+1 : id+11])
+	if currentDocRoom > DOC_MAX_ROOM {
 		return 0, dberr.Make(dberr.ErrorNoDoc, id)
 	}
-
-	if docEnd := id + DOC_HEADER + int(room); docEnd >= col.Size {
+	if docEnd := id + DOC_HEADER + int(currentDocRoom); docEnd >= col.Size {
 		return 0, dberr.Make(dberr.ErrorNoDoc, id)
 	}
-
-	if len(data) <= int(room) {
+	if dataLen <= int(currentDocRoom) {
 		padding := id + DOC_HEADER + len(data)
-		paddingEnd := id + DOC_HEADER + int(room)
+		paddingEnd := id + DOC_HEADER + int(currentDocRoom)
 		// Overwrite data and then overwrite padding
 		copy(col.Buf[id+DOC_HEADER:padding], data)
 		for ; padding < paddingEnd; padding += LEN_PADDING {
