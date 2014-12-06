@@ -1,10 +1,11 @@
 package data
 
 import (
-	"github.com/HouzuoGuo/tiedot/dberr"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/HouzuoGuo/tiedot/dberr"
 )
 
 func TestInsertRead(t *testing.T) {
@@ -111,7 +112,7 @@ func TestInsertDeleteRead(t *testing.T) {
 		t.Fatalf("Failed to read")
 	}
 	// it shall not panic
-	if err = col.Delete(col.Size); err.(dberr.Error).Code != dberr.DocDoesNotExist {
+	if err = col.Delete(col.Size); dberr.Type(err) != dberr.ErrorNoDoc {
 		t.Fatal("did not error")
 	}
 }
@@ -212,29 +213,29 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 		t.Fatalf("Read invalid location")
 	}
 	// Update invalid location
-	if _, err := col.Update(1, []byte{}); err.(dberr.Error).Code != dberr.DocDoesNotExist {
+	if _, err := col.Update(1, []byte{}); dberr.Type(err) != dberr.ErrorNoDoc {
 		t.Fatalf("Update invalid location")
 	}
-	if _, err := col.Update(col.Used, []byte{}); err.(dberr.Error).Code != dberr.DocDoesNotExist {
+	if _, err := col.Update(col.Used, []byte{}); dberr.Type(err) != dberr.ErrorNoDoc {
 		t.Fatalf("Update invalid location")
 	}
-	if _, err := col.Update(col.Size, []byte{}); err.(dberr.Error).Code != dberr.DocDoesNotExist {
+	if _, err := col.Update(col.Size, []byte{}); dberr.Type(err) != dberr.ErrorNoDoc {
 		t.Fatalf("Update invalid location")
 	}
-	if _, err := col.Update(999999999, []byte{}); err.(dberr.Error).Code != dberr.DocDoesNotExist {
+	if _, err := col.Update(999999999, []byte{}); dberr.Type(err) != dberr.ErrorNoDoc {
 		t.Fatalf("Update invalid location")
 	}
 	// Delete invalid location
-	if err = col.Delete(1); err.(dberr.Error).Code != dberr.DocDoesNotExist {
+	if err = col.Delete(1); dberr.Type(err) != dberr.ErrorNoDoc {
 		t.Fatal("did not error")
 	}
-	if err = col.Delete(col.Used); err.(dberr.Error).Code != dberr.DocDoesNotExist {
+	if err = col.Delete(col.Used); dberr.Type(err) != dberr.ErrorNoDoc {
 		t.Fatal("did not error")
 	}
-	if err = col.Delete(col.Size); err.(dberr.Error).Code != dberr.DocDoesNotExist {
+	if err = col.Delete(col.Size); dberr.Type(err) != dberr.ErrorNoDoc {
 		t.Fatal("did not error")
 	}
-	if err = col.Delete(999999999); err.(dberr.Error).Code != dberr.DocDoesNotExist {
+	if err = col.Delete(999999999); dberr.Type(err) != dberr.ErrorNoDoc {
 		t.Fatal("did not error")
 	}
 	// Insert - not enough room

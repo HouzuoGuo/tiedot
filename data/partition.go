@@ -6,9 +6,10 @@ The hash table stores the unchanging ID as entry key and the physical document l
 package data
 
 import (
+	"sync"
+
 	"github.com/HouzuoGuo/tiedot/dberr"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"sync"
 )
 
 // Partition associates a hash table with collection documents, allowing addressing of a document using an unchanging ID.
@@ -43,20 +44,25 @@ func (part *Partition) Insert(id int, data []byte) (physID int, err error) {
 // Find and retrieve a document by ID.
 func (part *Partition) Read(id int) ([]byte, error) {
 	physID := part.lookup.Get(id, 1)
+
 	if len(physID) == 0 {
-		return nil, dberr.ErrorNoDoc.Fault(id)
-	} else if data := part.col.Read(physID[0]); data == nil {
-		return nil, dberr.ErrorNoDoc.Fault(id)
-	} else {
-		return data, nil
+		return nil, dberr.Make(dberr.ErrorNoDoc, id)
 	}
+
+	data := part.col.Read(physID[0])
+
+	if data == nil {
+		return nil, dberr.Make(dberr.ErrorNoDoc, id)
+	}
+
+	return data, nil
 }
 
 // Update a document.
 func (part *Partition) Update(id int, data []byte) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return dberr.ErrorNoDoc.Fault(id)
+		return dberr.Make(dberr.ErrorNoDoc, id)
 	}
 	newID, err := part.col.Update(physID[0], data)
 	if err != nil {
@@ -72,7 +78,7 @@ func (part *Partition) Update(id int, data []byte) (err error) {
 // Lock a document for exclusive update.
 func (part *Partition) LockUpdate(id int) (err error) {
 	if _, alreadyLocked := part.updating[id]; alreadyLocked {
-		return dberr.ErrorDocLocked.Fault(id)
+		return dberr.Make(dberr.ErrorDocLocked, id)
 	}
 	part.updating[id] = struct{}{}
 	return
@@ -87,7 +93,7 @@ func (part *Partition) UnlockUpdate(id int) {
 func (part *Partition) Delete(id int) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return dberr.ErrorNoDoc.Fault(id)
+		return dberr.Make(dberr.ErrorNoDoc, id)
 	}
 	part.col.Delete(physID[0])
 	part.lookup.Remove(id, physID[0])
@@ -126,8 +132,13 @@ func (part *Partition) ApproxDocCount() int {
 }
 
 // Clear data file and lookup hash table.
-func (part *Partition) Clear() (err error) {
-	var failure bool
+func (part *Partition) Clear() error {
+
+	var (
+		err     error
+		failure bool
+	)
+
 	if err = part.col.Clear(); err != nil {
 		tdlog.CritNoRepeat("Failed to clear %s: %v", part.col.Path, err)
 		failure = true
@@ -137,14 +148,18 @@ func (part *Partition) Clear() (err error) {
 		failure = true
 	}
 	if failure {
-		err = dberr.ErrorIO
+		return dberr.Make(dberr.ErrorIO)
 	}
-	return
+	return nil
 }
 
 // Close all file handles.
-func (part *Partition) Close() (err error) {
-	var failure bool
+func (part *Partition) Close() error {
+
+	var (
+		err     error
+		failure bool
+	)
 	if err = part.col.Close(); err != nil {
 		tdlog.CritNoRepeat("Failed to close %s: %v", part.col.Path, err)
 		failure = true
@@ -154,7 +169,7 @@ func (part *Partition) Close() (err error) {
 		failure = true
 	}
 	if failure {
-		err = dberr.ErrorIO
+		return dberr.Make(dberr.ErrorIO)
 	}
-	return
+	return nil
 }
