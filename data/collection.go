@@ -52,7 +52,7 @@ func (col *Collection) Read(id uint64) []byte {
 func (col *Collection) Insert(data []byte) (id uint64, err error) {
 	room := uint64(len(data) << 1)
 	if room > DOC_MAX_ROOM {
-		return 0, dberr.ErrorDocTooLarge.Fault(DOC_MAX_ROOM, room)
+		return 0, dberr.Make(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, room)
 	}
 	id = col.Used
 	docSize := DOC_HEADER + room
@@ -77,13 +77,13 @@ func (col *Collection) Insert(data []byte) (id uint64, err error) {
 // Overwrite or re-insert a document, return the new document ID if re-inserted.
 func (col *Collection) Update(id uint64, data []byte) (newID uint64, err error) {
 	if newSize := uint64(len(data)); newSize > DOC_MAX_ROOM {
-		return 0, dberr.ErrorDocTooLarge.Fault(DOC_MAX_ROOM, newSize)
+		return 0, dberr.Make(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, newSize)
 	} else if id < 0 || id >= col.Used-DOC_HEADER || col.Buf[id] != 1 {
-		return 0, dberr.ErrorNoDoc.Fault(id)
+		return 0, dberr.Make(dberr.ErrorNoDoc, id)
 	} else if room := binary.LittleEndian.Uint64(col.Buf[id+1:]); room > DOC_MAX_ROOM {
-		return 0, dberr.ErrorNoDoc.Fault(id)
+		return 0, dberr.Make(dberr.ErrorNoDoc, id)
 	} else if docEnd := id + DOC_HEADER + room; docEnd >= col.Size {
-		return 0, dberr.ErrorNoDoc.Fault(id)
+		return 0, dberr.Make(dberr.ErrorNoDoc, id)
 	} else if newSize <= room {
 		padding := id + DOC_HEADER + newSize
 		paddingEnd := id + DOC_HEADER + room
@@ -107,11 +107,12 @@ func (col *Collection) Update(id uint64, data []byte) (newID uint64, err error) 
 // Delete a document by ID.
 func (col *Collection) Delete(id uint64) (err error) {
 	if id < 0 || id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
-		err = dberr.ErrorNoDoc.Fault(id)
-	} else if col.Buf[id] == 1 {
+		return dberr.Make(dberr.ErrorNoDoc, id)
+	}
+	if col.Buf[id] == 1 {
 		col.Buf[id] = 0
 	}
-	return
+	return nil
 }
 
 // Run the function on every document; stop when the function returns false.

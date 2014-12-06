@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/dberr"
-	"os"
 )
 
 /*
@@ -99,9 +100,9 @@ func embeddedExample() {
 		panic(err)
 	}
 
-	// More complicated error handing - identify the error kind.
+	// More complicated error handing - identify the error Type.
 	// In this example, the error code tells that the document no longer exists.
-	if err := feeds.Delete(docID); err.(dberr.Error).Code == dberr.DocDoesNotExist {
+	if err := feeds.Delete(docID); dberr.Type(err) == dberr.ErrorNoDoc {
 		fmt.Println("The document was already deleted")
 	}
 
