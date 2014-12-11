@@ -27,7 +27,7 @@ type BinProtSrv struct {
 	clientIDSeq, maintByClient  uint64
 	opLock                      *sync.Mutex
 	shutdown                    bool
-	pendingUpdates              int64
+	pendingTransactions         int64
 	schema                      *Schema
 }
 
@@ -43,17 +43,17 @@ type BinProtWorker struct {
 // Create a server, but do not yet start serving incoming connections.
 func NewServer(rank, nProcs int, workspace string) (srv *BinProtSrv) {
 	return &BinProtSrv{
-		rank:           rank,
-		nProcs:         nProcs,
-		workspace:      workspace,
-		dbPath:         path.Join(workspace, strconv.Itoa(rank)),
-		sockPath:       path.Join(workspace, strconv.Itoa(rank)+SOCK_FILE_SUFFIX),
-		clientIDSeq:    0,
-		maintByClient:  0,
-		opLock:         new(sync.Mutex),
-		shutdown:       false,
-		pendingUpdates: 0,
-		schema:         new(Schema)}
+		rank:                rank,
+		nProcs:              nProcs,
+		workspace:           workspace,
+		dbPath:              path.Join(workspace, strconv.Itoa(rank)),
+		sockPath:            path.Join(workspace, strconv.Itoa(rank)+SOCK_FILE_SUFFIX),
+		clientIDSeq:         0,
+		maintByClient:       0,
+		opLock:              new(sync.Mutex),
+		shutdown:            false,
+		pendingTransactions: 0,
+		schema:              new(Schema)}
 }
 
 // Serve incoming connections. Block until server is told to shutdown.

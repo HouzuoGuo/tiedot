@@ -7,11 +7,13 @@ import (
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/dberr"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"math/rand"
 	"strconv"
 	"strings"
 )
 
-type query struct {
+type Query struct {
+	client         *BinProtClient
 	colName, query string
 	colID          int32
 	colIDBytes     []byte
@@ -19,24 +21,34 @@ type query struct {
 }
 
 // Run a query (deserialized from JSON) on the specified collection, store result document IDs inside the keys of the map.
-func (client *BinProtClient) EvalQuery(query interface{}, colName string, result *map[uint64]struct{}) (err error) {
+func (client *BinProtClient) EvalQuery(q interface{}, colName string, result *map[uint64]struct{}) (err error) {
 	client.opLock.Lock()
 	colID, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {
 		client.opLock.Unlock()
 		return
 	}
-	err = &query{
+	// Place a lock on any rank
+	lockedServer := rand.Intn(client.nProcs)
+	if _, _, err = client.sendCmd(lockedServer, true, C_QUERY_PRE); err != nil {
+		return
+	}
+	qStruct := &Query{
+		client:     client,
 		colName:    colName,
 		colID:      colID,
 		colIDBytes: colIDBytes,
-		result:     result}.eval(query)
+		result:     result}
+	err = qStruct.eval(q)
+	if _, _, err = client.sendCmd(lockedServer, true, C_QUERY_PRE); err != nil {
+		tdlog.Noticef("Client %d: failed to call QUERY_POST on server %d", client.id, lockedServer)
+	}
 	client.opLock.Unlock()
 	return
 }
 
 // The main entry point of recursive query processing.
-func (q *query) eval(op interface{}) (err error) {
+func (q *Query) eval(op interface{}) (err error) {
 	switch expr := op.(type) {
 	case []interface{}: // [sub query 1, sub query 2, etc]
 		return q.union(expr)
@@ -72,7 +84,7 @@ func (q *query) eval(op interface{}) (err error) {
 }
 
 // Calculate union of sub-query results.
-func (q *query) union(exprs []interface{}) (err error) {
+func (q *Query) union(exprs []interface{}) (err error) {
 	for _, subExpr := range exprs {
 		if err = q.eval(subExpr); err != nil {
 			return
@@ -82,16 +94,16 @@ func (q *query) union(exprs []interface{}) (err error) {
 }
 
 // Put all document IDs into result.
-func (q *query) allIDs() (err error) {
-	src.forEachDoc(func(id uint64, _ []byte) bool {
-		(*result)[id] = struct{}{}
+func (q *Query) allIDs() (err error) {
+	q.client.forEachDocBytes(q.colName, func(id uint64, _ []byte) bool {
+		(*q.result)[id] = struct{}{}
 		return true
 	})
 	return
 }
 
 // Value equity check ("attribute == value") using hash lookup.
-func (q *query) lookup(lookupValue interface{}, expr map[string]interface{}) (err error) {
+func (q *Query) lookup(lookupValue interface{}, expr map[string]interface{}) (err error) {
 	// Figure out lookup path - JSON array "in"
 	path, hasPath := expr["in"]
 	if !hasPath {
@@ -117,9 +129,9 @@ func (q *query) lookup(lookupValue interface{}, expr map[string]interface{}) (er
 		}
 	}
 	lookupStrValue := fmt.Sprint(lookupValue) // the value to look for
-	lookupValueHash := db.StrHashStrHash(lookupStrValue)
+	lookupValueHash := db.StrHash(lookupStrValue)
 	scanPath := strings.Join(vecPath, db.INDEX_PATH_SEP)
-	if _, indexed := src.indexPaths[scanPath]; !indexed {
+	if _, indexed := q.client.indexPaths[scanPath]; !indexed {
 		return dberr.Make(dberr.ErrorNeedIndex, scanPath, expr)
 	}
 	ht := src.hts[scanPath]
@@ -138,7 +150,7 @@ func (q *query) lookup(lookupValue interface{}, expr map[string]interface{}) (er
 }
 
 // Value existence check (value != nil) using hash lookup.
-func (q *query) pathExists(hasPath interface{}, expr map[string]interface{}) (err error) {
+func (q *Query) pathExists(hasPath interface{}, expr map[string]interface{}) (err error) {
 	// Figure out the path
 	vecPath := make([]string, 0)
 	if vecPathInterface, ok := hasPath.([]interface{}); ok {
@@ -183,7 +195,7 @@ func (q *query) pathExists(hasPath interface{}, expr map[string]interface{}) (er
 }
 
 // Calculate intersection of sub-query results.
-func (q *query) intersect(subExprs interface{}) (err error) {
+func (q *Query) intersect(subExprs interface{}) (err error) {
 	myResult := make(map[uint64]struct{})
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		first := true
@@ -215,7 +227,7 @@ func (q *query) intersect(subExprs interface{}) (err error) {
 }
 
 // Calculate complement of sub-query results.
-func (q *query) complement(subExprs interface{}) (err error) {
+func (q *Query) complement(subExprs interface{}) (err error) {
 	myResult := make(map[uint64]struct{})
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		for _, subExpr := range subExprVecs {
@@ -245,12 +257,12 @@ func (q *query) complement(subExprs interface{}) (err error) {
 	return
 }
 
-func (q *query) hashScan(idxName string, key, limit uint64) []uint64 {
+func (q *Query) hashScan(idxName string, key, limit uint64) []uint64 {
 	return col.hts[idxName].Get(key, limit)
 }
 
 // Look for indexed integer values within the specified integer range.
-func (q *query) intRange(intFrom interface{}, expr map[string]interface{}) (err error) {
+func (q *Query) intRange(intFrom interface{}, expr map[string]interface{}) (err error) {
 	path, hasPath := expr["in"]
 	if !hasPath {
 		return errors.New("Missing path `in`")

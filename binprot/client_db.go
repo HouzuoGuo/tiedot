@@ -113,7 +113,7 @@ func (client *BinProtClient) Scrub(colName string) error {
 		}
 		total := docCount/10000 + 1
 		for page := uint64(0); page < total; page++ {
-			docs, err := client.getDocPage(colName, page, total)
+			docs, err := client.getDocPage(colName, page, total, true)
 			if err != nil {
 				return err
 			}
@@ -207,7 +207,7 @@ func (client *BinProtClient) Index(colName string, idxPath []string) error {
 		}
 		total := docCount/10000 + 1
 		for page := uint64(0); page < total; page++ {
-			docs, err := client.getDocPage(colName, page, total)
+			docs, err := client.getDocPage(colName, page, total, true)
 			if err != nil {
 				return err
 			}

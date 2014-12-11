@@ -27,10 +27,12 @@ const (
 	C_DOC_APPROX_COUNT = 17
 	C_DOC_GET_PAGE     = 18
 
-	// Index commands
-	C_HT_PUT    = 21
-	C_HT_GET    = 22
-	C_HT_REMOVE = 23
+	// Index and query commands
+	C_HT_PUT     = 21
+	C_HT_GET     = 22
+	C_HT_REMOVE  = 23
+	C_QUERY_PRE  = 24
+	C_QUERY_POST = 25
 
 	// Maintenance commands
 	C_RELOAD      = 91
@@ -97,7 +99,7 @@ func (worker *BinProtWorker) Run() {
 			// Process the command
 			switch cmd {
 			case C_DOC_INSERT:
-				// (Increase pending-update counter)
+				// (Increase pending-transaction counter)
 				// Insert and lock a document - collection ID, new document ID, serialized document content
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
@@ -108,18 +110,18 @@ func (worker *BinProtWorker) Run() {
 				} else if err := col.BPLockAndInsert(docID, doc); err != nil {
 					worker.ansErr(R_ERR, []byte(err.Error()))
 				} else {
-					atomic.AddInt64(&worker.srv.pendingUpdates, 1)
+					atomic.AddInt64(&worker.srv.pendingTransactions, 1)
 					worker.ansOK()
 				}
 			case C_DOC_UNLOCK:
-				// (Decrease pending-update counter)
+				// (Decrease pending-transaction counter)
 				// Unlock a document to allow further updates - collection ID, document ID
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
 				col, exists := worker.srv.schema.colLookup[colID]
 				if exists {
 					col.BPUnlock(docID)
-					atomic.AddInt64(&worker.srv.pendingUpdates, -1)
+					atomic.AddInt64(&worker.srv.pendingTransactions, -1)
 					worker.ansOK()
 				} else {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
@@ -137,7 +139,7 @@ func (worker *BinProtWorker) Run() {
 					worker.ansErr(R_ERR, []byte(err.Error()))
 				}
 			case C_DOC_LOCK_READ:
-				// (Increase pending-update counter)
+				// (Increase pending-transaction counter)
 				// Read a document back to the client, and lock the document for update - collection ID, document ID
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
@@ -145,7 +147,7 @@ func (worker *BinProtWorker) Run() {
 				if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				} else if doc, err := col.BPLockAndRead(docID); err == nil {
-					atomic.AddInt64(&worker.srv.pendingUpdates, 1)
+					atomic.AddInt64(&worker.srv.pendingTransactions, 1)
 					worker.ansOK(doc)
 				} else {
 					worker.ansErr(R_ERR, []byte(err.Error()))
@@ -241,9 +243,17 @@ func (worker *BinProtWorker) Run() {
 				} else {
 					worker.ansErr(R_ERR_SCHEMA, []byte{})
 				}
+			case C_QUERY_PRE:
+				// (Increase pending-transaction counter) do nothing
+				atomic.AddInt64(&worker.srv.pendingTransactions, 1)
+				worker.ansOK()
+			case C_QUERY_POST:
+				// (Decrease pending-transaction counter) do nothing
+				atomic.AddInt64(&worker.srv.pendingTransactions, -1)
+				worker.ansOK()
 			case C_GO_MAINT:
 				// Go to maintenance mode to allow exclusive data file access by the client
-				if atomic.LoadInt64(&worker.srv.pendingUpdates) > 0 {
+				if atomic.LoadInt64(&worker.srv.pendingTransactions) > 0 {
 					// Do not allow maintenance access if another client is in the middle of document update
 					worker.ansErr(R_ERR_MAINT, []byte("There are outstanding transactions"))
 				} else {

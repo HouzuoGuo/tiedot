@@ -207,7 +207,20 @@ func (client *BinProtClient) Delete(colName string, docID uint64) (err error) {
 	return
 }
 
-// Return an error if a value is not in index. Used only by test case.
+func (client *BinProtClient) hashLookup(colID int32, htID int32, limit uint64, strKey string) (result []uint64, err error) {
+	hashKey := db.StrHash(strKey)
+	_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, Bint32(htID), Buint64(hashKey), Buint64(limit))
+	if err != nil {
+		return
+	}
+	result = make([]uint64, len(resp))
+	for i, docID := range resp {
+		result[i] = Uint64(docID)
+	}
+	return
+}
+
+// (Test case only) Return an error if value is not uniquely indexed in the index.
 func (client *BinProtClient) valIsIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
@@ -228,24 +241,18 @@ func (client *BinProtClient) valIsIndexed(colName string, idxPath []string, val 
 		if !pathMatch {
 			continue
 		}
-		hashKey := db.StrHash(fmt.Sprint(val))
-		_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, Bint32(htID), Buint64(hashKey), Buint64(0))
+		vals, err := client.hashLookup(colID, htID, 0, fmt.Sprint(val))
 		if err != nil {
 			return err
-		}
-		vals := make([]uint64, len(resp))
-		for i, aVal := range resp {
-			vals[i] = Uint64(aVal)
-		}
-		if len(vals) != 1 || vals[0] != docID {
-			return fmt.Errorf("Looking for %v (%v) docID %v in %v, but got result %v", val, hashKey, docID, idxPath, vals)
+		} else if len(vals) != 1 || vals[0] != docID {
+			return fmt.Errorf("Looking for %v docID %v in %v, but got result %v", val, docID, idxPath, vals)
 		}
 		return nil
 	}
 	return fmt.Errorf("Index not found")
 }
 
-// Return an error if a value is in index. Used only by test case.
+// (Test case only) Return an error if value appears in the index.
 func (client *BinProtClient) valIsNotIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
@@ -266,18 +273,13 @@ func (client *BinProtClient) valIsNotIndexed(colName string, idxPath []string, v
 		if !pathMatch {
 			continue
 		}
-		hashKey := db.StrHash(fmt.Sprint(val))
-		_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, Bint32(htID), Buint64(hashKey), Buint64(0))
+		vals, err := client.hashLookup(colID, htID, 0, fmt.Sprint(val))
 		if err != nil {
 			return err
 		}
-		vals := make([]uint64, len(resp))
-		for i, aVal := range resp {
-			vals[i] = Uint64(aVal)
-		}
 		for _, v := range vals {
 			if v == docID {
-				return fmt.Errorf("Looking for %v %v %v in %v (should not return any), but got result %v", val, hashKey, docID, idxPath, vals)
+				return fmt.Errorf("Looking for %v %v in %v (should not return any), but got result %v", val, docID, idxPath, vals)
 			}
 		}
 		return nil
@@ -302,7 +304,8 @@ func (client *BinProtClient) ApproxDocCount(colName string) (count uint64, err e
 	return client.approxDocCount(colName)
 }
 
-func (client *BinProtClient) getDocPage(colName string, page, total uint64) (docs map[uint64]interface{}, err error) {
+// Note that returned docs map contains ID vs Bytes (deserialize == false) or ID vs JSON interface (deserialize == true).
+func (client *BinProtClient) getDocPage(colName string, page, total uint64, deserialize bool) (docs map[uint64]interface{}, err error) {
 	docs = make(map[uint64]interface{})
 	_, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {
@@ -317,11 +320,15 @@ func (client *BinProtClient) getDocPage(colName string, page, total uint64) (doc
 		for i := 0; i < len(resp); i += 2 {
 			docID := Uint64(resp[i])
 			docBytes := resp[i+1]
-			var doc interface{}
-			if err = json.Unmarshal(docBytes, &doc); err == nil {
-				docs[docID] = doc
+			if deserialize {
+				var doc interface{}
+				if err = json.Unmarshal(docBytes, &doc); err == nil {
+					docs[docID] = doc
+				} else {
+					tdlog.CritNoRepeat("Client %d: found document corruption in collection %s ID %d while going through docs", client.id, colName, docID)
+				}
 			} else {
-				tdlog.CritNoRepeat("Client %d: found document corruption in collection %s ID %d while going through docs", client.id, colName, docID)
+				docs[docID] = docBytes
 			}
 		}
 	}
@@ -331,7 +338,51 @@ func (client *BinProtClient) getDocPage(colName string, page, total uint64) (doc
 // Divide collection into roughly equally sized pages and return a page of documents.
 func (client *BinProtClient) GetDocPage(colName string, page, total uint64) (docs map[uint64]interface{}, err error) {
 	client.opLock.Lock()
-	docs, err = client.getDocPage(colName, page, total)
+	docs, err = client.getDocPage(colName, page, total, true)
 	client.opLock.Unlock()
 	return
+}
+
+// Run fun for all document ID vs document content (bytes).
+func (client *BinProtClient) forEachDocBytes(colName string, fun func(uint64, []byte) bool) (err error) {
+	docCount, err := client.approxDocCount(colName)
+	if err != nil {
+		return err
+	}
+	// Go through 10k documents at a time
+	total := docCount/10000 + 1
+	for page := uint64(0); page < total; page++ {
+		docs, err := client.getDocPage(colName, page, total, false)
+		if err != nil {
+			return err
+		}
+		for id, docBytes := range docs {
+			if !fun(id, docBytes.([]byte)) {
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
+// Run fun for all document ID vs document content (JSON interface).
+func (client *BinProtClient) forEachDoc(colName string, fun func(uint64, interface{}) bool) (err error) {
+	docCount, err := client.approxDocCount(colName)
+	if err != nil {
+		return err
+	}
+	// Go through 10k documents at a time
+	total := docCount/10000 + 1
+	for page := uint64(0); page < total; page++ {
+		docs, err := client.getDocPage(colName, page, total, true)
+		if err != nil {
+			return err
+		}
+		for id, doc := range docs {
+			if !fun(id, doc) {
+				return nil
+			}
+		}
+	}
+	return nil
 }
