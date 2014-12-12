@@ -207,7 +207,7 @@ func (client *BinProtClient) Delete(colName string, docID uint64) (err error) {
 	return
 }
 
-func (client *BinProtClient) hashLookup(colID int32, htID int32, limit uint64, strKey string) (result []uint64, err error) {
+func (client *BinProtClient) hashLookup(htID int32, limit uint64, strKey string) (result []uint64, err error) {
 	hashKey := db.StrHash(strKey)
 	_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, Bint32(htID), Buint64(hashKey), Buint64(limit))
 	if err != nil {
@@ -241,7 +241,7 @@ func (client *BinProtClient) valIsIndexed(colName string, idxPath []string, val 
 		if !pathMatch {
 			continue
 		}
-		vals, err := client.hashLookup(colID, htID, 0, fmt.Sprint(val))
+		vals, err := client.hashLookup(htID, 0, fmt.Sprint(val))
 		if err != nil {
 			return err
 		} else if len(vals) != 1 || vals[0] != docID {
@@ -273,7 +273,7 @@ func (client *BinProtClient) valIsNotIndexed(colName string, idxPath []string, v
 		if !pathMatch {
 			continue
 		}
-		vals, err := client.hashLookup(colID, htID, 0, fmt.Sprint(val))
+		vals, err := client.hashLookup(htID, 0, fmt.Sprint(val))
 		if err != nil {
 			return err
 		}

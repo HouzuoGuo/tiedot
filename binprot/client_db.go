@@ -254,8 +254,8 @@ func (client *BinProtClient) AllIndexesJointPaths(colName string) (paths []strin
 		return nil, fmt.Errorf("Collection %s does not exist", colName)
 	}
 	// Join and sort
-	for _, pathSegs := range client.schema.indexPaths[colID] {
-		paths = append(paths, strings.Join(pathSegs, db.INDEX_PATH_SEP))
+	for path := range client.schema.indexPathsJoint[colID] {
+		paths = append(paths, path)
 	}
 	sort.Strings(paths)
 	client.opLock.Unlock()

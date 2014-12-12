@@ -2,6 +2,7 @@
 package binprot
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
@@ -17,7 +18,6 @@ type Query struct {
 	colName, query string
 	colID          int32
 	colIDBytes     []byte
-	result         *map[uint64]struct{}
 }
 
 // Run a query (deserialized from JSON) on the specified collection, store result document IDs inside the keys of the map.
@@ -28,7 +28,7 @@ func (client *BinProtClient) EvalQuery(q interface{}, colName string, result *ma
 		client.opLock.Unlock()
 		return
 	}
-	// Place a lock on any rank
+	// Place a lock on any rank as a signal of ongoing query operations
 	lockedServer := rand.Intn(client.nProcs)
 	if _, _, err = client.sendCmd(lockedServer, true, C_QUERY_PRE); err != nil {
 		return
@@ -37,45 +37,62 @@ func (client *BinProtClient) EvalQuery(q interface{}, colName string, result *ma
 		client:     client,
 		colName:    colName,
 		colID:      colID,
-		colIDBytes: colIDBytes,
-		result:     result}
-	err = qStruct.eval(q)
-	if _, _, err = client.sendCmd(lockedServer, true, C_QUERY_PRE); err != nil {
+		colIDBytes: colIDBytes}
+	err = qStruct.eval(q, result)
+	if _, _, err = client.sendCmd(lockedServer, true, C_QUERY_POST); err != nil {
 		tdlog.Noticef("Client %d: failed to call QUERY_POST on server %d", client.id, lockedServer)
 	}
 	client.opLock.Unlock()
 	return
 }
 
-// The main entry point of recursive query processing.
-func (q *Query) eval(op interface{}) (err error) {
-	switch expr := op.(type) {
+// Read and deserialize a document.
+func (q *Query) readDeserializeDoc(docID uint64) (doc map[string]interface{}, err error) {
+	rank, docIDBytes := q.client.docID2RankBytes(docID)
+	_, resp, err := q.client.sendCmd(rank, true, C_DOC_READ, q.colIDBytes, docIDBytes)
+	err = json.Unmarshal(resp[0], &doc)
+	return
+}
+
+// Find an index or return error.
+func (q *Query) getHTID(vecPath []string, originalQExpr interface{}) (htID int32, err error) {
+	jointPath := strings.Join(vecPath, db.INDEX_PATH_SEP)
+	htID, exists := q.client.schema.indexPathsJoint[q.colID][jointPath]
+	if !exists {
+		err = dberr.Make(dberr.ErrorNeedIndex, vecPath, originalQExpr)
+	}
+	return
+}
+
+// Recursively process the query operation.
+func (q *Query) eval(queryExpr interface{}, result *map[uint64]struct{}) (err error) {
+	switch expr := queryExpr.(type) {
 	case []interface{}: // [sub query 1, sub query 2, etc]
-		return q.union(expr)
+		return q.union(expr, result)
 	case string:
 		if expr == "all" {
-			return q.allIDs()
+			return q.allIDs(result)
 		} else {
 			// Might be single document number
 			docID, err := strconv.ParseUint(expr, 10, 64)
 			if err != nil {
 				return dberr.Make(dberr.ErrorExpectingInt, "Single Document ID", docID)
 			}
-			(*q.result)[docID] = struct{}{}
+			(*result)[docID] = struct{}{}
 		}
 	case map[string]interface{}:
 		if lookupValue, lookup := expr["eq"]; lookup { // eq - lookup
-			return q.lookup(lookupValue, expr)
+			return q.lookup(lookupValue, expr, result)
 		} else if hasPath, exist := expr["has"]; exist { // has - path existence test
-			return q.pathExists(hasPath, expr)
+			return q.pathExists(hasPath, expr, result)
 		} else if subExprs, intersect := expr["n"]; intersect { // n - intersection
-			return q.intersect(subExprs)
+			return q.intersect(subExprs, result)
 		} else if subExprs, complement := expr["c"]; complement { // c - complement
-			return q.complement(subExprs)
+			return q.complement(subExprs, result)
 		} else if intFrom, htRange := expr["int-from"]; htRange { // int-from, int-to - integer range query
-			return q.intRange(intFrom, expr)
+			return q.intRange(intFrom, expr, result)
 		} else if intFrom, htRange := expr["int from"]; htRange { // "int from, "int to" - integer range query - same as above, just without dash
-			return q.intRange(intFrom, expr)
+			return q.intRange(intFrom, expr, result)
 		} else {
 			return errors.New(fmt.Sprintf("Query %v does not contain any operation (lookup/union/etc)", expr))
 		}
@@ -84,9 +101,9 @@ func (q *Query) eval(op interface{}) (err error) {
 }
 
 // Calculate union of sub-query results.
-func (q *Query) union(exprs []interface{}) (err error) {
+func (q *Query) union(exprs []interface{}, result *map[uint64]struct{}) (err error) {
 	for _, subExpr := range exprs {
-		if err = q.eval(subExpr); err != nil {
+		if err = q.eval(subExpr, result); err != nil {
 			return
 		}
 	}
@@ -94,18 +111,18 @@ func (q *Query) union(exprs []interface{}) (err error) {
 }
 
 // Put all document IDs into result.
-func (q *Query) allIDs() (err error) {
+func (q *Query) allIDs(result *map[uint64]struct{}) (err error) {
 	q.client.forEachDocBytes(q.colName, func(id uint64, _ []byte) bool {
-		(*q.result)[id] = struct{}{}
+		(*result)[id] = struct{}{}
 		return true
 	})
 	return
 }
 
 // Value equity check ("attribute == value") using hash lookup.
-func (q *Query) lookup(lookupValue interface{}, expr map[string]interface{}) (err error) {
+func (q *Query) lookup(lookupValue interface{}, queryExpr map[string]interface{}, result *map[uint64]struct{}) (err error) {
 	// Figure out lookup path - JSON array "in"
-	path, hasPath := expr["in"]
+	path, hasPath := queryExpr["in"]
 	if !hasPath {
 		return errors.New("Missing lookup path `in`")
 	}
@@ -119,7 +136,7 @@ func (q *Query) lookup(lookupValue interface{}, expr map[string]interface{}) (er
 	}
 	// Figure out result number limit
 	intLimit := uint64(0)
-	if limit, hasLimit := expr["limit"]; hasLimit {
+	if limit, hasLimit := queryExpr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
 			intLimit = uint64(floatLimit)
 		} else if _, ok := limit.(int); ok {
@@ -129,19 +146,17 @@ func (q *Query) lookup(lookupValue interface{}, expr map[string]interface{}) (er
 		}
 	}
 	lookupStrValue := fmt.Sprint(lookupValue) // the value to look for
-	lookupValueHash := db.StrHash(lookupStrValue)
-	scanPath := strings.Join(vecPath, db.INDEX_PATH_SEP)
-	if _, indexed := q.client.indexPaths[scanPath]; !indexed {
-		return dberr.Make(dberr.ErrorNeedIndex, scanPath, expr)
-	}
-	ht := src.hts[scanPath]
-	vals := ht.Get(lookupValueHash, intLimit)
-	for _, match := range vals {
-		// Filter result to avoid hash collision
-		if doc, err := src.read(match); err == nil {
-			for _, v := range GetIn(doc, vecPath) {
-				if fmt.Sprint(v) == lookupStrValue {
-					(*result)[match] = struct{}{}
+	if htID, err := q.getHTID(vecPath, queryExpr); err != nil {
+		return err
+	} else if vals, err := q.client.hashLookup(htID, intLimit, lookupStrValue); err != nil {
+		return err
+	} else {
+		for _, match := range vals {
+			if doc, err := q.readDeserializeDoc(match); err == nil {
+				for _, v := range db.GetIn(doc, vecPath) {
+					if fmt.Sprint(v) == lookupStrValue {
+						(*result)[match] = struct{}{}
+					}
 				}
 			}
 		}
@@ -150,7 +165,7 @@ func (q *Query) lookup(lookupValue interface{}, expr map[string]interface{}) (er
 }
 
 // Value existence check (value != nil) using hash lookup.
-func (q *Query) pathExists(hasPath interface{}, expr map[string]interface{}) (err error) {
+func (q *Query) pathExists(hasPath interface{}, queryExpr map[string]interface{}, result *map[uint64]struct{}) (err error) {
 	// Figure out the path
 	vecPath := make([]string, 0)
 	if vecPathInterface, ok := hasPath.([]interface{}); ok {
@@ -162,7 +177,7 @@ func (q *Query) pathExists(hasPath interface{}, expr map[string]interface{}) (er
 	}
 	// Figure out result number limit
 	intLimit := uint64(0)
-	if limit, hasLimit := expr["limit"]; hasLimit {
+	if limit, hasLimit := queryExpr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
 			intLimit = uint64(floatLimit)
 		} else if _, ok := limit.(int); ok {
@@ -173,7 +188,7 @@ func (q *Query) pathExists(hasPath interface{}, expr map[string]interface{}) (er
 	}
 	jointPath := strings.Join(vecPath, db.INDEX_PATH_SEP)
 	if _, indexed := src.indexPaths[jointPath]; !indexed {
-		return dberr.Make(dberr.ErrorNeedIndex, vecPath, expr)
+		return dberr.Make(dberr.ErrorNeedIndex, vecPath, queryExpr)
 	}
 	counter := uint64(0)
 	partDiv := src.approxDocCount() / 4000 // collect approx. 4k document IDs in each iteration
@@ -195,14 +210,14 @@ func (q *Query) pathExists(hasPath interface{}, expr map[string]interface{}) (er
 }
 
 // Calculate intersection of sub-query results.
-func (q *Query) intersect(subExprs interface{}) (err error) {
+func (q *Query) intersect(subExprs interface{}, result *map[uint64]struct{}) (err error) {
 	myResult := make(map[uint64]struct{})
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		first := true
 		for _, subExpr := range subExprVecs {
 			subResult := make(map[uint64]struct{})
 			intersection := make(map[uint64]struct{})
-			if err = q.eval(subExpr, src, &subResult); err != nil {
+			if err = q.eval(subExpr, &subResult); err != nil {
 				return
 			}
 			if first {
@@ -227,13 +242,13 @@ func (q *Query) intersect(subExprs interface{}) (err error) {
 }
 
 // Calculate complement of sub-query results.
-func (q *Query) complement(subExprs interface{}) (err error) {
+func (q *Query) complement(subExprs interface{}, result *map[uint64]struct{}) (err error) {
 	myResult := make(map[uint64]struct{})
 	if subExprVecs, ok := subExprs.([]interface{}); ok {
 		for _, subExpr := range subExprVecs {
 			subResult := make(map[uint64]struct{})
 			complement := make(map[uint64]struct{})
-			if err = q.eval(subExpr, src, &subResult); err != nil {
+			if err = q.eval(subExpr, &subResult); err != nil {
 				return
 			}
 			for k, _ := range subResult {
@@ -257,13 +272,9 @@ func (q *Query) complement(subExprs interface{}) (err error) {
 	return
 }
 
-func (q *Query) hashScan(idxName string, key, limit uint64) []uint64 {
-	return col.hts[idxName].Get(key, limit)
-}
-
 // Look for indexed integer values within the specified integer range.
-func (q *Query) intRange(intFrom interface{}, expr map[string]interface{}) (err error) {
-	path, hasPath := expr["in"]
+func (q *Query) intRange(intFrom interface{}, queryExpr map[string]interface{}, result *map[uint64]struct{}) (err error) {
+	path, hasPath := queryExpr["in"]
 	if !hasPath {
 		return errors.New("Missing path `in`")
 	}
@@ -278,7 +289,7 @@ func (q *Query) intRange(intFrom interface{}, expr map[string]interface{}) (err 
 	}
 	// Figure out result number limit
 	intLimit := uint64(0)
-	if limit, hasLimit := expr["limit"]; hasLimit {
+	if limit, hasLimit := queryExpr["limit"]; hasLimit {
 		if floatLimit, ok := limit.(float64); ok {
 			intLimit = uint64(floatLimit)
 		} else if _, ok := limit.(int); ok {
@@ -296,7 +307,7 @@ func (q *Query) intRange(intFrom interface{}, expr map[string]interface{}) (err 
 	} else {
 		return dberr.Make(dberr.ErrorExpectingInt, "int-from", from)
 	}
-	if intTo, ok := expr["int-to"]; ok {
+	if intTo, ok := queryExpr["int-to"]; ok {
 		if floatTo, ok := intTo.(float64); ok {
 			to = int(floatTo)
 		} else if _, ok := intTo.(int); ok {
@@ -304,7 +315,7 @@ func (q *Query) intRange(intFrom interface{}, expr map[string]interface{}) (err 
 		} else {
 			return dberr.Make(dberr.ErrorExpectingInt, "int-to", to)
 		}
-	} else if intTo, ok := expr["int to"]; ok {
+	} else if intTo, ok := queryExpr["int to"]; ok {
 		if floatTo, ok := intTo.(float64); ok {
 			to = int(floatTo)
 		} else if _, ok := intTo.(int); ok {
@@ -316,12 +327,12 @@ func (q *Query) intRange(intFrom interface{}, expr map[string]interface{}) (err 
 		return dberr.Make(dberr.ErrorMissing, "int-to")
 	}
 	if to > from && to-from > 1000 || from > to && from-to > 1000 {
-		tdlog.CritNoRepeat("Query %v involves index lookup on more than 1000 values, which can be very inefficient", expr)
+		tdlog.CritNoRepeat("Query %v involves index lookup on more than 1000 values, which can be very inefficient", queryExpr)
 	}
 	counter := uint64(0) // Number of results already collected
 	htPath := strings.Join(vecPath, ",")
 	if _, indexScan := src.indexPaths[htPath]; !indexScan {
-		return dberr.Make(dberr.ErrorNeedIndex, vecPath, expr)
+		return dberr.Make(dberr.ErrorNeedIndex, vecPath, queryExpr)
 	}
 	if from < to {
 		// Forward scan - from low value to high value
