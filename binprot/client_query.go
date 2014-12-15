@@ -83,8 +83,6 @@ func (q *Query) eval(queryExpr interface{}, result *map[uint64]struct{}) (err er
 	case map[string]interface{}:
 		if lookupValue, lookup := expr["eq"]; lookup { // eq - lookup
 			return q.lookup(lookupValue, expr, result)
-		} else if hasPath, exist := expr["has"]; exist { // has - path existence test
-			return q.pathExists(hasPath, expr, result)
 		} else if subExprs, intersect := expr["n"]; intersect { // n - intersection
 			return q.intersect(subExprs, result)
 		} else if subExprs, complement := expr["c"]; complement { // c - complement
@@ -103,8 +101,12 @@ func (q *Query) eval(queryExpr interface{}, result *map[uint64]struct{}) (err er
 // Calculate union of sub-query results.
 func (q *Query) union(exprs []interface{}, result *map[uint64]struct{}) (err error) {
 	for _, subExpr := range exprs {
-		if err = q.eval(subExpr, result); err != nil {
+		myResult := make(map[uint64]struct{})
+		if err = q.eval(subExpr, &myResult); err != nil {
 			return
+		}
+		for k := range myResult {
+			(*result)[k] = struct{}{}
 		}
 	}
 	return
@@ -151,6 +153,7 @@ func (q *Query) lookup(lookupValue interface{}, queryExpr map[string]interface{}
 	} else if vals, err := q.client.hashLookup(htID, intLimit, lookupStrValue); err != nil {
 		return err
 	} else {
+		fmt.Println("Preliminary results are: ", vals)
 		for _, match := range vals {
 			if doc, err := q.readDeserializeDoc(match); err == nil {
 				for _, v := range db.GetIn(doc, vecPath) {
@@ -162,51 +165,6 @@ func (q *Query) lookup(lookupValue interface{}, queryExpr map[string]interface{}
 		}
 	}
 	return
-}
-
-// Value existence check (value != nil) using hash lookup.
-func (q *Query) pathExists(hasPath interface{}, queryExpr map[string]interface{}, result *map[uint64]struct{}) (err error) {
-	// Figure out the path
-	vecPath := make([]string, 0)
-	if vecPathInterface, ok := hasPath.([]interface{}); ok {
-		for _, v := range vecPathInterface {
-			vecPath = append(vecPath, fmt.Sprint(v))
-		}
-	} else {
-		return errors.New(fmt.Sprintf("Expecting vector path, but %v given", hasPath))
-	}
-	// Figure out result number limit
-	intLimit := uint64(0)
-	if limit, hasLimit := queryExpr["limit"]; hasLimit {
-		if floatLimit, ok := limit.(float64); ok {
-			intLimit = uint64(floatLimit)
-		} else if _, ok := limit.(int); ok {
-			intLimit = uint64(limit.(int))
-		} else {
-			return dberr.Make(dberr.ErrorExpectingInt, "limit", limit)
-		}
-	}
-	jointPath := strings.Join(vecPath, db.INDEX_PATH_SEP)
-	if _, indexed := src.indexPaths[jointPath]; !indexed {
-		return dberr.Make(dberr.ErrorNeedIndex, vecPath, queryExpr)
-	}
-	counter := uint64(0)
-	partDiv := src.approxDocCount() / 4000 // collect approx. 4k document IDs in each iteration
-	if partDiv == 0 {
-		partDiv++
-	}
-	ht := src.hts[jointPath]
-	for i := uint64(0); i < partDiv; i++ {
-		_, ids := ht.GetPartition(i, partDiv)
-		for _, id := range ids {
-			(*result)[id] = struct{}{}
-			counter++
-			if counter == intLimit {
-				return nil
-			}
-		}
-	}
-	return nil
 }
 
 // Calculate intersection of sub-query results.
@@ -330,34 +288,38 @@ func (q *Query) intRange(intFrom interface{}, queryExpr map[string]interface{}, 
 		tdlog.CritNoRepeat("Query %v involves index lookup on more than 1000 values, which can be very inefficient", queryExpr)
 	}
 	counter := uint64(0) // Number of results already collected
-	htPath := strings.Join(vecPath, ",")
-	if _, indexScan := src.indexPaths[htPath]; !indexScan {
-		return dberr.Make(dberr.ErrorNeedIndex, vecPath, queryExpr)
-	}
 	if from < to {
 		// Forward scan - from low value to high value
 		for lookupValue := from; lookupValue <= to; lookupValue++ {
-			hashValue := StrHash(strconv.Itoa(lookupValue))
-			vals := src.hashScan(htPath, hashValue, intLimit)
-			for _, docID := range vals {
-				if intLimit > 0 && counter == intLimit {
-					break
+			if htID, err := q.getHTID(vecPath, queryExpr); err != nil {
+				return err
+			} else if vals, err := q.client.hashLookup(htID, intLimit, strconv.Itoa(lookupValue)); err != nil {
+				return err
+			} else {
+				for _, match := range vals {
+					if intLimit > 0 && counter == intLimit {
+						break
+					}
+					counter += 1
+					(*result)[match] = struct{}{}
 				}
-				counter += 1
-				(*result)[docID] = struct{}{}
 			}
 		}
 	} else {
 		// Backward scan - from high value to low value
 		for lookupValue := from; lookupValue >= to; lookupValue-- {
-			hashValue := StrHash(strconv.Itoa(lookupValue))
-			vals := src.hashScan(htPath, hashValue, intLimit)
-			for _, docID := range vals {
-				if intLimit > 0 && counter == intLimit {
-					break
+			if htID, err := q.getHTID(vecPath, queryExpr); err != nil {
+				return err
+			} else if vals, err := q.client.hashLookup(htID, intLimit, strconv.Itoa(lookupValue)); err != nil {
+				return err
+			} else {
+				for _, match := range vals {
+					if intLimit > 0 && counter == intLimit {
+						break
+					}
+					counter += 1
+					(*result)[match] = struct{}{}
 				}
-				counter += 1
-				(*result)[docID] = struct{}{}
 			}
 		}
 	}
