@@ -39,8 +39,9 @@ func (client *BinProtClient) EvalQuery(q interface{}, colName string, result *ma
 		colID:      colID,
 		colIDBytes: colIDBytes}
 	err = qStruct.eval(q, result)
-	if _, _, err = client.sendCmd(lockedServer, true, C_QUERY_POST); err != nil {
-		tdlog.Noticef("Client %d: failed to call QUERY_POST on server %d", client.id, lockedServer)
+	if _, _, errPost := client.sendCmd(lockedServer, true, C_QUERY_POST); errPost != nil {
+		tdlog.Noticef("Client %d: (SEVERE) failed to call QUERY_POST on server %d - %v", client.id, lockedServer, errPost)
+		client.close()
 	}
 	client.opLock.Unlock()
 	return
@@ -153,7 +154,6 @@ func (q *Query) lookup(lookupValue interface{}, queryExpr map[string]interface{}
 	} else if vals, err := q.client.hashLookup(htID, intLimit, lookupStrValue); err != nil {
 		return err
 	} else {
-		fmt.Println("Preliminary results are: ", vals)
 		for _, match := range vals {
 			if doc, err := q.readDeserializeDoc(match); err == nil {
 				for _, v := range db.GetIn(doc, vecPath) {

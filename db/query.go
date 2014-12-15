@@ -14,8 +14,12 @@ import (
 // Calculate union of sub-query results.
 func EvalUnion(exprs []interface{}, src *Col, result *map[uint64]struct{}) (err error) {
 	for _, subExpr := range exprs {
+		myResult := make(map[uint64]struct{})
 		if err = evalQuery(subExpr, src, result); err != nil {
 			return
+		}
+		for k := range myResult {
+			(*result)[k] = struct{}{}
 		}
 	}
 	return

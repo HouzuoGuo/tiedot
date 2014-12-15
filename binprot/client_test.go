@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"reflect"
 	"runtime/pprof"
 	"strconv"
 	"testing"
@@ -139,6 +140,7 @@ func TestPingMaintShutdown(t *testing.T) {
 	fmt.Println("Servers close")
 	servers[0].Shutdown()
 	servers[1].Shutdown()
+	// Should not panic
 	if err = clients[0].Ping(); err == nil {
 		t.Fatal("did not shutdown")
 	} else if err = clients[1].Ping(); err == nil {
@@ -146,11 +148,64 @@ func TestPingMaintShutdown(t *testing.T) {
 	}
 }
 
+func schemaIdentical(s1 *Schema, s2 *Schema, numCols, numHTs int) error {
+	// rev
+	if s1.rev != s2.rev {
+		return fmt.Errorf("rev mismatch %d - %d", s1.rev, s2.rev)
+	}
+	// colLookup
+	if len(s1.colLookup) != len(s2.colLookup) {
+		return fmt.Errorf("colLookup %v - %v", s1.colLookup, s2.colLookup)
+	}
+	for id, _ := range s1.colLookup {
+		if _, exists := s2.colLookup[id]; !exists {
+			return fmt.Errorf("colLookup id %d mismatch", id)
+		}
+	}
+	// colNameLookup
+	s1ColNameLookup := fmt.Sprint(s1.colNameLookup)
+	s2ColNameLookup := fmt.Sprint(s2.colNameLookup)
+	if !reflect.DeepEqual(s1.colNameLookup, s2.colNameLookup) {
+		return fmt.Errorf("colNameLookup %v - %v", s1ColNameLookup, s2ColNameLookup)
+	}
+	if len(s1.colNameLookup) != numCols || len(s1.colLookup) != numCols {
+		return fmt.Errorf("col count mismatch")
+	}
+	// htLookup
+	if len(s1.htLookup) != len(s2.htLookup) {
+		return fmt.Errorf("htLookup %v - %v", s1.htLookup, s2.htLookup)
+	}
+	for id, _ := range s1.htLookup {
+		if _, exists := s2.htLookup[id]; !exists {
+			return fmt.Errorf("htLookup id %d mismatch", id)
+		}
+	}
+	// indexPaths
+	s1IndexPaths := fmt.Sprint(s1.indexPaths)
+	s2IndexPaths := fmt.Sprint(s2.indexPaths)
+	if !reflect.DeepEqual(s1.indexPaths, s2.indexPaths) {
+		return fmt.Errorf("indexPaths %v - %v", s1IndexPaths, s2IndexPaths)
+	}
+	if len(s1.indexPaths) != numCols || len(s2.indexPaths) != numCols {
+		return fmt.Errorf("col count mismatch")
+	}
+	// indexPathsJoint
+	s1IndexPathsJoint := fmt.Sprint(s1.indexPathsJoint)
+	s2IndexPathsJoint := fmt.Sprint(s2.indexPathsJoint)
+	if !reflect.DeepEqual(s1.indexPathsJoint, s2.indexPathsJoint) {
+		return fmt.Errorf("indexPathsJoint %v - %v", s1IndexPathsJoint, s2IndexPathsJoint)
+	}
+	if len(s1.indexPathsJoint) != numCols || len(s2.indexPathsJoint) != numCols {
+		return fmt.Errorf("col count mismatch")
+	}
+	return nil
+}
+
 func TestSchemaLookup(t *testing.T) {
 	os.RemoveAll(WS)
 	defer os.RemoveAll(WS)
 	var err error
-	// Prepare database with one collection and one index
+	// Prepare database with a collection A and index "1"
 	dbs := [2]*db.DB{}
 	dbs[0], err = db.OpenDB(path.Join(WS, "0"))
 	if err != nil {
@@ -179,7 +234,7 @@ func TestSchemaLookup(t *testing.T) {
 		len(clients[0].schema.htLookup) != 1 || len(clients[1].schema.htLookup) != 1 {
 		t.Fatal(clients[0], clients[1])
 	}
-	// Simulate a server maintenance event
+	// Simulate a server maintenance event - create a collection B with an index "2"
 	dbs[0].Create("B")
 	dbs[0].Use("B").Index([]string{"2"})
 	dbs[1].Create("B")
@@ -195,12 +250,30 @@ func TestSchemaLookup(t *testing.T) {
 	} else if err = clients[1].Ping(); err != nil {
 		t.Fatal(err)
 	}
+	// Check consistency between server and client schema
+	if err := schemaIdentical(servers[0].schema, servers[1].schema, 2, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := schemaIdentical(servers[0].schema, clients[0].schema, 2, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := schemaIdentical(clients[0].schema, clients[1].schema, 2, 2); err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println("Manual reload")
 	// Try reload again
 	if _, err = clients[1].goMaintTest(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[1].reloadServerTest(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[1].leaveMaintTest(); err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println("Client 0 will ping")
+	// Client 1 reloaded and left maintenance mode, which increases server revision twice. Let both clients catch up.
+	if err := clients[0].Ping(); err != nil {
+		t.Fatal(err)
+	} else if err := clients[1].Ping(); err != nil {
 		t.Fatal(err)
 	}
 	// Check schema
@@ -235,10 +308,26 @@ func TestSchemaLookup(t *testing.T) {
 			}
 		}
 	}
+	// Make sure that both clients and servers see identical schema
+	if err := schemaIdentical(servers[0].schema, servers[1].schema, 2, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := schemaIdentical(servers[0].schema, clients[0].schema, 2, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := schemaIdentical(clients[0].schema, clients[1].schema, 2, 2); err != nil {
+		t.Fatal(err)
+	}
 	clients[0].Shutdown()
 	clients[1].Shutdown()
 	servers[0].Shutdown()
 	servers[1].Shutdown()
 	clients[0].Close()
 	clients[1].Close()
+	// Should not panic
+	if err := clients[0].Ping(); err == nil {
+		t.Fatal("did not error")
+	} else if err := clients[1].Ping(); err == nil {
+		t.Fatal("did not error")
+	}
 }

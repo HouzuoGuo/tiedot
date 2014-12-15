@@ -31,6 +31,7 @@ func TestDocInsertBench(t *testing.T) {
 	t.Log("avg latency ns", (end-start)/total)
 	t.Log("throughput/sec", float64(total)/(float64(end-start)/float64(1000000000)))
 	clients[0].Shutdown()
+	clients[1].Shutdown()
 }
 
 func TestDocCrud(t *testing.T) {
@@ -186,11 +187,12 @@ func TestDocCrud(t *testing.T) {
 		t.Fatal("Approximate is way off")
 	}
 
-	// If pendingUpdate counter is broken by error, server will refuse to go into maintenance mode
+	// If pendingTransaction counter is broken by mistake, server will refuse to go into maintenance mode.
 	if _, err = clients[0].goMaintTest(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[0].leaveMaintTest(); err != nil {
 		t.Fatal(err)
 	}
+	clients[1].Shutdown()
 	clients[0].Shutdown()
 }

@@ -76,6 +76,7 @@ func TestColCrud(t *testing.T) {
 	} else if allNames := clients[0].AllCols(); len(allNames) != 0 {
 		t.Fatal(allNames)
 	}
+	clients[1].Shutdown()
 	clients[0].Shutdown()
 }
 
@@ -110,6 +111,7 @@ func TestDumpDB(t *testing.T) {
 		t.Fatal(clients[0].schema.indexPaths, clients[1].schema.indexPaths)
 	}
 	clients[0].Shutdown()
+	clients[1].Shutdown()
 }
 
 func TestIdxCrud(t *testing.T) {
@@ -150,4 +152,5 @@ func TestIdxCrud(t *testing.T) {
 		t.Fatal(indexes, err)
 	}
 	clients[1].Shutdown()
+	clients[0].Shutdown()
 }

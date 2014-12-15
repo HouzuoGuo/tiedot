@@ -89,10 +89,8 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 		for {
 			client.opLock.Lock()
 			if err := client.ping(); err != nil {
-				for _, sock := range client.sock {
-					sock.Close()
-				}
 				tdlog.Noticef("Client %d: lost connection with server(s) and this client is closed", client.id)
+				client.close()
 				client.opLock.Unlock()
 				return
 			}
@@ -131,10 +129,8 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 		// Request-response all OK
 	case R_ERR_DOWN:
 		// If server has been instructed to shut down, shut down client also.
-		for _, sock := range client.sock {
-			sock.Close()
-		}
 		tdlog.Noticef("Client %d: server shutdown has begun and this client is closed", client.id)
+		client.close()
 		err = fmt.Errorf("Server is shutting down")
 	case R_ERR_SCHEMA:
 		// Reload my schema on reivison-mismatch
@@ -165,7 +161,7 @@ func (client *BinProtClient) reload(srvRev uint32) {
 	if err = clientDB.Close(); err != nil {
 		tdlog.Noticef("Client %d: failed to close database after a reload - %v", client.id, err)
 	}
-	tdlog.Noticef("Client %d: schema has been reloaded to match server's schema revision %d", client.id, srvRev)
+	tdlog.Noticef("Client %d: schema reloaded to revision %d", client.id, srvRev)
 	return
 }
 
@@ -176,7 +172,7 @@ func (client *BinProtClient) refreshClientInfo() error {
 		if retCode == R_ERR || retCode == R_ERR_DOWN {
 			return err
 		} else if retCode == R_ERR_MAINT {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(time.Duration(50+rand.Intn(100)) * time.Millisecond)
 			continue
 		} else {
 			client.nProcs = int(Uint64(info[0]))
@@ -211,8 +207,11 @@ func (client *BinProtClient) goMaint() (retCode byte, err error) {
 	for goMaintSrv := range client.sock {
 		if retCode, _, err = client.sendCmd(goMaintSrv, true, C_GO_MAINT); err != nil {
 			for leaveMaintSrv := 0; leaveMaintSrv < goMaintSrv; leaveMaintSrv++ {
-				if _, _, err := client.sendCmd(leaveMaintSrv, true, C_LEAVE_MAINT); err != nil {
-					tdlog.Noticef("Client %d: failed to call LEAVE_MAINT on server %d", client.id, leaveMaintSrv)
+				retCode, _, err = client.sendCmd(leaveMaintSrv, true, C_LEAVE_MAINT)
+				if err != nil {
+					tdlog.Noticef("Client %d: (SEVERE) failed to call LEAVE_MAINT on server %d - %v", client.id, leaveMaintSrv, err)
+					client.close()
+					return
 				}
 			}
 			return
@@ -259,10 +258,8 @@ func (client *BinProtClient) reqMaintAccess(fun func() error) error {
 		case R_ERR_DOWN:
 			fallthrough
 		case CLIENT_IO_ERR:
-			for _, sock := range client.sock {
-				sock.Close()
-			}
 			tdlog.Noticef("Client %d: IO error occured or servers are shutting down, this client is closed.", client.id)
+			client.close()
 			return fmt.Errorf("Servers are down before maintenance operation can take place - %v", err)
 		case R_OK:
 			funResult := fun()
@@ -292,14 +289,18 @@ func (client *BinProtClient) Ping() error {
 	return result
 }
 
+func (client *BinProtClient) close() {
+	for _, sock := range client.sock {
+		sock.Close()
+	}
+}
+
 // Disconnect from all servers, and render the client useless.
 func (client *BinProtClient) Close() {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
-	for _, sock := range client.sock {
-		sock.Close()
-	}
-	tdlog.Noticef("Client %d: closed on request", client.id)
+	client.close()
+	tdlog.Noticef("Client %d: closed on explicit request", client.id)
 }
 
 // Shutdown all servers and then close this client.
@@ -314,8 +315,6 @@ func (client *BinProtClient) Shutdown() {
 	})
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
-	for _, sock := range client.sock {
-		sock.Close()
-	}
+	client.close()
 	tdlog.Noticef("Client %d: servers have been asked to shutdown, this client is closed.", client.id)
 }

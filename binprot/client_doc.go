@@ -48,6 +48,19 @@ func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc interface{}
 	return nil
 }
 
+func (client *BinProtClient) hashLookup(htID int32, limit uint64, strKey string) (result []uint64, err error) {
+	hashKey := db.StrHash(strKey)
+	_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, Bint32(htID), Buint64(hashKey), Buint64(limit))
+	if err != nil {
+		return
+	}
+	result = make([]uint64, len(resp))
+	for i, docID := range resp {
+		result[i] = Uint64(docID)
+	}
+	return
+}
+
 // Remove a document from all indexes.
 func (client *BinProtClient) unindexDoc(colID int32, docID uint64, doc interface{}) error {
 	docIDBytes := Buint64(docID)
@@ -204,19 +217,6 @@ func (client *BinProtClient) Delete(colName string, docID uint64) (err error) {
 	}
 	_, _, err = client.sendCmd(rank, false, C_DOC_UNLOCK, colIDBytes, docIDBytes)
 	client.opLock.Unlock()
-	return
-}
-
-func (client *BinProtClient) hashLookup(htID int32, limit uint64, strKey string) (result []uint64, err error) {
-	hashKey := db.StrHash(strKey)
-	_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, Bint32(htID), Buint64(hashKey), Buint64(limit))
-	if err != nil {
-		return
-	}
-	result = make([]uint64, len(resp))
-	for i, docID := range resp {
-		result[i] = Uint64(docID)
-	}
 	return
 }
 

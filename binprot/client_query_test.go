@@ -41,6 +41,13 @@ func TestQuery(t *testing.T) {
 		`{"a": [{"b": "val3"}, {"b": ["val4", "val5"]}]}`}
 	ids := make([]uint64, len(docs))
 
+	// Prepare indexes
+	if err := clients[0].Index("col", []string{"a", "b"}); err != nil {
+		t.Fatal(err)
+	} else if err := clients[1].Index("col", []string{"f"}); err != nil {
+		t.Fatal(err)
+	}
+
 	// Insert docs
 	for i, doc := range docs {
 		var jsonDoc map[string]interface{}
@@ -52,19 +59,14 @@ func TestQuery(t *testing.T) {
 		}
 	}
 
-	// Prepare indexes
-	if err := clients[0].Index("col", []string{"a", "b"}); err != nil {
-		t.Fatal(err)
-	} else if err := clients[1].Index("col", []string{"f"}); err != nil {
-		t.Fatal(err)
-	} else if err := clients[0].Index("col", []string{"h"}); err != nil {
+	// Prepare more indexes
+	if err := clients[0].Index("col", []string{"h"}); err != nil {
 		t.Fatal(err)
 	} else if err := clients[1].Index("col", []string{"special"}); err != nil {
 		t.Fatal(err)
 	} else if err := clients[0].Index("col", []string{"e"}); err != nil {
 		t.Fatal(err)
 	}
-
 	// Prepare test runner function
 	runQuery := func(query string) (map[uint64]struct{}, error) {
 		result := make(map[uint64]struct{})
@@ -108,7 +110,6 @@ func TestQuery(t *testing.T) {
 	if !ensureMapHasKeys(q, ids[5]) {
 		t.Fatal(q)
 	}
-	fmt.Println("scan")
 	q, err = runQuery(`{"eq": 6, "in": ["a", "b"]}`)
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +127,7 @@ func TestQuery(t *testing.T) {
 	// collection scan
 	q, err = runQuery(`{"eq": 1, "in": ["c"]}`)
 	if dberr.Type(err) != dberr.ErrorNeedIndex {
-		t.Fatal("Collection scan should not happen")
+		t.Fatal("Collection scan should not happen", err, q)
 	}
 	// lookup on "special" (null)
 	q, err = runQuery(`{"eq": {"thing": null},  "in": ["special"]}`)
@@ -257,4 +258,13 @@ func TestQuery(t *testing.T) {
 	if !ensureMapHasKeys(q, ids[2], ids[4], ids[5]) {
 		t.Fatal(q)
 	}
+
+	// If pendingTransaction counter is broken by mistake, server will refuse to go into maintenance mode.
+	if _, err = clients[0].goMaintTest(); err != nil {
+		t.Fatal(err)
+	} else if err = clients[0].leaveMaintTest(); err != nil {
+		t.Fatal(err)
+	}
+	clients[0].Shutdown()
+	clients[1].Shutdown()
 }

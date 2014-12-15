@@ -26,7 +26,6 @@ func (schema *Schema) refresh(dbInstance *db.DB) {
 	schema.indexPaths = make(map[int32]map[int32][]string)
 	schema.indexPathsJoint = make(map[int32]map[string]int32)
 
-	// Both server and client run the same version of Go, therefore the order in which map keys are traversed is the same.
 	seq := 0
 	for _, colName := range dbInstance.AllCols() {
 		col := dbInstance.Use(colName)
@@ -36,11 +35,11 @@ func (schema *Schema) refresh(dbInstance *db.DB) {
 		schema.indexPaths[colID] = make(map[int32][]string)
 		schema.indexPathsJoint[colID] = make(map[string]int32)
 		seq++
-		for _, idxPath := range col.AllIndexes() {
-			jointPath := strings.Join(idxPath, db.INDEX_PATH_SEP)
-			schema.htLookup[int32(seq)] = col.BPUseHT(jointPath)
-			schema.indexPaths[colID][int32(seq)] = idxPath
-			schema.indexPathsJoint[colID][jointPath] = int32(seq)
+		for _, jointPaths := range col.AllIndexesJointPaths() {
+			splitted := strings.Split(jointPaths, db.INDEX_PATH_SEP)
+			schema.htLookup[int32(seq)] = col.BPUseHT(jointPaths)
+			schema.indexPaths[colID][int32(seq)] = splitted
+			schema.indexPathsJoint[colID][jointPaths] = int32(seq)
 			seq++
 		}
 	}
