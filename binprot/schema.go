@@ -34,7 +34,7 @@ func (schema *Schema) refresh(dbInstance *db.DB) {
 		schema.colLookup[colID] = col
 		schema.colNameLookup[colName] = colID
 		schema.indexPaths[colID] = make(map[int32][]string)
-		schema.indexPathsJoint[colID] = make(map[int32]map[string]int32)
+		schema.indexPathsJoint[colID] = make(map[string]int32)
 		seq++
 		for _, idxPath := range col.AllIndexes() {
 			jointPath := strings.Join(idxPath, db.INDEX_PATH_SEP)

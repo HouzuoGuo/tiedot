@@ -67,33 +67,47 @@ func (worker *BinProtWorker) ansErr(errCode byte, moreInfo []byte) {
 	}
 }
 
+// Disconnect and clean after the client in case of IO/client error.
+func (worker *BinProtWorker) disconnect() {
+	tdlog.Noticef("Server %d: lost connection to client %d due to error %v", worker.srv.rank, worker.id, worker.lastErr)
+	if worker.pendingMaintenance {
+		worker.srv.opLock.Lock()
+		worker.srv.maintByClient = 0
+		worker.srv.reload()
+		worker.srv.opLock.Unlock()
+	}
+	if worker.pendingTransaction {
+		atomic.AddInt64(&worker.srv.pendingTransactions, -1)
+	}
+}
+
 // The IO loop serving an incoming connection. Block until the connection is closed or server shuts down.
 func (worker *BinProtWorker) Run() {
 	tdlog.Noticef("Server %d: running worker for client %d", worker.srv.rank, worker.id)
 	for {
 		if worker.lastErr != nil {
-			tdlog.Noticef("Server %d: lost connection to client %d", worker.srv.rank, worker.id)
+			worker.disconnect()
 			return
 		}
-		// Read a command from client
+		// Read command and parameters from client
 		cmd, clientRev, params, err := worker.readCmd()
-		if err != nil {
-			// Client has disconnected
-			tdlog.Noticef("Server %d: lost connection with client %d - %v", worker.srv.rank, worker.id, err)
+		worker.lastErr = err
+		if worker.lastErr != nil {
+			worker.disconnect()
 			return
 		} else if worker.srv.shutdown {
-			// Server has/is shutting down
+			// Inform client that server has/is shutting down
 			worker.ansErr(R_ERR_DOWN, []byte{})
 			return
 		}
+		// The entire server process serves only one request at a time, governed by mutex.
 		worker.srv.opLock.Lock()
 		srvRev := worker.srv.schema.rev
 		if clientRev != srvRev {
-			// Check client revision
-			tdlog.Noticef("Server %d: telling client %d (rev %d) to refresh schema revision to match %d", worker.srv.rank, worker.id, clientRev, srvRev)
+			// In case of revision mismatch, inform client to refresh its schema.
 			worker.ansErr(R_ERR_SCHEMA, Buint32(srvRev))
 		} else if worker.srv.maintByClient != 0 && worker.srv.maintByClient != worker.id {
-			// No matter what command comes in, if the server is being maintained by _another_ client, the command will get an error response.
+			// In case of an ongoing maintenance operation, inform client to retry later.
 			worker.ansErr(R_ERR_MAINT, []byte("Server is being maintained by another client"))
 		} else {
 			// Process the command
@@ -110,6 +124,7 @@ func (worker *BinProtWorker) Run() {
 				} else if err := col.BPLockAndInsert(docID, doc); err != nil {
 					worker.ansErr(R_ERR, []byte(err.Error()))
 				} else {
+					worker.pendingTransaction = true
 					atomic.AddInt64(&worker.srv.pendingTransactions, 1)
 					worker.ansOK()
 				}
@@ -121,10 +136,13 @@ func (worker *BinProtWorker) Run() {
 				col, exists := worker.srv.schema.colLookup[colID]
 				if exists {
 					col.BPUnlock(docID)
+					worker.pendingTransaction = false
 					atomic.AddInt64(&worker.srv.pendingTransactions, -1)
 					worker.ansOK()
 				} else {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
+					worker.disconnect()
+					return
 				}
 			case C_DOC_READ:
 				// Read a document back to the client - collection ID, document ID
@@ -147,6 +165,7 @@ func (worker *BinProtWorker) Run() {
 				if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				} else if doc, err := col.BPLockAndRead(docID); err == nil {
+					worker.pendingTransaction = true
 					atomic.AddInt64(&worker.srv.pendingTransactions, 1)
 					worker.ansOK(doc)
 				} else {
@@ -244,11 +263,15 @@ func (worker *BinProtWorker) Run() {
 					worker.ansErr(R_ERR_SCHEMA, []byte{})
 				}
 			case C_QUERY_PRE:
-				// (Increase pending-transaction counter) do nothing
+				// (Increase pending-transaction counter)
+				// Query operation is about to begin, increase pending-transaction counter.
+				worker.pendingTransaction = true
 				atomic.AddInt64(&worker.srv.pendingTransactions, 1)
 				worker.ansOK()
 			case C_QUERY_POST:
-				// (Decrease pending-transaction counter) do nothing
+				// (Decrease pending-transaction counter)
+				// Query operation has completed, decrease pending-transaction counter.
+				worker.pendingTransaction = false
 				atomic.AddInt64(&worker.srv.pendingTransactions, -1)
 				worker.ansOK()
 			case C_GO_MAINT:
@@ -257,6 +280,7 @@ func (worker *BinProtWorker) Run() {
 					// Do not allow maintenance access if another client is in the middle of document update
 					worker.ansErr(R_ERR_MAINT, []byte("There are outstanding transactions"))
 				} else {
+					worker.pendingMaintenance = true
 					worker.srv.maintByClient = worker.id
 					worker.ansOK()
 				}
@@ -266,6 +290,7 @@ func (worker *BinProtWorker) Run() {
 				worker.ansOK()
 			case C_LEAVE_MAINT:
 				// Leave maintenance mode, then reload my schema and increase schema revision number.
+				worker.pendingMaintenance = false
 				worker.srv.maintByClient = 0
 				worker.srv.reload()
 				worker.ansOK()
@@ -278,6 +303,8 @@ func (worker *BinProtWorker) Run() {
 				worker.ansOK()
 			default:
 				worker.ansErr(R_ERR, []byte("Unknown command"))
+				worker.disconnect()
+				return
 			}
 		}
 		worker.srv.opLock.Unlock()

@@ -33,11 +33,13 @@ type BinProtSrv struct {
 
 // Serve incoming connection.
 type BinProtWorker struct {
-	srv     *BinProtSrv
-	id      uint64
-	in      *bufio.Reader
-	out     *bufio.Writer
-	lastErr error
+	srv                *BinProtSrv
+	id                 uint64
+	in                 *bufio.Reader
+	out                *bufio.Writer
+	pendingTransaction bool
+	pendingMaintenance bool
+	lastErr            error
 }
 
 // Create a server, but do not yet start serving incoming connections.
@@ -71,10 +73,12 @@ func (srv *BinProtSrv) Run() (err error) {
 			return nil
 		}
 		worker := &BinProtWorker{
-			srv: srv,
-			id:  atomic.AddUint64(&srv.clientIDSeq, 1),
-			in:  bufio.NewReader(conn),
-			out: bufio.NewWriter(conn)}
+			srv:                srv,
+			id:                 atomic.AddUint64(&srv.clientIDSeq, 1),
+			in:                 bufio.NewReader(conn),
+			out:                bufio.NewWriter(conn),
+			pendingTransaction: false,
+			pendingMaintenance: false}
 		go worker.Run()
 	}
 }
