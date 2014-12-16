@@ -6,9 +6,8 @@ import (
 )
 
 func TestColCrud(t *testing.T) {
-	os.RemoveAll(WS)
-	defer os.RemoveAll(WS)
-	_, clients := mkServersClients(2)
+	ws, _, clients := mkServersClients(2)
+	defer os.RemoveAll(ws)
 	if len(clients[0].AllCols()) != 0 {
 		t.Fatal(clients[0].AllCols())
 	}
@@ -81,12 +80,11 @@ func TestColCrud(t *testing.T) {
 }
 
 func TestDumpDB(t *testing.T) {
-	bak_dir := WS + "_bak"
-	os.RemoveAll(WS)
+	ws, _, clients := mkServersClients(2)
+	bak_dir := ws + "_bak"
 	os.RemoveAll(bak_dir)
-	defer os.RemoveAll(WS)
+	defer os.RemoveAll(ws)
 	defer os.RemoveAll(bak_dir)
-	_, clients := mkServersClients(2)
 	if err := clients[0].Create("a"); err != nil {
 		t.Fatal(err)
 	} else if err = clients[0].Index("a", []string{"1"}); err != nil {
@@ -99,12 +97,12 @@ func TestDumpDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	clients[1].Shutdown()
-	if err := os.RemoveAll(WS); err != nil {
+	if err := os.RemoveAll(ws); err != nil {
 		t.Fatal(err)
-	} else if err = os.Rename(bak_dir, WS); err != nil {
+	} else if err = os.Rename(bak_dir, ws); err != nil {
 		t.Fatal(err)
 	}
-	_, clients = mkServersClients(2)
+	_, clients = mkServersClientsReuseWS(ws, 2)
 	if clients[0].AllCols()[0] != "a" || clients[1].AllCols()[1] != "b" {
 		t.Fatal(clients[0].AllCols())
 	} else if len(clients[0].schema.indexPaths) != 2 || len(clients[1].schema.indexPaths[0]) != 1 {
@@ -115,9 +113,8 @@ func TestDumpDB(t *testing.T) {
 }
 
 func TestIdxCrud(t *testing.T) {
-	os.RemoveAll(WS)
-	defer os.RemoveAll(WS)
-	_, clients := mkServersClients(2)
+	ws, _, clients := mkServersClients(2)
+	defer os.RemoveAll(ws)
 
 	if err := clients[0].Create("col"); err != nil {
 		t.Fatal(err)

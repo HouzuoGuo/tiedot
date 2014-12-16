@@ -13,8 +13,6 @@ import (
 	"time"
 )
 
-var WS string = "/tmp/tiedot_binprot_test" + strconv.FormatUint(uint64(time.Now().UnixNano()), 10)
-
 func dumpGoroutineOnInterrupt() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
@@ -25,11 +23,11 @@ func dumpGoroutineOnInterrupt() {
 	}()
 }
 
-func mkServersClients(n int) (servers []*BinProtSrv, clients []*BinProtClient) {
+func mkServersClientsReuseWS(ws string, n int) (servers []*BinProtSrv, clients []*BinProtClient) {
 	servers = make([]*BinProtSrv, n)
 	clients = make([]*BinProtClient, n)
 	for i := 0; i < n; i++ {
-		servers[i] = NewServer(i, n, WS)
+		servers[i] = NewServer(i, n, ws)
 		go func(i int) {
 			if err := servers[i].Run(); err != nil {
 				panic(err)
@@ -38,7 +36,29 @@ func mkServersClients(n int) (servers []*BinProtSrv, clients []*BinProtClient) {
 	}
 	for i := 0; i < n; i++ {
 		var err error
-		if clients[i], err = NewClient(WS); err != nil {
+		if clients[i], err = NewClient(ws); err != nil {
+			panic(err)
+		}
+	}
+	return
+}
+
+func mkServersClients(n int) (ws string, servers []*BinProtSrv, clients []*BinProtClient) {
+	ws = "/tmp/tiedot_binprot_test" + strconv.FormatUint(uint64(time.Now().UnixNano()), 10)
+	os.RemoveAll(ws)
+	servers = make([]*BinProtSrv, n)
+	clients = make([]*BinProtClient, n)
+	for i := 0; i < n; i++ {
+		servers[i] = NewServer(i, n, ws)
+		go func(i int) {
+			if err := servers[i].Run(); err != nil {
+				panic(err)
+			}
+		}(i)
+	}
+	for i := 0; i < n; i++ {
+		var err error
+		if clients[i], err = NewClient(ws); err != nil {
 			panic(err)
 		}
 	}
@@ -47,27 +67,25 @@ func mkServersClients(n int) (servers []*BinProtSrv, clients []*BinProtClient) {
 
 func TestPingBench(t *testing.T) {
 	return
-	os.RemoveAll(WS)
-	defer os.RemoveAll(WS)
 	// Run one server and one client
-	_, client := mkServersClients(1)
+	ws, _, clients := mkServersClients(1)
+	defer os.RemoveAll(ws)
 	total := int64(1000000)
 	start := time.Now().UnixNano()
 	for i := int64(0); i < total; i++ {
-		client[0].Ping()
+		clients[0].Ping()
 	}
 	end := time.Now().UnixNano()
 	t.Log("avg latency ns", (end-start)/total)
 	t.Log("throughput/sec", float64(total)/(float64(end-start)/float64(1000000000)))
-	client[0].Shutdown()
+	clients[0].Shutdown()
 }
 
 func TestPingMaintShutdown(t *testing.T) {
-	os.RemoveAll(WS)
-	defer os.RemoveAll(WS)
+	ws, servers, clients := mkServersClients(2)
+	defer os.RemoveAll(ws)
 	var err error
 	// Run two servers/clients
-	servers, clients := mkServersClients(2)
 	// Ping both clients
 	if err = clients[0].Ping(); err != nil {
 		t.Fatal(err)
@@ -202,16 +220,16 @@ func schemaIdentical(s1 *Schema, s2 *Schema, numCols, numHTs int) error {
 }
 
 func TestSchemaLookup(t *testing.T) {
-	os.RemoveAll(WS)
-	defer os.RemoveAll(WS)
+	ws := "/tmp/tiedot_binprot_test" + strconv.FormatUint(uint64(time.Now().UnixNano()), 10)
+	defer os.RemoveAll(ws)
 	var err error
 	// Prepare database with a collection A and index "1"
 	dbs := [2]*db.DB{}
-	dbs[0], err = db.OpenDB(path.Join(WS, "0"))
+	dbs[0], err = db.OpenDB(path.Join(ws, "0"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	dbs[1], err = db.OpenDB(path.Join(WS, "1"))
+	dbs[1], err = db.OpenDB(path.Join(ws, "1"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +243,7 @@ func TestSchemaLookup(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Run two servers/clients
-	servers, clients := mkServersClients(2)
+	servers, clients := mkServersClientsReuseWS(ws, 2)
 	// Check schema
 	if len(servers[0].schema.colLookup) != 1 || len(servers[1].schema.colLookup) != 1 || len(servers[0].schema.htLookup) != 1 || len(servers[1].schema.htLookup) != 1 {
 		t.Fatal(servers[0], servers[1])

@@ -74,7 +74,9 @@ func (worker *BinProtWorker) disconnect() {
 	if worker.pendingMaintenance {
 		worker.srv.opLock.Lock()
 		worker.srv.maintByClient = 0
-		worker.srv.reload()
+		if !worker.srv.shutdown {
+			worker.srv.reload()
+		}
 		worker.srv.opLock.Unlock()
 	}
 	if worker.pendingTransaction {

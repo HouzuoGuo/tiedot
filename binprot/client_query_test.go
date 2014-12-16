@@ -23,9 +23,8 @@ func ensureMapHasKeys(m map[uint64]struct{}, keys ...uint64) bool {
 
 func TestQuery(t *testing.T) {
 	var err error
-	os.RemoveAll(WS)
-	defer os.RemoveAll(WS)
-	_, clients := mkServersClients(2)
+	ws, _, clients := mkServersClients(2)
+	defer os.RemoveAll(ws)
 	if err := clients[0].Create("col"); err != nil {
 		t.Fatal(err)
 	}
@@ -263,6 +262,10 @@ func TestQuery(t *testing.T) {
 	if _, err = clients[0].goMaintTest(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[0].leaveMaintTest(); err != nil {
+		t.Fatal(err)
+	} else if _, err = clients[1].goMaintTest(); err != nil {
+		t.Fatal(err)
+	} else if err = clients[1].leaveMaintTest(); err != nil {
 		t.Fatal(err)
 	}
 	clients[0].Shutdown()

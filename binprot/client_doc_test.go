@@ -8,9 +8,8 @@ import (
 
 func TestDocInsertBench(t *testing.T) {
 	return
-	os.RemoveAll(WS)
-	defer os.RemoveAll(WS)
-	_, clients := mkServersClients(2)
+	ws, _, clients := mkServersClients(2)
+	defer os.RemoveAll(ws)
 	if err := clients[0].Create("col"); err != nil {
 		t.Fatal(err)
 	} else if err := clients[0].Index("col", []string{"a"}); err != nil {
@@ -36,9 +35,8 @@ func TestDocInsertBench(t *testing.T) {
 
 func TestDocCrud(t *testing.T) {
 	var err error
-	os.RemoveAll(WS)
-	defer os.RemoveAll(WS)
-	_, clients := mkServersClients(2)
+	ws, _, clients := mkServersClients(2)
+	defer os.RemoveAll(ws)
 	if err := clients[0].Create("col"); err != nil {
 		t.Fatal(err)
 	} else if err = clients[0].Index("col", []string{"a", "b"}); err != nil {
