@@ -2,6 +2,7 @@
 package binprot
 
 import (
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"sync/atomic"
 )
@@ -69,7 +70,7 @@ func (worker *BinProtWorker) ansErr(errCode byte, moreInfo []byte) {
 
 // Disconnect and clean after the client in case of IO/client error.
 func (worker *BinProtWorker) disconnect() {
-	tdlog.Noticef("Server %d: lost connection to client %d due to error %v", worker.srv.rank, worker.id, worker.lastErr)
+	tdlog.Noticef("Server %d: connection lost/disconnected from client %d due to error %v", worker.srv.rank, worker.id, worker.lastErr)
 	if worker.pendingMaintenance {
 		worker.srv.opLock.Lock()
 		worker.srv.maintByClient = 0
@@ -119,7 +120,10 @@ func (worker *BinProtWorker) Run() {
 				docID := Uint64(params[1])
 				doc := params[2]
 				col, exists := worker.srv.schema.colLookup[colID]
-				if !exists {
+				if worker.pendingTransaction {
+					worker.ansErr(R_ERR, []byte("Client mishaved and asked for transaction twice"))
+					worker.disconnect()
+				} else if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				} else if err := col.BPLockAndInsert(docID, doc); err != nil {
 					worker.ansErr(R_ERR, []byte(err.Error()))
@@ -134,7 +138,10 @@ func (worker *BinProtWorker) Run() {
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
 				col, exists := worker.srv.schema.colLookup[colID]
-				if exists {
+				if !worker.pendingTransaction {
+					worker.ansErr(R_ERR, []byte("Client mishaved and asked for ending transaction without starting one"))
+					worker.disconnect()
+				} else if exists {
 					col.BPUnlock(docID)
 					worker.pendingTransaction = false
 					atomic.AddInt64(&worker.srv.pendingTransactions, -1)
@@ -162,7 +169,10 @@ func (worker *BinProtWorker) Run() {
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
 				col, exists := worker.srv.schema.colLookup[colID]
-				if !exists {
+				if worker.pendingTransaction {
+					worker.ansErr(R_ERR, []byte("Client mishaved and asked for transaction twice"))
+					worker.disconnect()
+				} else if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				} else if doc, err := col.BPLockAndRead(docID); err == nil {
 					worker.pendingTransaction = true
@@ -265,20 +275,30 @@ func (worker *BinProtWorker) Run() {
 			case C_QUERY_PRE:
 				// (Increase pending-transaction counter)
 				// Query operation is about to begin, increase pending-transaction counter.
-				worker.pendingTransaction = true
-				atomic.AddInt64(&worker.srv.pendingTransactions, 1)
-				worker.ansOK()
+				if worker.pendingTransaction {
+					worker.ansErr(R_ERR, []byte("Client mishaved and asked for transaction twice"))
+					worker.disconnect()
+				} else {
+					worker.pendingTransaction = true
+					atomic.AddInt64(&worker.srv.pendingTransactions, 1)
+					worker.ansOK()
+				}
 			case C_QUERY_POST:
 				// (Decrease pending-transaction counter)
 				// Query operation has completed, decrease pending-transaction counter.
-				worker.pendingTransaction = false
-				atomic.AddInt64(&worker.srv.pendingTransactions, -1)
-				worker.ansOK()
+				if worker.pendingTransaction {
+					worker.pendingTransaction = false
+					atomic.AddInt64(&worker.srv.pendingTransactions, -1)
+					worker.ansOK()
+				} else {
+					worker.ansErr(R_ERR, []byte("Client mishaved and asked for ending transaction without starting one"))
+					worker.disconnect()
+				}
 			case C_GO_MAINT:
 				// Go to maintenance mode to allow exclusive data file access by the client
 				if atomic.LoadInt64(&worker.srv.pendingTransactions) > 0 {
 					// Do not allow maintenance access if another client is in the middle of document update
-					worker.ansErr(R_ERR_MAINT, []byte("There are outstanding transactions"))
+					worker.ansErr(R_ERR_MAINT, []byte(fmt.Sprintf("There are %d outstanding transactions", atomic.LoadInt64(&worker.srv.pendingTransactions))))
 				} else {
 					worker.pendingMaintenance = true
 					worker.srv.maintByClient = worker.id

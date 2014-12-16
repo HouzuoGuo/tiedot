@@ -40,7 +40,7 @@ func (client *BinProtClient) EvalQuery(q interface{}, colName string, result *ma
 		colIDBytes: colIDBytes}
 	err = qStruct.eval(q, result)
 	if _, _, errPost := client.sendCmd(lockedServer, true, C_QUERY_POST); errPost != nil {
-		tdlog.Noticef("Client %d: (SEVERE) failed to call QUERY_POST on server %d - %v", client.id, lockedServer, errPost)
+		tdlog.Noticef("Client %d: failed to call QUERY_POST on server %d - %v, closing this client.", client.id, lockedServer, errPost)
 		client.close()
 	}
 	client.opLock.Unlock()

@@ -61,7 +61,6 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 	for i := 1; i < client.nProcs; i++ {
 		connSuccessful := false
 		for attempt := 0; attempt < 5; attempt++ {
-			tdlog.Noticef("Connection attempt %d on %d from client %d", attempt, i, client.id)
 			sockPath := path.Join(workspace, strconv.Itoa(i)+SOCK_FILE_SUFFIX)
 			sock, err := net.Dial("unix", sockPath)
 			if err != nil {
@@ -78,7 +77,6 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 			return nil, fmt.Errorf("Client %d: failed to connect to server no.%d of %d", client.id, i, client.nProcs)
 		}
 	}
-	tdlog.Noticef("Client %d: successfully connected to %d server processes", client.id, client.nProcs)
 	/*
 		Server does not track connected clients in a central structure. Sending shutdown command to server merely sets
 		a state flag and stops it from accepting new connections; existing workers (one per each client) remain running.
@@ -89,7 +87,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 		for {
 			client.opLock.Lock()
 			if err := client.ping(); err != nil {
-				tdlog.Noticef("Client %d: lost connection with server(s) and this client is closed", client.id)
+				tdlog.Noticef("Client %d: lost connection with server(s), closing this client.", client.id)
 				client.close()
 				client.opLock.Unlock()
 				return
@@ -99,7 +97,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 		}
 	}()
 	rand.Seed(time.Now().UnixNano())
-	tdlog.Noticef("Client %d: started", client.id)
+	tdlog.Noticef("Client %d: successfully started and connected to %d server processes", client.id, client.nProcs)
 	return
 }
 
@@ -129,11 +127,11 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 		// Request-response all OK
 	case R_ERR_DOWN:
 		// If server has been instructed to shut down, shut down client also.
-		tdlog.Noticef("Client %d: server shutdown has begun and this client is closed", client.id)
+		tdlog.Noticef("Client %d: server shutdown has begun, closing this client.", client.id)
 		client.close()
 		err = fmt.Errorf("Server is shutting down")
 	case R_ERR_SCHEMA:
-		// Reload my schema on reivison-mismatch
+		// Reload my schema on revision-mismatch
 		client.reload(Uint32(moreInfo[0]))
 		// May need to redo the command
 		if retryOnSchemaRefresh {
@@ -172,7 +170,7 @@ func (client *BinProtClient) refreshClientInfo() error {
 		if retCode == R_ERR || retCode == R_ERR_DOWN {
 			return err
 		} else if retCode == R_ERR_MAINT {
-			time.Sleep(time.Duration(50+rand.Intn(100)) * time.Millisecond)
+			time.Sleep(time.Duration(100+rand.Intn(200)) * time.Millisecond)
 			continue
 		} else {
 			client.nProcs = int(Uint64(info[0]))
@@ -209,7 +207,7 @@ func (client *BinProtClient) goMaint() (retCode byte, err error) {
 			for leaveMaintSrv := 0; leaveMaintSrv < goMaintSrv; leaveMaintSrv++ {
 				retCode, _, err = client.sendCmd(leaveMaintSrv, true, C_LEAVE_MAINT)
 				if err != nil {
-					tdlog.Noticef("Client %d: (SEVERE) failed to call LEAVE_MAINT on server %d - %v", client.id, leaveMaintSrv, err)
+					tdlog.Noticef("Client %d: failed to call LEAVE_MAINT on server %d - %v, closing this client.", client.id, leaveMaintSrv, err)
 					client.close()
 					return
 				}
@@ -253,7 +251,7 @@ func (client *BinProtClient) reqMaintAccess(fun func() error) error {
 		switch retCode {
 		case R_ERR_MAINT:
 			tdlog.Infof("Client %d: servers are busy, will try again after a short delay - %v", client.id, err)
-			time.Sleep(time.Duration(50+rand.Intn(100)) * time.Millisecond)
+			time.Sleep(time.Duration(100+rand.Intn(200)) * time.Millisecond)
 			continue
 		case R_ERR_DOWN:
 			fallthrough
@@ -316,5 +314,5 @@ func (client *BinProtClient) Shutdown() {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	client.close()
-	tdlog.Noticef("Client %d: servers have been asked to shutdown, this client is closed.", client.id)
+	tdlog.Noticef("Client %d: servers and this client are shut down on explicit request", client.id)
 }
