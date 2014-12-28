@@ -8,6 +8,13 @@ import (
 	"strings"
 )
 
+func (col *Col) BPUseHT(jointPath string) *data.HashTable {
+	col.db.lock.RLock()
+	ret := col.hts[jointPath]
+	col.db.lock.RUnlock()
+	return ret
+}
+
 func (col *Col) BPLock(id uint64) error {
 	if _, locked := col.locked[id]; locked {
 		return fmt.Errorf("Document %d is locked for update at the moment", id)

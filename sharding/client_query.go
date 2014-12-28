@@ -1,5 +1,5 @@
-// Binary protocol over IPC - query processor.
-package binprot
+// DB sharding via IPC using a binary protocol - query validation and processing.
+package sharding
 
 import (
 	"encoding/json"
@@ -14,14 +14,14 @@ import (
 )
 
 type Query struct {
-	client         *BinProtClient
+	client         *RouterClient
 	colName, query string
 	colID          int32
 	colIDBytes     []byte
 }
 
 // Run a query (deserialized from JSON) on the specified collection, store result document IDs inside the keys of the map.
-func (client *BinProtClient) EvalQuery(q interface{}, colName string, result *map[uint64]struct{}) (err error) {
+func (client *RouterClient) EvalQuery(q interface{}, colName string, result *map[uint64]struct{}) (err error) {
 	client.opLock.Lock()
 	colID, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {

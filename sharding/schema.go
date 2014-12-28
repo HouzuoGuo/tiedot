@@ -1,6 +1,5 @@
-// Binary protocol over unix domain socket - schema models as seen by both server and client.
-
-package binprot
+// DB sharding via IPC using a binary protocol - collect collection and index schema information for both server and client.
+package sharding
 
 import (
 	"github.com/HouzuoGuo/tiedot/data"

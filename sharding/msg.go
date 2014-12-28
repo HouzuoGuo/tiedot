@@ -1,5 +1,5 @@
-// Binary protocol over IPC - handle message records.
-package binprot
+// DB sharding via IPC using a binary protocol - encode and decode message records.
+package sharding
 
 import (
 	"bufio"

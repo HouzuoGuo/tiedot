@@ -1,4 +1,4 @@
-package binprot
+package sharding
 
 import (
 	"fmt"
@@ -23,9 +23,9 @@ func dumpGoroutineOnInterrupt() {
 	}()
 }
 
-func mkServersClientsReuseWS(ws string, n int) (servers []*BinProtSrv, clients []*BinProtClient) {
-	servers = make([]*BinProtSrv, n)
-	clients = make([]*BinProtClient, n)
+func mkServersClientsReuseWS(ws string, n int) (servers []*ShardServer, clients []*RouterClient) {
+	servers = make([]*ShardServer, n)
+	clients = make([]*RouterClient, n)
 	for i := 0; i < n; i++ {
 		servers[i] = NewServer(i, n, ws)
 		go func(i int) {
@@ -43,11 +43,11 @@ func mkServersClientsReuseWS(ws string, n int) (servers []*BinProtSrv, clients [
 	return
 }
 
-func mkServersClients(n int) (ws string, servers []*BinProtSrv, clients []*BinProtClient) {
+func mkServersClients(n int) (ws string, servers []*ShardServer, clients []*RouterClient) {
 	ws = "/tmp/tiedot_binprot_test" + strconv.FormatUint(uint64(time.Now().UnixNano()), 10)
 	os.RemoveAll(ws)
-	servers = make([]*BinProtSrv, n)
-	clients = make([]*BinProtClient, n)
+	servers = make([]*ShardServer, n)
+	clients = make([]*RouterClient, n)
 	for i := 0; i < n; i++ {
 		servers[i] = NewServer(i, n, ws)
 		go func(i int) {

@@ -1,5 +1,5 @@
-// The IO loop for serving an incoming connection.
-package binprot
+// DB sharding via IPC using a binary protocol - command handling on a shard server, main IO loop.
+package sharding
 
 import (
 	"fmt"
@@ -44,7 +44,7 @@ const (
 )
 
 // Server reads a command sent from a client.
-func (worker *BinProtWorker) readCmd() (cmd byte, rev uint32, params [][]byte, err error) {
+func (worker *ShardServerWorker) readCmd() (cmd byte, rev uint32, params [][]byte, err error) {
 	cmd, paramsInclRev, err := readRec(worker.in)
 	if err != nil {
 		return
@@ -55,21 +55,21 @@ func (worker *BinProtWorker) readCmd() (cmd byte, rev uint32, params [][]byte, e
 }
 
 // Server answers OK with extra params.
-func (worker *BinProtWorker) ansOK(moreInfo ...[]byte) {
+func (worker *ShardServerWorker) ansOK(moreInfo ...[]byte) {
 	if err := writeRec(worker.out, R_OK, moreInfo...); err != nil {
 		worker.lastErr = err
 	}
 }
 
 // Server answers an error with optionally more info.
-func (worker *BinProtWorker) ansErr(errCode byte, moreInfo []byte) {
+func (worker *ShardServerWorker) ansErr(errCode byte, moreInfo []byte) {
 	if err := writeRec(worker.out, errCode, moreInfo); err != nil {
 		worker.lastErr = err
 	}
 }
 
 // Disconnect and clean after the client in case of IO/client error.
-func (worker *BinProtWorker) disconnect() {
+func (worker *ShardServerWorker) disconnect() {
 	tdlog.Noticef("Server %d: connection lost/disconnected from client %d due to error %v", worker.srv.rank, worker.id, worker.lastErr)
 	if worker.pendingMaintenance {
 		worker.srv.opLock.Lock()
@@ -85,7 +85,7 @@ func (worker *BinProtWorker) disconnect() {
 }
 
 // The IO loop serving an incoming connection. Block until the connection is closed or server shuts down.
-func (worker *BinProtWorker) Run() {
+func (worker *ShardServerWorker) Run() {
 	tdlog.Noticef("Server %d: running worker for client %d", worker.srv.rank, worker.id)
 	for {
 		if worker.lastErr != nil {

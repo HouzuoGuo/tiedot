@@ -31,7 +31,7 @@ func OpenDB(dbPath string) (*DB, error) {
 	return db, db.load()
 }
 
-// Load all collection schema.
+// Open collections and load the schema information.
 func (db *DB) load() error {
 	if err := os.MkdirAll(db.path, 0700); err != nil {
 		return err

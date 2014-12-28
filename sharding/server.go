@@ -1,6 +1,5 @@
-// Binary protocol over unix domain socket - server messaging and IO loop.
-
-package binprot
+// DB sharding via IPC using a binary protocol - shard server structure.
+package sharding
 
 import (
 	"bufio"
@@ -19,7 +18,7 @@ const (
 )
 
 // Bin protocol server opens a database of its rank, and listens on a Unix domain socket.
-type BinProtSrv struct {
+type ShardServer struct {
 	rank, nProcs                int
 	workspace, dbPath, sockPath string
 	srvSock                     net.Listener
@@ -32,8 +31,8 @@ type BinProtSrv struct {
 }
 
 // Serve incoming connection.
-type BinProtWorker struct {
-	srv                *BinProtSrv
+type ShardServerWorker struct {
+	srv                *ShardServer
 	id                 uint64
 	in                 *bufio.Reader
 	out                *bufio.Writer
@@ -43,8 +42,8 @@ type BinProtWorker struct {
 }
 
 // Create a server, but do not yet start serving incoming connections.
-func NewServer(rank, nProcs int, workspace string) (srv *BinProtSrv) {
-	return &BinProtSrv{
+func NewServer(rank, nProcs int, workspace string) (srv *ShardServer) {
+	return &ShardServer{
 		rank:                rank,
 		nProcs:              nProcs,
 		workspace:           workspace,
@@ -59,7 +58,7 @@ func NewServer(rank, nProcs int, workspace string) (srv *BinProtSrv) {
 }
 
 // Serve incoming connections. Block until server is told to shutdown.
-func (srv *BinProtSrv) Run() (err error) {
+func (srv *ShardServer) Run() (err error) {
 	os.Remove(srv.sockPath)
 	srv.reload()
 	if srv.srvSock, err = net.Listen("unix", srv.sockPath); err != nil {
@@ -72,7 +71,7 @@ func (srv *BinProtSrv) Run() (err error) {
 			tdlog.Noticef("Server %d: is closing down - %v", srv.rank, err)
 			return nil
 		}
-		worker := &BinProtWorker{
+		worker := &ShardServerWorker{
 			srv:                srv,
 			id:                 atomic.AddUint64(&srv.clientIDSeq, 1),
 			in:                 bufio.NewReader(conn),
@@ -84,7 +83,7 @@ func (srv *BinProtSrv) Run() (err error) {
 }
 
 // Close and reopen database.
-func (srv *BinProtSrv) reload() {
+func (srv *ShardServer) reload() {
 	var err error
 	if srv.db != nil {
 		if err = srv.db.Close(); err != nil {
@@ -99,7 +98,7 @@ func (srv *BinProtSrv) reload() {
 }
 
 // Stop serving new/existing connections and shut server down.
-func (srv *BinProtSrv) Shutdown() {
+func (srv *ShardServer) Shutdown() {
 	if err := srv.srvSock.Close(); err != nil {
 		tdlog.Noticef("Server %d: failed to close server socket - %v", srv.rank, err)
 	}

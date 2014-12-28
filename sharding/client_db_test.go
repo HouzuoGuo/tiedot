@@ -1,4 +1,4 @@
-package binprot
+package sharding
 
 import (
 	"os"

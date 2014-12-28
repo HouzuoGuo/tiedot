@@ -100,13 +100,6 @@ func (col *Col) forEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
 	}
 }
 
-func (col *Col) BPUseHT(jointPath string) *data.HashTable {
-	col.db.lock.RLock()
-	ret := col.hts[jointPath]
-	col.db.lock.RUnlock()
-	return ret
-}
-
 // Do fun for all documents in the collection.
 func (col *Col) ForEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
 	col.db.lock.RLock()

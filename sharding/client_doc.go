@@ -1,5 +1,5 @@
-// Binary protocol over IPC - Document management features (client).
-package binprot
+// DB sharding via IPC using a binary protocol - index schema handling, document and index value manipulation.
+package sharding
 
 import (
 	"encoding/json"
@@ -10,14 +10,14 @@ import (
 )
 
 // Given a document ID, calculate the server rank in which the document belongs, and also turn the ID into byte slice.
-func (client *BinProtClient) docID2RankBytes(id uint64) (rank int, idBytes []byte) {
+func (client *RouterClient) docID2RankBytes(id uint64) (rank int, idBytes []byte) {
 	rank = int(id % uint64(client.nProcs))
 	idBytes = Buint64(id)
 	return
 }
 
 // Lookup collection ID by name. If the collection name is not found, ping the server once and retry.
-func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idBytes []byte, err error) {
+func (client *RouterClient) colName2IDBytes(colName string) (colID int32, idBytes []byte, err error) {
 	colID, exists := client.schema.colNameLookup[colName]
 	if !exists {
 		if err = client.ping(); err != nil {
@@ -32,7 +32,7 @@ func (client *BinProtClient) colName2IDBytes(colName string) (colID int32, idByt
 }
 
 // Put a document on all indexes.
-func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc interface{}) error {
+func (client *RouterClient) indexDoc(colID int32, docID uint64, doc interface{}) error {
 	docIDBytes := Buint64(docID)
 	for htID, path := range client.schema.indexPaths[colID] {
 		htIDBytes := Bint32(htID)
@@ -48,7 +48,7 @@ func (client *BinProtClient) indexDoc(colID int32, docID uint64, doc interface{}
 	return nil
 }
 
-func (client *BinProtClient) hashLookup(htID int32, limit uint64, strKey string) (result []uint64, err error) {
+func (client *RouterClient) hashLookup(htID int32, limit uint64, strKey string) (result []uint64, err error) {
 	hashKey := db.StrHash(strKey)
 	_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, Bint32(htID), Buint64(hashKey), Buint64(limit))
 	if err != nil {
@@ -62,7 +62,7 @@ func (client *BinProtClient) hashLookup(htID int32, limit uint64, strKey string)
 }
 
 // Remove a document from all indexes.
-func (client *BinProtClient) unindexDoc(colID int32, docID uint64, doc interface{}) error {
+func (client *RouterClient) unindexDoc(colID int32, docID uint64, doc interface{}) error {
 	docIDBytes := Buint64(docID)
 	for htID, path := range client.schema.indexPaths[colID] {
 		htIDBytes := Bint32(htID)
@@ -79,7 +79,7 @@ func (client *BinProtClient) unindexDoc(colID int32, docID uint64, doc interface
 }
 
 // Insert a document with the specified ID and put it onto all indexes. Used by Scrub for document recovery.
-func (client *BinProtClient) insertRecovery(colID int32, docID uint64, doc interface{}) error {
+func (client *RouterClient) insertRecovery(colID int32, docID uint64, doc interface{}) error {
 	docBytes, err := json.Marshal(doc)
 	if err != nil {
 		return err
@@ -98,7 +98,7 @@ func (client *BinProtClient) insertRecovery(colID int32, docID uint64, doc inter
 }
 
 // Insert a document and put it onto all indexes.
-func (client *BinProtClient) Insert(colName string, doc map[string]interface{}) (docID uint64, err error) {
+func (client *RouterClient) Insert(colName string, doc map[string]interface{}) (docID uint64, err error) {
 	docID = uint64(rand.Int63())
 	docBytes, err := json.Marshal(doc)
 	if err != nil {
@@ -123,7 +123,7 @@ func (client *BinProtClient) Insert(colName string, doc map[string]interface{}) 
 }
 
 // Read a document by ID.
-func (client *BinProtClient) Read(colName string, docID uint64) (doc map[string]interface{}, err error) {
+func (client *RouterClient) Read(colName string, docID uint64) (doc map[string]interface{}, err error) {
 	rank, docIDBytes := client.docID2RankBytes(docID)
 	client.opLock.Lock()
 	_, colIDBytes, err := client.colName2IDBytes(colName)
@@ -141,7 +141,7 @@ func (client *BinProtClient) Read(colName string, docID uint64) (doc map[string]
 }
 
 // Update a document by ID.
-func (client *BinProtClient) Update(colName string, docID uint64, doc map[string]interface{}) (err error) {
+func (client *RouterClient) Update(colName string, docID uint64, doc map[string]interface{}) (err error) {
 	docBytes, err := json.Marshal(doc)
 	if err != nil {
 		return
@@ -185,7 +185,7 @@ func (client *BinProtClient) Update(colName string, docID uint64, doc map[string
 }
 
 // Delete a document by ID
-func (client *BinProtClient) Delete(colName string, docID uint64) (err error) {
+func (client *RouterClient) Delete(colName string, docID uint64) (err error) {
 	rank, docIDBytes := client.docID2RankBytes(docID)
 	client.opLock.Lock()
 	colID, colIDBytes, err := client.colName2IDBytes(colName)
@@ -221,7 +221,7 @@ func (client *BinProtClient) Delete(colName string, docID uint64) (err error) {
 }
 
 // (Test case only) Return an error if value is not uniquely indexed in the index.
-func (client *BinProtClient) valIsIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
+func (client *RouterClient) valIsIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	colID, _, err := client.colName2IDBytes(colName)
@@ -253,7 +253,7 @@ func (client *BinProtClient) valIsIndexed(colName string, idxPath []string, val 
 }
 
 // (Test case only) Return an error if value appears in the index.
-func (client *BinProtClient) valIsNotIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
+func (client *RouterClient) valIsNotIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	colID, _, err := client.colName2IDBytes(colName)
@@ -287,7 +287,7 @@ func (client *BinProtClient) valIsNotIndexed(colName string, idxPath []string, v
 	return fmt.Errorf("Index not found")
 }
 
-func (client *BinProtClient) approxDocCount(colName string) (count uint64, err error) {
+func (client *RouterClient) approxDocCount(colName string) (count uint64, err error) {
 	_, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {
 		return
@@ -298,14 +298,14 @@ func (client *BinProtClient) approxDocCount(colName string) (count uint64, err e
 }
 
 // Return an approximate number of documents in the collection.
-func (client *BinProtClient) ApproxDocCount(colName string) (count uint64, err error) {
+func (client *RouterClient) ApproxDocCount(colName string) (count uint64, err error) {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	return client.approxDocCount(colName)
 }
 
 // Note that returned docs map contains ID vs Bytes (deserialize == false) or ID vs JSON interface (deserialize == true).
-func (client *BinProtClient) getDocPage(colName string, page, total uint64, deserialize bool) (docs map[uint64]interface{}, err error) {
+func (client *RouterClient) getDocPage(colName string, page, total uint64, deserialize bool) (docs map[uint64]interface{}, err error) {
 	docs = make(map[uint64]interface{})
 	_, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {
@@ -336,7 +336,7 @@ func (client *BinProtClient) getDocPage(colName string, page, total uint64, dese
 }
 
 // Divide collection into roughly equally sized pages and return a page of documents.
-func (client *BinProtClient) GetDocPage(colName string, page, total uint64) (docs map[uint64]interface{}, err error) {
+func (client *RouterClient) GetDocPage(colName string, page, total uint64) (docs map[uint64]interface{}, err error) {
 	client.opLock.Lock()
 	docs, err = client.getDocPage(colName, page, total, true)
 	client.opLock.Unlock()
@@ -344,7 +344,7 @@ func (client *BinProtClient) GetDocPage(colName string, page, total uint64) (doc
 }
 
 // Run fun for all document ID vs document content (bytes).
-func (client *BinProtClient) forEachDocBytes(colName string, fun func(uint64, []byte) bool) (err error) {
+func (client *RouterClient) forEachDocBytes(colName string, fun func(uint64, []byte) bool) (err error) {
 	docCount, err := client.approxDocCount(colName)
 	if err != nil {
 		return err
@@ -366,7 +366,7 @@ func (client *BinProtClient) forEachDocBytes(colName string, fun func(uint64, []
 }
 
 // Run fun for all document ID vs document content (JSON interface).
-func (client *BinProtClient) forEachDoc(colName string, fun func(uint64, interface{}) bool) (err error) {
+func (client *RouterClient) forEachDoc(colName string, fun func(uint64, interface{}) bool) (err error) {
 	docCount, err := client.approxDocCount(colName)
 	if err != nil {
 		return err

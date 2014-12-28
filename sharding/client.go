@@ -1,6 +1,5 @@
-// Binary protocol over IPC - client messaging.
-
-package binprot
+// DB sharding via IPC using a binary protocol - client structure, connection logic, and message handling.
+package sharding
 
 import (
 	"bufio"
@@ -15,8 +14,8 @@ import (
 	"time"
 )
 
-// Bin protocol client connects to servers via Unix domain socket.
-type BinProtClient struct {
+// Client connects to ranks of sharded DB servers via Unix domain socket.
+type RouterClient struct {
 	workspace string
 	id        uint64
 	sock      []net.Conn
@@ -27,9 +26,9 @@ type BinProtClient struct {
 	schema    *Schema
 }
 
-// Create a client and immediately connect to server.
-func NewClient(workspace string) (client *BinProtClient, err error) {
-	client = &BinProtClient{
+// Create a client and immediately connect to all DB shard servers.
+func NewClient(workspace string) (client *RouterClient, err error) {
+	client = &RouterClient{
 		id:        0,
 		workspace: workspace,
 		sock:      make([]net.Conn, 0, 8),
@@ -102,7 +101,7 @@ func NewClient(workspace string) (client *BinProtClient, err error) {
 }
 
 // Client sends a command and reads server's response.
-func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (retCode byte, moreInfo [][]byte, err error) {
+func (client *RouterClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (retCode byte, moreInfo [][]byte, err error) {
 	allParams := make([][]byte, len(params)+1)
 	// Param 0 should be the client's schema revision
 	allParams[0] = Buint32(client.schema.rev)
@@ -150,7 +149,7 @@ func (client *BinProtClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd by
 }
 
 // Reload client's schema.
-func (client *BinProtClient) reload(srvRev uint32) {
+func (client *RouterClient) reload(srvRev uint32) {
 	clientDB, err := db.OpenDB(path.Join(client.workspace, "0"))
 	if err != nil {
 		panic(err)
@@ -164,7 +163,7 @@ func (client *BinProtClient) reload(srvRev uint32) {
 }
 
 // Ping server to learn how many server processes there are and my client ID.
-func (client *BinProtClient) refreshClientInfo() error {
+func (client *RouterClient) refreshClientInfo() error {
 	for {
 		retCode, info, err := client.sendCmd(0, true, C_PING)
 		if retCode == R_ERR || retCode == R_ERR_DOWN {
@@ -181,7 +180,7 @@ func (client *BinProtClient) refreshClientInfo() error {
 }
 
 // Reload schema on all server processes, and afterwards ping server to reload my schema.
-func (client *BinProtClient) reloadServer() error {
+func (client *RouterClient) reloadServer() error {
 	for i := 0; i < client.nProcs; i++ {
 		_, _, err := client.sendCmd(i, true, C_RELOAD)
 		if err != nil {
@@ -194,14 +193,14 @@ func (client *BinProtClient) reloadServer() error {
 	return nil
 }
 
-func (client *BinProtClient) reloadServerTest() error {
+func (client *RouterClient) reloadServerTest() error {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	return client.reloadServer()
 }
 
 // Request maintenance access from all servers.
-func (client *BinProtClient) goMaint() (retCode byte, err error) {
+func (client *RouterClient) goMaint() (retCode byte, err error) {
 	for goMaintSrv := range client.sock {
 		if retCode, _, err = client.sendCmd(goMaintSrv, true, C_GO_MAINT); err != nil {
 			for leaveMaintSrv := 0; leaveMaintSrv < goMaintSrv; leaveMaintSrv++ {
@@ -219,14 +218,14 @@ func (client *BinProtClient) goMaint() (retCode byte, err error) {
 }
 
 // Request maintenance access from all servers, acquire client lock. Used only by test case!
-func (client *BinProtClient) goMaintTest() (retCode byte, err error) {
+func (client *RouterClient) goMaintTest() (retCode byte, err error) {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	return client.goMaint()
 }
 
 // Remove maintenance access from all servers.
-func (client *BinProtClient) leaveMaint() error {
+func (client *RouterClient) leaveMaint() error {
 	for leaveMaintSrv := range client.sock {
 		if _, _, err := client.sendCmd(leaveMaintSrv, true, C_LEAVE_MAINT); err != nil {
 			return err
@@ -236,14 +235,14 @@ func (client *BinProtClient) leaveMaint() error {
 }
 
 // Request maintenance access from all servers, acquire client lock. Used only by test case!
-func (client *BinProtClient) leaveMaintTest() error {
+func (client *RouterClient) leaveMaintTest() error {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	return client.leaveMaint()
 }
 
 // Request maintenance access from servers, run the function, and finally remove maintenance access.
-func (client *BinProtClient) reqMaintAccess(fun func() error) error {
+func (client *RouterClient) reqMaintAccess(fun func() error) error {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	for {
@@ -269,7 +268,7 @@ func (client *BinProtClient) reqMaintAccess(fun func() error) error {
 	}
 }
 
-func (client *BinProtClient) ping() (err error) {
+func (client *RouterClient) ping() (err error) {
 	for i := range client.sock {
 		retCode, _, err := client.sendCmd(i, true, C_PING)
 		if retCode != R_OK && retCode != R_ERR_MAINT {
@@ -280,21 +279,21 @@ func (client *BinProtClient) ping() (err error) {
 }
 
 // Ping all servers, and expect OK or ERR_MAINT response.
-func (client *BinProtClient) Ping() error {
+func (client *RouterClient) Ping() error {
 	client.opLock.Lock()
 	result := client.ping()
 	client.opLock.Unlock()
 	return result
 }
 
-func (client *BinProtClient) close() {
+func (client *RouterClient) close() {
 	for _, sock := range client.sock {
 		sock.Close()
 	}
 }
 
 // Disconnect from all servers, and render the client useless.
-func (client *BinProtClient) Close() {
+func (client *RouterClient) Close() {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	client.close()
@@ -302,7 +301,7 @@ func (client *BinProtClient) Close() {
 }
 
 // Shutdown all servers and then close this client.
-func (client *BinProtClient) Shutdown() {
+func (client *RouterClient) Shutdown() {
 	client.reqMaintAccess(func() error {
 		for i := range client.sock {
 			if _, _, err := client.sendCmd(i, true, C_SHUTDOWN); err != nil {
