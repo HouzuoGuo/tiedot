@@ -37,7 +37,7 @@ func TestFindingAppendAndClear(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	// Open
-	tmpFile, err := OpenDataFile(tmp, 1024)
+	tmpFile, err := OpenDataFile(tmp, 500)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -46,41 +46,53 @@ func TestFindingAppendAndClear(t *testing.T) {
 		t.Fatal("Incorrect Used", tmpFile.Used)
 	}
 	// Write something
-	tmpFile.Buf[500] = 1
+	tmpFile.Buf[100] = 1
 	tmpFile.Close()
 
 	// Re-open
-	tmpFile, err = OpenDataFile(tmp, 1024)
+	tmpFile, err = OpenDataFile(tmp, 500)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
-	if tmpFile.Used != 501 {
+	if tmpFile.Used != 101 {
 		t.Fatal("Incorrect Used")
 	}
-	// Write again
-	for i := 750; i < 800; i++ {
+	// Write again and test used-size calculation
+	for i := 150; i < 179; i++ {
 		tmpFile.Buf[i] = byte('a')
 	}
 	tmpFile.Close()
-
-	// Re-open again
-	tmpFile, err = OpenDataFile(tmp, 1024)
+	tmpFile, err = OpenDataFile(tmp, 500)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
-	if tmpFile.Used != 800 {
+	if tmpFile.Used != 179 {
+		t.Fatal("Incorrect Append", tmpFile.Used)
+	}
+	// Do it once more
+	for i := 263; i < 367; i++ {
+		tmpFile.Buf[i] = byte('a')
+	}
+	tmpFile.Close()
+	tmpFile, err = OpenDataFile(tmp, 500)
+	if err != nil {
+		t.Fatalf("Failed to open: %v", err)
+	}
+	if tmpFile.Used != 367 {
 		t.Fatal("Incorrect Append", tmpFile.Used)
 	}
 	// Clear the file and test size
 	if err = tmpFile.Clear(); err != nil {
 		t.Fatal(err)
 	}
-	if !(len(tmpFile.Buf) == 1024 && tmpFile.Buf[750] == 0 && tmpFile.Growth == 1024 && tmpFile.Size == 1024 && tmpFile.Used == 0) {
+	if !(len(tmpFile.Buf) == 500 && tmpFile.Buf[367] == 0 && tmpFile.Growth == 500 && tmpFile.Size == 500 && tmpFile.Used == 0) {
 		t.Fatal("Did not clear", len(tmpFile.Buf), tmpFile.Growth, tmpFile.Size, tmpFile.Used)
 	}
 	// Can still write to the buffer?
-	tmpFile.Buf[999] = 1
-	tmpFile.Close()
+	tmpFile.Buf[499] = 1
+	if err := tmpFile.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestFileGrow(t *testing.T) {

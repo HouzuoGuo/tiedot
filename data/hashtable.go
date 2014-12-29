@@ -1,9 +1,9 @@
 /*
-Hash table file contains binary content; it implements a static hash table made of hash buckets and integer entries.
-Every bucket has a fixed number of entries. When a bucket becomes full, a new bucket is chained to it in order to store
-more entries. Every entry has an integer key and value.
-An entry key may have multiple values assigned to it, however the combination of entry key and value must be unique
-across the entire hash table.
+Data structure - static hash table.
+Static hash table file only contains binary data, made of entries and buckets. Every entry has an integer key and value.
+Hash table bucket contains a fixed (constant) number of entries. When a bucket becomes full, a new bucket is chained to
+it in order to store more entries.
+An integer key may have one or more values assigned to it. Every key-value combination is unique in a hash table.
 */
 package data
 
@@ -13,27 +13,37 @@ import (
 )
 
 const (
-	HT_FILE_GROWTH  = 32 * 1048576                          // Hash table file initial size & file growth
-	ENTRY_SIZE      = 1 + 8 + 8                             // Hash entry size: validity (single byte), key (uint64), value (uint64)
-	BUCKET_HEADER   = 8                                     // Bucket header size: next chained bucket number (int 10 bytes)
-	PER_BUCKET      = 16                                    // Entries per bucket
-	HASH_BITS       = 16                                    // Number of hash key bits
-	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE // Size of a bucket
-	INITIAL_BUCKETS = uint64(65536)                         // Initial number of buckets == 2 ^ HASH_BITS
+	// Hash table file initial size & size growth (16 MBytes)
+	HT_FILE_GROWTH = 16 * 1048576
+	// Table entry size (validity - byte, key - uint64, value - uint64)
+	ENTRY_SIZE = 1 + 8 + 8
+	// Bucket header size (next chained bucket number - uint64)
+	BUCKET_HEADER = 8
+	// Number of entries per bucket
+	PER_BUCKET = 12
+	// Number of bits used for hashing
+	HASH_BITS = 16
+	// Size of bucket in bytes
+	BUCKET_SIZE = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE
+	// Number of buckets in the beginning (2 ^ HASH_BITS)
+	INITIAL_BUCKETS = uint64(65536)
 )
 
-// Hash table file is a binary file containing buckets of hash entries.
+// Hash table file contains binary data of table entries and buckets.
 type HashTable struct {
 	*DataFile
 	numBuckets uint64
 }
 
-// Smear the integer entry key and return the portion (first HASH_BITS bytes) used for allocating the entry.
+/*
+Smear (re-hash) the entry key for a better distribution in hash table.
+Then return portion of the key used for hash table operation (last HASH_BITS bits).
+*/
 func HashKey(key uint64) uint64 {
 	key = key ^ (key >> 4)
 	key = (key ^ 0xdeadbeef) + (key << 5)
 	key = key ^ (key >> 11)
-	return key & ((1 << HASH_BITS) - 1) // Do not modify this line
+	return key & ((1 << HASH_BITS) - 1) // retrieve the last N bits
 }
 
 // Open a hash table file.
@@ -46,7 +56,7 @@ func OpenHashTable(path string) (ht *HashTable, err error) {
 	return
 }
 
-// Follow the longest bucket chain to calculate total number of buckets, hence the "used size" of hash table file.
+// Follow the longest bucket chain to calculate total number of buckets as well as the "used size" of data file.
 func (ht *HashTable) calculateNumBuckets() {
 	ht.numBuckets = ht.Size / BUCKET_SIZE
 	largestBucketNum := INITIAL_BUCKETS - 1
@@ -66,7 +76,7 @@ func (ht *HashTable) calculateNumBuckets() {
 	tdlog.Infof("%s: calculated used size is %d", ht.Path, usedSize)
 }
 
-// Return number of the next chained bucket.
+// Return the bucket number of the next one in chain.
 func (ht *HashTable) nextBucket(bucket uint64) uint64 {
 	if bucket >= ht.numBuckets {
 		return 0
@@ -83,7 +93,7 @@ func (ht *HashTable) nextBucket(bucket uint64) uint64 {
 	}
 }
 
-// Return number of the last bucket in chain.
+// Return the bucket number of the last one in chain.
 func (ht *HashTable) lastBucket(bucket uint64) uint64 {
 	for curr := bucket; ; {
 		next := ht.nextBucket(curr)
@@ -94,7 +104,7 @@ func (ht *HashTable) lastBucket(bucket uint64) uint64 {
 	}
 }
 
-// Create and chain a new bucket.
+// Create a new bucket and put it into bucket chain.
 func (ht *HashTable) growBucket(bucket uint64) {
 	ht.EnsureSize(BUCKET_SIZE)
 	lastBucketAddr := ht.lastBucket(bucket) * BUCKET_SIZE
@@ -133,7 +143,7 @@ func (ht *HashTable) Put(key, val uint64) {
 	}
 }
 
-// Look up values by key.
+// Look up values associated to the key.
 func (ht *HashTable) Get(key, limit uint64) (vals []uint64) {
 	if limit == 0 {
 		vals = make([]uint64, 0, 16)
@@ -163,7 +173,7 @@ func (ht *HashTable) Get(key, limit uint64) (vals []uint64) {
 	}
 }
 
-// Flag an entry as invalid, so that Get will not return it later on.
+// Flag an entry as invalid, so that Get operation will not find it later on.
 func (ht *HashTable) Remove(key, val uint64) {
 	for entry, bucket := uint64(0), HashKey(key); ; {
 		entryAddr := bucket*BUCKET_SIZE + BUCKET_HEADER + entry*ENTRY_SIZE
@@ -208,7 +218,7 @@ func GetPartitionRange(partNum, totalParts uint64) (start uint64, end uint64) {
 	return
 }
 
-// Collect entries all the way from "head" bucket to the end of its chained buckets.
+// Collect all entries belonging to the specified bucket and all of its chained buckets.
 func (ht *HashTable) collectEntries(head uint64) (keys, vals []uint64) {
 	keys = make([]uint64, 0, PER_BUCKET)
 	vals = make([]uint64, 0, PER_BUCKET)
@@ -232,7 +242,7 @@ func (ht *HashTable) collectEntries(head uint64) (keys, vals []uint64) {
 	}
 }
 
-// Return all entries in the chosen partition.
+// Divide the entire hash table into roughly equally sized partitions, and return all entries in the chosen partition.
 func (ht *HashTable) GetPartition(partNum, partSize uint64) (keys, vals []uint64) {
 	rangeStart, rangeEnd := GetPartitionRange(partNum, partSize)
 	prealloc := (rangeEnd - rangeStart) * PER_BUCKET

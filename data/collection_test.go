@@ -21,17 +21,17 @@ func TestInsertRead(t *testing.T) {
 	docs := [][]byte{
 		[]byte("abc"),
 		[]byte("1234")}
-	ids := [2]uint64{}
-	if ids[0], err = col.Insert(docs[0]); ids[0] != 0 || err != nil {
-		t.Fatalf("Failed to insert: %d %v", ids[0], err)
+	locations := [2]uint64{}
+	if locations[0], err = col.Insert(docs[0]); locations[0] != 0 || err != nil {
+		t.Fatalf("Failed to insert: %d %v", locations[0], err)
 	}
-	if ids[1], err = col.Insert(docs[1]); err != nil {
+	if locations[1], err = col.Insert(docs[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if doc0 := col.Read(ids[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != string(docs[0]) {
+	if doc0 := col.Read(locations[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != string(docs[0]) {
 		t.Fatal("Failed to read", doc0)
 	}
-	if doc1 := col.Read(ids[1]); doc1 == nil || strings.TrimSpace(string(doc1)) != string(docs[1]) {
+	if doc1 := col.Read(locations[1]); doc1 == nil || strings.TrimSpace(string(doc1)) != string(docs[1]) {
 		t.Fatalf("Failed to read")
 	}
 	// it shall not panic
@@ -51,18 +51,18 @@ func TestInsertUpdateRead(t *testing.T) {
 	docs := [][]byte{
 		[]byte("abc"),
 		[]byte("1234")}
-	ids := [2]uint64{}
-	if ids[0], err = col.Insert(docs[0]); err != nil {
+	locations := [2]uint64{}
+	if locations[0], err = col.Insert(docs[0]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if ids[1], err = col.Insert(docs[1]); err != nil {
+	if locations[1], err = col.Insert(docs[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	updated := [2]uint64{}
-	if updated[0], err = col.Update(ids[0], []byte("abcdef")); err != nil || updated[0] != ids[0] {
+	if updated[0], err = col.Update(locations[0], []byte("abcdef")); err != nil || updated[0] != locations[0] {
 		t.Fatalf("Failed to update: %v", err)
 	}
-	if updated[1], err = col.Update(ids[1], []byte("longlonglonglonglonglonglong")); err != nil || updated[1] == ids[1] {
+	if updated[1], err = col.Update(locations[1], []byte("longlonglonglonglonglonglong")); err != nil || updated[1] == locations[1] {
 		t.Fatalf("Failed to update: %v", err)
 	}
 	if doc0 := col.Read(updated[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != "abcdef" {
@@ -89,26 +89,26 @@ func TestInsertDeleteRead(t *testing.T) {
 		[]byte("abc"),
 		[]byte("1234"),
 		[]byte("2345")}
-	ids := [3]uint64{}
-	if ids[0], err = col.Insert(docs[0]); err != nil {
+	locations := [3]uint64{}
+	if locations[0], err = col.Insert(docs[0]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if ids[1], err = col.Insert(docs[1]); err != nil {
+	if locations[1], err = col.Insert(docs[1]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if ids[2], err = col.Insert(docs[2]); err != nil {
+	if locations[2], err = col.Insert(docs[2]); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
-	if doc0 := col.Read(ids[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != string(docs[0]) {
+	if doc0 := col.Read(locations[0]); doc0 == nil || strings.TrimSpace(string(doc0)) != string(docs[0]) {
 		t.Fatalf("Failed to read")
 	}
-	if err = col.Delete(ids[1]); err != nil {
+	if err = col.Delete(locations[1]); err != nil {
 		t.Fatal(err)
 	}
-	if doc1 := col.Read(ids[1]); doc1 != nil {
+	if doc1 := col.Read(locations[1]); doc1 != nil {
 		t.Fatalf("Did not delete")
 	}
-	if doc2 := col.Read(ids[2]); doc2 == nil || strings.TrimSpace(string(doc2)) != string(docs[2]) {
+	if doc2 := col.Read(locations[2]); doc2 == nil || strings.TrimSpace(string(doc2)) != string(docs[2]) {
 		t.Fatalf("Failed to read")
 	}
 	// it shall not panic
@@ -127,29 +127,29 @@ func TestInsertReadAll(t *testing.T) {
 		return
 	}
 	defer col.Close()
-	var ids [5]uint64
-	ids[0], err = col.Insert([]byte("abc"))
+	var locations [5]uint64
+	locations[0], err = col.Insert([]byte("abc"))
 	if err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
-	ids[1], err = col.Insert([]byte("abc"))
+	locations[1], err = col.Insert([]byte("abc"))
 	if err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
-	ids[2], err = col.Insert([]byte("abc"))
+	locations[2], err = col.Insert([]byte("abc"))
 	if err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
-	ids[3], err = col.Insert([]byte("abc"))
+	locations[3], err = col.Insert([]byte("abc"))
 	if err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
-	ids[4], err = col.Insert([]byte("abc"))
+	locations[4], err = col.Insert([]byte("abc"))
 	if err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
 	successfullyRead := 0
-	t.Log(ids)
+	t.Log(locations)
 	col.ForEachDoc(func(_ uint64, _ []byte) bool {
 		successfullyRead++
 		return true
@@ -159,8 +159,8 @@ func TestInsertReadAll(t *testing.T) {
 	}
 	successfullyRead = 0
 	// intentionally corrupt two docuemnts
-	col.Buf[ids[4]] = 3     // corrupted validity
-	col.Buf[ids[2]+1] = 255 // corrupted room
+	col.Buf[locations[4]] = 3     // corrupted validity
+	col.Buf[locations[2]+1] = 255 // corrupted room
 	col.ForEachDoc(func(_ uint64, _ []byte) bool {
 		successfullyRead++
 		return true
@@ -170,7 +170,7 @@ func TestInsertReadAll(t *testing.T) {
 	}
 }
 
-func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
+func TestCollectionGrowAndBoundaryChecking(t *testing.T) {
 	tmp := "/tmp/tiedot_test_col"
 	os.Remove(tmp)
 	defer os.Remove(tmp)

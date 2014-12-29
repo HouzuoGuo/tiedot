@@ -1,7 +1,7 @@
 /*
 (Collection) Partition is a collection data file accompanied by a hash table in order to allow addressing of a
-document using an unchanging ID:
-The hash table stores the unchanging ID as entry key and the physical document location as entry value.
+document using a persistent, unchanging ID irrespective of document growth and relocation.
+The hash table stores ID in entry key and document physical location in entry value, both of which are uint64.
 */
 package data
 
@@ -10,7 +10,7 @@ import (
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
-// Partition associates a hash table with collection documents, allowing addressing of a document using an unchanging ID.
+// Partition associates a hash table with collection documents, allowing addressing of a document using a persistent ID.
 type Partition struct {
 	col    *Collection
 	lookup *HashTable
@@ -27,17 +27,17 @@ func OpenPartition(colPath, lookupPath string) (part *Partition, err error) {
 	return
 }
 
-// Insert a document. The ID may be used to retrieve/update/delete the document later on.
-func (part *Partition) Insert(id uint64, data []byte) (physID uint64, err error) {
-	physID, err = part.col.Insert(data)
+// Insert a new document and associate it with the specified ID. Return the physical location of inserted document.
+func (part *Partition) Insert(id uint64, data []byte) (docLoc uint64, err error) {
+	docLoc, err = part.col.Insert(data)
 	if err != nil {
 		return
 	}
-	part.lookup.Put(id, physID)
+	part.lookup.Put(id, docLoc)
 	return
 }
 
-// Find and retrieve a document by ID.
+// Retrieve a document by ID.
 func (part *Partition) Read(id uint64) ([]byte, error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
@@ -93,16 +93,17 @@ func (part *Partition) ForEachDoc(partNum, totalPart uint64, fun func(id uint64,
 	return true
 }
 
-// Return approximate number of documents in the partition.
+// Calculate approximate number of documents in the partition.
 func (part *Partition) ApproxDocCount() uint64 {
-	totalPart := uint64(18) // not magic; a larger number makes estimation less accurate, but improves performance
+	// Larger number = faster and less accurate; smaller number = slower and more accurate
+	totalPart := uint64(18)
 	for {
 		keys, _ := part.lookup.GetPartition(0, totalPart)
 		if len(keys) == 0 {
 			if totalPart < 8 {
-				return 0 // the hash table is really really empty
+				return 0 // the hash table is looking really empty
 			}
-			// Try a larger partition size
+			// The hash table looks quite sparse, try a smaller partition size.
 			totalPart = totalPart / 2
 		} else {
 			return uint64(float64(len(keys)) * float64(totalPart))
@@ -110,7 +111,7 @@ func (part *Partition) ApproxDocCount() uint64 {
 	}
 }
 
-// Clear data file and lookup hash table.
+// Clear document data file and lookup hash table.
 func (part *Partition) Clear() error {
 	var (
 		err     error

@@ -1,4 +1,10 @@
-// Common data file features - enlarge, close, close, etc.
+/*
+Provide common IO features for data structure files based on memory-mapped buffer:
+- Create file with an initial capacity.
+- Grow file when more capacity is demanded (growth size is constant).
+- Keep track of amount of space occupied by data ("Used Size").
+- Access binary, text, or mixed content at random location.
+*/
 package data
 
 import (
@@ -7,7 +13,7 @@ import (
 	"os"
 )
 
-// Data file keeps track of the amount of total and used space.
+// Data structure file contains random-accessible binary, text, or mixed content, and keeps track of used size.
 type DataFile struct {
 	Path               string
 	Size, Used, Growth uint64
@@ -15,9 +21,14 @@ type DataFile struct {
 	Buf                gommap.MMap
 }
 
-// Return true if the buffer begins with 64 consecutive zero bytes.
-func LooksEmpty(buf gommap.MMap) bool {
-	upTo := 1024
+/*
+Return true if the buffer slice begins with 128 consecutive bytes of zero.
+Used for calculating the Used Size of a data structure file.
+IMPORTANT: data structure implementation must re-implement the Used Size calculation if there is a chance for 128
+consecutive bytes of 0 to appear in middle of the used portion of the data file.
+*/
+func BufLooksEmpty(buf gommap.MMap) bool {
+	upTo := 128
 	if upTo >= len(buf) {
 		upTo = len(buf) - 1
 	}
@@ -29,7 +40,7 @@ func LooksEmpty(buf gommap.MMap) bool {
 	return true
 }
 
-// Open a data file that grows by the specified size.
+// Open/create a data file with an initial capacity and size growth constant.
 func OpenDataFile(path string, growth uint64) (file *DataFile, err error) {
 	file = &DataFile{Path: path, Growth: growth}
 	if file.Fh, err = os.OpenFile(file.Path, os.O_CREATE|os.O_RDWR, 0600); err != nil {
@@ -39,7 +50,7 @@ func OpenDataFile(path string, growth uint64) (file *DataFile, err error) {
 	if size, err = file.Fh.Seek(0, os.SEEK_END); err != nil {
 		return
 	}
-	// Ensure the file is not smaller than file growth
+	// Grow the file if the initial size is smaller than specified
 	if file.Size = uint64(size); file.Size < file.Growth {
 		if err = file.EnsureSize(file.Growth); err != nil {
 			return
@@ -52,8 +63,8 @@ func OpenDataFile(path string, growth uint64) (file *DataFile, err error) {
 	for low, mid, high := uint64(0), file.Size/2, file.Size; ; {
 		switch {
 		case high-mid == 1:
-			if LooksEmpty(file.Buf[mid:]) {
-				if mid > 0 && LooksEmpty(file.Buf[mid-1:]) {
+			if BufLooksEmpty(file.Buf[mid:]) {
+				if mid > 0 && BufLooksEmpty(file.Buf[mid-1:]) {
 					file.Used = mid - 1
 				} else {
 					file.Used = mid
@@ -62,7 +73,7 @@ func OpenDataFile(path string, growth uint64) (file *DataFile, err error) {
 			}
 			file.Used = high
 			return
-		case LooksEmpty(file.Buf[mid:]):
+		case BufLooksEmpty(file.Buf[mid:]):
 			high = mid
 			mid = low + (mid-low)/2
 		default:
@@ -74,7 +85,7 @@ func OpenDataFile(path string, growth uint64) (file *DataFile, err error) {
 	return
 }
 
-// Ensure there is enough room for that many bytes of data.
+// Make sure there is enough room for some more data.
 func (file *DataFile) EnsureSize(more uint64) (err error) {
 	if file.Used+more <= file.Size {
 		return
