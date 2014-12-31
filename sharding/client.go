@@ -158,7 +158,7 @@ func (client *RouterClient) reload(srvRev uint32) {
 	if err = clientDB.Close(); err != nil {
 		tdlog.Noticef("Client %d: failed to close database after a reload - %v", client.id, err)
 	}
-	tdlog.Noticef("Client %d: schema reloaded to revision %d", client.id, srvRev)
+	tdlog.Infof("Client %d: schema reloaded to revision %d", client.id, srvRev)
 	return
 }
 

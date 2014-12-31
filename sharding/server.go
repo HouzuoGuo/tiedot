@@ -94,7 +94,7 @@ func (srv *ShardServer) reload() {
 		panic(err)
 	}
 	srv.schema.refresh(srv.db)
-	tdlog.Noticef("Server %d: schema reloaded to revision %d", srv.rank, srv.schema.rev)
+	tdlog.Infof("Server %d: schema reloaded to revision %d", srv.rank, srv.schema.rev)
 }
 
 // Stop serving new/existing connections and shut server down.
