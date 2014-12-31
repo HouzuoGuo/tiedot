@@ -23,8 +23,8 @@ const (
 	DOC_MAX_ROOM = 2 * 1048576
 	// Document header size (validity - byte, document room - uint64)
 	DOC_HEADER = 1 + 8
-	// Pre-compiled document padding (128 spaces)
-	PADDING     = "                                                                                                                                "
+	// Pre-compiled document padding (32 spaces)
+	PADDING     = "                                "
 	LEN_PADDING = uint64(len(PADDING))
 )
 

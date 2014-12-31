@@ -22,13 +22,13 @@ type DataFile struct {
 }
 
 /*
-Return true if the buffer slice begins with 128 consecutive bytes of zero.
+Return true if the buffer slice begins with 32 consecutive bytes of zero.
 Used for calculating the Used Size of a data structure file.
-IMPORTANT: data structure implementation must re-implement the Used Size calculation if there is a chance for 128
+IMPORTANT: data structure implementation must re-implement the Used Size calculation if there is a chance for 32
 consecutive bytes of 0 to appear in middle of the used portion of the data file.
 */
 func BufLooksEmpty(buf gommap.MMap) bool {
-	upTo := 128
+	upTo := 32
 	if upTo >= len(buf) {
 		upTo = len(buf) - 1
 	}

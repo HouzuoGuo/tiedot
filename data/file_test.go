@@ -37,7 +37,7 @@ func TestFindingAppendAndClear(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	// Open
-	tmpFile, err := OpenDataFile(tmp, 500)
+	tmpFile, err := OpenDataFile(tmp, 100)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -46,50 +46,50 @@ func TestFindingAppendAndClear(t *testing.T) {
 		t.Fatal("Incorrect Used", tmpFile.Used)
 	}
 	// Write something
-	tmpFile.Buf[100] = 1
+	tmpFile.Buf[20] = 1
 	tmpFile.Close()
 
 	// Re-open
-	tmpFile, err = OpenDataFile(tmp, 500)
+	tmpFile, err = OpenDataFile(tmp, 100)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
-	if tmpFile.Used != 101 {
+	if tmpFile.Used != 21 {
 		t.Fatal("Incorrect Used")
 	}
 	// Write again and test used-size calculation
-	for i := 150; i < 179; i++ {
+	for i := 37; i < 53; i++ {
 		tmpFile.Buf[i] = byte('a')
 	}
 	tmpFile.Close()
-	tmpFile, err = OpenDataFile(tmp, 500)
+	tmpFile, err = OpenDataFile(tmp, 100)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
-	if tmpFile.Used != 179 {
+	if tmpFile.Used != 53 {
 		t.Fatal("Incorrect Append", tmpFile.Used)
 	}
 	// Do it once more
-	for i := 263; i < 367; i++ {
+	for i := 67; i < 73; i++ {
 		tmpFile.Buf[i] = byte('a')
 	}
 	tmpFile.Close()
-	tmpFile, err = OpenDataFile(tmp, 500)
+	tmpFile, err = OpenDataFile(tmp, 100)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
-	if tmpFile.Used != 367 {
+	if tmpFile.Used != 73 {
 		t.Fatal("Incorrect Append", tmpFile.Used)
 	}
 	// Clear the file and test size
 	if err = tmpFile.Clear(); err != nil {
 		t.Fatal(err)
 	}
-	if !(len(tmpFile.Buf) == 500 && tmpFile.Buf[367] == 0 && tmpFile.Growth == 500 && tmpFile.Size == 500 && tmpFile.Used == 0) {
+	if !(len(tmpFile.Buf) == 100 && tmpFile.Buf[73] == 0 && tmpFile.Growth == 100 && tmpFile.Size == 100 && tmpFile.Used == 0) {
 		t.Fatal("Did not clear", len(tmpFile.Buf), tmpFile.Growth, tmpFile.Size, tmpFile.Used)
 	}
 	// Can still write to the buffer?
-	tmpFile.Buf[499] = 1
+	tmpFile.Buf[99] = 1
 	if err := tmpFile.Close(); err != nil {
 		t.Fatal(err)
 	}

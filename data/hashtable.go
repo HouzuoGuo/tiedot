@@ -13,14 +13,14 @@ import (
 )
 
 const (
-	// Hash table file initial size & size growth (16 MBytes)
-	HT_FILE_GROWTH = 16 * 1048576
+	// Hash table file initial size & size growth (20 MBytes)
+	HT_FILE_GROWTH = 20 * 1048576
 	// Table entry size (validity - byte, key - uint64, value - uint64)
 	ENTRY_SIZE = 1 + 8 + 8
 	// Bucket header size (next chained bucket number - uint64)
 	BUCKET_HEADER = 8
 	// Number of entries per bucket
-	PER_BUCKET = 12
+	PER_BUCKET = 16
 	// Number of bits used for hashing
 	HASH_BITS = 16
 	// Size of bucket in bytes
