@@ -137,13 +137,13 @@ func (part *Partition) Clear() error {
 	var err error
 
 	if e := part.col.Clear(); e != nil {
-		tdlog.CritNoRepeat("Failed to clear %s: %v", part.col.Path, err)
+		tdlog.CritNoRepeat("Failed to clear %s: %v", part.col.Path, e)
 
 		err = dberr.New(dberr.ErrorIO)
 	}
 
 	if e := part.lookup.Clear(); e != nil {
-		tdlog.CritNoRepeat("Failed to clear %s: %v", part.lookup.Path, err)
+		tdlog.CritNoRepeat("Failed to clear %s: %v", part.lookup.Path, e)
 
 		err = dberr.New(dberr.ErrorIO)
 	}
@@ -154,13 +154,15 @@ func (part *Partition) Clear() error {
 // Close all file handles.
 func (part *Partition) Close() error {
 
-	if err := part.col.Close(); err != nil {
-		tdlog.CritNoRepeat("Failed to close %s: %v", part.col.Path, err)
-		return dberr.New(dberr.ErrorIO)
+	var err error
+
+	if e := part.col.Close(); e != nil {
+		tdlog.CritNoRepeat("Failed to close %s: %v", part.col.Path, e)
+		err = dberr.New(dberr.ErrorIO)
 	}
-	if err := part.lookup.Close(); err != nil {
-		tdlog.CritNoRepeat("Failed to close %s: %v", part.lookup.Path, err)
-		return dberr.New(dberr.ErrorIO)
+	if e := part.lookup.Close(); e != nil {
+		tdlog.CritNoRepeat("Failed to close %s: %v", part.lookup.Path, e)
+		err = dberr.New(dberr.ErrorIO)
 	}
-	return nil
+	return err
 }
