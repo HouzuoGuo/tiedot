@@ -53,7 +53,7 @@ func (col *Collection) Read(id int) []byte {
 func (col *Collection) Insert(data []byte) (id int, err error) {
 	room := len(data) << 1
 	if room > DOC_MAX_ROOM {
-		return 0, dberr.Make(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, room)
+		return 0, dberr.New(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, room)
 	}
 	id = col.Used
 	docSize := DOC_HEADER + room
@@ -79,17 +79,17 @@ func (col *Collection) Insert(data []byte) (id int, err error) {
 func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 	dataLen := len(data)
 	if dataLen > DOC_MAX_ROOM {
-		return 0, dberr.Make(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, dataLen)
+		return 0, dberr.New(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, dataLen)
 	}
 	if id < 0 || id >= col.Used-DOC_HEADER || col.Buf[id] != 1 {
-		return 0, dberr.Make(dberr.ErrorNoDoc, id)
+		return 0, dberr.New(dberr.ErrorNoDoc, id)
 	}
 	currentDocRoom, _ := binary.Varint(col.Buf[id+1 : id+11])
 	if currentDocRoom > DOC_MAX_ROOM {
-		return 0, dberr.Make(dberr.ErrorNoDoc, id)
+		return 0, dberr.New(dberr.ErrorNoDoc, id)
 	}
 	if docEnd := id + DOC_HEADER + int(currentDocRoom); docEnd >= col.Size {
-		return 0, dberr.Make(dberr.ErrorNoDoc, id)
+		return 0, dberr.New(dberr.ErrorNoDoc, id)
 	}
 	if dataLen <= int(currentDocRoom) {
 		padding := id + DOC_HEADER + len(data)
@@ -115,7 +115,7 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 func (col *Collection) Delete(id int) error {
 
 	if id < 0 || id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
-		return dberr.Make(dberr.ErrorNoDoc, id)
+		return dberr.New(dberr.ErrorNoDoc, id)
 	}
 
 	if col.Buf[id] == 1 {

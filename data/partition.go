@@ -46,13 +46,13 @@ func (part *Partition) Read(id int) ([]byte, error) {
 	physID := part.lookup.Get(id, 1)
 
 	if len(physID) == 0 {
-		return nil, dberr.Make(dberr.ErrorNoDoc, id)
+		return nil, dberr.New(dberr.ErrorNoDoc, id)
 	}
 
 	data := part.col.Read(physID[0])
 
 	if data == nil {
-		return nil, dberr.Make(dberr.ErrorNoDoc, id)
+		return nil, dberr.New(dberr.ErrorNoDoc, id)
 	}
 
 	return data, nil
@@ -62,7 +62,7 @@ func (part *Partition) Read(id int) ([]byte, error) {
 func (part *Partition) Update(id int, data []byte) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return dberr.Make(dberr.ErrorNoDoc, id)
+		return dberr.New(dberr.ErrorNoDoc, id)
 	}
 	newID, err := part.col.Update(physID[0], data)
 	if err != nil {
@@ -78,7 +78,7 @@ func (part *Partition) Update(id int, data []byte) (err error) {
 // Lock a document for exclusive update.
 func (part *Partition) LockUpdate(id int) (err error) {
 	if _, alreadyLocked := part.updating[id]; alreadyLocked {
-		return dberr.Make(dberr.ErrorDocLocked, id)
+		return dberr.New(dberr.ErrorDocLocked, id)
 	}
 	part.updating[id] = struct{}{}
 	return
@@ -93,7 +93,7 @@ func (part *Partition) UnlockUpdate(id int) {
 func (part *Partition) Delete(id int) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return dberr.Make(dberr.ErrorNoDoc, id)
+		return dberr.New(dberr.ErrorNoDoc, id)
 	}
 	part.col.Delete(physID[0])
 	part.lookup.Remove(id, physID[0])
@@ -148,7 +148,7 @@ func (part *Partition) Clear() error {
 		failure = true
 	}
 	if failure {
-		return dberr.Make(dberr.ErrorIO)
+		return dberr.New(dberr.ErrorIO)
 	}
 	return nil
 }
@@ -169,7 +169,7 @@ func (part *Partition) Close() error {
 		failure = true
 	}
 	if failure {
-		return dberr.Make(dberr.ErrorIO)
+		return dberr.New(dberr.ErrorIO)
 	}
 	return nil
 }
