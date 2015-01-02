@@ -134,41 +134,32 @@ func (part *Partition) ApproxDocCount() int {
 // Clear data file and lookup hash table.
 func (part *Partition) Clear() error {
 
-	var (
-		err     error
-		failure bool
-	)
+	var err error
 
-	if err = part.col.Clear(); err != nil {
+	if e := part.col.Clear(); e != nil {
 		tdlog.CritNoRepeat("Failed to clear %s: %v", part.col.Path, err)
-		failure = true
+
+		err = dberr.New(dberr.ErrorIO)
 	}
-	if err = part.lookup.Clear(); err != nil {
+
+	if e := part.lookup.Clear(); e != nil {
 		tdlog.CritNoRepeat("Failed to clear %s: %v", part.lookup.Path, err)
-		failure = true
+
+		err = dberr.New(dberr.ErrorIO)
 	}
-	if failure {
-		return dberr.New(dberr.ErrorIO)
-	}
-	return nil
+
+	return err
 }
 
 // Close all file handles.
 func (part *Partition) Close() error {
 
-	var (
-		err     error
-		failure bool
-	)
-	if err = part.col.Close(); err != nil {
+	if err := part.col.Close(); err != nil {
 		tdlog.CritNoRepeat("Failed to close %s: %v", part.col.Path, err)
-		failure = true
+		return dberr.New(dberr.ErrorIO)
 	}
-	if err = part.lookup.Close(); err != nil {
+	if err := part.lookup.Close(); err != nil {
 		tdlog.CritNoRepeat("Failed to close %s: %v", part.lookup.Path, err)
-		failure = true
-	}
-	if failure {
 		return dberr.New(dberr.ErrorIO)
 	}
 	return nil
