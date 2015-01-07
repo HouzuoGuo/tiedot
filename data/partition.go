@@ -79,7 +79,7 @@ func (part *Partition) Delete(id uint64) (err error) {
 	return
 }
 
-// Partition documents into roughly equally sized portions, and run the function on every document in the portion.
+// Partition documents into roughly equally sized portions, and run the function on each document in the portion.
 func (part *Partition) ForEachDoc(partNum, totalPart uint64, fun func(id uint64, doc []byte) bool) (moveOn bool) {
 	ids, physIDs := part.lookup.GetPartition(partNum, totalPart)
 	for i, id := range ids {

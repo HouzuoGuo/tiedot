@@ -1,4 +1,4 @@
-/* Document management and index maintenance. */
+/* Single-shard - document management and index maintenance features */
 package db
 
 import (
@@ -45,7 +45,7 @@ func StrHash(str string) uint64 {
 	return hash
 }
 
-// Put a document on all user-created indexes.
+// Put a document on all indexes.
 func (col *Col) indexDoc(id uint64, doc map[string]interface{}) {
 	for idxName, idxPath := range col.indexPaths {
 		for _, idxVal := range GetIn(doc, idxPath) {
@@ -56,7 +56,7 @@ func (col *Col) indexDoc(id uint64, doc map[string]interface{}) {
 	}
 }
 
-// Remove a document from all user-created indexes.
+// Remove a document from all indexes.
 func (col *Col) unindexDoc(id uint64, doc map[string]interface{}) {
 	for idxName, idxPath := range col.indexPaths {
 		for _, idxVal := range GetIn(doc, idxPath) {
@@ -67,7 +67,7 @@ func (col *Col) unindexDoc(id uint64, doc map[string]interface{}) {
 	}
 }
 
-// Insert a document with the specified ID into the collection (incl. index).
+// Insert a document with a specified ID, used by document recovery mechanism only.
 func (col *Col) insertRecovery(id uint64, doc map[string]interface{}) (err error) {
 	docJS, err := json.Marshal(doc)
 	if err != nil {
@@ -82,7 +82,7 @@ func (col *Col) insertRecovery(id uint64, doc map[string]interface{}) (err error
 	return
 }
 
-// Insert a document into the collection.
+// Insert a document, return its auto-assigned ID.
 func (col *Col) Insert(doc map[string]interface{}) (id uint64, err error) {
 	docJS, err := json.Marshal(doc)
 	if err != nil {
@@ -110,7 +110,7 @@ func (col *Col) read(id uint64) (doc map[string]interface{}, err error) {
 	return
 }
 
-// Find and retrieve a document by ID.
+// Retrieve a document by ID.
 func (col *Col) Read(id uint64) (doc map[string]interface{}, err error) {
 	col.db.lock.RLock()
 	doc, err = col.read(id)
@@ -118,7 +118,7 @@ func (col *Col) Read(id uint64) (doc map[string]interface{}, err error) {
 	return
 }
 
-// Update a document.
+// Update a document by ID.
 func (col *Col) Update(id uint64, doc map[string]interface{}) error {
 	if doc == nil {
 		return fmt.Errorf("Updating %d: input doc may not be nil", id)

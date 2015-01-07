@@ -1,4 +1,4 @@
-/* Collection and DB storage management. */
+/* Single shard - collection and DB storage management features. */
 package db
 
 import (
@@ -17,16 +17,19 @@ import (
 	"time"
 )
 
-// Database structures.
+// Single-shard database.
 type DB struct {
+	// Only one database operation may happen at a time.
 	lock *sync.RWMutex
-	path string          // Root path of database directory
-	cols map[string]*Col // All collections
+	// Root path of database data directory
+	path string
+	// Collection names VS collection structure
+	cols map[string]*Col
 }
 
-// Open database and load all collections & indexes.
+// Open database and load all collections.
 func OpenDB(dbPath string) (*DB, error) {
-	rand.Seed(time.Now().UnixNano()) // document ID generation relies on this RNG
+	rand.Seed(time.Now().UnixNano()) // initialize RNG for document ID generation
 	db := &DB{lock: new(sync.RWMutex), path: dbPath}
 	return db, db.load()
 }
@@ -79,7 +82,7 @@ func (db *DB) AllCols() (ret []string) {
 	return
 }
 
-// Use the return value to interact with collection. Return value may be nil if the collection does not exist.
+// Return a reference to collection structure, which can be used to manage documents and collection schema.
 func (db *DB) Use(name string) *Col {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -110,7 +113,7 @@ func (db *DB) Rename(oldName, newName string) error {
 	return nil
 }
 
-// Truncate a collection - delete all documents and clear
+// Truncate a collection - delete all documents.
 func (db *DB) Truncate(name string) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -129,20 +132,20 @@ func (db *DB) Truncate(name string) error {
 	return nil
 }
 
-// Scrub a collection - fix corrupted documents and de-fragment free space.
+// De-fragment free space and get rid of corrupted documents.
 func (db *DB) Scrub(name string) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	}
-	// Prepare a temporary collection in file system
+	// Prepare a temporary (scrub destination) collection
 	tmpColName := fmt.Sprintf("scrub-%s-%d", name, time.Now().UnixNano())
 	tmpColDir := path.Join(db.path, tmpColName)
 	if err := os.MkdirAll(tmpColDir, 0700); err != nil {
 		return err
 	}
-	// Mirror indexes from original collection
+	// Mirror index schema from the original collection
 	for _, idxPath := range db.cols[name].indexPaths {
 		if err := ioutil.WriteFile(path.Join(tmpColDir, strings.Join(idxPath, INDEX_PATH_SEP)), []byte{}, 0700); err != nil {
 			return err
@@ -196,7 +199,7 @@ func (db *DB) Drop(name string) error {
 	return nil
 }
 
-// Close all database files. Do not use the DB afterwards!
+// Close all database files. This DB reference cannot be used any longer.
 func (db *DB) Close() error {
 	db.lock.Lock()
 	defer db.lock.Unlock()

@@ -1,4 +1,4 @@
-/* Collection schema and index management. */
+/* Single shard - collection schema and index management features. */
 package db
 
 import (
@@ -13,42 +13,49 @@ import (
 )
 
 const (
-	DOC_DATA_FILE   = "dat" // Prefix of partition collection data file name.
-	DOC_LOOKUP_FILE = "id"  // Prefix of partition hash table (ID lookup) file name.
-	INDEX_PATH_SEP  = "!"   // Separator between index keys in index name, which is also the index file name.
+	// Name of collection data file
+	DOC_DATA_FILE = "dat"
+	// Name of document ID lookup hash table
+	DOC_LOOKUP_FILE = "id"
+	// Index path separator (appears in hash table file name)
+	INDEX_PATH_SEP = "!"
 )
 
-// Collection has data partitions and some index meta information.
+// Schema information and document/index management features for a single DB shard.
 type Col struct {
-	db         *DB
-	name       string
-	part       *data.Partition            // Collection partitions
-	hts        map[string]*data.HashTable // Index partitions
-	indexPaths map[string][]string        // Index names and paths
-	locked     map[uint64]bool            // (BinProt only) documents that are locked for update
+	db   *DB
+	name string
+	// Document data
+	part *data.Partition
+	// Joint index paths VS hash table
+	hts map[string]*data.HashTable
+	// Joint index paths VS split index paths
+	indexPaths map[string][]string
+	// (For multi-shard environment) currently held document locks
+	locked map[uint64]struct{}
 }
 
-// Open a collection and load all indexes.
+// Open a collection and load schema information.
 func OpenCol(db *DB, name string) (*Col, error) {
-	col := &Col{db: db, name: name, locked: make(map[uint64]bool)}
+	col := &Col{db: db, name: name, locked: make(map[uint64]struct{})}
+	if err := os.MkdirAll(path.Join(col.db.path, col.name), 0700); err != nil {
+		return nil, err
+	}
 	return col, col.load()
 }
 
-// Load collection schema including index schema.
+// Load collection schema (index schema).
 func (col *Col) load() error {
-	if err := os.MkdirAll(path.Join(col.db.path, col.name), 0700); err != nil {
-		return err
-	}
 	col.hts = make(map[string]*data.HashTable)
 	col.indexPaths = make(map[string][]string)
-	// Open collection document partition
+	// Open document collection
 	var err error
 	if col.part, err = data.OpenPartition(
 		path.Join(col.db.path, col.name, DOC_DATA_FILE),
 		path.Join(col.db.path, col.name, DOC_LOOKUP_FILE)); err != nil {
 		return err
 	}
-	// Look for index directories
+	// Search for index files
 	colDirContent, err := ioutil.ReadDir(path.Join(col.db.path, col.name))
 	if err != nil {
 		return err
@@ -69,7 +76,7 @@ func (col *Col) load() error {
 	return nil
 }
 
-// Close collection files. Do not use the collection afterwards!
+// Close all collection files. Stop using the collection after the call.
 func (col *Col) close() error {
 	errs := make([]error, 0, 0)
 	if err := col.part.Close(); err != nil {
@@ -86,10 +93,9 @@ func (col *Col) close() error {
 	return fmt.Errorf("%v", errs)
 }
 
-// Do fun for all documents in the collection.
 func (col *Col) forEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
 	// Process approx.4k documents in each iteration
-	partDiv := col.approxDocCount()
+	partDiv := col.approxDocCount() / 4000
 	if partDiv == 0 {
 		partDiv++
 	}
@@ -100,14 +106,14 @@ func (col *Col) forEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
 	}
 }
 
-// Do fun for all documents in the collection.
+// Run the function on each document, stop as soon as the function returns false.
 func (col *Col) ForEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
 	col.db.lock.RLock()
 	col.forEachDoc(fun)
 	col.db.lock.RUnlock()
 }
 
-// Create an index on the path.
+// Create an index, the path represents a series of document attributes leading to the indexed value(s).
 func (col *Col) Index(idxPath []string) (err error) {
 	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
 	col.db.lock.Lock()
@@ -116,6 +122,7 @@ func (col *Col) Index(idxPath []string) (err error) {
 		return fmt.Errorf("Path %v is already indexed", idxPath)
 	}
 	col.indexPaths[idxName] = idxPath
+	// Create new index file
 	idxFileName := path.Join(col.db.path, col.name, idxName)
 	if col.hts[idxName], err = data.OpenHashTable(idxFileName); err != nil {
 		col.db.lock.Unlock()
@@ -155,7 +162,7 @@ func (col *Col) AllIndexes() (ret [][]string) {
 	return ret
 }
 
-// Return all indexed paths. Index path segments are joint.
+// Return all indexed paths. Index path segments are joint and return value is sorted.
 func (col *Col) AllIndexesJointPaths() (ret []string) {
 	ret = make([]string, 0, 0)
 	for _, path := range col.AllIndexes() {
@@ -193,7 +200,7 @@ func (col *Col) ApproxDocCount() (ret uint64) {
 	return
 }
 
-// Divide the collection into roughly equally sized pages, and do fun on all documents in the specified page.
+// Partition documents into roughly equally sized portions, and run the function on each document in the portion.
 func (col *Col) ForEachDocInPage(page, total uint64, fun func(id uint64, doc []byte) bool) {
 	col.db.lock.RLock()
 	if !col.part.ForEachDoc(page, total, fun) {

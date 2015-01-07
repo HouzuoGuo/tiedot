@@ -1,4 +1,4 @@
-/* Document and collection management features for binprot server. */
+/* Features in addition to single-shard implementation, to support multi-shard environment. */
 package db
 
 import (
@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// Return reference to hash table by joint index path.
 func (col *Col) BPUseHT(jointPath string) *data.HashTable {
 	col.db.lock.RLock()
 	ret := col.hts[jointPath]
@@ -15,18 +16,21 @@ func (col *Col) BPUseHT(jointPath string) *data.HashTable {
 	return ret
 }
 
+// Record placement of a document lock.
 func (col *Col) BPLock(id uint64) error {
 	if _, locked := col.locked[id]; locked {
-		return fmt.Errorf("Document %d is locked for update at the moment", id)
+		return fmt.Errorf("Document %d is currently locked", id)
 	}
-	col.locked[id] = true
+	col.locked[id] = struct{}{}
 	return nil
 }
 
+// Remove a document lock.
 func (col *Col) BPUnlock(id uint64) {
 	delete(col.locked, id)
 }
 
+// Insert a new document and place a lock on it.
 func (col *Col) BPLockAndInsert(id uint64, doc []byte) (err error) {
 	if err = col.BPLock(id); err != nil {
 		return err
@@ -35,11 +39,13 @@ func (col *Col) BPLockAndInsert(id uint64, doc []byte) (err error) {
 	return
 }
 
+// Retrieve a document by ID, return raw document content.
 func (col *Col) BPRead(id uint64) (doc []byte, err error) {
 	doc, err = col.part.Read(id)
 	return
 }
 
+// Retrieve a document by ID and place a lock on it.
 func (col *Col) BPLockAndRead(id uint64) (doc []byte, err error) {
 	if err = col.BPLock(id); err != nil {
 		return
@@ -48,6 +54,7 @@ func (col *Col) BPLockAndRead(id uint64) (doc []byte, err error) {
 	return
 }
 
+// Update a document by ID.
 func (col *Col) BPUpdate(id uint64, newDoc []byte) (err error) {
 	err = col.part.Update(id, newDoc)
 	return

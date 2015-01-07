@@ -1,14 +1,13 @@
-/* Query processor. */
+/* Single-shard query processor. */
 package db
 
 import (
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
-
 	"github.com/HouzuoGuo/tiedot/dberr"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"strconv"
+	"strings"
 )
 
 // Calculate union of sub-query results.
