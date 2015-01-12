@@ -127,7 +127,7 @@ func (worker *ShardServerWorker) Run() {
 					worker.disconnect()
 				} else if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
-				} else if err := col.BPLockAndInsert(docID, doc); err != nil {
+				} else if err := col.MultiShardLockDocAndInsert(docID, doc); err != nil {
 					worker.ansErr(R_ERR, []byte(err.Error()))
 				} else {
 					worker.pendingTransaction = true
@@ -144,7 +144,7 @@ func (worker *ShardServerWorker) Run() {
 					worker.ansErr(R_ERR, []byte("Client mishaved and asked for ending transaction without starting one"))
 					worker.disconnect()
 				} else if exists {
-					col.BPUnlock(docID)
+					col.MultiShardUnlockDoc(docID)
 					worker.pendingTransaction = false
 					atomic.AddInt64(&worker.srv.pendingTransactions, -1)
 					worker.ansOK()
@@ -176,7 +176,7 @@ func (worker *ShardServerWorker) Run() {
 					worker.disconnect()
 				} else if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
-				} else if doc, err := col.BPLockAndRead(docID); err == nil {
+				} else if doc, err := col.MultiShardLockDocAndRead(docID); err == nil {
 					worker.pendingTransaction = true
 					atomic.AddInt64(&worker.srv.pendingTransactions, 1)
 					worker.ansOK(doc)

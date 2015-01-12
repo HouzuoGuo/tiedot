@@ -36,7 +36,7 @@ func (schema *Schema) refresh(dbInstance *db.DB) {
 		seq++
 		for _, jointPaths := range col.AllIndexesJointPaths() {
 			splitted := strings.Split(jointPaths, db.INDEX_PATH_SEP)
-			schema.htLookup[int32(seq)] = col.BPUseHT(jointPaths)
+			schema.htLookup[int32(seq)] = col.MultiShardUseHT(jointPaths)
 			schema.indexPaths[colID][int32(seq)] = splitted
 			schema.indexPathsJoint[colID][jointPaths] = int32(seq)
 			seq++

@@ -12,6 +12,9 @@
 //	* a file's timestamp may or may not be updated by writes through mappings
 //	* specifying a size larger than the file's actual size can increase the file's size
 //	* If the mapped file is being modified by another process while your program's running, don't expect consistent results between platforms
+
+// Several unnecessary features have been removed from the original gommap code by Howard in this fork.
+
 package gommap
 
 import (

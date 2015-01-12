@@ -36,12 +36,14 @@ func NewClient(workspace string) (client *RouterClient, err error) {
 		out:       make([]*bufio.Writer, 0, 8),
 		opLock:    new(sync.Mutex),
 		schema:    new(Schema)}
-	// Connect to server 0
+	// Connect to server 0, use retry mechanism with exponential back-off.
+	waitNextRetry := 10
 	for attempt := 0; attempt < 10; attempt++ {
 		sockPath := path.Join(workspace, "0"+SOCK_FILE_SUFFIX)
 		sock, err := net.Dial("unix", sockPath)
 		if err != nil {
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(time.Duration(waitNextRetry) * time.Millisecond)
+			waitNextRetry *= 2
 			continue
 		}
 		client.sock = append(client.sock, sock)
@@ -54,16 +56,18 @@ func NewClient(workspace string) (client *RouterClient, err error) {
 		break
 	}
 	if client.nProcs == 0 {
-		return nil, fmt.Errorf("Client %d: failed to get number of server processes", client.id)
+		return nil, fmt.Errorf("Client %d - failed to get number of server processes", client.id)
 	}
-	// Connect to remaining server processes
+	// Connect to remaining server processes, use retry mechanism with exponential back-off.
 	for i := 1; i < client.nProcs; i++ {
 		connSuccessful := false
-		for attempt := 0; attempt < 5; attempt++ {
+		waitNextRetry := 10
+		for attempt := 0; attempt < 20; attempt++ {
 			sockPath := path.Join(workspace, strconv.Itoa(i)+SOCK_FILE_SUFFIX)
 			sock, err := net.Dial("unix", sockPath)
 			if err != nil {
-				time.Sleep(50 * time.Millisecond)
+				time.Sleep(time.Duration(waitNextRetry) * time.Millisecond)
+				waitNextRetry *= 2
 				continue
 			}
 			client.sock = append(client.sock, sock)
@@ -73,20 +77,22 @@ func NewClient(workspace string) (client *RouterClient, err error) {
 			break
 		}
 		if !connSuccessful {
-			return nil, fmt.Errorf("Client %d: failed to connect to server no.%d of %d", client.id, i, client.nProcs)
+			return nil, fmt.Errorf("Client %d - failed to connect to server no.%d of %d", client.id, i, client.nProcs)
 		}
 	}
 	/*
-		Server does not track connected clients in a central structure. Sending shutdown command to server merely sets
-		a state flag and stops it from accepting new connections; existing workers (one per each client) remain running.
-		Having the worker goroutines running prevents server process from exiting, and therefore every client pings all
-		servers at regular interval.
+		Server spawns independent workers for each client, but it does not track every client in a central structure.
+		In order for server to initiate an orderly shutdown (when told by client), the server sets a flag to prevent
+		new clients from being served; however, the previously established client connections remain valid for a while.
+		Each client will be informed by server before server eventually shuts down, therefore, when client is idling,
+		it pings server every second in the goroutine below, so that it will give up its connection as soon as server
+		intends to shutdown, or server crash (unlikely).
 	*/
 	go func() {
 		for {
 			client.opLock.Lock()
 			if err := client.ping(); err != nil {
-				tdlog.Noticef("Client %d: lost connection with server(s), closing this client.", client.id)
+				tdlog.Noticef("Client %d - lost connection with server(s), closing this client.", client.id)
 				client.close()
 				client.opLock.Unlock()
 				return
@@ -96,7 +102,7 @@ func NewClient(workspace string) (client *RouterClient, err error) {
 		}
 	}()
 	rand.Seed(time.Now().UnixNano())
-	tdlog.Noticef("Client %d: successfully started and connected to %d server processes", client.id, client.nProcs)
+	tdlog.Noticef("Client %d - successfully started and connected to %d server processes", client.id, client.nProcs)
 	return
 }
 
@@ -125,9 +131,7 @@ func (client *RouterClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byt
 	case R_OK:
 		// Request-response all OK
 	case R_ERR_DOWN:
-		// If server has been instructed to shut down, shut down client also.
-		tdlog.Noticef("Client %d: server shutdown has begun, closing this client.", client.id)
-		client.close()
+		// The background ping goroutine will properly close sockets and log
 		err = fmt.Errorf("Server is shutting down")
 	case R_ERR_SCHEMA:
 		// Reload my schema on revision-mismatch
@@ -136,13 +140,13 @@ func (client *RouterClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byt
 		if retryOnSchemaRefresh {
 			return client.sendCmd(rank, retryOnSchemaRefresh, cmd, params...)
 		} else {
-			err = fmt.Errorf("Server suggested schema mismatch")
+			err = fmt.Errorf("My schema was old and this operation is not retryable")
 		}
 	default:
 		if len(moreInfo) > 0 && len(moreInfo[0]) > 0 {
-			err = fmt.Errorf("Server returned error %d: %v", retCode, string(moreInfo[0]))
+			err = fmt.Errorf("Server error %d: %v", retCode, string(moreInfo[0]))
 		} else {
-			err = fmt.Errorf("Server returned error %d, no more details available.", retCode)
+			err = fmt.Errorf("Server error %d", retCode)
 		}
 	}
 	return
@@ -156,9 +160,9 @@ func (client *RouterClient) reload(srvRev uint32) {
 	}
 	client.schema.refreshToRev(clientDB, srvRev)
 	if err = clientDB.Close(); err != nil {
-		tdlog.Noticef("Client %d: failed to close database after a reload - %v", client.id, err)
+		tdlog.Noticef("Client %d - failed to close database after a reload: %v", client.id, err)
 	}
-	tdlog.Infof("Client %d: schema reloaded to revision %d", client.id, srvRev)
+	tdlog.Infof("Client %d - schema reloaded to revision %d", client.id, srvRev)
 	return
 }
 
@@ -206,7 +210,7 @@ func (client *RouterClient) goMaint() (retCode byte, err error) {
 			for leaveMaintSrv := 0; leaveMaintSrv < goMaintSrv; leaveMaintSrv++ {
 				retCode, _, err = client.sendCmd(leaveMaintSrv, true, C_LEAVE_MAINT)
 				if err != nil {
-					tdlog.Noticef("Client %d: failed to call LEAVE_MAINT on server %d - %v, closing this client.", client.id, leaveMaintSrv, err)
+					tdlog.Noticef("Client %d - failed to call LEAVE_MAINT on server %d, closing this client: %v", client.id, leaveMaintSrv, err)
 					client.close()
 					return
 				}
@@ -249,36 +253,37 @@ func (client *RouterClient) reqMaintAccess(fun func() error) error {
 		retCode, err := client.goMaint()
 		switch retCode {
 		case R_ERR_MAINT:
-			tdlog.Infof("Client %d: servers are busy, will try again after a short delay - %v", client.id, err)
+			tdlog.Infof("Client %d - servers are busy, will try again after a short delay.", client.id)
 			time.Sleep(time.Duration(100+rand.Intn(200)) * time.Millisecond)
 			continue
 		case R_ERR_DOWN:
 			fallthrough
 		case CLIENT_IO_ERR:
-			tdlog.Noticef("Client %d: IO error occured or servers are shutting down, this client is closed.", client.id)
+			tdlog.Noticef("Client %d - closing due to IO error: %v", client.id, err)
 			client.close()
-			return fmt.Errorf("Servers are down before maintenance operation can take place - %v", err)
+			return fmt.Errorf("IO error occured before maintenance operation can take place - %v", err)
 		case R_OK:
 			funResult := fun()
 			if err := client.leaveMaint(); err != nil {
-				return fmt.Errorf("Function error: %v, client LEAVE_MAINT error: %v", funResult, err)
+				return fmt.Errorf("Function error - %v, client LEAVE_MAINT error - %v", funResult, err)
 			}
 			return funResult
 		}
 	}
 }
 
+// Ping all servers, expect either OK or ERR_MAINT response from every server.
 func (client *RouterClient) ping() (err error) {
 	for i := range client.sock {
 		retCode, _, err := client.sendCmd(i, true, C_PING)
 		if retCode != R_OK && retCode != R_ERR_MAINT {
-			return fmt.Errorf("Ping error: server %d, code %d, err %v", i, retCode, err)
+			return fmt.Errorf("Ping error - server %d, code %d, err %v", i, retCode, err)
 		}
 	}
 	return nil
 }
 
-// Ping all servers, and expect OK or ERR_MAINT response.
+// Ping all servers to check their liveness.
 func (client *RouterClient) Ping() error {
 	client.opLock.Lock()
 	result := client.ping()
@@ -288,7 +293,9 @@ func (client *RouterClient) Ping() error {
 
 func (client *RouterClient) close() {
 	for _, sock := range client.sock {
-		sock.Close()
+		if err := sock.Close(); err != nil {
+			tdlog.Noticef("Client %d - failed to close socket: %v", client.id, err)
+		}
 	}
 }
 
@@ -297,7 +304,7 @@ func (client *RouterClient) Close() {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	client.close()
-	tdlog.Noticef("Client %d: closed on explicit request", client.id)
+	tdlog.Noticef("Client %d - closed on explicit request", client.id)
 }
 
 // Shutdown all servers and then close this client.
@@ -305,7 +312,7 @@ func (client *RouterClient) Shutdown() {
 	client.reqMaintAccess(func() error {
 		for i := range client.sock {
 			if _, _, err := client.sendCmd(i, true, C_SHUTDOWN); err != nil {
-				tdlog.Noticef("Client %d: failed to shutdown server %d - %v", client.id, i, err)
+				tdlog.Noticef("Client %d - failed to shutdown server %d: %v", client.id, i, err)
 			}
 		}
 		return nil
@@ -313,5 +320,5 @@ func (client *RouterClient) Shutdown() {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	client.close()
-	tdlog.Noticef("Client %d: servers and this client are shut down on explicit request", client.id)
+	tdlog.Noticef("Client %d - servers and this client are shut down on explicit request", client.id)
 }

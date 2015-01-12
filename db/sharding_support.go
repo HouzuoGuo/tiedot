@@ -1,4 +1,4 @@
-/* Features in addition to single-shard implementation, to support multi-shard environment. */
+/* Features supporting multi-shard environment in addition to the ordinary single-shard implementation. */
 package db
 
 import (
@@ -8,16 +8,16 @@ import (
 	"strings"
 )
 
-// Return reference to hash table by joint index path.
-func (col *Col) BPUseHT(jointPath string) *data.HashTable {
+// Return reference to hash table.
+func (col *Col) MultiShardUseHT(jointPath string) *data.HashTable {
 	col.db.lock.RLock()
 	ret := col.hts[jointPath]
 	col.db.lock.RUnlock()
 	return ret
 }
 
-// Record placement of a document lock.
-func (col *Col) BPLock(id uint64) error {
+// Place a document lock by memorizing its ID in an internal structure.
+func (col *Col) MultiShardLockDoc(id uint64) error {
 	if _, locked := col.locked[id]; locked {
 		return fmt.Errorf("Document %d is currently locked", id)
 	}
@@ -25,14 +25,14 @@ func (col *Col) BPLock(id uint64) error {
 	return nil
 }
 
-// Remove a document lock.
-func (col *Col) BPUnlock(id uint64) {
+// Remove a document ID from the internal lock structure.
+func (col *Col) MultiShardUnlockDoc(id uint64) {
 	delete(col.locked, id)
 }
 
-// Insert a new document and place a lock on it.
-func (col *Col) BPLockAndInsert(id uint64, doc []byte) (err error) {
-	if err = col.BPLock(id); err != nil {
+// Insert a new document and immediately place a lock on it.
+func (col *Col) MultiShardLockDocAndInsert(id uint64, doc []byte) (err error) {
+	if err = col.MultiShardLockDoc(id); err != nil {
 		return err
 	}
 	_, err = col.part.Insert(id, doc)
@@ -45,9 +45,9 @@ func (col *Col) BPRead(id uint64) (doc []byte, err error) {
 	return
 }
 
-// Retrieve a document by ID and place a lock on it.
-func (col *Col) BPLockAndRead(id uint64) (doc []byte, err error) {
-	if err = col.BPLock(id); err != nil {
+// Retrieve a document by ID and immediately place a lock on it.
+func (col *Col) MultiShardLockDocAndRead(id uint64) (doc []byte, err error) {
+	if err = col.MultiShardLockDoc(id); err != nil {
 		return
 	}
 	doc, err = col.part.Read(id)
@@ -60,15 +60,17 @@ func (col *Col) BPUpdate(id uint64, newDoc []byte) (err error) {
 	return
 }
 
+// Delete a document by ID.
 func (col *Col) BPDelete(id uint64) {
 	col.part.Delete(id)
 }
 
+// Return approximate number of documents in the partition.
 func (col *Col) BPApproxDocCount() uint64 {
 	return col.part.ApproxDocCount()
 }
 
-// Install an index without reindexing documents.
+// Install an index without re-indexing any document.
 func (col *Col) BPIndex(idxPath []string) (err error) {
 	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
 	if _, exists := col.indexPaths[idxName]; exists {

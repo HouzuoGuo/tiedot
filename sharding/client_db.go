@@ -13,6 +13,7 @@ import (
 	"time"
 )
 
+// Run fun for each database shard.
 func (client *RouterClient) forAllDBsDo(fun func(*db.DB) error) error {
 	for i := 0; i < client.nProcs; i++ {
 		clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i)))
@@ -36,7 +37,7 @@ func (client *RouterClient) Create(colName string) error {
 	})
 }
 
-// Return all collection names sorted in alphabetical order.
+// Return all collection names, sorted in alphabetical order.
 func (client *RouterClient) AllCols() (names []string) {
 	if err := client.Ping(); err != nil {
 		tdlog.Noticef("Client %d: failed to ping before returning collection names - %v", client.id, err)
@@ -60,7 +61,7 @@ func (client *RouterClient) Rename(oldName, newName string) error {
 	})
 }
 
-// Truncate a collection
+// Truncate a collection - fast delete all documents and clear all indexes.
 func (client *RouterClient) Truncate(colName string) error {
 	return client.reqMaintAccess(func() error {
 		return client.forAllDBsDo(func(clientDB *db.DB) error {
@@ -69,7 +70,7 @@ func (client *RouterClient) Truncate(colName string) error {
 	})
 }
 
-// Compact a collection and recover corrupted documents.
+// De-fragment collection free-space and get rid of corrupted documents.
 func (client *RouterClient) Scrub(colName string) error {
 	return client.reqMaintAccess(func() error {
 		// Remember existing indexes
@@ -227,7 +228,7 @@ func (client *RouterClient) Index(colName string, idxPath []string) error {
 	})
 }
 
-// Return all indexed paths in a collection. Results are sorted in alphabetical order.
+// Return all indexed paths in a collection, sorted in alphabetical order.
 func (client *RouterClient) AllIndexes(colName string) (paths [][]string, err error) {
 	jointPath, err := client.AllIndexesJointPaths(colName)
 	if err != nil {

@@ -48,6 +48,7 @@ func (client *RouterClient) indexDoc(colID int32, docID uint64, doc interface{})
 	return nil
 }
 
+// Look for potential value matches among indexed values. Collision cases should be handled by caller.
 func (client *RouterClient) hashLookup(htID int32, limit uint64, strKey string) (result []uint64, err error) {
 	hashKey := db.StrHash(strKey)
 	_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, Bint32(htID), Buint64(hashKey), Buint64(limit))
@@ -200,9 +201,8 @@ func (client *RouterClient) Delete(colName string, docID uint64) (err error) {
 		return
 	}
 	var originalDoc map[string]interface{}
-	if json.Unmarshal(resp[0], &originalDoc) != nil {
-		tdlog.Noticef("Will not attempt to unindex document %d during delete", docID)
-	}
+	// Will not attempt to unindex the original document if it became corrupted
+	json.Unmarshal(resp[0], &originalDoc)
 	// Remove the document
 	if _, _, err = client.sendCmd(rank, false, C_DOC_DELETE, colIDBytes, docIDBytes); err != nil {
 		client.opLock.Unlock()
@@ -220,7 +220,7 @@ func (client *RouterClient) Delete(colName string, docID uint64) (err error) {
 	return
 }
 
-// (Test case only) Return an error if value is not uniquely indexed in the index.
+// (Test case only) return an error if value is not uniquely indexed in the index.
 func (client *RouterClient) valIsIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
@@ -252,7 +252,7 @@ func (client *RouterClient) valIsIndexed(colName string, idxPath []string, val i
 	return fmt.Errorf("Index not found")
 }
 
-// (Test case only) Return an error if value appears in the index.
+// (Test case only) return an error if value appears in the index.
 func (client *RouterClient) valIsNotIndexed(colName string, idxPath []string, val interface{}, docID uint64) error {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
@@ -297,14 +297,14 @@ func (client *RouterClient) approxDocCount(colName string) (count uint64, err er
 	return
 }
 
-// Return an approximate number of documents in the collection.
+// Return approximate number of documents in the collection.
 func (client *RouterClient) ApproxDocCount(colName string) (count uint64, err error) {
 	client.opLock.Lock()
 	defer client.opLock.Unlock()
 	return client.approxDocCount(colName)
 }
 
-// Note that returned docs map contains ID vs Bytes (deserialize == false) or ID vs JSON interface (deserialize == true).
+// Get a page of documents, The return value contains document ID vs Bytes (deserialize == false) or ID vs JSON interface (deserialize == true).
 func (client *RouterClient) getDocPage(colName string, page, total uint64, deserialize bool) (docs map[uint64]interface{}, err error) {
 	docs = make(map[uint64]interface{})
 	_, colIDBytes, err := client.colName2IDBytes(colName)
@@ -325,7 +325,7 @@ func (client *RouterClient) getDocPage(colName string, page, total uint64, deser
 				if err = json.Unmarshal(docBytes, &doc); err == nil {
 					docs[docID] = doc
 				} else {
-					tdlog.CritNoRepeat("Client %d: found document corruption in collection %s ID %d while going through docs", client.id, colName, docID)
+					tdlog.CritNoRepeat("Client %d - found document corruption in collection %s ID %d while going through docs", client.id, colName, docID)
 				}
 			} else {
 				docs[docID] = docBytes
