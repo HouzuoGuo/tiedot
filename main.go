@@ -34,9 +34,8 @@ func main() {
 	// HTTP mode params
 	var dir string
 	var port int
-	var webcpRoute, tlsCrt, tlsKey string
+	var tlsCrt, tlsKey string
 	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
-	flag.StringVar(&webcpRoute, "webcp", "admin", "(HTTP API) web control panel route (without leading slash), 'no' to disable.")
 	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
 	flag.StringVar(&tlsCrt, "tlscrt", "", "(HTTP API) TLS certificate (TLS is optional, empty to disable).")
 	flag.StringVar(&tlsKey, "tlskey", "", "(HTTP API) TLS certificate key (TLS is optional, empty to disable).")
@@ -105,7 +104,7 @@ func main() {
 			tdlog.Notice("To enable JWT, please specify RSA private and public key.")
 			os.Exit(1)
 		}
-		httpapi.Start(dir, port, tlsCrt, tlsKey, webcpRoute, jwtPubKey, jwtPrivateKey)
+		httpapi.Start(dir, port, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey)
 	case "example":
 		// Run embedded usage examples
 		embeddedExample()

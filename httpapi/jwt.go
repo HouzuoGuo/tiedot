@@ -4,21 +4,21 @@ The package creates, serves, and verifies JWT used by HTTP clients.
 
 JWT authentication identities are stored in documents of collection "jwt", each document record should look like:
 {
-	"id": "the_login_identity",
-	"password": "hashed_password_sha512",
-	"endpoints": [
-		"create",
-		"drop",
-		"insert",
-		"query",
-		"update",
-		"other_api_endpoint_names..."
-	],
-	"collections: [
-		"collection_name_A",
-		"collection_name_B",
-		"other_collection_names..."
-	]
+    "id": "the_login_identity",
+    "password": "hashed_password_sha512",
+    "endpoints": [
+        "create",
+        "drop",
+        "insert",
+        "query",
+        "update",
+        "other_api_endpoint_names..."
+    ],
+    "collections: [
+        "collection_name_A",
+        "collection_name_B",
+        "other_collection_names..."
+    ]
 }
 
 A JWT document record allows a user identity identified by "id" and "password" to call the specified API endpoints

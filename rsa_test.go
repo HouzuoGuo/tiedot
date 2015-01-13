@@ -8,13 +8,15 @@ import (
 )
 
 var (
-	privateKey []byte //openssl genrsa -out rsa 1024
-	publicKey  []byte //openssl rsa -in rsa -pubout > rsa.pub
+	privateKey []byte //openssl genrsa -out rsa.key 1024
+	publicKey  []byte //openssl rsa -in rsa.key -out rsa.pub
+	//openssl req -new -key rsa.key -out rsa.csr
+	//openssl x509 -req -in rsa.csr -signkey rsa.key -out rsa.crt -days 365
 )
 
 func TestRsa(t *testing.T) {
 	var err error
-	if privateKey, err = ioutil.ReadFile("rsa"); err != nil {
+	if privateKey, err = ioutil.ReadFile("rsa.key"); err != nil {
 		t.Fatal(err)
 	}
 	if publicKey, err = ioutil.ReadFile("rsa.pub"); err != nil {

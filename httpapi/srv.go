@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"github.com/HouzuoGuo/tiedot/webcp"
 	"net/http"
 )
 
@@ -23,18 +22,11 @@ func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bo
 	return true
 }
 
-func Start(dir string, port int, tlsCrt, tlsKey, webcpRoute string, jwtPubKey, jwtPrivateKey string) {
+func Start(dir string, port int, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey string) {
 	var err error
 	HttpDB, err = db.OpenDB(dir)
 	if err != nil {
 		panic(err)
-	}
-
-	// web control panel
-	if webcpRoute == "" || webcpRoute == "none" || webcpRoute == "no" || webcpRoute == "false" {
-		tdlog.Noticef("Web control panel is disabled.")
-	} else {
-		webcp.RegisterWebCp(webcpRoute)
 	}
 
 	http.HandleFunc("/version", Version)
@@ -59,29 +51,29 @@ func Start(dir string, port int, tlsCrt, tlsKey, webcpRoute string, jwtPubKey, j
 	}
 }
 
-func ServeEndpoints(){
-		// collection management (stop-the-world)
-		http.HandleFunc("/create", Create)
-		http.HandleFunc("/rename", Rename)
-		http.HandleFunc("/drop", Drop)
-		http.HandleFunc("/all", All)
-		http.HandleFunc("/scrub", Scrub)
-		http.HandleFunc("/sync", Sync)
-		// query
-		http.HandleFunc("/query", Query)
-		http.HandleFunc("/count", Count)
-		// document management
-		http.HandleFunc("/insert", Insert)
-		http.HandleFunc("/get", Get)
-		http.HandleFunc("/getpage", GetPage)
-		http.HandleFunc("/update", Update)
-		http.HandleFunc("/delete", Delete)
-		http.HandleFunc("/approxdoccount", ApproxDocCount)
-		// index management (stop-the-world)
-		http.HandleFunc("/index", Index)
-		http.HandleFunc("/indexes", Indexes)
-		http.HandleFunc("/unindex", Unindex)
-		// misc (stop-the-world)
-		http.HandleFunc("/shutdown", Shutdown)
-		http.HandleFunc("/dump", Dump)
+func ServeEndpoints() {
+	// collection management (stop-the-world)
+	http.HandleFunc("/create", Create)
+	http.HandleFunc("/rename", Rename)
+	http.HandleFunc("/drop", Drop)
+	http.HandleFunc("/all", All)
+	http.HandleFunc("/scrub", Scrub)
+	http.HandleFunc("/sync", Sync)
+	// query
+	http.HandleFunc("/query", Query)
+	http.HandleFunc("/count", Count)
+	// document management
+	http.HandleFunc("/insert", Insert)
+	http.HandleFunc("/get", Get)
+	http.HandleFunc("/getpage", GetPage)
+	http.HandleFunc("/update", Update)
+	http.HandleFunc("/delete", Delete)
+	http.HandleFunc("/approxdoccount", ApproxDocCount)
+	// index management (stop-the-world)
+	http.HandleFunc("/index", Index)
+	http.HandleFunc("/indexes", Indexes)
+	http.HandleFunc("/unindex", Unindex)
+	// misc (stop-the-world)
+	http.HandleFunc("/shutdown", Shutdown)
+	http.HandleFunc("/dump", Dump)
 }
