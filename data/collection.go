@@ -9,6 +9,7 @@ package data
 
 import (
 	"encoding/binary"
+
 	"github.com/HouzuoGuo/tiedot/dberr"
 )
 
@@ -52,7 +53,7 @@ func (col *Collection) Read(id int) []byte {
 func (col *Collection) Insert(data []byte) (id int, err error) {
 	room := len(data) << 1
 	if room > DOC_MAX_ROOM {
-		return 0, dberr.ErrorDocTooLarge.Fault(DOC_MAX_ROOM, room)
+		return 0, dberr.Make(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, room)
 	}
 	id = col.Used
 	docSize := DOC_HEADER + room
@@ -76,17 +77,23 @@ func (col *Collection) Insert(data []byte) (id int, err error) {
 
 // Overwrite or re-insert a document, return the new document ID if re-inserted.
 func (col *Collection) Update(id int, data []byte) (newID int, err error) {
-	if room := len(data); room > DOC_MAX_ROOM {
-		return 0, dberr.ErrorDocTooLarge.Fault(DOC_MAX_ROOM, room)
-	} else if id < 0 || id >= col.Used-DOC_HEADER || col.Buf[id] != 1 {
-		return 0, dberr.ErrorNoDoc.Fault(id)
-	} else if room, _ := binary.Varint(col.Buf[id+1 : id+11]); room > DOC_MAX_ROOM {
-		return 0, dberr.ErrorNoDoc.Fault(id)
-	} else if docEnd := id + DOC_HEADER + int(room); docEnd >= col.Size {
-		return 0, dberr.ErrorNoDoc.Fault(id)
-	} else if len(data) <= int(room) {
+	dataLen := len(data)
+	if dataLen > DOC_MAX_ROOM {
+		return 0, dberr.Make(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, dataLen)
+	}
+	if id < 0 || id >= col.Used-DOC_HEADER || col.Buf[id] != 1 {
+		return 0, dberr.Make(dberr.ErrorNoDoc, id)
+	}
+	currentDocRoom, _ := binary.Varint(col.Buf[id+1 : id+11])
+	if currentDocRoom > DOC_MAX_ROOM {
+		return 0, dberr.Make(dberr.ErrorNoDoc, id)
+	}
+	if docEnd := id + DOC_HEADER + int(currentDocRoom); docEnd >= col.Size {
+		return 0, dberr.Make(dberr.ErrorNoDoc, id)
+	}
+	if dataLen <= int(currentDocRoom) {
 		padding := id + DOC_HEADER + len(data)
-		paddingEnd := id + DOC_HEADER + int(room)
+		paddingEnd := id + DOC_HEADER + int(currentDocRoom)
 		// Overwrite data and then overwrite padding
 		copy(col.Buf[id+DOC_HEADER:padding], data)
 		for ; padding < paddingEnd; padding += LEN_PADDING {
@@ -105,13 +112,17 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 }
 
 // Delete a document by ID.
-func (col *Collection) Delete(id int) (err error) {
+func (col *Collection) Delete(id int) error {
+
 	if id < 0 || id > col.Used-DOC_HEADER || col.Buf[id] != 1 {
-		err = dberr.ErrorNoDoc.Fault(id)
-	} else if col.Buf[id] == 1 {
+		return dberr.Make(dberr.ErrorNoDoc, id)
+	}
+
+	if col.Buf[id] == 1 {
 		col.Buf[id] = 0
 	}
-	return
+
+	return nil
 }
 
 // Run the function on every document; stop when the function returns false.
