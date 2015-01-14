@@ -59,7 +59,7 @@ func (col *Collection) Read(loc uint64) []byte {
 func (col *Collection) Insert(data []byte) (loc uint64, err error) {
 	room := uint64(len(data) << 1)
 	if room > DOC_MAX_ROOM {
-		return 0, dberr.Make(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, room)
+		return 0, dberr.New(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, room)
 	}
 	loc = col.Used
 	docSize := DOC_HEADER + room
@@ -85,13 +85,13 @@ func (col *Collection) Insert(data []byte) (loc uint64, err error) {
 // Update a document. Return identical document location if document was overwritten; otherwise return its new location.
 func (col *Collection) Update(loc uint64, data []byte) (maybeNewLoc uint64, err error) {
 	if newSize := uint64(len(data)); newSize > DOC_MAX_ROOM {
-		return 0, dberr.Make(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, newSize)
+		return 0, dberr.New(dberr.ErrorDocTooLarge, DOC_MAX_ROOM, newSize)
 	} else if loc < 0 || loc >= col.Used-DOC_HEADER || col.Buf[loc] != 1 {
-		return 0, dberr.Make(dberr.ErrorNoDoc, loc)
+		return 0, dberr.New(dberr.ErrorNoDoc, loc)
 	} else if room := binary.LittleEndian.Uint64(col.Buf[loc+1:]); room > DOC_MAX_ROOM {
-		return 0, dberr.Make(dberr.ErrorNoDoc, loc)
+		return 0, dberr.New(dberr.ErrorNoDoc, loc)
 	} else if docEnd := loc + DOC_HEADER + room; docEnd >= col.Size {
-		return 0, dberr.Make(dberr.ErrorNoDoc, loc)
+		return 0, dberr.New(dberr.ErrorNoDoc, loc)
 	} else if newSize <= room {
 		// There is enough room left, re-calculate padding size.
 		padding := loc + DOC_HEADER + newSize
@@ -116,7 +116,7 @@ func (col *Collection) Update(loc uint64, data []byte) (maybeNewLoc uint64, err 
 // Mark a document as deleted. Its space is wasted until the next "scrub" operation (implemented in DB logic).
 func (col *Collection) Delete(loc uint64) (err error) {
 	if loc < 0 || loc > col.Used-DOC_HEADER || col.Buf[loc] != 1 {
-		return dberr.Make(dberr.ErrorNoDoc, loc)
+		return dberr.New(dberr.ErrorNoDoc, loc)
 	}
 	if col.Buf[loc] == 1 {
 		col.Buf[loc] = 0

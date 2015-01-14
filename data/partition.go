@@ -41,12 +41,12 @@ func (part *Partition) Insert(id uint64, data []byte) (docLoc uint64, err error)
 func (part *Partition) Read(id uint64) ([]byte, error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return nil, dberr.Make(dberr.ErrorNoDoc, id)
+		return nil, dberr.New(dberr.ErrorNoDoc, id)
 	}
 
 	data := part.col.Read(physID[0])
 	if data == nil {
-		return nil, dberr.Make(dberr.ErrorNoDoc, id)
+		return nil, dberr.New(dberr.ErrorNoDoc, id)
 	}
 	return data, nil
 }
@@ -55,7 +55,7 @@ func (part *Partition) Read(id uint64) ([]byte, error) {
 func (part *Partition) Update(id uint64, data []byte) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return dberr.Make(dberr.ErrorNoDoc, id)
+		return dberr.New(dberr.ErrorNoDoc, id)
 	}
 	newID, err := part.col.Update(physID[0], data)
 	if err != nil {
@@ -72,7 +72,7 @@ func (part *Partition) Update(id uint64, data []byte) (err error) {
 func (part *Partition) Delete(id uint64) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return dberr.Make(dberr.ErrorNoDoc, id)
+		return dberr.New(dberr.ErrorNoDoc, id)
 	}
 	part.col.Delete(physID[0])
 	part.lookup.Remove(id, physID[0])
@@ -112,38 +112,27 @@ func (part *Partition) ApproxDocCount() uint64 {
 }
 
 // Clear document data file and lookup hash table.
-func (part *Partition) Clear() error {
-	var (
-		err     error
-		failure bool
-	)
+func (part *Partition) Clear() (err error) {
 	if err = part.col.Clear(); err != nil {
 		tdlog.CritNoRepeat("Failed to clear %s: %v", part.col.Path, err)
-		failure = true
+		err = dberr.New(dberr.ErrorIO)
 	}
 	if err = part.lookup.Clear(); err != nil {
 		tdlog.CritNoRepeat("Failed to clear %s: %v", part.lookup.Path, err)
-		failure = true
+		err = dberr.New(dberr.ErrorIO)
 	}
-	if failure {
-		return dberr.Make(dberr.ErrorIO)
-	}
-	return nil
+	return err
 }
 
 // Close file handles. Stop using the partition after the call!
 func (part *Partition) Close() (err error) {
-	var failure bool
 	if err = part.col.Close(); err != nil {
 		tdlog.CritNoRepeat("Failed to close %s: %v", part.col.Path, err)
-		failure = true
+		err = dberr.New(dberr.ErrorIO)
 	}
 	if err = part.lookup.Close(); err != nil {
 		tdlog.CritNoRepeat("Failed to close %s: %v", part.lookup.Path, err)
-		failure = true
+		err = dberr.New(dberr.ErrorIO)
 	}
-	if failure {
-		return dberr.Make(dberr.ErrorIO)
-	}
-	return nil
+	return err
 }
