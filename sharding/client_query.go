@@ -60,7 +60,7 @@ func (q *Query) getHTID(vecPath []string, originalQExpr interface{}) (htID int32
 	jointPath := strings.Join(vecPath, db.INDEX_PATH_SEP)
 	htID, exists := q.client.schema.indexPathsJoint[q.colID][jointPath]
 	if !exists {
-		err = dberr.Make(dberr.ErrorNeedIndex, vecPath, originalQExpr)
+		err = dberr.New(dberr.ErrorNeedIndex, vecPath, originalQExpr)
 	}
 	return
 }
@@ -77,7 +77,7 @@ func (q *Query) eval(queryExpr interface{}, result *map[uint64]struct{}) (err er
 			// Might be single document number
 			docID, err := strconv.ParseUint(expr, 10, 64)
 			if err != nil {
-				return dberr.Make(dberr.ErrorExpectingInt, "Single Document ID", docID)
+				return dberr.New(dberr.ErrorExpectingInt, "Single Document ID", docID)
 			}
 			(*result)[docID] = struct{}{}
 		}
@@ -145,7 +145,7 @@ func (q *Query) lookup(lookupValue interface{}, queryExpr map[string]interface{}
 		} else if _, ok := limit.(int); ok {
 			intLimit = uint64(limit.(int))
 		} else {
-			return dberr.Make(dberr.ErrorExpectingInt, "limit", limit)
+			return dberr.New(dberr.ErrorExpectingInt, "limit", limit)
 		}
 	}
 	lookupStrValue := fmt.Sprint(lookupValue) // the value to look for
@@ -194,7 +194,7 @@ func (q *Query) intersect(subExprs interface{}, result *map[uint64]struct{}) (er
 			(*result)[docID] = struct{}{}
 		}
 	} else {
-		return dberr.Make(dberr.ErrorExpectingSubQuery, subExprs)
+		return dberr.New(dberr.ErrorExpectingSubQuery, subExprs)
 	}
 	return
 }
@@ -225,7 +225,7 @@ func (q *Query) complement(subExprs interface{}, result *map[uint64]struct{}) (e
 			(*result)[docID] = struct{}{}
 		}
 	} else {
-		return dberr.Make(dberr.ErrorExpectingSubQuery, subExprs)
+		return dberr.New(dberr.ErrorExpectingSubQuery, subExprs)
 	}
 	return
 }
@@ -253,7 +253,7 @@ func (q *Query) intRange(intFrom interface{}, queryExpr map[string]interface{}, 
 		} else if _, ok := limit.(int); ok {
 			intLimit = uint64(limit.(int))
 		} else {
-			return dberr.Make(dberr.ErrorExpectingInt, limit)
+			return dberr.New(dberr.ErrorExpectingInt, limit)
 		}
 	}
 	// Figure out the range ("from" value & "to" value)
@@ -263,7 +263,7 @@ func (q *Query) intRange(intFrom interface{}, queryExpr map[string]interface{}, 
 	} else if _, ok := intFrom.(int); ok {
 		from = intFrom.(int)
 	} else {
-		return dberr.Make(dberr.ErrorExpectingInt, "int-from", from)
+		return dberr.New(dberr.ErrorExpectingInt, "int-from", from)
 	}
 	if intTo, ok := queryExpr["int-to"]; ok {
 		if floatTo, ok := intTo.(float64); ok {
@@ -271,7 +271,7 @@ func (q *Query) intRange(intFrom interface{}, queryExpr map[string]interface{}, 
 		} else if _, ok := intTo.(int); ok {
 			to = intTo.(int)
 		} else {
-			return dberr.Make(dberr.ErrorExpectingInt, "int-to", to)
+			return dberr.New(dberr.ErrorExpectingInt, "int-to", to)
 		}
 	} else if intTo, ok := queryExpr["int to"]; ok {
 		if floatTo, ok := intTo.(float64); ok {
@@ -279,10 +279,10 @@ func (q *Query) intRange(intFrom interface{}, queryExpr map[string]interface{}, 
 		} else if _, ok := intTo.(int); ok {
 			to = intTo.(int)
 		} else {
-			return dberr.Make(dberr.ErrorExpectingInt, "int to", to)
+			return dberr.New(dberr.ErrorExpectingInt, "int to", to)
 		}
 	} else {
-		return dberr.Make(dberr.ErrorMissing, "int-to")
+		return dberr.New(dberr.ErrorMissing, "int-to")
 	}
 	if to > from && to-from > 1000 || from > to && from-to > 1000 {
 		tdlog.CritNoRepeat("Query %v involves index lookup on more than 1000 values, which can be very inefficient", queryExpr)
