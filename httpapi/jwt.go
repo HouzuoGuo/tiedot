@@ -35,14 +35,16 @@ package httpapi
 import (
 	//"crypto/sha1"
 	//"encoding/base64"
+
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/HouzuoGuo/tiedot/tdlog"
-	jwt "github.com/dgrijalva/jwt-go"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/tdlog"
+	jwt "github.com/dgrijalva/jwt-go"
 )
 
 var (
@@ -106,6 +108,12 @@ func jwtInitSetup() {
 func getJwt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
+	if origin := r.Header.Get("Origin"); origin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
+	w.Header().Set("Access-Control-Expose-Headers", "Authorization")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 	// Verify identity
 	id := r.FormValue(JWT_ID_ATTR)
 	if id == "" {
@@ -163,11 +171,20 @@ func getJwt(w http.ResponseWriter, r *http.Request) {
 // Verify user's JWT.
 func checkJwt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	token, err := jwt.ParseFromRequest(r, func(token *jwt.Token) (interface{}, error) {
+	if origin := r.Header.Get("Origin"); origin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
+	w.Header().Set("Access-Control-Expose-Headers", "Authorization")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+	t, err := jwt.ParseFromRequest(r, func(token *jwt.Token) (interface{}, error) {
 		return publicKey, nil
 	})
-	if token.Valid {
+	if t == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if t.Valid {
 		w.WriteHeader(http.StatusOK)
 	} else {
 		http.Error(w, fmt.Sprintf("{\"error\": \"%s %s\"}", "JWT not valid,", err), http.StatusUnauthorized)
@@ -180,13 +197,14 @@ func jwtWrap(originalHandler http.HandlerFunc) http.HandlerFunc {
 		if origin := r.Header.Get("Origin"); origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
+		w.Header().Set("Access-Control-Expose-Headers", "Authorization")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 		t, _ := jwt.ParseFromRequest(r, func(token *jwt.Token) (interface{}, error) {
 			return publicKey, nil
 		})
 		if t == nil {
-			http.Error(w, "", http.StatusUnauthorized)
+			w.WriteHeader(http.StatusOK)
 			return
 		} else if !t.Valid {
 			http.Error(w, "", http.StatusUnauthorized)
