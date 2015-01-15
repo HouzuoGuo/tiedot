@@ -36,6 +36,7 @@ type ShardServerWorker struct {
 	id                 uint64
 	in                 *bufio.Reader
 	out                *bufio.Writer
+	sock               net.Conn
 	pendingTransaction bool
 	pendingMaintenance bool
 	lastErr            error
@@ -74,6 +75,7 @@ func (srv *ShardServer) Run() (err error) {
 		worker := &ShardServerWorker{
 			srv:                srv,
 			id:                 atomic.AddUint64(&srv.clientIDSeq, 1),
+			sock:               conn,
 			in:                 bufio.NewReader(conn),
 			out:                bufio.NewWriter(conn),
 			pendingTransaction: false,
@@ -97,10 +99,16 @@ func (srv *ShardServer) reload() {
 	tdlog.Infof("Server %d: schema reloaded to revision %d", srv.rank, srv.schema.rev)
 }
 
-// Stop serving new/existing connections and shut server down.
-func (srv *ShardServer) Shutdown() {
+func (srv *ShardServer) shutdown0() {
 	if err := srv.srvSock.Close(); err != nil {
 		tdlog.Noticef("Server %d: failed to close server socket - %v", srv.rank, err)
 	}
 	srv.shutdown = true
+}
+
+// Stop serving new/existing connections and shut server down.
+func (srv *ShardServer) Shutdown() {
+	srv.opLock.Lock()
+	srv.shutdown0()
+	srv.opLock.Unlock()
 }

@@ -44,9 +44,11 @@ const (
 )
 
 // Server reads a command sent from a client.
-func (worker *ShardServerWorker) readCmd() (cmd byte, rev uint32, params [][]byte, err error) {
+func (worker *ShardServerWorker) readCmd() (cmd byte, rev uint32, params [][]byte) {
 	cmd, paramsInclRev, err := readRec(worker.in)
 	if err != nil {
+		worker.lastErr = err
+		worker.sock.Close()
 		return
 	}
 	rev = Uint32(paramsInclRev[0])
@@ -58,6 +60,7 @@ func (worker *ShardServerWorker) readCmd() (cmd byte, rev uint32, params [][]byt
 func (worker *ShardServerWorker) ansOK(moreInfo ...[]byte) {
 	if err := writeRec(worker.out, R_OK, moreInfo...); err != nil {
 		worker.lastErr = err
+		worker.sock.Close()
 	}
 }
 
@@ -65,23 +68,23 @@ func (worker *ShardServerWorker) ansOK(moreInfo ...[]byte) {
 func (worker *ShardServerWorker) ansErr(errCode byte, moreInfo []byte) {
 	if err := writeRec(worker.out, errCode, moreInfo); err != nil {
 		worker.lastErr = err
+		worker.sock.Close()
 	}
 }
 
-// Disconnect and clean after the client in case of IO/client error.
+// Disconnect and clean after the client in case of IO/client error. May run only when opLock is locked.
 func (worker *ShardServerWorker) disconnect() {
 	tdlog.Noticef("Server %d: connection lost/disconnected from client %d due to error %v", worker.srv.rank, worker.id, worker.lastErr)
 	if worker.pendingMaintenance {
-		worker.srv.opLock.Lock()
 		worker.srv.maintByClient = 0
 		if !worker.srv.shutdown {
 			worker.srv.reload()
 		}
-		worker.srv.opLock.Unlock()
 	}
 	if worker.pendingTransaction {
 		atomic.AddInt64(&worker.srv.pendingTransactions, -1)
 	}
+	worker.sock.Close()
 }
 
 // The IO loop serving an incoming connection. Block until the connection is closed or server shuts down.
@@ -89,22 +92,28 @@ func (worker *ShardServerWorker) Run() {
 	tdlog.Noticef("Server %d: running worker for client %d", worker.srv.rank, worker.id)
 	for {
 		if worker.lastErr != nil {
+			worker.srv.opLock.Lock()
 			worker.disconnect()
+			worker.srv.opLock.Unlock()
 			return
 		}
 		// Read command and parameters from client
-		cmd, clientRev, params, err := worker.readCmd()
-		worker.lastErr = err
+		cmd, clientRev, params := worker.readCmd()
 		if worker.lastErr != nil {
+			worker.srv.opLock.Lock()
 			worker.disconnect()
-			return
-		} else if worker.srv.shutdown {
-			// Inform client that server has/is shutting down
-			worker.ansErr(R_ERR_DOWN, []byte{})
+			worker.srv.opLock.Unlock()
 			return
 		}
-		// The entire server process serves only one request at a time, governed by mutex.
+		// The entire server process serves only one request at a time, governed by the lock.
 		worker.srv.opLock.Lock()
+		if worker.srv.shutdown {
+			// Inform client that server has/is shutting down
+			worker.ansErr(R_ERR_DOWN, []byte{})
+			worker.disconnect()
+			worker.srv.opLock.Unlock()
+			return
+		}
 		srvRev := worker.srv.schema.rev
 		if clientRev != srvRev {
 			// In case of revision mismatch, inform client to refresh its schema.
@@ -125,6 +134,8 @@ func (worker *ShardServerWorker) Run() {
 				if worker.pendingTransaction {
 					worker.ansErr(R_ERR, []byte("Client mishaved and asked for transaction twice"))
 					worker.disconnect()
+					worker.srv.opLock.Unlock()
+					return
 				} else if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				} else if err := col.MultiShardLockDocAndInsert(docID, doc); err != nil {
@@ -143,14 +154,17 @@ func (worker *ShardServerWorker) Run() {
 				if !worker.pendingTransaction {
 					worker.ansErr(R_ERR, []byte("Client mishaved and asked for ending transaction without starting one"))
 					worker.disconnect()
+					worker.srv.opLock.Unlock()
+					return
 				} else if exists {
 					col.MultiShardUnlockDoc(docID)
 					worker.pendingTransaction = false
 					atomic.AddInt64(&worker.srv.pendingTransactions, -1)
 					worker.ansOK()
 				} else {
-					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
+					worker.ansErr(R_ERR, []byte("Collection does not exist"))
 					worker.disconnect()
+					worker.srv.opLock.Unlock()
 					return
 				}
 			case C_DOC_READ:
@@ -174,6 +188,8 @@ func (worker *ShardServerWorker) Run() {
 				if worker.pendingTransaction {
 					worker.ansErr(R_ERR, []byte("Client mishaved and asked for transaction twice"))
 					worker.disconnect()
+					worker.srv.opLock.Unlock()
+					return
 				} else if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				} else if doc, err := col.MultiShardLockDocAndRead(docID); err == nil {
@@ -280,6 +296,8 @@ func (worker *ShardServerWorker) Run() {
 				if worker.pendingTransaction {
 					worker.ansErr(R_ERR, []byte("Client mishaved and asked for transaction twice"))
 					worker.disconnect()
+					worker.srv.opLock.Unlock()
+					return
 				} else {
 					worker.pendingTransaction = true
 					atomic.AddInt64(&worker.srv.pendingTransactions, 1)
@@ -295,6 +313,8 @@ func (worker *ShardServerWorker) Run() {
 				} else {
 					worker.ansErr(R_ERR, []byte("Client mishaved and asked for ending transaction without starting one"))
 					worker.disconnect()
+					worker.srv.opLock.Unlock()
+					return
 				}
 			case C_GO_MAINT:
 				// Go to maintenance mode to allow exclusive data file access by the client
@@ -321,11 +341,12 @@ func (worker *ShardServerWorker) Run() {
 				worker.ansOK(Buint64(uint64(worker.srv.nProcs)), Buint64(worker.id))
 			case C_SHUTDOWN:
 				// Stop accepting new client connections, and inform existing clients to close their connection.
-				worker.srv.Shutdown()
+				worker.srv.shutdown0()
 				worker.ansOK()
 			default:
 				worker.ansErr(R_ERR, []byte("Unknown command"))
 				worker.disconnect()
+				worker.srv.opLock.Unlock()
 				return
 			}
 		}

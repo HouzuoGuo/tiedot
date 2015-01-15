@@ -92,8 +92,8 @@ func NewClient(workspace string) (client *RouterClient, err error) {
 		for {
 			client.opLock.Lock()
 			if err := client.ping(); err != nil {
-				tdlog.Noticef("Client %d - lost connection with server(s), closing this client.", client.id)
-				client.close()
+				// ping error automatically closes client
+				tdlog.Noticef("Client %d - lost connection with server during ping: %v", client.id, err)
 				client.opLock.Unlock()
 				return
 			}
@@ -106,7 +106,7 @@ func NewClient(workspace string) (client *RouterClient, err error) {
 	return
 }
 
-// Client sends a command and reads server's response.
+// Client sends a command and reads server's response. Close the client if IO error occurs.
 func (client *RouterClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (retCode byte, moreInfo [][]byte, err error) {
 	allParams := make([][]byte, len(params)+1)
 	// Param 0 should be the client's schema revision
@@ -118,36 +118,46 @@ func (client *RouterClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byt
 	// Client sends command to server
 	if err = writeRec(client.out[rank], cmd, allParams...); err != nil {
 		retCode = CLIENT_IO_ERR
+		tdlog.Noticef("Client %d - lost connection with server during sendCmd: %v", client.id, err)
+		client.close()
 		return
 	}
 	// Client reads server response
 	retCode, moreInfo, err = readRec(client.in[rank])
 	if err != nil {
 		retCode = CLIENT_IO_ERR
+		tdlog.Noticef("Client %d - lost connection with server during sendCmd: %v", client.id, err)
+		client.close()
 		return
 	}
 	// Determine what to do with the return code
-	switch retCode {
-	case R_OK:
-		// Request-response all OK
-	case R_ERR_DOWN:
-		// The background ping goroutine will properly close sockets and log
+	if retCode == R_OK {
+		return
+	}
+	if retCode == R_ERR_DOWN {
 		err = fmt.Errorf("Server is shutting down")
-	case R_ERR_SCHEMA:
-		// Reload my schema on revision-mismatch
+		tdlog.Noticef("Client %d - server is closing down and so am I", client.id)
+		client.close()
+	} else if retCode == R_ERR_SCHEMA {
+		// Catch up with server schema, and then retry the same command.
 		client.reload(Uint32(moreInfo[0]))
-		// May need to redo the command
 		if retryOnSchemaRefresh {
 			return client.sendCmd(rank, retryOnSchemaRefresh, cmd, params...)
 		} else {
 			err = fmt.Errorf("My schema was old and this operation is not retryable")
 		}
-	default:
+	} else if retCode == R_ERR || retCode == R_ERR_MAINT {
+		// Server error or maintenance is ongoing
 		if len(moreInfo) > 0 && len(moreInfo[0]) > 0 {
 			err = fmt.Errorf("Server error %d: %v", retCode, string(moreInfo[0]))
 		} else {
 			err = fmt.Errorf("Server error %d", retCode)
 		}
+	} else {
+		// Unknown status code, perhaps a programming mistake.
+		err = fmt.Errorf("Unknown error code %d", retCode)
+		tdlog.Noticef("Client %d - cannot understand server", client.id)
+		client.close()
 	}
 	return
 }
@@ -208,12 +218,7 @@ func (client *RouterClient) goMaint() (retCode byte, err error) {
 	for goMaintSrv := range client.sock {
 		if retCode, _, err = client.sendCmd(goMaintSrv, true, C_GO_MAINT); err != nil {
 			for leaveMaintSrv := 0; leaveMaintSrv < goMaintSrv; leaveMaintSrv++ {
-				retCode, _, err = client.sendCmd(leaveMaintSrv, true, C_LEAVE_MAINT)
-				if err != nil {
-					tdlog.Noticef("Client %d - failed to call LEAVE_MAINT on server %d, closing this client: %v", client.id, leaveMaintSrv, err)
-					client.close()
-					return
-				}
+				client.sendCmd(leaveMaintSrv, true, C_LEAVE_MAINT)
 			}
 			return
 		}
@@ -259,8 +264,6 @@ func (client *RouterClient) reqMaintAccess(fun func() error) error {
 		case R_ERR_DOWN:
 			fallthrough
 		case CLIENT_IO_ERR:
-			tdlog.Noticef("Client %d - closing due to IO error: %v", client.id, err)
-			client.close()
 			return fmt.Errorf("IO error occured before maintenance operation can take place - %v", err)
 		case R_OK:
 			funResult := fun()
@@ -292,6 +295,7 @@ func (client *RouterClient) Ping() error {
 }
 
 func (client *RouterClient) close() {
+	// Client only needs to close sockets, the DB is not open.
 	for _, sock := range client.sock {
 		if err := sock.Close(); err != nil {
 			tdlog.Noticef("Client %d - failed to close socket: %v", client.id, err)
