@@ -46,13 +46,13 @@ func (part *Partition) Read(id int) ([]byte, error) {
 	physID := part.lookup.Get(id, 1)
 
 	if len(physID) == 0 {
-		return nil, dberr.Make(dberr.ErrorNoDoc, id)
+		return nil, dberr.New(dberr.ErrorNoDoc, id)
 	}
 
 	data := part.col.Read(physID[0])
 
 	if data == nil {
-		return nil, dberr.Make(dberr.ErrorNoDoc, id)
+		return nil, dberr.New(dberr.ErrorNoDoc, id)
 	}
 
 	return data, nil
@@ -62,7 +62,7 @@ func (part *Partition) Read(id int) ([]byte, error) {
 func (part *Partition) Update(id int, data []byte) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return dberr.Make(dberr.ErrorNoDoc, id)
+		return dberr.New(dberr.ErrorNoDoc, id)
 	}
 	newID, err := part.col.Update(physID[0], data)
 	if err != nil {
@@ -78,7 +78,7 @@ func (part *Partition) Update(id int, data []byte) (err error) {
 // Lock a document for exclusive update.
 func (part *Partition) LockUpdate(id int) (err error) {
 	if _, alreadyLocked := part.updating[id]; alreadyLocked {
-		return dberr.Make(dberr.ErrorDocLocked, id)
+		return dberr.New(dberr.ErrorDocLocked, id)
 	}
 	part.updating[id] = struct{}{}
 	return
@@ -93,7 +93,7 @@ func (part *Partition) UnlockUpdate(id int) {
 func (part *Partition) Delete(id int) (err error) {
 	physID := part.lookup.Get(id, 1)
 	if len(physID) == 0 {
-		return dberr.Make(dberr.ErrorNoDoc, id)
+		return dberr.New(dberr.ErrorNoDoc, id)
 	}
 	part.col.Delete(physID[0])
 	part.lookup.Remove(id, physID[0])
@@ -134,42 +134,35 @@ func (part *Partition) ApproxDocCount() int {
 // Clear data file and lookup hash table.
 func (part *Partition) Clear() error {
 
-	var (
-		err     error
-		failure bool
-	)
+	var err error
 
-	if err = part.col.Clear(); err != nil {
-		tdlog.CritNoRepeat("Failed to clear %s: %v", part.col.Path, err)
-		failure = true
+	if e := part.col.Clear(); e != nil {
+		tdlog.CritNoRepeat("Failed to clear %s: %v", part.col.Path, e)
+
+		err = dberr.New(dberr.ErrorIO)
 	}
-	if err = part.lookup.Clear(); err != nil {
-		tdlog.CritNoRepeat("Failed to clear %s: %v", part.lookup.Path, err)
-		failure = true
+
+	if e := part.lookup.Clear(); e != nil {
+		tdlog.CritNoRepeat("Failed to clear %s: %v", part.lookup.Path, e)
+
+		err = dberr.New(dberr.ErrorIO)
 	}
-	if failure {
-		return dberr.Make(dberr.ErrorIO)
-	}
-	return nil
+
+	return err
 }
 
 // Close all file handles.
 func (part *Partition) Close() error {
 
-	var (
-		err     error
-		failure bool
-	)
-	if err = part.col.Close(); err != nil {
-		tdlog.CritNoRepeat("Failed to close %s: %v", part.col.Path, err)
-		failure = true
+	var err error
+
+	if e := part.col.Close(); e != nil {
+		tdlog.CritNoRepeat("Failed to close %s: %v", part.col.Path, e)
+		err = dberr.New(dberr.ErrorIO)
 	}
-	if err = part.lookup.Close(); err != nil {
-		tdlog.CritNoRepeat("Failed to close %s: %v", part.lookup.Path, err)
-		failure = true
+	if e := part.lookup.Close(); e != nil {
+		tdlog.CritNoRepeat("Failed to close %s: %v", part.lookup.Path, e)
+		err = dberr.New(dberr.ErrorIO)
 	}
-	if failure {
-		return dberr.Make(dberr.ErrorIO)
-	}
-	return nil
+	return err
 }

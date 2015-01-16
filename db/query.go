@@ -53,14 +53,14 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 		} else if _, ok := limit.(int); ok {
 			intLimit = limit.(int)
 		} else {
-			return dberr.Make(dberr.ErrorExpectingInt, "limit", limit)
+			return dberr.New(dberr.ErrorExpectingInt, "limit", limit)
 		}
 	}
 	lookupStrValue := fmt.Sprint(lookupValue) // the value to look for
 	lookupValueHash := StrHash(lookupStrValue)
 	scanPath := strings.Join(vecPath, INDEX_PATH_SEP)
 	if _, indexed := src.indexPaths[scanPath]; !indexed {
-		return dberr.Make(dberr.ErrorNeedIndex, scanPath, expr)
+		return dberr.New(dberr.ErrorNeedIndex, scanPath, expr)
 	}
 	num := lookupValueHash % src.db.numParts
 	ht := src.hts[num][scanPath]
@@ -99,12 +99,12 @@ func PathExistence(hasPath interface{}, expr map[string]interface{}, src *Col, r
 		} else if _, ok := limit.(int); ok {
 			intLimit = limit.(int)
 		} else {
-			return dberr.Make(dberr.ErrorExpectingInt, "limit", limit)
+			return dberr.New(dberr.ErrorExpectingInt, "limit", limit)
 		}
 	}
 	jointPath := strings.Join(vecPath, INDEX_PATH_SEP)
 	if _, indexed := src.indexPaths[jointPath]; !indexed {
-		return dberr.Make(dberr.ErrorNeedIndex, vecPath, expr)
+		return dberr.New(dberr.ErrorNeedIndex, vecPath, expr)
 	}
 	counter := 0
 	partDiv := src.approxDocCount(false) / src.db.numParts / 4000 // collect approx. 4k document IDs in each iteration
@@ -157,7 +157,7 @@ func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err er
 			(*result)[docID] = struct{}{}
 		}
 	} else {
-		return dberr.Make(dberr.ErrorExpectingSubQuery, subExprs)
+		return dberr.New(dberr.ErrorExpectingSubQuery, subExprs)
 	}
 	return
 }
@@ -188,7 +188,7 @@ func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err e
 			(*result)[docID] = struct{}{}
 		}
 	} else {
-		return dberr.Make(dberr.ErrorExpectingSubQuery, subExprs)
+		return dberr.New(dberr.ErrorExpectingSubQuery, subExprs)
 	}
 	return
 }
@@ -224,7 +224,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 		} else if _, ok := limit.(int); ok {
 			intLimit = limit.(int)
 		} else {
-			return dberr.Make(dberr.ErrorExpectingInt, limit)
+			return dberr.New(dberr.ErrorExpectingInt, limit)
 		}
 	}
 	// Figure out the range ("from" value & "to" value)
@@ -234,7 +234,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 	} else if _, ok := intFrom.(int); ok {
 		from = intFrom.(int)
 	} else {
-		return dberr.Make(dberr.ErrorExpectingInt, "int-from", from)
+		return dberr.New(dberr.ErrorExpectingInt, "int-from", from)
 	}
 	if intTo, ok := expr["int-to"]; ok {
 		if floatTo, ok := intTo.(float64); ok {
@@ -242,7 +242,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 		} else if _, ok := intTo.(int); ok {
 			to = intTo.(int)
 		} else {
-			return dberr.Make(dberr.ErrorExpectingInt, "int-to", to)
+			return dberr.New(dberr.ErrorExpectingInt, "int-to", to)
 		}
 	} else if intTo, ok := expr["int to"]; ok {
 		if floatTo, ok := intTo.(float64); ok {
@@ -250,10 +250,10 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 		} else if _, ok := intTo.(int); ok {
 			to = intTo.(int)
 		} else {
-			return dberr.Make(dberr.ErrorExpectingInt, "int to", to)
+			return dberr.New(dberr.ErrorExpectingInt, "int to", to)
 		}
 	} else {
-		return dberr.Make(dberr.ErrorMissing, "int-to")
+		return dberr.New(dberr.ErrorMissing, "int-to")
 	}
 	if to > from && to-from > 1000 || from > to && from-to > 1000 {
 		tdlog.CritNoRepeat("Query %v involves index lookup on more than 1000 values, which can be very inefficient", expr)
@@ -261,7 +261,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 	counter := int(0) // Number of results already collected
 	htPath := strings.Join(vecPath, ",")
 	if _, indexScan := src.indexPaths[htPath]; !indexScan {
-		return dberr.Make(dberr.ErrorNeedIndex, vecPath, expr)
+		return dberr.New(dberr.ErrorNeedIndex, vecPath, expr)
 	}
 	if from < to {
 		// Forward scan - from low value to high value
@@ -310,7 +310,7 @@ func evalQuery(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLoc
 			// Might be single document number
 			docID, err := strconv.ParseInt(expr, 10, 64)
 			if err != nil {
-				return dberr.Make(dberr.ErrorExpectingInt, "Single Document ID", docID)
+				return dberr.New(dberr.ErrorExpectingInt, "Single Document ID", docID)
 			}
 			(*result)[int(docID)] = struct{}{}
 		}
