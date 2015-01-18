@@ -35,15 +35,15 @@ func main() {
 	var dir string
 	var port int
 	var tlsCrt, tlsKey string
-	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
-	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
-	flag.StringVar(&tlsCrt, "tlscrt", "", "(HTTP API) TLS certificate (TLS is optional, empty to disable).")
-	flag.StringVar(&tlsKey, "tlskey", "", "(HTTP API) TLS certificate key (TLS is optional, empty to disable).")
+	flag.StringVar(&dir, "dir", "", "(HTTP server) database directory")
+	flag.IntVar(&port, "port", 8080, "(HTTP server) port number")
+	flag.StringVar(&tlsCrt, "tlscrt", "", "(HTTP server) TLS certificate (empty to disable TLS).")
+	flag.StringVar(&tlsKey, "tlskey", "", "(HTTP server) TLS certificate key (empty to disable TLS).")
 
 	// HTTP + JWT params
 	var jwtPubKey, jwtPrivateKey string
-	flag.StringVar(&jwtPubKey, "jwtpubkey", "", "(HTTP with JWT) Public key for signing tokens")
-	flag.StringVar(&jwtPrivateKey, "jwtprivatekey", "", "(HTTP with JWT) Private key for decoding tokens")
+	flag.StringVar(&jwtPubKey, "jwtpubkey", "", "(HTTP JWT server) Public key for signing tokens (empty to disable JWT)")
+	flag.StringVar(&jwtPrivateKey, "jwtprivatekey", "", "(HTTP JWT server) Private key for decoding tokens (empty to disable JWT)")
 
 	// Benchmark mode params
 	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
