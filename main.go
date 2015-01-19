@@ -3,11 +3,8 @@ package main
 
 import (
 	"flag"
-	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/httpapi"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"github.com/HouzuoGuo/tiedot/webcp"
-	"log"
 	"os"
 	"os/signal"
 	"runtime/pprof"
@@ -15,31 +12,49 @@ import (
 
 func main() {
 	// Parse CLI parameters
-	var mode, dir string
-	var port int
-	var profile, debug bool
+	// General params
+	var mode string
+	var maxprocs int
 	flag.StringVar(&mode, "mode", "", "[httpd|bench|example]")
-	flag.StringVar(&dir, "dir", "", "(HTTP API) database directory")
-	flag.IntVar(&port, "port", 8080, "(HTTP API) port number")
-	flag.StringVar(&webcp.WebCp, "webcp", "admin", "(HTTP API) web control panel route (without leading slash)")
-	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
+	flag.IntVar(&maxprocs, "gomaxprocs", 1, "GOMAXPROCS")
+
+	// Debug params
+	var profile, debug bool
+	flag.BoolVar(&tdlog.VerboseLog, "verbose", false, "Turn verbose logging on/off")
 	flag.BoolVar(&profile, "profile", false, "Write profiler results to prof.out")
 	flag.BoolVar(&debug, "debug", false, "Dump goroutine stack traces upon receiving interrupt signal")
-	flag.BoolVar(&tdlog.VerboseLog, "verbose", false, "Turn verbose logging on/off")
+
+	// HTTP mode params
+	var dir string
+	var port int
+	var tlsCrt, tlsKey string
+	flag.StringVar(&dir, "dir", "", "(HTTP server) database directory")
+	flag.IntVar(&port, "port", 8080, "(HTTP server) port number")
+	flag.StringVar(&tlsCrt, "tlscrt", "", "(HTTP server) TLS certificate (empty to disable TLS).")
+	flag.StringVar(&tlsKey, "tlskey", "", "(HTTP server) TLS certificate key (empty to disable TLS).")
+
+	// HTTP + JWT params
+	var jwtPubKey, jwtPrivateKey string
+	flag.StringVar(&jwtPubKey, "jwtpubkey", "", "(HTTP JWT server) Public key for signing tokens (empty to disable JWT)")
+	flag.StringVar(&jwtPrivateKey, "jwtprivatekey", "", "(HTTP JWT server) Private key for decoding tokens (empty to disable JWT)")
+
+	// Benchmark mode params
+	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
 	flag.BoolVar(&benchCleanup, "benchcleanup", true, "Whether to clean up (delete benchmark DB) after benchmark")
 	flag.Parse()
 
 	// User must specify a mode to run
 	if mode == "" {
 		flag.PrintDefaults()
-		return
+		os.Exit(1)
 	}
 
 	// Start profiler if enabled
 	if profile {
 		resultFile, err := os.Create("perf.out")
 		if err != nil {
-			log.Panicf("Cannot create profiler result file %s", resultFile)
+			tdlog.Noticef("Cannot create profiler result file %s", resultFile)
+			os.Exit(1)
 		}
 		pprof.StartCPUProfile(resultFile)
 		defer pprof.StopCPUProfile()
@@ -57,19 +72,27 @@ func main() {
 	}
 
 	switch mode {
-	case "httpd": // Run HTTP API server
+	case "httpd":
+		// Run HTTP API server
 		if dir == "" {
-			tdlog.Panicf("Please specify database directory, for example -dir=/tmp/db")
+			tdlog.Notice("Please specify database directory, for example -dir=/tmp/db")
+			os.Exit(1)
 		}
 		if port == 0 {
-			tdlog.Panicf("Please specify port number, for example -port=8080")
+			tdlog.Notice("Please specify port number, for example -port=8080")
+			os.Exit(1)
 		}
-		db, err := db.OpenDB(dir)
-		if err != nil {
-			panic(err)
+		if tlsCrt != "" && tlsKey == "" {
+			tdlog.Notice("To enable HTTPS, please specify both RSA certificate and key file.")
+			os.Exit(1)
 		}
-		httpapi.Start(db, port)
-	case "example": // Run embedded usage examples
+		if jwtPrivateKey != "" && jwtPubKey == "" {
+			tdlog.Notice("To enable JWT, please specify RSA private and public key.")
+			os.Exit(1)
+		}
+		httpapi.Start(dir, port, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey)
+	case "example":
+		// Run embedded usage examples
 		embeddedExample()
 	case "bench":
 		benchmark()

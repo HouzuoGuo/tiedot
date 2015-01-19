@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"github.com/HouzuoGuo/tiedot/webcp"
 	"net/http"
 )
 
-var HttpDB *db.DB
+var (
+	HttpDB *db.DB
+)
 
 // Store form parameter value of specified key to *val and return true; if key does not exist, set HTTP status 400 and return false.
 func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bool {
@@ -21,9 +22,36 @@ func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bo
 	return true
 }
 
-func Start(db *db.DB, port int) {
-	HttpDB = db
+func Start(dir string, port int, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey string) {
+	var err error
+	HttpDB, err = db.OpenDB(dir)
+	if err != nil {
+		panic(err)
+	}
 
+	http.HandleFunc("/version", Version)
+	http.HandleFunc("/memstats", MemStats)
+
+	if jwtPrivateKey != "" {
+		// JWT support
+		ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey)
+	} else {
+		// No JWT
+		ServeEndpoints()
+	}
+
+	if tlsCrt != "" {
+		tdlog.Noticef("Will listen on all interfaces (HTTPS), port %d.", port)
+		if err := http.ListenAndServeTLS(fmt.Sprintf(":%d", port), tlsCrt, tlsKey, nil); err != nil {
+			tdlog.Panicf("Failed to start HTTPS service - %s", err)
+		}
+	} else {
+		tdlog.Noticef("Will listen on all interfaces (HTTP), port %d.", port)
+		http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	}
+}
+
+func ServeEndpoints() {
 	// collection management (stop-the-world)
 	http.HandleFunc("/create", Create)
 	http.HandleFunc("/rename", Rename)
@@ -47,12 +75,4 @@ func Start(db *db.DB, port int) {
 	// misc (stop-the-world)
 	http.HandleFunc("/shutdown", Shutdown)
 	http.HandleFunc("/dump", Dump)
-	// misc
-	http.HandleFunc("/version", Version)
-	http.HandleFunc("/memstats", MemStats)
-	// web control panel
-	webcp.RegisterWebCp()
-
-	tdlog.Noticef("Will listen on all interfaces, port %d", port)
-	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
