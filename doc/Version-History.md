@@ -1,3 +1,7 @@
+### 3.2 (2015-??-??)
+
+Javascript Web Token can be optionally enabled to authorize API calls.
+
 ### 3.1.3 (2014-12-01)
 
 Sorry - I messed up a file in 3.1.2. This release fixes it.

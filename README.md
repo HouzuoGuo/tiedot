@@ -37,7 +37,7 @@ Let me know what you think about tiedot, I love to hear from you! Please [Email 
 
 tiedot is distributed under the [Simplified BSD license][Contributors and License].
 
-The newest version 3.1.3 (tag 3.1.3) introduced improved RPM spec and systemd unit file to properly build on Open Build Service. Please check out [Version History] for change logs and more version information.
+The newest version 3.2 introduces Javascript Web Token authorization in addition to the conventional HTTP APIs. Please check out [Version History] for change logs and more version information.
 
 ### Project Story
 

@@ -8,33 +8,26 @@ import (
 )
 
 var (
-	privateKey []byte //openssl genrsa -out rsa.key 1024
-	publicKey  []byte //openssl rsa -in rsa.key -out rsa.pub
-	//openssl req -new -key rsa.key -out rsa.csr
-	//openssl x509 -req -in rsa.csr -signkey rsa.key -out rsa.crt -days 365
+	// openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout rsa-test.key -out rsa-test.pub
+	privateKey []byte
+	publicKey  []byte
 )
 
-func TestRsa(t *testing.T) {
+func TestJWTToken(t *testing.T) {
 	var err error
-	if privateKey, err = ioutil.ReadFile("rsa.key"); err != nil {
+	if privateKey, err = ioutil.ReadFile("rsa-test.key"); err != nil {
 		t.Fatal(err)
 	}
-	if publicKey, err = ioutil.ReadFile("rsa.pub"); err != nil {
+	if publicKey, err = ioutil.ReadFile("rsa-test.pub"); err != nil {
 		t.Fatal(err)
 	}
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 	token.Claims["PERMISSION"] = "admin@tiedot"
 	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
-	if ts, err := token.SignedString(privateKey); err != nil {
+	ts, err := token.SignedString(privateKey)
+	if err != nil {
 		t.Fatal(err)
-	} else {
-		check(t, ts)
 	}
-}
-
-func check(t *testing.T, ts string) {
-	var err error
-	var token *jwt.Token
 	if token, err = jwt.Parse(ts, func(ts *jwt.Token) (interface{}, error) {
 		return publicKey, nil
 	}); err != nil {
