@@ -4,8 +4,8 @@ The package creates, serves, and verifies JWT used by HTTP clients.
 
 JWT authentication identities are stored in documents of collection "jwt", each document record should look like:
 {
-    "id": "the_login_identity",
-    "password": "hashed_password_sha512",
+    "user": "login_identity",
+    "pass": "second_secret",
     "endpoints": [
         "create",
         "drop",
@@ -21,7 +21,7 @@ JWT authentication identities are stored in documents of collection "jwt", each 
     ]
 }
 
-A JWT document record allows a user identity identified by "id" and "password" to call the specified API endpoints
+A JWT document record allows a user identity identified by "user" and "pass" to call the specified API endpoints
 on the specified collections.
 
 The JWT identity collection "jwt", along with a special user identity "admin", are created upon startup.
@@ -33,9 +33,6 @@ The special user identity "admin" allows access to all features and collection d
 package httpapi
 
 import (
-	//"crypto/sha1"
-	//"encoding/base64"
-
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -55,11 +52,11 @@ var (
 const (
 	// JWT Record and claim
 	JWT_COL_NAME         = "jwt"
-	JWT_ID_ATTR          = "id"
-	JWT_PASS_ATTR        = "password"
+	JWT_USER_ATTR        = "user"
+	JWT_PASS_ATTR        = "pass"
 	JWT_ENDPOINTS_ATTR   = "endpoints"
 	JWT_COLLECTIONS_ATTR = "collections"
-	JWT_ADMIN_ID         = "admin"
+	JWT_USER_ADMIN       = "admin"
 	// JWT claim
 	JWT_EXPIRY = "exp"
 )
@@ -78,29 +75,28 @@ func jwtInitSetup() {
 	for _, oneIndex := range jwtCol.AllIndexes() {
 		indexPaths[strings.Join(oneIndex, db.INDEX_PATH_SEP)] = struct{}{}
 	}
-	if _, exists := indexPaths[JWT_ID_ATTR]; !exists {
-		if err := jwtCol.Index([]string{JWT_ID_ATTR}); err != nil {
+	if _, exists := indexPaths[JWT_USER_ATTR]; !exists {
+		if err := jwtCol.Index([]string{JWT_USER_ATTR}); err != nil {
 			tdlog.Panicf("JWT: failed to create collection index - %v", err)
 		}
 	}
 	// Create default user "admin"
 	adminQuery := map[string]interface{}{
-		"eq": JWT_ADMIN_ID,
-		"in": []interface{}{JWT_ID_ATTR}}
+		"eq": JWT_USER_ADMIN,
+		"in": []interface{}{JWT_USER_ATTR}}
 	adminQueryResult := make(map[uint64]struct{})
 	if err := db.EvalQuery(adminQuery, jwtCol, &adminQueryResult); err != nil {
 		tdlog.Panicf("JWT: failed to query admin user ID - %v", err)
 	}
 	if len(adminQueryResult) == 0 {
 		if _, err := jwtCol.Insert(map[string]interface{}{
-			JWT_ID_ATTR: JWT_ADMIN_ID,
-			// Pass is SHA512 of empty string
-			JWT_PASS_ATTR:        "z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
+			JWT_USER_ATTR:        JWT_USER_ADMIN,
+			JWT_PASS_ATTR:        "",
 			JWT_COLLECTIONS_ATTR: []interface{}{},
 			JWT_ENDPOINTS_ATTR:   []interface{}{}}); err != nil {
 			tdlog.Panicf("JWT: failed to create default admin user - %v", err)
 		}
-		tdlog.Notice("JWT: initialization ran successfully, the default user 'admin' has been created.")
+		tdlog.Notice("JWT: successfully initialized DB for JWT features. The default user 'admin' has been created.")
 	}
 }
 
@@ -115,9 +111,9 @@ func getJwt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 	// Verify identity
-	id := r.FormValue(JWT_ID_ATTR)
-	if id == "" {
-		http.Error(w, "Please pass JWT 'id' parameter", http.StatusBadRequest)
+	user := r.FormValue(JWT_USER_ATTR)
+	if user == "" {
+		http.Error(w, "Please pass JWT 'user' parameter", http.StatusBadRequest)
 		return
 	}
 	jwtCol := HttpDB.Use(JWT_COL_NAME)
@@ -125,24 +121,20 @@ func getJwt(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Server is missing JWT identity collection, please restart the server.", http.StatusInternalServerError)
 		return
 	}
-	idQuery := map[string]interface{}{
-		"eq": id,
-		"in": []interface{}{JWT_ID_ATTR}}
-	idQueryResult := make(map[uint64]struct{})
-	if err := db.EvalQuery(idQuery, jwtCol, &idQueryResult); err != nil {
-		tdlog.CritNoRepeat("JWT identity collection query failed: %v", err)
-		http.Error(w, "JWT identity collection query failed", http.StatusInternalServerError)
+	userQuery := map[string]interface{}{
+		"eq": user,
+		"in": []interface{}{JWT_USER_ATTR}}
+	userQueryResult := make(map[uint64]struct{})
+	if err := db.EvalQuery(userQuery, jwtCol, &userQueryResult); err != nil {
+		tdlog.CritNoRepeat("Query failed in JWT identity collection : %v", err)
+		http.Error(w, "Query failed in JWT identity collection", http.StatusInternalServerError)
 		return
 	}
 	// Verify password
-	// sha := sha1.Sum([]byte(r.FormValue("password")))
-	// pass := base64.URLEncoding.EncodeToString(sha[:20])
 	pass := r.FormValue(JWT_PASS_ATTR)
-	// tdlog.Notice(pass)
-	for recID, _ := range idQueryResult {
+	for recID, _ := range userQueryResult {
 		rec, err := jwtCol.Read(recID)
 		if err != nil {
-			//tdlog.Notice(rec)
 			break
 		}
 		if rec[JWT_PASS_ATTR] != pass {
@@ -151,7 +143,7 @@ func getJwt(w http.ResponseWriter, r *http.Request) {
 		}
 		// Successful password match
 		token := jwt.New(jwt.GetSigningMethod("RS256"))
-		token.Claims[JWT_ID_ATTR] = rec[JWT_ID_ATTR]
+		token.Claims[JWT_USER_ATTR] = rec[JWT_USER_ATTR]
 		token.Claims[JWT_COLLECTIONS_ATTR] = rec[JWT_COLLECTIONS_ATTR]
 		token.Claims[JWT_ENDPOINTS_ATTR] = rec[JWT_ENDPOINTS_ATTR]
 		token.Claims[JWT_EXPIRY] = time.Now().Add(time.Hour * 72).Unix()
@@ -210,7 +202,7 @@ func jwtWrap(originalHandler http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
-		if t.Claims[JWT_ID_ATTR] == JWT_ADMIN_ID {
+		if t.Claims[JWT_USER_ATTR] == JWT_USER_ADMIN {
 			originalHandler(w, r)
 			return
 		}
@@ -279,5 +271,5 @@ func ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey string) {
 	http.HandleFunc("/getJwt", getJwt)
 	http.HandleFunc("/checkJwt", checkJwt)
 
-	tdlog.Noticef("JWT is enabled. API endpoints will require JWT authorization.")
+	tdlog.Noticef("JWT is enabled. API endpoints require JWT authorization.")
 }
