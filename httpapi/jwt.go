@@ -100,16 +100,21 @@ func jwtInitSetup() {
 	}
 }
 
-// Verify user identity and hand out a JWT.
-func getJwt(w http.ResponseWriter, r *http.Request) {
+// Enforce must-revalidate cache control, and configure response headers for CORS operation.
+func addCommonJwtRespHeaders(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
-	w.Header().Set("Content-Type", "application/json")
 	if origin := r.Header.Get("Origin"); origin != "" {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 	}
 	w.Header().Set("Access-Control-Expose-Headers", "Authorization")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+}
+
+// Verify user identity and hand out a JWT.
+func getJWT(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	addCommonJwtRespHeaders(w, r)
 	// Verify identity
 	user := r.FormValue(JWT_USER_ATTR)
 	if user == "" {
@@ -161,58 +166,39 @@ func getJwt(w http.ResponseWriter, r *http.Request) {
 }
 
 // Verify user's JWT.
-func checkJwt(w http.ResponseWriter, r *http.Request) {
+func checkJWT(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if origin := r.Header.Get("Origin"); origin != "" {
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-	}
-	w.Header().Set("Access-Control-Expose-Headers", "Authorization")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+	addCommonJwtRespHeaders(w, r)
 	t, err := jwt.ParseFromRequest(r, func(token *jwt.Token) (interface{}, error) {
 		return publicKey, nil
 	})
-	if t == nil {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-	if t.Valid {
-		w.WriteHeader(http.StatusOK)
-	} else {
+	if t == nil || !t.Valid {
 		http.Error(w, fmt.Sprintf("{\"error\": \"%s %s\"}", "JWT not valid,", err), http.StatusUnauthorized)
+	} else {
+		w.WriteHeader(http.StatusOK)
 	}
 }
 
-// Enable JWT authorization check on the handler function.
+// Enable JWT authorization check on the HTTP handler function.
 func jwtWrap(originalHandler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if origin := r.Header.Get("Origin"); origin != "" {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-		}
-		w.Header().Set("Access-Control-Expose-Headers", "Authorization")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+		addCommonJwtRespHeaders(w, r)
 		t, _ := jwt.ParseFromRequest(r, func(token *jwt.Token) (interface{}, error) {
 			return publicKey, nil
 		})
-		if t == nil {
-			w.WriteHeader(http.StatusOK)
-			return
-		} else if !t.Valid {
+		if t == nil || !t.Valid {
 			http.Error(w, "", http.StatusUnauthorized)
 			return
-		}
-		if t.Claims[JWT_USER_ATTR] == JWT_USER_ADMIN {
+		} else if t.Claims[JWT_USER_ATTR] == JWT_USER_ADMIN {
 			originalHandler(w, r)
 			return
 		}
 		var url = strings.TrimPrefix(r.URL.Path, "/")
+		var col = r.FormValue("col")
 		if !sliceContainsStr(t.Claims[JWT_ENDPOINTS_ATTR], url) {
 			http.Error(w, "", http.StatusUnauthorized)
 			return
-		}
-		var col = r.FormValue("col")
-		if col != "" && !sliceContainsStr(t.Claims[JWT_COLLECTIONS_ATTR], col) {
+		} else if col != "" && !sliceContainsStr(t.Claims[JWT_COLLECTIONS_ATTR], col) {
 			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
@@ -237,8 +223,7 @@ func ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey string) {
 	var e error
 	if publicKey, e = ioutil.ReadFile(jwtPubKey); e != nil {
 		tdlog.Panicf("JWT: Failed to read public key file - %s", e)
-	}
-	if privateKey, e = ioutil.ReadFile(jwtPrivateKey); e != nil {
+	} else if privateKey, e = ioutil.ReadFile(jwtPrivateKey); e != nil {
 		tdlog.Panicf("JWT: Failed to read private key file - %s", e)
 	}
 
@@ -268,8 +253,9 @@ func ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey string) {
 	// misc
 	http.HandleFunc("/shutdown", jwtWrap(Shutdown))
 	http.HandleFunc("/dump", jwtWrap(Dump))
-	http.HandleFunc("/getJwt", getJwt)
-	http.HandleFunc("/checkJwt", checkJwt)
+	// does not require JWT auth
+	http.HandleFunc("/getjwt", getJWT)
+	http.HandleFunc("/checkjwt", checkJWT)
 
 	tdlog.Noticef("JWT is enabled. API endpoints require JWT authorization.")
 }
