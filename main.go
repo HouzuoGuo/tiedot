@@ -25,13 +25,13 @@ func main() {
 	flag.BoolVar(&debug, "debug", false, "Dump goroutine stack traces upon receiving interrupt signal")
 
 	// HTTP mode params
-	var dir string
-	var port int
-	var tlsCrt, tlsKey string
-	flag.StringVar(&dir, "dir", "", "(HTTP server) database directory")
-	flag.IntVar(&port, "port", 8080, "(HTTP server) port number")
-	flag.StringVar(&tlsCrt, "tlscrt", "", "(HTTP server) TLS certificate (empty to disable TLS).")
-	flag.StringVar(&tlsKey, "tlskey", "", "(HTTP server) TLS certificate key (empty to disable TLS).")
+	var httpDBDir string
+	var httpPort int
+	var httpTLSCrt, httpTLSKey string
+	flag.StringVar(&httpDBDir, "httpdbdir", "", "(HTTP server) database directory")
+	flag.IntVar(&httpPort, "httpport", 8080, "(HTTP server) port number")
+	flag.StringVar(&httpTLSCrt, "httptlscrt", "", "(HTTP server) TLS certificate (empty to disable TLS).")
+	flag.StringVar(&httpTLSKey, "httptlskey", "", "(HTTP server) TLS certificate key (empty to disable TLS).")
 
 	// HTTP + JWT params
 	var jwtPubKey, jwtPrivateKey string
@@ -74,15 +74,15 @@ func main() {
 	switch mode {
 	case "httpd":
 		// Run HTTP API server
-		if dir == "" {
-			tdlog.Notice("Please specify database directory, for example -dir=/tmp/db")
+		if httpDBDir == "" {
+			tdlog.Notice("Please specify database directory, for example -httpdbdir=/tmp/db")
 			os.Exit(1)
 		}
-		if port == 0 {
-			tdlog.Notice("Please specify port number, for example -port=8080")
+		if httpPort == 0 {
+			tdlog.Notice("Please specify port number, for example -httpport=19993")
 			os.Exit(1)
 		}
-		if tlsCrt != "" && tlsKey == "" {
+		if httpTLSCrt != "" && httpTLSKey == "" {
 			tdlog.Notice("To enable HTTPS, please specify both RSA certificate and key file.")
 			os.Exit(1)
 		}
@@ -90,7 +90,7 @@ func main() {
 			tdlog.Notice("To enable JWT, please specify RSA private and public key.")
 			os.Exit(1)
 		}
-		httpapi.Start(dir, port, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey)
+		httpapi.Start(httpDBDir, httpPort, httpTLSCrt, httpTLSKey, jwtPubKey, jwtPrivateKey)
 	case "example":
 		// Run embedded usage examples
 		embeddedExample()
