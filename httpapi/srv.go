@@ -29,6 +29,8 @@ func Start(dir string, port int, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey string
 		panic(err)
 	}
 
+	// These endpoints are always available and do not require JWT auth
+	http.HandleFunc("/", Welcome)
 	http.HandleFunc("/version", Version)
 	http.HandleFunc("/memstats", MemStats)
 
@@ -49,6 +51,15 @@ func Start(dir string, port int, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey string
 		tdlog.Noticef("Will listen on all interfaces (HTTP), port %d.", port)
 		http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	}
+}
+
+// Greet user with a welcome message.
+func Welcome(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.Error(w, "Invalid API endpoint", 404)
+		return
+	}
+	w.Write([]byte("Welcome to tiedot"))
 }
 
 func ServeEndpoints() {
