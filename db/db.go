@@ -2,7 +2,6 @@
 package db
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io"
@@ -12,15 +11,11 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
-	"strings"
-	"sync"
 	"time"
 )
 
-// Single-shard database.
+// Single-shard database features.
 type DB struct {
-	// Only one database operation may happen at a time.
-	lock *sync.RWMutex
 	// Root path of database data directory
 	path string
 	// Collection names VS collection structure
@@ -30,7 +25,7 @@ type DB struct {
 // Open database and load all collections.
 func OpenDB(dbPath string) (*DB, error) {
 	rand.Seed(time.Now().UnixNano()) // initialize RNG for document ID generation
-	db := &DB{lock: new(sync.RWMutex), path: dbPath}
+	db := &DB{path: dbPath}
 	return db, db.load()
 }
 
@@ -58,8 +53,6 @@ func (db *DB) load() error {
 
 // Create a new collection.
 func (db *DB) Create(name string) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
 	if _, exists := db.cols[name]; exists {
 		return fmt.Errorf("Collection %s already exists", name)
 	} else if err := os.MkdirAll(path.Join(db.path, name), 0700); err != nil {
@@ -72,8 +65,6 @@ func (db *DB) Create(name string) error {
 
 // Return all collection names.
 func (db *DB) AllCols() (ret []string) {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
 	ret = make([]string, 0, len(db.cols))
 	for name, _ := range db.cols {
 		ret = append(ret, name)
@@ -84,8 +75,6 @@ func (db *DB) AllCols() (ret []string) {
 
 // Return a reference to collection structure, which can be used to manage documents and collection schema.
 func (db *DB) Use(name string) *Col {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
 	if col, exists := db.cols[name]; exists {
 		return col
 	}
@@ -94,8 +83,6 @@ func (db *DB) Use(name string) *Col {
 
 // Rename a collection.
 func (db *DB) Rename(oldName, newName string) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
 	if _, exists := db.cols[oldName]; !exists {
 		return fmt.Errorf("Collection %s does not exist", oldName)
 	} else if _, exists := db.cols[newName]; exists {
@@ -115,8 +102,6 @@ func (db *DB) Rename(oldName, newName string) error {
 
 // Truncate a collection - delete all documents.
 func (db *DB) Truncate(name string) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	}
@@ -132,62 +117,8 @@ func (db *DB) Truncate(name string) error {
 	return nil
 }
 
-// De-fragment free space and get rid of corrupted documents.
-func (db *DB) Scrub(name string) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
-	if _, exists := db.cols[name]; !exists {
-		return fmt.Errorf("Collection %s does not exist", name)
-	}
-	// Prepare a temporary (scrub destination) collection
-	tmpColName := fmt.Sprintf("scrub-%s-%d", name, time.Now().UnixNano())
-	tmpColDir := path.Join(db.path, tmpColName)
-	if err := os.MkdirAll(tmpColDir, 0700); err != nil {
-		return err
-	}
-	// Mirror index schema from the original collection
-	for _, idxPath := range db.cols[name].indexPaths {
-		if err := ioutil.WriteFile(path.Join(tmpColDir, strings.Join(idxPath, INDEX_PATH_SEP)), []byte{}, 0700); err != nil {
-			return err
-		}
-	}
-	// Iterate through all documents and put them into the temporary collection
-	tmpCol, err := OpenCol(db, tmpColName)
-	if err != nil {
-		return err
-	}
-	db.cols[name].forEachDoc(func(id uint64, doc []byte) bool {
-		var docObj map[string]interface{}
-		if err := json.Unmarshal([]byte(doc), &docObj); err != nil {
-			// Skip corrupted document
-			return true
-		}
-		if err := tmpCol.insertRecovery(id, docObj); err != nil {
-			tdlog.Noticef("Scrub %s: failed to insert back document %v", name, docObj)
-		}
-		return true
-	})
-	if err := tmpCol.close(); err != nil {
-		return err
-	}
-	// Replace the original collection with the "temporary" one
-	db.cols[name].close()
-	if err := os.RemoveAll(path.Join(db.path, name)); err != nil {
-		return err
-	}
-	if err := os.Rename(path.Join(db.path, tmpColName), path.Join(db.path, name)); err != nil {
-		return err
-	}
-	if db.cols[name], err = OpenCol(db, name); err != nil {
-		return err
-	}
-	return nil
-}
-
 // Drop a collection and lose all of its documents and indexes.
 func (db *DB) Drop(name string) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
 	if _, exists := db.cols[name]; !exists {
 		return fmt.Errorf("Collection %s does not exist", name)
 	} else if err := db.cols[name].close(); err != nil {
@@ -201,8 +132,6 @@ func (db *DB) Drop(name string) error {
 
 // Close all database files. This DB reference cannot be used any longer.
 func (db *DB) Close() error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
 	errs := make([]error, 0, 0)
 	for _, col := range db.cols {
 		if err := col.close(); err != nil {
@@ -217,8 +146,6 @@ func (db *DB) Close() error {
 
 // Copy this database into destination directory (for backup).
 func (db *DB) Dump(dest string) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
 	cpFun := func(currPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

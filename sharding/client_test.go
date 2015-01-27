@@ -2,10 +2,8 @@ package sharding
 
 import (
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
 	"os"
 	"os/signal"
-	"path"
 	"reflect"
 	"runtime/pprof"
 	"strconv"
@@ -223,26 +221,14 @@ func TestSchemaLookup(t *testing.T) {
 	ws := "/tmp/tiedot_binprot_test" + strconv.FormatUint(uint64(time.Now().UnixNano()), 10)
 	defer os.RemoveAll(ws)
 	var err error
-	// Prepare database with a collection A and index "1"
-	dbs := [2]*db.DB{}
-	dbs[0], err = db.OpenDB(path.Join(ws, "0"))
-	if err != nil {
+	// The one manipulating schema
+	_, maintClients := mkServersClientsReuseWS(ws, 2)
+	if err = maintClients[0].Create("A"); err != nil {
+		t.Fatal(err)
+	} else if err = maintClients[0].Index("A", []string{"1"}); err != nil {
 		t.Fatal(err)
 	}
-	dbs[1], err = db.OpenDB(path.Join(ws, "1"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = dbs[0].Create("A"); err != nil {
-		t.Fatal(err)
-	} else if err = dbs[0].Use("A").Index([]string{"1"}); err != nil {
-		t.Fatal(err)
-	} else if err = dbs[1].Create("A"); err != nil {
-		t.Fatal(err)
-	} else if err = dbs[1].Use("A").Index([]string{"1"}); err != nil {
-		t.Fatal(err)
-	}
-	// Run two servers/clients
+	// Run two ordinary servers/clients
 	servers, clients := mkServersClientsReuseWS(ws, 2)
 	// Check schema
 	if len(servers[0].schema.colLookup) != 1 || len(servers[1].schema.colLookup) != 1 || len(servers[0].schema.htLookup) != 1 || len(servers[1].schema.htLookup) != 1 {
@@ -252,11 +238,13 @@ func TestSchemaLookup(t *testing.T) {
 		len(clients[0].schema.htLookup) != 1 || len(clients[1].schema.htLookup) != 1 {
 		t.Fatal(clients[0], clients[1])
 	}
-	// Simulate a server maintenance event - create a collection B with an index "2"
-	dbs[0].Create("B")
-	dbs[0].Use("B").Index([]string{"2"})
-	dbs[1].Create("B")
-	dbs[1].Use("B").Index([]string{"2"})
+	// Emulate a server maintenance event - create a collection B with an index "2"
+	if err = maintClients[1].Create("B"); err != nil {
+		t.Fatal(err)
+	} else if err = maintClients[1].Index("B", []string{"2"}); err != nil {
+		t.Fatal(err)
+	}
+	maintClients[1].Close()
 	if _, err = clients[0].goMaintTest(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[0].leaveMaintTest(); err != nil {

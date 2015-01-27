@@ -45,43 +45,6 @@ func StrHash(str string) uint64 {
 	return hash
 }
 
-// Put a document on all indexes.
-func (col *Col) indexDoc(id uint64, doc map[string]interface{}) {
-	for idxName, idxPath := range col.indexPaths {
-		for _, idxVal := range GetIn(doc, idxPath) {
-			if idxVal != nil {
-				col.hts[idxName].Put(StrHash(fmt.Sprint(idxVal)), id)
-			}
-		}
-	}
-}
-
-// Remove a document from all indexes.
-func (col *Col) unindexDoc(id uint64, doc map[string]interface{}) {
-	for idxName, idxPath := range col.indexPaths {
-		for _, idxVal := range GetIn(doc, idxPath) {
-			if idxVal != nil {
-				col.hts[idxName].Remove(StrHash(fmt.Sprint(idxVal)), id)
-			}
-		}
-	}
-}
-
-// Insert a document with a specified ID, used by document recovery mechanism only.
-func (col *Col) insertRecovery(id uint64, doc map[string]interface{}) (err error) {
-	docJS, err := json.Marshal(doc)
-	if err != nil {
-		return
-	}
-	// Put document data into collection
-	if _, err = col.part.Insert(id, []byte(docJS)); err != nil {
-		return
-	}
-	// Index the document
-	col.indexDoc(id, doc)
-	return
-}
-
 // Insert a document, return its auto-assigned ID.
 func (col *Col) Insert(doc map[string]interface{}) (id uint64, err error) {
 	docJS, err := json.Marshal(doc)
@@ -89,32 +52,20 @@ func (col *Col) Insert(doc map[string]interface{}) (id uint64, err error) {
 		return
 	}
 	id = uint64(rand.Int63())
-	col.db.lock.Lock()
 	// Put document data into collection
 	if _, err = col.part.Insert(id, []byte(docJS)); err != nil {
-		col.db.lock.Unlock()
 		return
 	}
-	// Index the document
-	col.indexDoc(id, doc)
-	col.db.lock.Unlock()
-	return
-}
-
-func (col *Col) read(id uint64) (doc map[string]interface{}, err error) {
-	docB, err := col.part.Read(id)
-	if err != nil {
-		return
-	}
-	err = json.Unmarshal(docB, &doc)
 	return
 }
 
 // Retrieve a document by ID.
 func (col *Col) Read(id uint64) (doc map[string]interface{}, err error) {
-	col.db.lock.RLock()
-	doc, err = col.read(id)
-	col.db.lock.RUnlock()
+	docB, err := col.part.Read(id)
+	if err != nil {
+		return
+	}
+	err = json.Unmarshal(docB, &doc)
 	return
 }
 
@@ -127,10 +78,8 @@ func (col *Col) Update(id uint64, doc map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	col.db.lock.Lock()
 	originalB, err := col.part.Read(id)
 	if err != nil {
-		col.db.lock.Unlock()
 		return err
 	}
 	var original map[string]interface{}
@@ -138,38 +87,12 @@ func (col *Col) Update(id uint64, doc map[string]interface{}) error {
 		tdlog.Noticef("Will not attempt to unindex document %d during update", id)
 	}
 	if err = col.part.Update(id, []byte(docJS)); err != nil {
-		col.db.lock.Unlock()
 		return err
 	}
-	// Done with the collection data, next is to maintain indexed values
-	if original != nil {
-		col.unindexDoc(id, original)
-	}
-	col.indexDoc(id, doc)
-	col.db.lock.Unlock()
 	return nil
 }
 
 // Delete a document.
 func (col *Col) Delete(id uint64) error {
-	col.db.lock.Lock()
-	originalB, err := col.part.Read(id)
-	if err != nil {
-		col.db.lock.Unlock()
-		return err
-	}
-	var original map[string]interface{}
-	if err = json.Unmarshal(originalB, &original); err != nil {
-		tdlog.Noticef("Will not attempt to unindex document %d during delete", id)
-	}
-	if err = col.part.Delete(id); err != nil {
-		col.db.lock.Unlock()
-		return err
-	}
-	// Done with the collection data, next is to remove indexed values
-	if original != nil {
-		col.unindexDoc(id, original)
-	}
-	col.db.lock.Unlock()
-	return nil
+	return col.part.Delete(id)
 }

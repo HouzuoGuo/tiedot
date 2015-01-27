@@ -124,9 +124,6 @@ func TestDocCrudAndIdx(t *testing.T) {
 		t.Fatal(err)
 	}
 	col := db.Use("col")
-	if err = col.Index([]string{"a", "b"}); err != nil {
-		t.Fatal(err)
-	}
 	numDocs := 2011
 	docIDs := make([]uint64, numDocs)
 	// Insert documents
@@ -143,9 +140,6 @@ func TestDocCrudAndIdx(t *testing.T) {
 		if doc, err := col.Read(docID); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i) {
 			t.Fatal(docID, doc)
 		}
-		if err = idxHas(col, []string{"a", "b"}, i, docID); err != nil {
-			t.Fatal(err)
-		}
 	}
 	// Update document
 	if err = col.Update(654321, map[string]interface{}{}); dberr.Type(err) != dberr.ErrorNoDoc {
@@ -161,18 +155,6 @@ func TestDocCrudAndIdx(t *testing.T) {
 	for i, docID := range docIDs {
 		if doc, err := col.Read(docID); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i*2) {
 			t.Fatal(docID, doc)
-		}
-		if i == 0 {
-			if err = idxHas(col, []string{"a", "b"}, 0, docID); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			if err = idxHasNot(col, []string{"a", "b"}, uint64(i), docID); err != nil {
-				t.Fatal(err)
-			}
-			if err = idxHas(col, []string{"a", "b"}, uint64(i*2), docID); err != nil {
-				t.Fatal(err)
-			}
 		}
 	}
 	// Delete half of those documents
@@ -195,32 +177,11 @@ func TestDocCrudAndIdx(t *testing.T) {
 			if _, err := col.Read(docID); dberr.Type(err) != dberr.ErrorNoDoc {
 				t.Fatal("Did not delete", i, docID)
 			}
-			if err = idxHasNot(col, []string{"a", "b"}, uint64(i*2), docID); err != nil {
-				t.Fatal(err)
-			}
 		} else {
 			// After delete - verify unaffected documents and index
 			if doc, err := col.Read(docID); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i*2) {
 				t.Fatal(docID, doc)
 			}
-			if err = idxHas(col, []string{"a", "b"}, i*2, docID); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-	// Recreate index and verify
-	if err = col.Unindex([]string{"a", "b"}); err != nil {
-		t.Fatal(err)
-	}
-	if err = col.Index([]string{"a", "b"}); err != nil {
-		t.Fatal(err)
-	}
-	for i := numDocs/2 + 1; i < numDocs; i++ {
-		if doc, err := col.Read(docIDs[i]); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i*2) {
-			t.Fatal(doc, err)
-		}
-		if err = idxHas(col, []string{"a", "b"}, i*2, docIDs[i]); err != nil {
-			t.Fatal(err)
 		}
 	}
 
@@ -228,20 +189,6 @@ func TestDocCrudAndIdx(t *testing.T) {
 	t.Log("ApproxDocCount", col.ApproxDocCount())
 	if col.ApproxDocCount() < 600 || col.ApproxDocCount() > 1400 {
 		t.Fatal("Approximate is way off", col.ApproxDocCount())
-	}
-
-	// Scrub and verify
-	if err = db.Scrub("col"); err != nil {
-		t.Fatal(err)
-	}
-	col = db.Use("col")
-	for i := numDocs/2 + 1; i < numDocs; i++ {
-		if doc, err := col.Read(docIDs[i]); err != nil || doc["a"].(map[string]interface{})["b"].(float64) != float64(i*2) {
-			t.Fatal(doc, err)
-		}
-		if err = idxHas(col, []string{"a", "b"}, i*2, docIDs[i]); err != nil {
-			t.Fatal(err)
-		}
 	}
 
 	// Iterate over all documents 10 times

@@ -2,7 +2,6 @@
 package db
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
 	"io/ioutil"
@@ -93,9 +92,10 @@ func (col *Col) close() error {
 	return fmt.Errorf("%v", errs)
 }
 
-func (col *Col) forEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
+// Run the function on each document, stop as soon as the function returns false.
+func (col *Col) ForEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
 	// Process approx.4k documents in each iteration
-	partDiv := col.approxDocCount() / 4000
+	partDiv := col.ApproxDocCount() / 4000
 	if partDiv == 0 {
 		partDiv++
 	}
@@ -106,50 +106,20 @@ func (col *Col) forEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
 	}
 }
 
-// Run the function on each document, stop as soon as the function returns false.
-func (col *Col) ForEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
-	col.db.lock.RLock()
-	col.forEachDoc(fun)
-	col.db.lock.RUnlock()
+// Return approximate number of documents in the collection.
+func (col *Col) ApproxDocCount() uint64 {
+	return col.part.ApproxDocCount()
 }
 
-// Create an index, the path represents a series of document attributes leading to the indexed value(s).
-func (col *Col) Index(idxPath []string) (err error) {
-	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
-	col.db.lock.Lock()
-	if _, exists := col.indexPaths[idxName]; exists {
-		col.db.lock.Unlock()
-		return fmt.Errorf("Path %v is already indexed", idxPath)
+// Partition documents into roughly equally sized portions, and run the function on each document in the portion.
+func (col *Col) ForEachDocInPage(page, total uint64, fun func(id uint64, doc []byte) bool) {
+	if !col.part.ForEachDoc(page, total, fun) {
+		return
 	}
-	col.indexPaths[idxName] = idxPath
-	// Create new index file
-	idxFileName := path.Join(col.db.path, col.name, idxName)
-	if col.hts[idxName], err = data.OpenHashTable(idxFileName); err != nil {
-		col.db.lock.Unlock()
-		return err
-	}
-	// Put all documents on the new index
-	col.forEachDoc(func(id uint64, doc []byte) (moveOn bool) {
-		var docObj map[string]interface{}
-		if err := json.Unmarshal(doc, &docObj); err != nil {
-			// Skip corrupted document
-			return true
-		}
-		for _, idxVal := range GetIn(docObj, idxPath) {
-			if idxVal != nil {
-				hashKey := StrHash(fmt.Sprint(idxVal))
-				col.hts[idxName].Put(hashKey, id)
-			}
-		}
-		return true
-	})
-	col.db.lock.Unlock()
-	return
 }
 
 // Return all indexed paths.
 func (col *Col) AllIndexes() (ret [][]string) {
-	col.db.lock.RLock()
 	ret = make([][]string, 0, len(col.indexPaths))
 	for _, path := range col.indexPaths {
 		pathCopy := make([]string, len(path))
@@ -158,7 +128,6 @@ func (col *Col) AllIndexes() (ret [][]string) {
 		}
 		ret = append(ret, pathCopy)
 	}
-	col.db.lock.RUnlock()
 	return ret
 }
 
@@ -175,37 +144,12 @@ func (col *Col) AllIndexesJointPaths() (ret []string) {
 // Remove an index.
 func (col *Col) Unindex(idxPath []string) (err error) {
 	idxName := strings.Join(idxPath, INDEX_PATH_SEP)
-	col.db.lock.Lock()
 	if _, exists := col.indexPaths[idxName]; !exists {
-		col.db.lock.Unlock()
 		return fmt.Errorf("Path %v is not indexed", idxPath)
 	}
 	delete(col.indexPaths, idxName)
 	col.hts[idxName].Close()
 	delete(col.hts, idxName)
 	err = os.RemoveAll(path.Join(col.db.path, col.name, idxName))
-	col.db.lock.Unlock()
 	return
-}
-
-func (col *Col) approxDocCount() uint64 {
-	return col.part.ApproxDocCount()
-}
-
-// Return approximate number of documents in the collection.
-func (col *Col) ApproxDocCount() (ret uint64) {
-	col.db.lock.RLock()
-	ret = col.part.ApproxDocCount()
-	col.db.lock.RUnlock()
-	return
-}
-
-// Partition documents into roughly equally sized portions, and run the function on each document in the portion.
-func (col *Col) ForEachDocInPage(page, total uint64, fun func(id uint64, doc []byte) bool) {
-	col.db.lock.RLock()
-	if !col.part.ForEachDoc(page, total, fun) {
-		col.db.lock.RUnlock()
-		return
-	}
-	col.db.lock.RUnlock()
 }

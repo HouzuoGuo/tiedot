@@ -10,9 +10,7 @@ import (
 
 // Return reference to hash table.
 func (col *Col) MultiShardUseHT(jointPath string) *data.HashTable {
-	col.db.lock.RLock()
 	ret := col.hts[jointPath]
-	col.db.lock.RUnlock()
 	return ret
 }
 
