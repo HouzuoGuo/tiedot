@@ -93,6 +93,20 @@ func TestDBDirCrud(t *testing.T) {
 	mustExist(path.Join(dir, "1", COLLECTION_DIR, "col1", COLLECTION_INDEX_DIR), true, t)
 	mustNotExist(path.Join(dir, "0", COLLECTION_DIR, "col2"), t)
 	mustNotExist(path.Join(dir, "1", COLLECTION_DIR, "col2"), t)
+	if dbfs.RenameCollection("col1", "col0"); err != nil {
+		t.Fatal(err)
+	}
+	mustNotExist(path.Join(dir, "0", COLLECTION_DIR, "col1"), t)
+	mustNotExist(path.Join(dir, "1", COLLECTION_DIR, "col1"), t)
+	mustExist(path.Join(dir, "0", COLLECTION_DIR, "col0", COLLECTION_INDEX_DIR), true, t)
+	mustExist(path.Join(dir, "1", COLLECTION_DIR, "col0", COLLECTION_INDEX_DIR), true, t)
+	if dbfs.RenameCollection("col0", "col1"); err != nil {
+		t.Fatal(err)
+	}
+	mustNotExist(path.Join(dir, "0", COLLECTION_DIR, "col2"), t)
+	mustNotExist(path.Join(dir, "1", COLLECTION_DIR, "col2"), t)
+	mustExist(path.Join(dir, "0", COLLECTION_DIR, "col1", COLLECTION_INDEX_DIR), true, t)
+	mustExist(path.Join(dir, "1", COLLECTION_DIR, "col1", COLLECTION_INDEX_DIR), true, t)
 
 	// Index CRUD
 	if err := dbfs.CreateIndex("col1", JoinIndexPath([]string{"b", "c"})); err != nil {

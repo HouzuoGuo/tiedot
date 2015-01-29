@@ -30,7 +30,7 @@ type Col struct {
 	hts map[string]*data.HashTable
 	// Joint index paths VS split index paths
 	indexPaths map[string][]string
-	// (For multi-shard environment) currently held document locks
+	// Currently held document locks
 	locked map[uint64]struct{}
 }
 

@@ -100,6 +100,32 @@ func (dbfs *DBDirStruct) CreateCollection(colName string) error {
 	return nil
 }
 
+// Rename a collection.
+func (dbfs *DBDirStruct) RenameCollection(oldName, newName string) error {
+	foundAt := -1
+	for i, existingCol := range dbfs.Collections {
+		if existingCol == newName {
+			return fmt.Errorf("Collection name %s is already used", newName)
+		} else if existingCol == oldName {
+			foundAt = i
+		}
+	}
+	if foundAt == -1 {
+		return fmt.Errorf("Collection %s does not exist", oldName)
+	}
+	for i := 0; i < dbfs.NShards; i++ {
+		colOldDir := path.Join(dbfs.DBDir, strconv.Itoa(i), COLLECTION_DIR, oldName)
+		colNewDir := path.Join(dbfs.DBDir, strconv.Itoa(i), COLLECTION_DIR, newName)
+		if err := os.Rename(colOldDir, colNewDir); err != nil {
+			return err
+		}
+	}
+	dbfs.Collections[foundAt] = newName
+	dbfs.Indexes[newName] = dbfs.Indexes[oldName]
+	delete(dbfs.Indexes, oldName)
+	return nil
+}
+
 // Remove directories and data files of a collection.
 func (dbfs *DBDirStruct) DropCollection(colName string) error {
 	foundAt := -1
