@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 	"testing"
 )
 
@@ -186,7 +187,7 @@ func TestDumpDB(t *testing.T) {
 	} else if err := db.Create("b"); err != nil {
 		t.Fatal(err)
 	}
-	id1, err := db.Use("a").Insert(map[string]interface{}{"whatever": "1"})
+	err = db.Use("a").MultiShardLockDocAndInsert(123, []byte("abcde"))
 	if err != nil {
 		t.Fatal(err)
 	} else if err := db.Dump(TEST_DATA_DIR + "bak"); err != nil {
@@ -203,8 +204,8 @@ func TestDumpDB(t *testing.T) {
 	if allCols := db2.AllCols(); !(allCols[0] == "a" && allCols[1] == "b") {
 		t.Fatal(allCols)
 	}
-	if doc, err := db2.Use("a").Read(id1); err != nil || doc["whatever"].(string) != "1" {
-		t.Fatal(doc, err)
+	if doc, err := db2.Use("a").BPRead(123); err != nil || strings.TrimSpace(string(doc)) != "abcde" {
+		t.Fatal(string(doc), err)
 	}
 	if err := db2.Close(); err != nil {
 		t.Fatal(err)

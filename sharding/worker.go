@@ -228,7 +228,7 @@ func (worker *ShardServerWorker) Run() {
 				colID := Int32(params[0])
 				col, exists := worker.srv.schema.colLookup[colID]
 				if exists {
-					worker.ansOK(Buint64(col.ApproxDocCount()))
+					worker.ansOK(Buint64(col.BPApproxDocCount()))
 				} else {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				}
@@ -239,7 +239,7 @@ func (worker *ShardServerWorker) Run() {
 				total := Uint64(params[2])
 				col, exists := worker.srv.schema.colLookup[colID]
 				if exists {
-					approxCount := col.ApproxDocCount()
+					approxCount := col.BPApproxDocCount()
 					// id1, doc1, id2, doc2, id3, doc3 ...
 					resp := make([][]byte, 0, approxCount/total*page*2)
 					col.ForEachDocInPage(page, total, func(id uint64, doc []byte) (moveOn bool) {

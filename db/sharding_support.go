@@ -53,9 +53,8 @@ func (col *Col) MultiShardLockDocAndRead(id uint64) (doc []byte, err error) {
 }
 
 // Update a document by ID.
-func (col *Col) BPUpdate(id uint64, newDoc []byte) (err error) {
-	err = col.part.Update(id, newDoc)
-	return
+func (col *Col) BPUpdate(id uint64, newDoc []byte) error {
+	return col.part.Update(id, newDoc)
 }
 
 // Delete a document by ID.

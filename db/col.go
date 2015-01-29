@@ -92,25 +92,6 @@ func (col *Col) close() error {
 	return fmt.Errorf("%v", errs)
 }
 
-// Run the function on each document, stop as soon as the function returns false.
-func (col *Col) ForEachDoc(fun func(id uint64, doc []byte) (moveOn bool)) {
-	// Process approx.4k documents in each iteration
-	partDiv := col.ApproxDocCount() / 4000
-	if partDiv == 0 {
-		partDiv++
-	}
-	for i := uint64(0); i < partDiv; i++ {
-		if !col.part.ForEachDoc(i, partDiv, fun) {
-			return
-		}
-	}
-}
-
-// Return approximate number of documents in the collection.
-func (col *Col) ApproxDocCount() uint64 {
-	return col.part.ApproxDocCount()
-}
-
 // Partition documents into roughly equally sized portions, and run the function on each document in the portion.
 func (col *Col) ForEachDocInPage(page, total uint64, fun func(id uint64, doc []byte) bool) {
 	if !col.part.ForEachDoc(page, total, fun) {

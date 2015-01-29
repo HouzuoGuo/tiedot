@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path"
 	"reflect"
 	"runtime/pprof"
 	"strconv"
@@ -217,34 +218,46 @@ func schemaIdentical(s1 *Schema, s2 *Schema, numCols, numHTs int) error {
 	return nil
 }
 
+func createEmptyFile(dir, filename string) {
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		panic(err)
+	}
+	if filename != "" {
+		_, err := os.Create(path.Join(dir, filename))
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
 func TestSchemaLookup(t *testing.T) {
 	ws := "/tmp/tiedot_binprot_test" + strconv.FormatUint(uint64(time.Now().UnixNano()), 10)
 	defer os.RemoveAll(ws)
 	var err error
-	// The one manipulating schema
-	_, maintClients := mkServersClientsReuseWS(ws, 2)
-	if err = maintClients[0].Create("A"); err != nil {
-		t.Fatal(err)
-	} else if err = maintClients[0].Index("A", []string{"1"}); err != nil {
-		t.Fatal(err)
-	}
+	// Manually create a DB collection called A and an index on attr "1"
+	createEmptyFile(path.Join(ws, "0", "A"), "dat")
+	createEmptyFile(path.Join(ws, "0", "A"), "id")
+	createEmptyFile(path.Join(ws, "0", "A"), "1")
+	createEmptyFile(path.Join(ws, "1", "A"), "dat")
+	createEmptyFile(path.Join(ws, "1", "A"), "id")
+	createEmptyFile(path.Join(ws, "1", "A"), "1")
 	// Run two ordinary servers/clients
 	servers, clients := mkServersClientsReuseWS(ws, 2)
 	// Check schema
 	if len(servers[0].schema.colLookup) != 1 || len(servers[1].schema.colLookup) != 1 || len(servers[0].schema.htLookup) != 1 || len(servers[1].schema.htLookup) != 1 {
-		t.Fatal(servers[0], servers[1])
+		t.Fatal(servers[0].schema.htLookup, servers[1].schema.htLookup)
 	}
 	if len(clients[0].schema.colLookup) != 1 || len(clients[1].schema.colLookup) != 1 ||
 		len(clients[0].schema.htLookup) != 1 || len(clients[1].schema.htLookup) != 1 {
-		t.Fatal(clients[0], clients[1])
+		t.Fatal(clients[0].schema, clients[1].schema)
 	}
 	// Emulate a server maintenance event - create a collection B with an index "2"
-	if err = maintClients[1].Create("B"); err != nil {
-		t.Fatal(err)
-	} else if err = maintClients[1].Index("B", []string{"2"}); err != nil {
-		t.Fatal(err)
-	}
-	maintClients[1].Close()
+	createEmptyFile(path.Join(ws, "0", "B"), "dat")
+	createEmptyFile(path.Join(ws, "0", "B"), "id")
+	createEmptyFile(path.Join(ws, "0", "B"), "2")
+	createEmptyFile(path.Join(ws, "1", "B"), "dat")
+	createEmptyFile(path.Join(ws, "1", "B"), "id")
+	createEmptyFile(path.Join(ws, "1", "B"), "2")
 	if _, err = clients[0].goMaintTest(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[0].leaveMaintTest(); err != nil {
