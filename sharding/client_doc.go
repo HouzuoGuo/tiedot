@@ -4,10 +4,46 @@ package sharding
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math/rand"
 )
+
+// Resolve the attribute(s) in the document structure along the given path.
+func ResolveDocAttr(doc interface{}, path []string) (ret []interface{}) {
+	docMap, ok := doc.(map[string]interface{})
+	if !ok {
+		return
+	}
+	var thing interface{} = docMap
+	// Get inside each path segment
+	for i, seg := range path {
+		if aMap, ok := thing.(map[string]interface{}); ok {
+			thing = aMap[seg]
+		} else if anArray, ok := thing.([]interface{}); ok {
+			for _, element := range anArray {
+				ret = append(ret, ResolveDocAttr(element, path[i:])...)
+			}
+			return ret
+		} else {
+			return nil
+		}
+	}
+	switch thing.(type) {
+	case []interface{}:
+		return append(ret, thing.([]interface{})...)
+	default:
+		return append(ret, thing)
+	}
+}
+
+// Hash a string using sdbm algorithm.
+func StringHash(str string) uint64 {
+	var hash uint64
+	for _, c := range str {
+		hash = uint64(c) + (hash << 6) + (hash << 16) - hash
+	}
+	return hash
+}
 
 // Given a document ID, calculate the server rank in which the document belongs, and also turn the ID into byte slice.
 func (client *RouterClient) docID2RankBytes(id uint64) (rank int, idBytes []byte) {
@@ -36,9 +72,9 @@ func (client *RouterClient) indexDoc(colID int32, docID uint64, doc interface{})
 	docIDBytes := Buint64(docID)
 	for htID, path := range client.schema.indexPaths[colID] {
 		htIDBytes := Bint32(htID)
-		for _, val := range db.GetIn(doc, path) {
+		for _, val := range ResolveDocAttr(doc, path) {
 			if val != nil {
-				htKey := db.StrHash(fmt.Sprint(val))
+				htKey := StringHash(fmt.Sprint(val))
 				if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_PUT, htIDBytes, Buint64(htKey), docIDBytes); err != nil {
 					return err
 				}
@@ -50,7 +86,7 @@ func (client *RouterClient) indexDoc(colID int32, docID uint64, doc interface{})
 
 // Look for potential value matches among indexed values. Collision cases should be handled by caller.
 func (client *RouterClient) hashLookup(htID int32, limit uint64, strKey string) (result []uint64, err error) {
-	hashKey := db.StrHash(strKey)
+	hashKey := StringHash(strKey)
 	_, resp, err := client.sendCmd(int(hashKey%uint64(client.nProcs)), false, C_HT_GET, Bint32(htID), Buint64(hashKey), Buint64(limit))
 	if err != nil {
 		return
@@ -67,9 +103,9 @@ func (client *RouterClient) unindexDoc(colID int32, docID uint64, doc interface{
 	docIDBytes := Buint64(docID)
 	for htID, path := range client.schema.indexPaths[colID] {
 		htIDBytes := Bint32(htID)
-		for _, val := range db.GetIn(doc, path) {
+		for _, val := range ResolveDocAttr(doc, path) {
 			if val != nil {
-				htKey := db.StrHash(fmt.Sprint(val))
+				htKey := StringHash(fmt.Sprint(val))
 				if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_REMOVE, htIDBytes, Buint64(htKey), docIDBytes); err != nil {
 					return err
 				}

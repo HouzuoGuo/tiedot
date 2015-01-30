@@ -10,81 +10,45 @@ import (
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 )
 
-const (
-	// Name of collection data file
-	DOC_DATA_FILE = "dat"
-	// Name of document ID lookup hash table
-	DOC_LOOKUP_FILE = "id"
-	// Index path separator (appears in hash table file name)
-	INDEX_PATH_SEP = "!"
-)
+// Tie schema and database files together to provide collection/index manipulation features.
+type DB struct {
+	// Root path of database directory
+	dir    string
+	schema *Schema
+	dbfs   *data.DBDirStruct
 
-// Resolve the attribute(s) in the document structure along the given path.
-func GetIn(doc interface{}, path []string) (ret []interface{}) {
-	docMap, ok := doc.(map[string]interface{})
-	if !ok {
+	colByID   map[int32]*data.Partition
+	indexByID map[int32]*data.HashTable
+
+	// Currently held document locks
+	lockedDocs map[uint64]struct{}
+}
+
+// Open database, load schema and data structures.
+func OpenDB(dir string) (*DB, error) {
+	db := &DB{
+		dir:        dir,
+		schema:     new(Schema),
+		colByID:    make(map[int32]*data.Partition),
+		indexByID:  make(map[int32]*data.HashTable),
+		lockedDocs: make(map[uint64]struct{})}
+	return db, db.Reload()
+}
+
+// Load database schema and data structures
+func (db *DB) Reload() (err error) {
+	if db.dbfs, err = data.DBReadDir(dir); err != nil {
 		return
 	}
-	var thing interface{} = docMap
-	// Get into each path segment
-	for i, seg := range path {
-		if aMap, ok := thing.(map[string]interface{}); ok {
-			thing = aMap[seg]
-		} else if anArray, ok := thing.([]interface{}); ok {
-			for _, element := range anArray {
-				ret = append(ret, GetIn(element, path[i:])...)
-			}
-			return ret
-		} else {
-			return nil
-		}
-	}
-	switch thing.(type) {
-	case []interface{}:
-		return append(ret, thing.([]interface{})...)
-	default:
-		return append(ret, thing)
-	}
-}
+	// else if err = db.schema.ReloadAndSetRev()
 
-// Hash a string using sdbm algorithm.
-func StrHash(str string) uint64 {
-	var hash uint64
-	for _, c := range str {
-		hash = uint64(c) + (hash << 6) + (hash << 16) - hash
-	}
-	return hash
-}
-
-// Single-shard database features.
-type DB struct {
-	// Root path of database data directory
-	path string
-	// Collection names VS collection structure
-	cols map[string]*Col
-}
-
-// Open database and load all collections.
-func OpenDB(dbPath string) (*DB, error) {
-	rand.Seed(time.Now().UnixNano()) // initialize RNG for document ID generation
-	db := &DB{path: dbPath}
-	return db, db.load()
-}
-
-// Open collections and load the schema information.
-func (db *DB) load() error {
-	if err := os.MkdirAll(db.path, 0700); err != nil {
-		return err
-	}
 	// Look for collection directories and open the collections
 	db.cols = make(map[string]*Col)
 	dirContent, err := ioutil.ReadDir(db.path)
@@ -237,20 +201,6 @@ func (db *DB) Dump(dest string) error {
 		return nil
 	}
 	return filepath.Walk(db.path, cpFun)
-}
-
-// Schema information and document/index management features for a single DB shard.
-type Col struct {
-	db   *DB
-	name string
-	// Document data
-	part *data.Partition
-	// Joint index paths VS hash table
-	hts map[string]*data.HashTable
-	// Joint index paths VS split index paths
-	indexPaths map[string][]string
-	// Currently held document locks
-	locked map[uint64]struct{}
 }
 
 // Open a collection and load schema information.

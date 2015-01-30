@@ -212,8 +212,10 @@ func DBIdentify(dir string) (dirExists, latestVersion bool, err error) {
 // Create a database directory structure.
 func DBNewDir(dir string, nShards int) error {
 	dirExists, latestVersion, err := DBIdentify(dir)
-	if dirExists && !latestVersion || err != nil {
-		return fmt.Errorf("The directory already hosts an older DB version, or file operation failed.")
+	if dirExists && !latestVersion {
+		return fmt.Errorf("The directory already hosts an older DB version")
+	} else if err != nil {
+		return err
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
