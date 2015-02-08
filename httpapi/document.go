@@ -117,6 +117,35 @@ func GetPage(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
+// Return all documents for the given collection.
+func GetAll(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "must-revalidate")
+	w.Header().Set("Content-Type", "application/json")
+	var col string
+	if !Require(w, r, "col", &col) {
+		return
+	}
+	dbcol := HttpDB.Use(col)
+	if dbcol == nil {
+		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)
+		return
+	}
+	docs := make(map[string]interface{})
+	dbcol.ForEachDoc(func(id int, doc []byte) bool {
+		var docObj map[string]interface{}
+		if err := json.Unmarshal(doc, &docObj); err == nil {
+			docs[strconv.Itoa(id)] = docObj
+		}
+		return true
+	})
+	resp, err := json.Marshal(docs)
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	w.Write(resp)
+}
+
 // Update a document.
 func Update(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
