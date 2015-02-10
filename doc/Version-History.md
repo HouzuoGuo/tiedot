@@ -1,6 +1,13 @@
-### 3.2 (2015-??-??)
+### 3.2 (2015-02-12)
 
-Javascript Web Token can be optionally enabled to authorize API calls.
+Bug fix:
+- tiedot performs poorly on certain OS/FS combinations, this is due to the sparse file unintentionally created by Truncate operation, which is now fixed.
+
+New experimental feature:
+- Javascript Web Token can be optionally enabled to hand out token and authorize API calls.
+
+Be aware that:
+- This release gets rid of the web control panel due to numerous packaging/functional issues. Please let me know if you are interested in renovating the web control panel application!
 
 ### 3.1.3 (2014-12-01)
 

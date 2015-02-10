@@ -78,7 +78,6 @@ func TestResolveDocAttr(t *testing.T) {
 	}
 }
 
-
 func TestDocInsertBench(t *testing.T) {
 	return
 	ws, _, clients := mkServersClients(2)

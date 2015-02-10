@@ -59,6 +59,7 @@ func OpenDataFile(path string, growth uint64) (file *DataFile, err error) {
 	if file.Buf == nil {
 		file.Buf, err = gommap.Map(file.Fh)
 	}
+	defer tdlog.Infof("%s opened: %d of %d bytes in-use", file.Path, file.Used, file.Size)
 	// Bi-sect file buffer to find out how much space is in-use
 	for low, mid, high := uint64(0), file.Size/2, file.Size; ; {
 		switch {
@@ -81,8 +82,28 @@ func OpenDataFile(path string, growth uint64) (file *DataFile, err error) {
 			mid = mid + (high-mid)/2
 		}
 	}
-	tdlog.Infof("%s opened: %d of %d bytes in-use", file.Path, file.Used, file.Size)
 	return
+}
+
+// Fill up portion of a file with 0s.
+func (file *DataFile) overwriteWithZero(from uint64, size uint64) (err error) {
+	if _, err = file.Fh.Seek(int64(from), os.SEEK_SET); err != nil {
+		return
+	}
+	zeroSize := uint64(1048576 * 8) // Fill 8 MB at a time
+	zero := make([]byte, zeroSize)
+	for i := uint64(0); i < size; i += zeroSize {
+		var zeroSlice []byte
+		if i+zeroSize > size {
+			zeroSlice = zero[0 : size-i]
+		} else {
+			zeroSlice = zero
+		}
+		if _, err = file.Fh.Write(zeroSlice); err != nil {
+			return
+		}
+	}
+	return file.Fh.Sync()
 }
 
 // Make sure there is enough room for some more data.
@@ -94,7 +115,7 @@ func (file *DataFile) EnsureSize(more uint64) (err error) {
 			return
 		}
 	}
-	if err = os.Truncate(file.Path, int64(file.Size+file.Growth)); err != nil {
+	if err = file.overwriteWithZero(file.Size, file.Growth); err != nil {
 		return
 	} else if file.Buf, err = gommap.Map(file.Fh); err != nil {
 		return
@@ -118,9 +139,9 @@ func (file *DataFile) Clear() (err error) {
 		return
 	} else if err = os.Truncate(file.Path, 0); err != nil {
 		return
-	} else if err = os.Truncate(file.Path, int64(file.Growth)); err != nil {
-		return
 	} else if file.Fh, err = os.OpenFile(file.Path, os.O_CREATE|os.O_RDWR, 0600); err != nil {
+		return
+	} else if err = file.overwriteWithZero(0, file.Growth); err != nil {
 		return
 	} else if file.Buf, err = gommap.Map(file.Fh); err != nil {
 		return
