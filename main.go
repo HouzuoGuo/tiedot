@@ -5,10 +5,43 @@ import (
 	"flag"
 	"github.com/HouzuoGuo/tiedot/httpapi"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"runtime/pprof"
+	"strconv"
+	"strings"
 )
+
+// Read Linux system VM parameters and print performance configuration advice when necessary.
+func linuxPerfAdvice() {
+	readFileIntContent := func(filePath string) (contentInt int, err error) {
+		content, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			return
+		}
+		contentInt, err = strconv.Atoi(strings.TrimSpace(string(content)))
+		return
+	}
+	swappiness, err := readFileIntContent("/proc/sys/vm/swappiness")
+	if err != nil {
+		tdlog.Notice("Non-fatal - unable to offer performance advice based on vm.swappiness.")
+	} else if swappiness > 50 {
+		tdlog.Noticef("System vm.swappiness is very high (%d), for optimium performance please lower it to below 50.", swappiness)
+	}
+	dirtyRatio, err := readFileIntContent("/proc/sys/vm/dirty_ratio")
+	if err != nil {
+		tdlog.Notice("Non-fatal - unable to offer performance advice based on vm.dirty_ratio.")
+	} else if dirtyRatio < 50 {
+		tdlog.Noticef("System vm.dirty_ratio is very low (%d), for optimium performance please increase it to above 50.", dirtyRatio)
+	}
+	dirtyBGRatio, err := readFileIntContent("/proc/sys/vm/dirty_background_ratio")
+	if err != nil {
+		tdlog.Notice("Non-fatal - unable to offer performance advice based on vm.dirty_background_ratio.")
+	} else if dirtyBGRatio < 50 {
+		tdlog.Noticef("System vm.dirty_background_ratio is very low (%d), for optimium performance please increase it to above 50.", dirtyBGRatio)
+	}
+}
 
 func main() {
 	// Parse CLI parameters
@@ -48,6 +81,8 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
+
+	linuxPerfAdvice()
 
 	// Start profiler if enabled
 	if profile {
