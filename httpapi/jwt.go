@@ -2,10 +2,10 @@
 JWT stands for JSON Web Token.
 The package creates, serves, and verifies JWT used by HTTP clients.
 
-JWT authentication identities are stored in documents of collection "jwt", each document record should look like:
+JWT user ID and access rights are stored in documents of collection "jwt", each document record should look like:
 {
-    "user": "login_identity",
-    "pass": "second_secret",
+    "user": "user_name",
+    "pass": "password_plain_text",
     "endpoints": [
         "create",
         "drop",

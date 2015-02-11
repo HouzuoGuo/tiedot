@@ -131,11 +131,11 @@ func main() {
 			tdlog.Notice("Please specify port number, for example -port=8080")
 			os.Exit(1)
 		}
-		if tlsCrt != "" && tlsKey == "" {
+		if tlsCrt != "" && tlsKey == "" || tlsKey != "" && tlsCrt == "" {
 			tdlog.Notice("To enable HTTPS, please specify both RSA certificate and key file.")
 			os.Exit(1)
 		}
-		if jwtPrivateKey != "" && jwtPubKey == "" {
+		if jwtPrivateKey != "" && jwtPubKey == "" || jwtPubKey != "" && jwtPrivateKey == "" {
 			tdlog.Notice("To enable JWT, please specify RSA private and public key.")
 			os.Exit(1)
 		}
