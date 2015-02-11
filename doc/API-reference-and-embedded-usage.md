@@ -2,9 +2,15 @@
 
 You may use any HTTP methods (supported by Go HTTP server) to make API requests.
 
-Server response will always have `Cache-Control: must-revalidate` header. Most responses return `applicaton/json` content type, but there are exceptions.
+Server response will always have `Cache-Control: must-revalidate` header. Most responses return `applicaton/json` content type, but there are exceptions. All API endpoints are safe for concurrent usage.
 
-All endpoints are safe for concurrent usage. To start HTTP server, please run tiedot with CLI parameter `-mode=httpd -dir=<database_directory> -port=<port_number>`.
+To start HTTP server, run tiedot with CLI parameters: `-mode=httpd -dir=path_to_db_directory -port=port_number`
+
+To enable HTTPS and disable HTTP, add additional parameters: `-tlskey=keyfile -tlscrt=crtfile`.
+
+To enable mandatory JWT (Javascript Web Token) authorization on all API calls, add additional parameters: `-jwtprivatekey=keyfile2 -jwtpubkey=pubkeyfile`.
+
+The "rsa-test" key-pair in tiedot source code is for testing purpose only, please refrain from using it to start HTTPS server or to enable JWT.
 
 ## General error response
 
@@ -113,30 +119,7 @@ When internal error occurs, server will respond with an error message (plain tex
 
 \* Document ID is an automatically generated unique ID. It remains unchanged for the document until the document is deleted.
 
-\** "getpage" divides all documents into roughly equally sized "pages" and return the page of your choice. Use "approxdoccount" to determine total number of pages. The returned documents reflect storage layout and are not ordered.
-
-## Query
-
-<table>
-  <tr>
-    <th>Function</th>
-    <th>URL</th>
-    <th>Parameters</th>
-    <th>Normal response</th>
-  </tr>
-  <tr>
-    <td>Execute query and return documents</td>
-    <td>/query</td>
-    <td>Collection `col` and query string `q`</td>
-    <td>HTTP 200 and result document IDs and content</td>
-  </tr>
-  <tr>
-    <td>Execute query and count results</td>
-    <td>/count</td>
-    <td>Collection `col` and query string `q`</td>
-    <td>HTTP 200 and an integer number</td>
-  </tr>
-</table>
+\** "getpage" divides all documents roughly equally large "pages". It is useful for doing collection scan. To calculate total number of pages, first decide how many documents you would like to see in a page, then calculate `"approxdoccount" / DOCS_PER_PAGE`. The documents in HTTP response reflect storage layout and are not ordered.
 
 ## Index management
 
@@ -198,7 +181,89 @@ When internal error occurs, server will respond with an error message (plain tex
     <td>Version number</td>
     <td>/version</td>
     <td>(nil)</td>
-    <td>HTTP 200 and "5"</td>
+    <td>HTTP 200 and "6"</td>
+  </tr>
+</table>
+
+## JWT - Javascript Web Token
+
+Launch tiedot HTTP server with JWT will enable mandatory JWT authorization on all API endpoints. The general operation flow is following:
+
+- tiedot HTTP server starts up with JWT enabled.
+- Client calls `/getjwt?user=user_name&pass=password` and then memorize the "Authorization" header from response. This is your JW token containing your access rights. The token is encrypted by tiedot server and can only be decrypted by tiedot server. The token is valid for 72 hours.
+- Client makes subsequent API calls to JWT-enabled HTTP endpoints, with an additional Authorization header (the return value of `getjwt`) in each request.
+
+<table>
+  <tr>
+    <th>Function</th>
+    <th>URL</th>
+    <th>Parameters</th>
+    <th>Normal response</th>
+  </tr>
+  <tr>
+    <td>Acquire a new token</td>
+    <td>/getjwt</td>
+    <td>User name `user` and password `pass</td>
+    <td>HTTP 200 and the new token is in Authorization header</td>
+  </tr>
+  <tr>
+    <td>Check a token's validity</td>
+    <td>/checkjwt</td>
+    <td>Token in request Authorization header</td>
+    <td>HTTP 200</td>
+  </tr>
+</table>
+
+### User and access rights management in JWT
+
+An HTTP client acquires JW token by calling `/getjwt` with parameter `user` and `pass`. Upon enabling JWT for the first time on a database, the default user "admin" with empty password is created, and the following message will be shown during tiedot startup:
+
+    JWT: successfully initialized DB for JWT features. The default user 'admin' has been created.
+
+The database collection `jwt` stores user, password, and access rights information for all users, including "admin". "admin" is a special user not restrained by access rights assignment.
+
+You are free to manipulate collection `jwt` to manage users, passwords, and access rights. Each document should look like:
+
+    {
+        "user": "user_name",
+        "pass": "password_plain_text",
+        "endpoints": [
+            "create",
+            "drop",
+            "insert",
+            "query",
+            "update",
+            "other_api_endpoint_names..."
+        ],
+        "collections: [
+            "collection_name_A",
+            "collection_name_B",
+            "other_collection_names..."
+        ]
+    }
+
+Password is in plain-text, you are free to use a randomly generated password, or a hashed password in an algorithm of your choice.
+
+## Query
+
+<table>
+  <tr>
+    <th>Function</th>
+    <th>URL</th>
+    <th>Parameters</th>
+    <th>Normal response</th>
+  </tr>
+  <tr>
+    <td>Execute query and return documents</td>
+    <td>/query</td>
+    <td>Collection `col` and query string `q`</td>
+    <td>HTTP 200 and result document IDs and content</td>
+  </tr>
+  <tr>
+    <td>Execute query and count results</td>
+    <td>/count</td>
+    <td>Collection `col` and query string `q`</td>
+    <td>HTTP 200 and an integer number</td>
   </tr>
 </table>
 

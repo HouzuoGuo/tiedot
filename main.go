@@ -117,11 +117,11 @@ func main() {
 			tdlog.Notice("Please specify port number, for example -httpport=19993")
 			os.Exit(1)
 		}
-		if httpTLSCrt != "" && httpTLSKey == "" {
+		if httpTLSCrt != "" && httpTLSKey == "" || httpTLSKey != "" && httpTLSCrt == "" {
 			tdlog.Notice("To enable HTTPS, please specify both RSA certificate and key file.")
 			os.Exit(1)
 		}
-		if jwtPrivateKey != "" && jwtPubKey == "" {
+		if jwtPrivateKey != "" && jwtPubKey == "" || jwtPubKey != "" && jwtPrivateKey == "" {
 			tdlog.Notice("To enable JWT, please specify RSA private and public key.")
 			os.Exit(1)
 		}
