@@ -243,6 +243,7 @@ func ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey string) {
 	http.HandleFunc("/insert", jwtWrap(Insert))
 	http.HandleFunc("/get", jwtWrap(Get))
 	http.HandleFunc("/getpage", jwtWrap(GetPage))
+	http.HandleFunc("/getall", jwtWrap(GetAll))
 	http.HandleFunc("/update", jwtWrap(Update))
 	http.HandleFunc("/delete", jwtWrap(Delete))
 	http.HandleFunc("/approxdoccount", jwtWrap(ApproxDocCount))

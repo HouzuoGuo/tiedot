@@ -77,6 +77,7 @@ func ServeEndpoints() {
 	http.HandleFunc("/insert", Insert)
 	http.HandleFunc("/get", Get)
 	http.HandleFunc("/getpage", GetPage)
+	http.HandleFunc("/getall", GetAll)
 	http.HandleFunc("/update", Update)
 	http.HandleFunc("/delete", Delete)
 	http.HandleFunc("/approxdoccount", ApproxDocCount)
