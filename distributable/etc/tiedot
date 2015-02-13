@@ -1,7 +1,6 @@
 HTTP_PORT=19993
 HTTP_DB_DIR=/var/lib/tiedot/default_db
 
-# tiedot uses go.rice to package/serve static resource files for the web control panel (-admin)
-# Unfortunately, while building the RPM package, go.rice fails to properly package the files.
-# Therefore the web control panel will not work and have to be disabled.
-HTTP_EXTRA_ARGS="-webcp=no"
+# Put additional CLI parameters here in order to launch tiedot with HTTPS, JWT, or verbose logging, and other options.
+# Consult tiedot documentation and/or `tiedot -h` for a complete list of acceptable CLI parameters.
+HTTP_EXTRA_ARGS=""
