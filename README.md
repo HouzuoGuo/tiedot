@@ -58,7 +58,7 @@ There are several other data structure servers/DB engines written in Go, namely 
 [Query processor and index]: https://github.com/HouzuoGuo/tiedot/wiki/Query-processor-and-index
 [Concurrency and networking]: https://github.com/HouzuoGuo/tiedot/wiki/Concurrency-and-networking
 [Performance tuning and benchmarks]: https://github.com/HouzuoGuo/tiedot/wiki/Performance-tuning-and-benchmarks
-[Dependencies and limitations]: https://github.com/HouzuoGuo/tiedot/wiki/Dependencies-and-limitations
+[limitations]: https://github.com/HouzuoGuo/tiedot/wiki/Limitations
 [Email me]: mailto:guohouzuo@gmail.com
 [Twitter]: https://twitter.com/hzguo
 [blog]: http://allstarnix.blogspot.com.au
