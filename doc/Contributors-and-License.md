@@ -20,6 +20,7 @@ I sincerely appreciate the following individuals and organizations for their con
 - Stefan Richter
 - Tom D
 - Xin Wang "TonyW"
+- zhibinr
 
 And thanks everyone (and You) for watching/starring/forking and evaluating tiedot!
 
