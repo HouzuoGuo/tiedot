@@ -3,7 +3,6 @@
 You will need:
 
 - Git
-- Mercurial (due to [external dependencies])
 - Go (>= 1.1)
 - A regular web browser OR curl/wget
 
@@ -124,5 +123,3 @@ There is also `/count?col=foo` API to return number of results.
 Let's gracefully shutdown server:
 
     > curl "http://localhost:8080/shutdown"
-
-[external dependencies]: https://github.com/HouzuoGuo/tiedot/wiki/Dependencies-and-limitations
