@@ -86,14 +86,14 @@ func GetPage(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "total", &total) {
 		return
 	}
-	pageNum, err := strconv.Atoi(page)
-	if err != nil || pageNum < 0 {
-		http.Error(w, fmt.Sprintf("Invalid page number '%v'.", page), 400)
+	totalPage, err := strconv.Atoi(total)
+	if err != nil || totalPage < 1 {
+		http.Error(w, fmt.Sprintf("Invalid total page number '%v'.", totalPage), 400)
 		return
 	}
-	totalPage, err := strconv.Atoi(total)
-	if err != nil || totalPage == 0 {
-		http.Error(w, fmt.Sprintf("Invalid total page number '%v'.", totalPage), 400)
+	pageNum, err := strconv.Atoi(page)
+	if err != nil || pageNum < 0 || pageNum >= totalPage {
+		http.Error(w, fmt.Sprintf("Invalid page number '%v'.", page), 400)
 		return
 	}
 	dbcol := HttpDB.Use(col)
