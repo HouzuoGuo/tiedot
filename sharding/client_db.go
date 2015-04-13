@@ -3,37 +3,22 @@ package sharding
 
 import (
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"os"
 	"path"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 )
-
-// Run fun for each database shard.
-func (client *RouterClient) forAllDBsDo(fun func(*db.DB) error) error {
-	for i := 0; i < client.nProcs; i++ {
-		clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i)))
-		if err != nil {
-			return err
-		} else if err = fun(clientDB); err != nil {
-			return err
-		} else if err = clientDB.Close(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // Create a new collection.
 func (client *RouterClient) Create(colName string) error {
 	return client.reqMaintAccess(func() error {
-		return client.forAllDBsDo(func(clientDB *db.DB) error {
-			return clientDB.Create(colName)
-		})
+		dbfs, err := data.DBReadDir(client.dbdir)
+		if err != nil {
+			return err
+		}
+		return dbfs.CreateCollection(colName)
 	})
 }
 
@@ -43,30 +28,30 @@ func (client *RouterClient) AllCols() (names []string) {
 		tdlog.Noticef("Client %d: failed to ping before returning collection names - %v", client.id, err)
 	}
 	client.opLock.Lock()
-	names = make([]string, 0, len(client.schema.colNameLookup))
-	for name := range client.schema.colNameLookup {
-		names = append(names, name)
-	}
+	names = client.dbo.GetAllColNames()
 	client.opLock.Unlock()
-	sort.Strings(names)
 	return
 }
 
 // Rename a collection.
 func (client *RouterClient) Rename(oldName, newName string) error {
 	return client.reqMaintAccess(func() error {
-		return client.forAllDBsDo(func(clientDB *db.DB) error {
-			return clientDB.Rename(oldName, newName)
-		})
+		dbfs, err := data.DBReadDir(client.dbdir)
+		if err != nil {
+			return err
+		}
+		return dbfs.RenameCollection(oldName, newName)
 	})
 }
 
 // Truncate a collection - fast delete all documents and clear all indexes.
 func (client *RouterClient) Truncate(colName string) error {
 	return client.reqMaintAccess(func() error {
-		return client.forAllDBsDo(func(clientDB *db.DB) error {
-			return clientDB.Truncate(colName)
-		})
+		dbfs, err := data.DBReadDir(client.dbdir)
+		if err != nil {
+			return err
+		}
+		return dbfs.Truncate(colName)
 	})
 }
 
@@ -124,55 +109,41 @@ func (client *RouterClient) Scrub(colName string) error {
 			}
 		}
 		// Replace the original collection by the good&clean one
-		err = client.forAllDBsDo(func(clientDB *db.DB) error {
-			if err := clientDB.Drop(colName); err != nil {
-				return err
-			} else if err := clientDB.Rename(tmpColName, colName); err != nil {
-				return err
-			}
-			return nil
-		})
+		dbfs, err := data.DBReadDir(client.dbdir)
 		if err != nil {
 			return err
-		} else if err = client.reloadServer(); err != nil {
+		}
+		err = dbfs.DropCollection(colName)
+		if err != nil {
 			return err
 		}
-		return nil
+		err = dbfs.RenameCollection(tmpColName, colName)
+		if err != nil {
+			return err
+		}
+		return client.reloadServer()
 	})
 }
 
 // Drop a collection.
 func (client *RouterClient) Drop(colName string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < client.nProcs; i++ {
-			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
-				return err
-			} else if err = clientDB.Drop(colName); err != nil {
-				return err
-			} else if err = clientDB.Close(); err != nil {
-				return err
-			}
+		dbfs, err := data.DBReadDir(client.dbdir)
+		if err != nil {
+			return err
 		}
-		return nil
+		return dbfs.DropCollection(colName)
 	})
 }
 
 // Copy database into destination directory (for backup).
 func (client *RouterClient) DumpDB(destDir string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < client.nProcs; i++ {
-			destDirPerRank := path.Join(destDir, strconv.Itoa(i))
-			if err := os.MkdirAll(destDirPerRank, 0700); err != nil {
-				return err
-			} else if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
-				return err
-			} else if err = clientDB.Dump(destDirPerRank); err != nil {
-				return err
-			} else if err = clientDB.Close(); err != nil {
-				return err
-			}
+		dbfs, err := data.DBReadDir(client.dbdir)
+		if err != nil {
+			return err
 		}
-		return nil
+		return dbfs.Backup(destDir)
 	})
 }
 
@@ -214,9 +185,9 @@ func (client *RouterClient) Index(colName string, idxPath []string) error {
 			// A simplified client.indexDoc
 			for docID, doc := range docs {
 				docIDBytes := Buint64(docID)
-				for _, val := range db.GetIn(doc, idxPath) {
+				for _, val := range ResolveDocAttr(doc, idxPath) {
 					if val != nil {
-						htKey := db.StrHash(fmt.Sprint(val))
+						htKey := StringHash(fmt.Sprint(val))
 						if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_PUT, htIDBytes, Buint64(htKey), docIDBytes); err != nil {
 							return err
 						}
@@ -236,7 +207,7 @@ func (client *RouterClient) AllIndexes(colName string) (paths [][]string, err er
 	}
 	paths = make([][]string, len(jointPath))
 	for i, aPath := range jointPath {
-		paths[i] = strings.Split(aPath, db.INDEX_PATH_SEP)
+		paths[i] = data.SplitIndexPath(aPath)
 	}
 	return
 }
@@ -248,34 +219,19 @@ func (client *RouterClient) AllIndexesJointPaths(colName string) (paths []string
 		tdlog.Noticef("Client %d: failed to ping before returning index paths - %v", client.id, err)
 	}
 	client.opLock.Lock()
-	colID, exists := client.schema.colNameLookup[colName]
-	if !exists {
-		client.opLock.Unlock()
-		return nil, fmt.Errorf("Collection %s does not exist", colName)
-	}
-	// Join and sort
-	for path := range client.schema.indexPathsJoint[colID] {
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
+	paths, err = client.dbo.GetAllIndexPaths(colName)
 	client.opLock.Unlock()
+	sort.Strings(paths)
 	return
 }
 
 // Remove an index.
 func (client *RouterClient) Unindex(colName string, idxPath []string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < client.nProcs; i++ {
-			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
-				return err
-			} else if clientDB.Use(colName) == nil {
-				continue
-			} else if err = clientDB.Use(colName).Unindex(idxPath); err != nil {
-				return err
-			} else if err = clientDB.Close(); err != nil {
-				return err
-			}
+		dbfs, err := data.DBReadDir(client.dbdir)
+		if err != nil {
+			return err
 		}
-		return nil
+		return dbfs.DropIndex(colName, data.JoinIndexPath(idxPath))
 	})
 }

@@ -65,9 +65,7 @@ func TestPartitionDocCRUD(t *testing.T) {
 	if err = part.Clear(); err != nil {
 		t.Fatal(err)
 	}
-	if err = part.Close(); err != nil {
-		t.Fatal(err)
-	}
+	part.Close()
 }
 
 func TestApproxDocCount(t *testing.T) {

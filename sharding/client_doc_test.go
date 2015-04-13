@@ -1,6 +1,7 @@
 package sharding
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 	"time"

@@ -4,7 +4,7 @@ package sharding
 import (
 	"bufio"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math/rand"
 	"net"
@@ -16,30 +16,34 @@ import (
 
 // Client connects to ranks of sharded DB servers via Unix domain socket.
 type RouterClient struct {
-	workspace string
-	id        uint64
-	sock      []net.Conn
-	in        []*bufio.Reader
-	out       []*bufio.Writer
-	nProcs    int
-	opLock    *sync.Mutex
-	schema    *Schema
+	dbdir  string
+	id     uint64
+	sock   []net.Conn
+	in     []*bufio.Reader
+	out    []*bufio.Writer
+	nProcs int
+	opLock *sync.Mutex
+	dbo    *data.DBObjects
 }
 
 // Create a client and immediately connect to all DB shard servers.
-func NewClient(workspace string) (client *RouterClient, err error) {
+func NewClient(dbdir string) (client *RouterClient, err error) {
 	client = &RouterClient{
-		id:        0,
-		workspace: workspace,
-		sock:      make([]net.Conn, 0, 8),
-		in:        make([]*bufio.Reader, 0, 8),
-		out:       make([]*bufio.Writer, 0, 8),
-		opLock:    new(sync.Mutex),
-		schema:    new(Schema)}
+		id:     0,
+		dbdir:  dbdir,
+		sock:   make([]net.Conn, 0, 8),
+		in:     make([]*bufio.Reader, 0, 8),
+		out:    make([]*bufio.Writer, 0, 8),
+		opLock: new(sync.Mutex)}
+	// Load DB object IDs without loading any collection/index files
+	client.dbo, err = data.DBObjectsLoad(dbdir, -1)
+	if err != nil {
+		return
+	}
 	// Connect to server 0, use retry mechanism with exponential back-off.
 	waitNextRetry := 10
 	for attempt := 0; attempt < 10; attempt++ {
-		sockPath := path.Join(workspace, "0"+SOCK_FILE_SUFFIX)
+		sockPath := path.Join(dbdir, "0"+SOCK_FILE_SUFFIX)
 		sock, err := net.Dial("unix", sockPath)
 		if err != nil {
 			time.Sleep(time.Duration(waitNextRetry) * time.Millisecond)
@@ -63,7 +67,7 @@ func NewClient(workspace string) (client *RouterClient, err error) {
 		connSuccessful := false
 		waitNextRetry := 10
 		for attempt := 0; attempt < 20; attempt++ {
-			sockPath := path.Join(workspace, strconv.Itoa(i)+SOCK_FILE_SUFFIX)
+			sockPath := path.Join(dbdir, strconv.Itoa(i)+SOCK_FILE_SUFFIX)
 			sock, err := net.Dial("unix", sockPath)
 			if err != nil {
 				time.Sleep(time.Duration(waitNextRetry) * time.Millisecond)
@@ -110,7 +114,7 @@ func NewClient(workspace string) (client *RouterClient, err error) {
 func (client *RouterClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byte, params ...[]byte) (retCode byte, moreInfo [][]byte, err error) {
 	allParams := make([][]byte, len(params)+1)
 	// Param 0 should be the client's schema revision
-	allParams[0] = Buint32(client.schema.rev)
+	allParams[0] = Buint32(client.dbo.GetCurrentRev())
 	// Copy down the remaining params
 	for i, param := range params {
 		allParams[i+1] = param
@@ -164,13 +168,8 @@ func (client *RouterClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byt
 
 // Reload client's schema.
 func (client *RouterClient) reload(srvRev uint32) {
-	clientDB, err := db.OpenDB(path.Join(client.workspace, "0"))
-	if err != nil {
+	if err := client.dbo.ReloadAndSetRev(srvRev); err != nil {
 		panic(err)
-	}
-	client.schema.refreshToRev(clientDB, srvRev)
-	if err = clientDB.Close(); err != nil {
-		tdlog.Noticef("Client %d - failed to close database after a reload: %v", client.id, err)
 	}
 	tdlog.Infof("Client %d - schema reloaded to revision %d", client.id, srvRev)
 	return

@@ -3,7 +3,7 @@ package sharding
 
 import (
 	"bufio"
-	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"net"
 	"os"
@@ -22,12 +22,11 @@ type ShardServer struct {
 	rank, nProcs                int
 	workspace, dbPath, sockPath string
 	srvSock                     net.Listener
-	db                          *db.DB
 	clientIDSeq, maintByClient  uint64
 	opLock                      *sync.Mutex
 	shutdown                    bool
 	pendingTransactions         int64
-	schema                      *Schema
+	dbo                         *data.DBObjects
 }
 
 // Serve incoming connection.
@@ -54,8 +53,7 @@ func NewServer(rank, nProcs int, workspace string) (srv *ShardServer) {
 		maintByClient:       0,
 		opLock:              new(sync.Mutex),
 		shutdown:            false,
-		pendingTransactions: 0,
-		schema:              new(Schema)}
+		pendingTransactions: 0}
 }
 
 // Serve incoming connections. Block until server is told to shutdown.
@@ -86,17 +84,10 @@ func (srv *ShardServer) Run() (err error) {
 
 // Close and reopen database.
 func (srv *ShardServer) reload() {
-	var err error
-	if srv.db != nil {
-		if err = srv.db.Close(); err != nil {
-			tdlog.Noticef("Server %d: failed to close DB before reloading - %v", srv.rank, err)
-		}
-	}
-	if srv.db, err = db.OpenDB(srv.dbPath); err != nil {
+	if err := srv.dbo.Reload(); err != nil {
 		panic(err)
 	}
-	srv.schema.refresh(srv.db)
-	tdlog.Infof("Server %d: schema reloaded to revision %d", srv.rank, srv.schema.rev)
+	tdlog.Infof("Server %d: schema reloaded to revision %d", srv.rank, srv.dbo.GetCurrentRev())
 }
 
 func (srv *ShardServer) shutdown0() {

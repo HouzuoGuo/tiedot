@@ -6,6 +6,7 @@ The hash table stores ID in entry key and document physical location in entry va
 package data
 
 import (
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/dberr"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
@@ -14,6 +15,7 @@ import (
 type Partition struct {
 	col    *Collection
 	lookup *HashTable
+	locks  map[uint64]struct{}
 }
 
 // Open a collection partition.
@@ -124,15 +126,40 @@ func (part *Partition) Clear() (err error) {
 	return err
 }
 
+// Place a document lock by memorising its ID in an internal structure.
+func (part *Partition) LockDoc(docID uint64) (err error) {
+	if _, locked := part.locks[docID]; locked {
+		return fmt.Errorf("Document %d is currently locked", docID)
+	}
+	part.locks[docID] = struct{}{}
+	return nil
+}
+
+// Remove a document ID from the internal lock structure.
+func (part *Partition) UnlockDoc(docID uint64) {
+	delete(part.locks, docID)
+}
+
+// Insert a new document and immediately place a lock on it.
+func (part *Partition) LockAndInsert(docID uint64, doc []byte) (err error) {
+	if err := part.LockDoc(docID); err != nil {
+		return err
+	}
+	_, err = part.Insert(docID, doc)
+	return
+}
+
+// Read a document and immediately place a lock on it.
+func (part *Partition) LockAndRead(docID uint64) (doc []byte, err error) {
+	if err := part.LockDoc(docID); err != nil {
+		return nil, err
+	}
+	doc, err = part.Read(docID)
+	return
+}
+
 // Close file handles. Stop using the partition after the call!
-func (part *Partition) Close() (err error) {
-	if err = part.col.Close(); err != nil {
-		tdlog.CritNoRepeat("Failed to close %s: %v", part.col.Path, err)
-		err = dberr.New(dberr.ErrorIO)
-	}
-	if err = part.lookup.Close(); err != nil {
-		tdlog.CritNoRepeat("Failed to close %s: %v", part.lookup.Path, err)
-		err = dberr.New(dberr.ErrorIO)
-	}
-	return err
+func (part *Partition) Close() {
+	part.col.Close()
+	part.lookup.Close()
 }

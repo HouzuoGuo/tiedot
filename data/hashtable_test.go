@@ -28,9 +28,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	}
 	numBuckets := ht.numBuckets
 	// Reopen the hash table and test the features
-	if err = ht.Close(); err != nil {
-		t.Fatal(err)
-	}
+	ht.Close()
 	reopened, err := OpenHashTable(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
@@ -64,9 +62,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	if len(allKV) != 0 {
 		t.Fatal("Did not clear the hash table")
 	}
-	if err = reopened.Close(); err != nil {
-		t.Fatal(err)
-	}
+	reopened.Close()
 }
 
 func TestPutGet2(t *testing.T) {

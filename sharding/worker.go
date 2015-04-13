@@ -114,7 +114,7 @@ func (worker *ShardServerWorker) Run() {
 			worker.srv.opLock.Unlock()
 			return
 		}
-		srvRev := worker.srv.schema.rev
+		srvRev := worker.srv.dbo.GetCurrentRev()
 		if clientRev != srvRev {
 			// In case of revision mismatch, inform client to refresh its schema.
 			worker.ansErr(R_ERR_SCHEMA, Buint32(srvRev))
@@ -130,7 +130,7 @@ func (worker *ShardServerWorker) Run() {
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
 				doc := params[2]
-				col, exists := worker.srv.schema.colLookup[colID]
+				part, exists := worker.srv.dbo.GetPartByID(colID)
 				if worker.pendingTransaction {
 					worker.ansErr(R_ERR, []byte("Client mishaved and asked for transaction twice"))
 					worker.disconnect()
@@ -138,7 +138,7 @@ func (worker *ShardServerWorker) Run() {
 					return
 				} else if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
-				} else if err := col.MultiShardLockDocAndInsert(docID, doc); err != nil {
+				} else if err := part.LockAndInsert(docID, doc); err != nil {
 					worker.ansErr(R_ERR, []byte(err.Error()))
 				} else {
 					worker.pendingTransaction = true
@@ -150,14 +150,14 @@ func (worker *ShardServerWorker) Run() {
 				// Unlock a document to allow further updates - collection ID, document ID
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
-				col, exists := worker.srv.schema.colLookup[colID]
+				col, exists := worker.srv.dbo.GetPartByID(colID)
 				if !worker.pendingTransaction {
 					worker.ansErr(R_ERR, []byte("Client mishaved and asked for ending transaction without starting one"))
 					worker.disconnect()
 					worker.srv.opLock.Unlock()
 					return
 				} else if exists {
-					col.MultiShardUnlockDoc(docID)
+					col.LockDoc(docID)
 					worker.pendingTransaction = false
 					atomic.AddInt64(&worker.srv.pendingTransactions, -1)
 					worker.ansOK()
@@ -171,10 +171,10 @@ func (worker *ShardServerWorker) Run() {
 				// Read a document back to the client - collection ID, document ID
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
-				col, exists := worker.srv.schema.colLookup[colID]
+				col, exists := worker.srv.dbo.GetPartByID(colID)
 				if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
-				} else if doc, err := col.BPRead(docID); err == nil {
+				} else if doc, err := col.Read(docID); err == nil {
 					worker.ansOK(doc)
 				} else {
 					worker.ansErr(R_ERR, []byte(err.Error()))
@@ -184,7 +184,7 @@ func (worker *ShardServerWorker) Run() {
 				// Read a document back to the client, and lock the document for update - collection ID, document ID
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
-				col, exists := worker.srv.schema.colLookup[colID]
+				col, exists := worker.srv.dbo.GetPartByID(colID)
 				if worker.pendingTransaction {
 					worker.ansErr(R_ERR, []byte("Client mishaved and asked for transaction twice"))
 					worker.disconnect()
@@ -192,7 +192,7 @@ func (worker *ShardServerWorker) Run() {
 					return
 				} else if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
-				} else if doc, err := col.MultiShardLockDocAndRead(docID); err == nil {
+				} else if doc, err := col.LockAndRead(docID); err == nil {
 					worker.pendingTransaction = true
 					atomic.AddInt64(&worker.srv.pendingTransactions, 1)
 					worker.ansOK(doc)
@@ -204,10 +204,10 @@ func (worker *ShardServerWorker) Run() {
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
 				doc := params[2]
-				col, exists := worker.srv.schema.colLookup[colID]
+				col, exists := worker.srv.dbo.GetPartByID(colID)
 				if !exists {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
-				} else if err := col.BPUpdate(docID, doc); err == nil {
+				} else if err := col.Update(docID, doc); err == nil {
 					worker.ansOK()
 				} else {
 					worker.ansErr(R_ERR, []byte(err.Error()))
@@ -216,9 +216,9 @@ func (worker *ShardServerWorker) Run() {
 				// Delete a document - collection ID, document ID, new document
 				colID := Int32(params[0])
 				docID := Uint64(params[1])
-				col, exists := worker.srv.schema.colLookup[colID]
+				col, exists := worker.srv.dbo.GetPartByID(colID)
 				if exists {
-					col.BPDelete(docID)
+					col.Delete(docID)
 					worker.ansOK()
 				} else {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
@@ -226,9 +226,10 @@ func (worker *ShardServerWorker) Run() {
 			case C_DOC_APPROX_COUNT:
 				// Return approximate document count - collection ID
 				colID := Int32(params[0])
-				col, exists := worker.srv.schema.colLookup[colID]
+				col, exists := worker.srv.dbo.GetPartByID(colID)
 				if exists {
-					worker.ansOK(Buint64(col.BPApproxDocCount()))
+					// Note: the total = my approximate * number of servers
+					worker.ansOK(Buint64(col.ApproxDocCount() * worker.srv.nProcs))
 				} else {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				}
@@ -237,12 +238,12 @@ func (worker *ShardServerWorker) Run() {
 				colID := Int32(params[0])
 				page := Uint64(params[1])
 				total := Uint64(params[2])
-				col, exists := worker.srv.schema.colLookup[colID]
+				col, exists := worker.srv.dbo.GetPartByID(colID)
 				if exists {
-					approxCount := col.BPApproxDocCount()
+					approxCount := col.ApproxDocCount()
 					// id1, doc1, id2, doc2, id3, doc3 ...
 					resp := make([][]byte, 0, approxCount/total*page*2)
-					col.ForEachDocInPage(page, total, func(id uint64, doc []byte) (moveOn bool) {
+					col.ForEachDoc(page, total, func(id uint64, doc []byte) (moveOn bool) {
 						resp = append(resp, Buint64(id), doc)
 						return true
 					})
@@ -255,7 +256,7 @@ func (worker *ShardServerWorker) Run() {
 				htID := Int32(params[0])
 				htKey := Uint64(params[1])
 				limit := Uint64(params[2])
-				ht, exists := worker.srv.schema.htLookup[htID]
+				ht, exists := worker.srv.dbo.GetHashTableByID(htID)
 				if exists {
 					vals := ht.Get(htKey, limit)
 					resp := make([][]byte, len(vals))
@@ -271,7 +272,7 @@ func (worker *ShardServerWorker) Run() {
 				htID := Int32(params[0])
 				htKey := Uint64(params[1])
 				htVal := Uint64(params[2])
-				ht, exists := worker.srv.schema.htLookup[htID]
+				ht, exists := worker.srv.dbo.GetHashTableByID(htID)
 				if exists {
 					ht.Put(htKey, htVal)
 					worker.ansOK()
@@ -283,7 +284,7 @@ func (worker *ShardServerWorker) Run() {
 				htID := Int32(params[0])
 				htKey := Uint64(params[1])
 				htVal := Uint64(params[2])
-				ht, exists := worker.srv.schema.htLookup[htID]
+				ht, exists := worker.srv.dbo.GetHashTableByID(htID)
 				if exists {
 					ht.Remove(htKey, htVal)
 					worker.ansOK()

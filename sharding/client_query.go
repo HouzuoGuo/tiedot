@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/dberr"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math/rand"
 	"strconv"
-	"strings"
 )
 
 type Query struct {
@@ -57,8 +55,7 @@ func (q *Query) readDeserializeDoc(docID uint64) (doc map[string]interface{}, er
 
 // Find an index or return error.
 func (q *Query) getHTID(vecPath []string, originalQExpr interface{}) (htID int32, err error) {
-	jointPath := strings.Join(vecPath, db.INDEX_PATH_SEP)
-	htID, exists := q.client.schema.indexPathsJoint[q.colID][jointPath]
+	htID, exists := q.client.dbo.GetIndexIDBySplitPath(vecPath)
 	if !exists {
 		err = dberr.New(dberr.ErrorNeedIndex, vecPath, originalQExpr)
 	}
@@ -156,7 +153,7 @@ func (q *Query) lookup(lookupValue interface{}, queryExpr map[string]interface{}
 	} else {
 		for _, match := range vals {
 			if doc, err := q.readDeserializeDoc(match); err == nil {
-				for _, v := range db.GetIn(doc, vecPath) {
+				for _, v := range sharding.ResolveDocAttr(doc, vecPath) {
 					if fmt.Sprint(v) == lookupStrValue {
 						(*result)[match] = struct{}{}
 					}

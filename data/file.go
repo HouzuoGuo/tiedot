@@ -126,18 +126,19 @@ func (file *DataFile) EnsureSize(more uint64) (err error) {
 }
 
 // Un-map the file buffer and close the file handle.
-func (file *DataFile) Close() (err error) {
-	if err = file.Buf.Unmap(); err != nil {
-		return
+func (file *DataFile) Close() {
+	if err := file.Buf.Unmap(); err != nil {
+		tdlog.CritNoRepeat("Failed to unmap %s: %v", file.Path, err)
 	}
-	return file.Fh.Close()
+	if err := file.Fh.Close(); err != nil {
+		tdlog.CritNoRepeat("Failed to close %s: %v", file.Path, err)
+	}
 }
 
 // Clear the entire file and resize it to initial size.
 func (file *DataFile) Clear() (err error) {
-	if err = file.Close(); err != nil {
-		return
-	} else if err = os.Truncate(file.Path, 0); err != nil {
+	file.Close()
+	if err = os.Remove(file.Path); err != nil {
 		return
 	} else if file.Fh, err = os.OpenFile(file.Path, os.O_CREATE|os.O_RDWR, 0600); err != nil {
 		return

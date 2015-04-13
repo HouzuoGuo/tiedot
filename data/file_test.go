@@ -27,9 +27,6 @@ func TestOpenFlushClose(t *testing.T) {
 	if tmpFile.Fh == nil || tmpFile.Buf == nil {
 		t.Fatal("Not mmapped")
 	}
-	if err := tmpFile.Close(); err != nil {
-		t.Fatalf("Failed to close: %v", err)
-	}
 }
 
 func TestFindingAppendAndClear(t *testing.T) {
@@ -90,9 +87,7 @@ func TestFindingAppendAndClear(t *testing.T) {
 	}
 	// Can still write to the buffer?
 	tmpFile.Buf[99] = 1
-	if err := tmpFile.Close(); err != nil {
-		t.Fatal(err)
-	}
+	tmpFile.Close()
 }
 
 func TestFileGrow(t *testing.T) {
