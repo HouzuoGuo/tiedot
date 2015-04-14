@@ -96,11 +96,6 @@ func GetPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid page number '%v'.", page), 400)
 		return
 	}
-	pageNum, err := strconv.Atoi(page)
-	if err != nil || pageNum < 0 || pageNum >= totalPage {
-		http.Error(w, fmt.Sprintf("Invalid page number '%v'.", page), 400)
-		return
-	}
 	dbcol := HttpDB.Use(col)
 	if dbcol == nil {
 		http.Error(w, fmt.Sprintf("Collection '%s' does not exist.", col), 400)

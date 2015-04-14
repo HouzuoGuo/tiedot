@@ -6,7 +6,6 @@ The hash table stores ID in entry key and document physical location in entry va
 package data
 
 import (
-	"fmt"
 	"github.com/HouzuoGuo/tiedot/dberr"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
@@ -129,7 +128,7 @@ func (part *Partition) Clear() (err error) {
 // Place a document lock by memorising its ID in an internal structure.
 func (part *Partition) LockDoc(docID uint64) (err error) {
 	if _, locked := part.locks[docID]; locked {
-		return fmt.Errorf("Document %d is currently locked", docID)
+		return dberr.New(dberr.ErrorDocLocked, docID)
 	}
 	part.locks[docID] = struct{}{}
 	return nil

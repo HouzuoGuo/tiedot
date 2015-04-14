@@ -145,4 +145,18 @@ func TestDBDirCrud(t *testing.T) {
 	if col1ID != path.Join(dir, "0", COLLECTION_DIR, "col1", COLLECTION_ID_LOOKUP_FILE) {
 		t.Fatal(col1ID)
 	}
+
+	// Attempt to recreate the DB directory but the shard number should not change.
+	if err = DBNewDir(dir, 8); err != nil {
+		t.Fatal(err)
+	}
+	nShards, err := ioutil.ReadFile(path.Join(dir, NSHARDS_FILE))
+	if string(nShards) != "2" || err != nil {
+		t.Fatal(err, nShards)
+	}
+	// Verify NShards as well
+	dbfs, err = DBReadDir(dir)
+	if err != nil || dbfs.NShards != 2 {
+		t.Fatal(err, dbfs)
+	}
 }

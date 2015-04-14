@@ -264,6 +264,13 @@ func TestDocCrud(t *testing.T) {
 	} else if err = clients[0].leaveMaintTest(); err != nil {
 		t.Fatal(err)
 	}
+
+	// Truncate and verify
+	if err = clients[1].Truncate("col"); err != nil {
+		t.Fatal(err)
+	} else if count, err := clients[1].ApproxDocCount("col"); count != 0 || err != nil {
+		t.Fatal("did not truncate", count, err)
+	}
 	clients[1].Shutdown()
 	clients[0].Shutdown()
 }

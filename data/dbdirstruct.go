@@ -49,41 +49,45 @@ type DBDirStruct struct {
 }
 
 // Identify whether a directory hosts a database, and whether the DB version is matching.
-func DBIdentify(dir string) (dirExists, matchVersion bool, err error) {
+func DBIdentify(dir string) (alreadyDBDir, matchVersion bool, err error) {
 	if _, err = os.Stat(dir); os.IsNotExist(err) {
 		return false, false, nil
 	} else if err != nil {
 		return false, false, err
 	}
 	verInfo, err := ioutil.ReadFile(path.Join(dir, VERSION_FILE))
-	if err != nil {
-		return true, false, nil
+	if err == nil {
+		return true, strings.TrimSpace(string(verInfo)) == CURRENT_VERSION, nil
 	}
-	return true, strings.TrimSpace(string(verInfo)) == CURRENT_VERSION, nil
+	return false, false, nil
 }
 
 // Create a database directory structure.
 func DBNewDir(dir string, nShards int) error {
-	dirExists, matchVersion, err := DBIdentify(dir)
-	if dirExists && !matchVersion {
-		return fmt.Errorf("The directory already hosts an a DB of unmatching version")
-	} else if err != nil {
+	alreadyDBDir, matchVersion, err := DBIdentify(dir)
+	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
-	}
-	for i := 0; i < nShards; i++ {
-		if err := os.MkdirAll(path.Join(dir, strconv.Itoa(i)), 0700); err != nil {
-			return err
-		} else if err := os.MkdirAll(path.Join(dir, strconv.Itoa(i), COLLECTION_DIR), 0700); err != nil {
+	if alreadyDBDir {
+		if !matchVersion {
+			return fmt.Errorf("The directory already hosts an a DB of unmatching version")
+		}
+	} else {
+		if err := os.MkdirAll(dir, 0700); err != nil {
 			return err
 		}
-	}
-	if err := ioutil.WriteFile(path.Join(dir, VERSION_FILE), []byte(CURRENT_VERSION), 0600); err != nil {
-		return err
-	} else if err := ioutil.WriteFile(path.Join(dir, NSHARDS_FILE), []byte(strconv.Itoa(nShards)), 0600); err != nil {
-		return err
+		for i := 0; i < nShards; i++ {
+			if err := os.MkdirAll(path.Join(dir, strconv.Itoa(i)), 0700); err != nil {
+				return err
+			} else if err := os.MkdirAll(path.Join(dir, strconv.Itoa(i), COLLECTION_DIR), 0700); err != nil {
+				return err
+			}
+		}
+		if err := ioutil.WriteFile(path.Join(dir, VERSION_FILE), []byte(CURRENT_VERSION), 0600); err != nil {
+			return err
+		} else if err := ioutil.WriteFile(path.Join(dir, NSHARDS_FILE), []byte(strconv.Itoa(nShards)), 0600); err != nil {
+			return err
+		}
 	}
 	return nil
 }

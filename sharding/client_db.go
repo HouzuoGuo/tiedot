@@ -130,7 +130,7 @@ func (client *RouterClient) Drop(colName string) error {
 }
 
 // Copy database into destination directory (for backup).
-func (client *RouterClient) DumpDB(destDir string) error {
+func (client *RouterClient) Backup(destDir string) error {
 	return client.reqMaintAccess(func() error {
 		dbfs, err := data.DBReadDir(client.dbdir)
 		if err != nil {

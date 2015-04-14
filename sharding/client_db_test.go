@@ -93,7 +93,7 @@ func TestDumpDB(t *testing.T) {
 		t.Fatal(err)
 	} else if err = clients[1].Index("b", []string{"2"}); err != nil {
 		t.Fatal(err)
-	} else if err = clients[0].DumpDB(bak_dir); err != nil {
+	} else if err = clients[0].Backup(bak_dir); err != nil {
 		t.Fatal(err)
 	}
 	clients[1].Shutdown()

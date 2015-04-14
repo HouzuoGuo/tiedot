@@ -64,6 +64,7 @@ func readRec(in *bufio.Reader) (status byte, params [][]byte, err error) {
 		params = make([][]byte, 0)
 		return
 	}
+	// Handle escape sequence of parameter start/end and record end
 	params = make([][]byte, 0, 4)
 	escaping := false
 	param := make([]byte, 0, 8)

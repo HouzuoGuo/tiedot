@@ -320,7 +320,7 @@ func (client *RouterClient) ApproxDocCount(colName string) (count uint64, err er
 }
 
 // Get a page of documents, The return value contains document ID vs Bytes (deserialize == false) or ID vs JSON interface (deserialize == true).
-func (client *RouterClient) getDocPage(colName string, page, total uint64, deserialize bool) (docs map[uint64]interface{}, err error) {
+func (client *RouterClient) getDocPage(colName string, page, total uint64, deserialise bool) (docs map[uint64]interface{}, err error) {
 	docs = make(map[uint64]interface{})
 	_, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {
@@ -335,7 +335,7 @@ func (client *RouterClient) getDocPage(colName string, page, total uint64, deser
 		for i := 0; i < len(resp); i += 2 {
 			docID := Uint64(resp[i])
 			docBytes := resp[i+1]
-			if deserialize {
+			if deserialise {
 				var doc interface{}
 				if err = json.Unmarshal(docBytes, &doc); err == nil {
 					docs[docID] = doc
@@ -351,9 +351,9 @@ func (client *RouterClient) getDocPage(colName string, page, total uint64, deser
 }
 
 // Divide collection into roughly equally sized pages and return a page of documents.
-func (client *RouterClient) GetDocPage(colName string, page, total uint64) (docs map[uint64]interface{}, err error) {
+func (client *RouterClient) GetDocPage(colName string, page, total uint64, deserialise bool) (docs map[uint64]interface{}, err error) {
 	client.opLock.Lock()
-	docs, err = client.getDocPage(colName, page, total, true)
+	docs, err = client.getDocPage(colName, page, total, deserialise)
 	client.opLock.Unlock()
 	return
 }
@@ -378,6 +378,14 @@ func (client *RouterClient) forEachDocBytes(colName string, fun func(uint64, []b
 		}
 	}
 	return nil
+}
+
+// Run fun for all document ID vs document content (bytes), with locking.
+func (client *RouterClient) ForEachDocBytes(colName string, fun func(uint64, []byte) bool) (err error) {
+	client.opLock.Lock()
+	err = client.forEachDocBytes(colName, fun)
+	client.opLock.Unlock()
+	return
 }
 
 // Run fun for all document ID vs document content (JSON interface).

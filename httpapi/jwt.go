@@ -39,6 +39,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	jwt "github.com/dgrijalva/jwt-go"
@@ -73,7 +74,7 @@ func jwtInitSetup() {
 	// Create indexes on ID attribute
 	indexPaths := make(map[string]struct{})
 	for _, oneIndex := range jwtCol.AllIndexes() {
-		indexPaths[strings.Join(oneIndex, db.INDEX_PATH_SEP)] = struct{}{}
+		indexPaths[data.JoinIndexPath(oneIndex)] = struct{}{}
 	}
 	if _, exists := indexPaths[JWT_USER_ATTR]; !exists {
 		if err := jwtCol.Index([]string{JWT_USER_ATTR}); err != nil {
