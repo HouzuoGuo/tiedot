@@ -48,7 +48,7 @@ func main() {
 	// General params
 	var mode string
 	var maxprocs int
-	flag.StringVar(&mode, "mode", "", "[httpd|bench|example]")
+	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|example]")
 	flag.IntVar(&maxprocs, "gomaxprocs", 1, "GOMAXPROCS")
 
 	// Debug params
@@ -131,6 +131,8 @@ func main() {
 		embeddedExample()
 	case "bench":
 		benchmark()
+	case "bench2":
+		benchmark2()
 	default:
 		flag.PrintDefaults()
 		return

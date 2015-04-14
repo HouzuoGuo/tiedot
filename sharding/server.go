@@ -69,7 +69,7 @@ func (srv *ShardServer) Run() (err error) {
 	for {
 		conn, err := srv.srvSock.Accept()
 		if err != nil {
-			tdlog.Noticef("Server %d: is closing down - %v", srv.rank, err)
+			tdlog.Noticef("Server %d: is closing down", srv.rank)
 			return nil
 		}
 		worker := &ShardServerWorker{
@@ -91,9 +91,7 @@ func (srv *ShardServer) reload() {
 }
 
 func (srv *ShardServer) shutdown0() {
-	if err := srv.srvSock.Close(); err != nil {
-		tdlog.Noticef("Server %d: failed to close server socket - %v", srv.rank, err)
-	}
+	srv.srvSock.Close()
 	srv.shutdown = true
 }
 

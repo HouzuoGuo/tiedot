@@ -290,11 +290,9 @@ func (client *RouterClient) Ping() error {
 }
 
 func (client *RouterClient) close() {
-	// Client only needs to close sockets, the DB is not open.
+	// Client only needs to close sockets
 	for _, sock := range client.sock {
-		if err := sock.Close(); err != nil {
-			tdlog.Noticef("Client %d - failed to close socket: %v", client.id, err)
-		}
+		sock.Close()
 	}
 }
 
