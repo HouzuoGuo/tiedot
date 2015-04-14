@@ -89,17 +89,17 @@ func DBNewDir(dir string, nShards int) error {
 }
 
 // Read the content of sharded database directory and return the database structure info.
-func DBReadDir(dir string) (dbfs *DBDirStruct, err error) {
-	dbfs = &DBDirStruct{DBDir: dir}
-	verBytes, err := ioutil.ReadFile(path.Join(dir, VERSION_FILE))
+func DBReadDir(dbdir string) (dbfs *DBDirStruct, err error) {
+	dbfs = &DBDirStruct{DBDir: dbdir}
+	verBytes, err := ioutil.ReadFile(path.Join(dbdir, VERSION_FILE))
 	if err != nil {
 		return
 	}
 	dbfs.Version = strings.TrimSpace(string(verBytes))
 	if dbfs.Version != CURRENT_VERSION {
-		return nil, fmt.Errorf("The DB file version is %s in %s, which is incompatible with current version %s.", dbfs.Version, dir, CURRENT_VERSION)
+		return nil, fmt.Errorf("The DB file version is %s in %s, which is incompatible with current version %s.", dbfs.Version, dbdir, CURRENT_VERSION)
 	}
-	nshardsBytes, err := ioutil.ReadFile(path.Join(dir, NSHARDS_FILE))
+	nshardsBytes, err := ioutil.ReadFile(path.Join(dbdir, NSHARDS_FILE))
 	if err != nil {
 		return
 	}
@@ -108,7 +108,7 @@ func DBReadDir(dir string) (dbfs *DBDirStruct, err error) {
 		return
 	}
 	// Open collections directory
-	colDirContent, err := ioutil.ReadDir(path.Join(dir, "0", COLLECTION_DIR))
+	colDirContent, err := ioutil.ReadDir(path.Join(dbdir, "0", COLLECTION_DIR))
 	if err != nil {
 		return
 	}
@@ -119,7 +119,7 @@ func DBReadDir(dir string) (dbfs *DBDirStruct, err error) {
 		indexes[colName] = make([]string, 0, 0)
 		colNames = append(colNames, colName)
 		// Open "indexes" directory inside the collection directory
-		indexDirContent, err := ioutil.ReadDir(path.Join(dir, "0", COLLECTION_DIR, colName, COLLECTION_INDEX_DIR))
+		indexDirContent, err := ioutil.ReadDir(path.Join(dbdir, "0", COLLECTION_DIR, colName, COLLECTION_INDEX_DIR))
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +160,7 @@ func (dbfs *DBDirStruct) GetCollectionDataFilePaths(colName string, shard int) (
 
 // Return path to hash table index file of the specific shard collection, and index name.
 func (dbfs *DBDirStruct) GetIndexFilePath(colName string, idxPath []string, shard int) string {
-	return path.Join(dbfs.DBDir, strconv.Itoa(shard), COLLECTION_DIR, colName, JoinIndexPath(idxPath))
+	return path.Join(dbfs.DBDir, strconv.Itoa(shard), COLLECTION_DIR, colName, COLLECTION_INDEX_DIR, JoinIndexPath(idxPath))
 }
 
 // Return an error if collection is not found.
@@ -282,7 +282,8 @@ func (dbfs *DBDirStruct) DropIndex(colName, jointIdxPath string) error {
 		return fmt.Errorf("Index %s does not exist in %s", jointIdxPath, colName)
 	}
 	for i := 0; i < dbfs.NShards; i++ {
-		idxFile := path.Join(dbfs.DBDir, strconv.Itoa(i), COLLECTION_DIR, colName, COLLECTION_INDEX_DIR, jointIdxPath)
+		colDir := path.Join(dbfs.DBDir, strconv.Itoa(i), COLLECTION_DIR, colName)
+		idxFile := path.Join(colDir, COLLECTION_INDEX_DIR, jointIdxPath)
 		if err := os.Remove(idxFile); err != nil {
 			return err
 		}
@@ -308,7 +309,7 @@ func (dbfs *DBDirStruct) Backup(destDir string) error {
 				return err
 			}
 			tdlog.Noticef("Dump: created directory %s", destDir)
-		} else {
+		} else if info.Mode().IsRegular() {
 			src, err := os.Open(currPath)
 			if err != nil {
 				return err

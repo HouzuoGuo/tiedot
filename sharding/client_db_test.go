@@ -105,8 +105,26 @@ func TestDumpDB(t *testing.T) {
 	_, clients = mkServersClientsReuseWS(ws, 2)
 	if clients[0].AllCols()[0] != "a" || clients[1].AllCols()[1] != "b" {
 		t.Fatal(clients[0].AllCols())
-	} else if len(clients[0].schema.indexPaths) != 2 || len(clients[1].schema.indexPaths[0]) != 1 {
-		t.Fatal(clients[0].schema.indexPaths, clients[1].schema.indexPaths)
+	}
+	// Test backup collection A
+	if colAID, exists := clients[0].dbo.GetColIDByName("a"); !exists {
+		t.Fatal(clients[0].dbo)
+	} else if indexes := clients[0].dbo.GetIndexesByColID(colAID); len(indexes) != 1 {
+		t.Fatal(indexes)
+	} else if idxID := clients[0].dbo.GetIndexIDBySplitPath(colAID, []string{"1"}); idxID == -1 {
+		t.Fatal(clients[0].dbo)
+	} else if indexes[idxID][0] != "1" {
+		t.Fatal(indexes)
+	}
+	// Test backup collection B
+	if colBID, exists := clients[0].dbo.GetColIDByName("b"); !exists {
+		t.Fatal(clients[0].dbo)
+	} else if indexes := clients[0].dbo.GetIndexesByColID(colBID); len(indexes) != 1 {
+		t.Fatal(indexes)
+	} else if idxID := clients[0].dbo.GetIndexIDBySplitPath(colBID, []string{"2"}); idxID == -1 {
+		t.Fatal(clients[0].dbo)
+	} else if indexes[idxID][0] != "2" {
+		t.Fatal(indexes)
 	}
 	clients[0].Shutdown()
 	clients[1].Shutdown()

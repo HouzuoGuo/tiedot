@@ -55,8 +55,8 @@ func (q *Query) readDeserializeDoc(docID uint64) (doc map[string]interface{}, er
 
 // Find an index or return error.
 func (q *Query) getHTID(vecPath []string, originalQExpr interface{}) (htID int32, err error) {
-	htID, exists := q.client.dbo.GetIndexIDBySplitPath(vecPath)
-	if !exists {
+	htID = q.client.dbo.GetIndexIDBySplitPath(q.colID, vecPath)
+	if htID == -1 {
 		err = dberr.New(dberr.ErrorNeedIndex, vecPath, originalQExpr)
 	}
 	return
@@ -153,7 +153,7 @@ func (q *Query) lookup(lookupValue interface{}, queryExpr map[string]interface{}
 	} else {
 		for _, match := range vals {
 			if doc, err := q.readDeserializeDoc(match); err == nil {
-				for _, v := range sharding.ResolveDocAttr(doc, vecPath) {
+				for _, v := range ResolveDocAttr(doc, vecPath) {
 					if fmt.Sprint(v) == lookupStrValue {
 						(*result)[match] = struct{}{}
 					}

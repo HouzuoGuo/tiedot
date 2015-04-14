@@ -12,23 +12,36 @@ import (
 
 // Identify loaded collections and indexes using a unique integer ID.
 type DBObjects struct {
-	dir  string
-	rank int
-	rev  uint32
+	dbdir string
+	rank  int
+	rev   uint32
 
-	colIDByName map[string]int32
-	htIDByPath  map[int32]map[string]int32
+	colIDByName  map[string]int32
+	htPathsByCol map[int32]map[int32][]string
+	htIDByPath   map[int32]map[string]int32
 
 	parts map[int32]*Partition
 	hts   map[int32]*HashTable
 }
 
-// Load collections and indexes. Rank of -1 means no objects will be loaded.
-func DBObjectsLoad(dir string, rank int) (dbo *DBObjects, err error) {
-	dbo = &DBObjects{dir: dir, rank: rank, rev: 0,
-		colIDByName: make(map[string]int32), htIDByPath: make(map[int32]map[string]int32),
-		parts: make(map[int32]*Partition), hts: make(map[int32]*HashTable)}
-	err = dbo.Reload()
+// Initialise DBObjects without loading any objects (rank is set to -1).
+func DBObjectsNew(dbdir string) (dbo *DBObjects) {
+	dbo = &DBObjects{dbdir: dbdir, rank: -1, rev: 0,
+		colIDByName:  make(map[string]int32),
+		htPathsByCol: make(map[int32]map[int32][]string),
+		htIDByPath:   make(map[int32]map[string]int32),
+		parts:        make(map[int32]*Partition), hts: make(map[int32]*HashTable)}
+	return
+}
+
+// Load collections and indexes.
+func DBObjectsLoad(dbdir string, rank int) (dbo *DBObjects) {
+	dbo = &DBObjects{dbdir: dbdir, rank: rank, rev: 0,
+		colIDByName:  make(map[string]int32),
+		htPathsByCol: make(map[int32]map[int32][]string),
+		htIDByPath:   make(map[int32]map[string]int32),
+		parts:        make(map[int32]*Partition), hts: make(map[int32]*HashTable)}
+	dbo.Reload()
 	return
 }
 
@@ -38,12 +51,8 @@ func (dbo *DBObjects) GetCurrentRev() uint32 {
 }
 
 // Look for a hash table's integer ID by collection name and index path segments. Return -1 if not found.
-func (dbo *DBObjects) GetIndexIDBySplitPath(colName string, indexPath []string) int32 {
+func (dbo *DBObjects) GetIndexIDBySplitPath(colID int32, indexPath []string) int32 {
 	jointPath := JoinIndexPath(indexPath)
-	colID, exists := dbo.colIDByName[colName]
-	if !exists {
-		return -1
-	}
 	htID, exists := dbo.htIDByPath[colID][jointPath]
 	if !exists {
 		return -1
@@ -52,13 +61,14 @@ func (dbo *DBObjects) GetIndexIDBySplitPath(colName string, indexPath []string) 
 }
 
 // Re-read the database directory to gather the latest schema information.
-func (dbo *DBObjects) Reload() (err error) {
-	dbfs, err := DBReadDir(dbo.dir)
+func (dbo *DBObjects) Reload() {
+	dbfs, err := DBReadDir(dbo.dbdir)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	dbo.colIDByName = make(map[string]int32)
+	dbo.htPathsByCol = make(map[int32]map[int32][]string)
 	dbo.htIDByPath = make(map[int32]map[string]int32)
 
 	seq := int32(0)
@@ -66,12 +76,14 @@ func (dbo *DBObjects) Reload() (err error) {
 		colID := seq
 
 		dbo.colIDByName[colName] = colID
+		dbo.htPathsByCol[colID] = make(map[int32][]string)
 		dbo.htIDByPath[colID] = make(map[string]int32)
 
 		seq++
 		for _, jointPath := range dbfs.GetIndexesSorted(colName) {
 			indexID := seq
 			dbo.htIDByPath[colID][jointPath] = indexID
+			dbo.htPathsByCol[colID][indexID] = SplitIndexPath(jointPath)
 			seq++
 		}
 	}
@@ -89,7 +101,7 @@ func (dbo *DBObjects) Reload() (err error) {
 		colPath, idLookupPath := dbfs.GetCollectionDataFilePaths(colName, dbo.rank)
 		part, err := OpenPartition(colPath, idLookupPath)
 		if err != nil {
-			return err
+			panic(err)
 		}
 		dbo.parts[id] = part
 	}
@@ -97,32 +109,34 @@ func (dbo *DBObjects) Reload() (err error) {
 		for idxPath, idxID := range dbo.htIDByPath[colID] {
 			ht, err := OpenHashTable(dbfs.GetIndexFilePath(colName, SplitIndexPath(idxPath), dbo.rank))
 			if err != nil {
-				return err
+				panic(err)
 			}
 			dbo.hts[idxID] = ht
 		}
 	}
-
-	return nil
 }
 
 // Similar to Reload, but in addition it sets revision field to the specified value.
-func (dbo *DBObjects) ReloadAndSetRev(newRev uint32) (err error) {
-	if err = dbo.Reload(); err == nil {
-		dbo.rev = newRev
-	}
-	return
+func (dbo *DBObjects) ReloadAndSetRev(newRev uint32) {
+	dbo.Reload()
+	dbo.rev = newRev
 }
 
-// Return an opened partition (document data partition) specified by the ID.
+// Return an opened collection (document data partition) specified by the ID.
 func (dbo *DBObjects) GetPartByID(id int32) (part *Partition, exists bool) {
 	part, exists = dbo.parts[id]
 	return
 }
 
-// Return an opened partition (document data partition) specified by the ID.
+// Return an opened hash table specified by the ID.
 func (dbo *DBObjects) GetHashTableByID(id int32) (ht *HashTable, exists bool) {
 	ht, exists = dbo.hts[id]
+	return
+}
+
+// Return collection ID by name.
+func (dbo *DBObjects) GetColIDByName(name string) (id int32, exists bool) {
+	id, exists = dbo.colIDByName[name]
 	return
 }
 
@@ -148,6 +162,15 @@ func (dbo *DBObjects) GetAllIndexPaths(colName string) (jointPaths []string, err
 		jointPaths = append(jointPaths, htPath)
 	}
 	return
+}
+
+// Return index ID vs index paths for collection specified by ID.
+func (dbo *DBObjects) GetIndexesJointPathByColID(colID int32) map[string]int32 {
+	return dbo.htIDByPath[colID]
+}
+
+func (dbo *DBObjects) GetIndexesByColID(colID int32) map[int32][]string {
+	return dbo.htPathsByCol[colID]
 }
 
 // Close opened collection files and indexes.

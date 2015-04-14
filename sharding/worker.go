@@ -157,7 +157,7 @@ func (worker *ShardServerWorker) Run() {
 					worker.srv.opLock.Unlock()
 					return
 				} else if exists {
-					col.LockDoc(docID)
+					col.UnlockDoc(docID)
 					worker.pendingTransaction = false
 					atomic.AddInt64(&worker.srv.pendingTransactions, -1)
 					worker.ansOK()
@@ -228,8 +228,8 @@ func (worker *ShardServerWorker) Run() {
 				colID := Int32(params[0])
 				col, exists := worker.srv.dbo.GetPartByID(colID)
 				if exists {
-					// Note: the total = my approximate * number of servers
-					worker.ansOK(Buint64(col.ApproxDocCount() * worker.srv.nProcs))
+					// Note: return approx. count of documents on This server only.
+					worker.ansOK(Buint64(col.ApproxDocCount()))
 				} else {
 					worker.ansErr(R_ERR_SCHEMA, []byte("Collection does not exist"))
 				}

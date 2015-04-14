@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"path"
 	"sort"
-	"strconv"
 	"time"
 )
 
@@ -57,44 +55,46 @@ func (client *RouterClient) Truncate(colName string) error {
 
 // De-fragment collection free-space and get rid of corrupted documents.
 func (client *RouterClient) Scrub(colName string) error {
-	return client.reqMaintAccess(func() error {
+	return client.reqMaintAccess(func() (err error) {
+		dbfs, err := data.DBReadDir(client.dbdir)
+		if err != nil {
+			return
+		}
+		found := false
+		for _, name := range client.dbo.GetAllColNames() {
+			if name == colName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("Collection %s does not exist", colName)
+		}
 		// Remember existing indexes
-		existingIndexes := make([][]string, 0, 0)
-		colID, exists := client.schema.colNameLookup[colName]
-		if !exists {
-			return fmt.Errorf("Collection does not exist")
-		}
-		for _, existingIndex := range client.schema.indexPaths[colID] {
-			existingIndexes = append(existingIndexes, existingIndex)
-		}
+		existingIndexes := dbfs.GetIndexesSorted(colName)
 		// Create a temporary collection for holding good&clean documents
 		tmpColName := fmt.Sprintf("scrub-%s-%d", colName, time.Now().UnixNano())
-		err := client.forAllDBsDo(func(clientDB *db.DB) error {
-			if err := clientDB.Create(tmpColName); err != nil {
-				return err
-			}
-			// Recreate all indexes
-			for _, existingIndex := range existingIndexes {
-				if err := clientDB.Use(tmpColName).BPIndex(existingIndex); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		// Reload schema so that servers & client know the temp collection
-		if err != nil {
-			return err
-		} else if err = client.reloadServer(); err != nil {
-			return err
+		if err = dbfs.CreateCollection(tmpColName); err != nil {
+			return
 		}
-		tmpColID, exists := client.schema.colNameLookup[tmpColName]
+		// Recreate all indexes
+		for _, existingIndex := range existingIndexes {
+			if err = dbfs.CreateIndex(tmpColName, existingIndex); err != nil {
+				return
+			}
+		}
+		// Reload both server and to make the temp collection known and loaded
+		if err = client.reloadServer(); err != nil {
+			return
+		}
+		tmpColID, exists := client.dbo.GetColIDByName(tmpColName)
 		if !exists {
 			return fmt.Errorf("TmpCol went missing?!")
 		}
 		// Put documents back in - 10k at a time
 		docCount, err := client.approxDocCount(colName)
 		if err != nil {
-			return err
+			return
 		}
 		total := docCount/10000 + 1
 		for page := uint64(0); page < total; page++ {
@@ -103,23 +103,16 @@ func (client *RouterClient) Scrub(colName string) error {
 				return err
 			}
 			for docID, doc := range docs {
-				if err := client.insertRecovery(tmpColID, docID, doc); err != nil {
+				if err = client.insertRecovery(tmpColID, docID, doc); err != nil {
 					return err
 				}
 			}
 		}
 		// Replace the original collection by the good&clean one
-		dbfs, err := data.DBReadDir(client.dbdir)
-		if err != nil {
-			return err
-		}
-		err = dbfs.DropCollection(colName)
-		if err != nil {
-			return err
-		}
-		err = dbfs.RenameCollection(tmpColName, colName)
-		if err != nil {
-			return err
+		if err = dbfs.DropCollection(colName); err != nil {
+			return
+		} else if err = dbfs.RenameCollection(tmpColName, colName); err != nil {
+			return
 		}
 		return client.reloadServer()
 	})
@@ -150,25 +143,25 @@ func (client *RouterClient) DumpDB(destDir string) error {
 // Create an index.
 func (client *RouterClient) Index(colName string, idxPath []string) error {
 	return client.reqMaintAccess(func() error {
-		for i := 0; i < client.nProcs; i++ {
-			if clientDB, err := db.OpenDB(path.Join(client.workspace, strconv.Itoa(i))); err != nil {
-				return err
-			} else if clientDB.Use(colName) == nil {
-				return fmt.Errorf("Collection does not exist")
-			} else if err = clientDB.Use(colName).BPIndex(idxPath); err != nil {
-				return err
-			} else if err = clientDB.Close(); err != nil {
-				return err
-			}
+		// Create the new index
+		dbfs, err := data.DBReadDir(client.dbdir)
+		if err != nil {
+			return err
+		} else if err = dbfs.CreateIndex(colName, data.JoinIndexPath(idxPath)); err != nil {
+			return err
 		}
 		// Refresh schema on server and myself
 		if err := client.reloadServer(); err != nil {
 			return err
 		}
 		// Figure out the hash table ID
-		newHTID := client.schema.GetHTIDByPath(colName, idxPath)
+		colID, exists := client.dbo.GetColIDByName(colName)
+		if !exists {
+			return fmt.Errorf("New collection went missing?!")
+		}
+		newHTID := client.dbo.GetIndexIDBySplitPath(colID, idxPath)
 		if newHTID == -1 {
-			return fmt.Errorf("New hash table is missing?!")
+			return fmt.Errorf("New hash table went missing?!")
 		}
 		htIDBytes := Bint32(newHTID)
 		// Reindex documents - 10k at a time
@@ -188,6 +181,7 @@ func (client *RouterClient) Index(colName string, idxPath []string) error {
 				for _, val := range ResolveDocAttr(doc, idxPath) {
 					if val != nil {
 						htKey := StringHash(fmt.Sprint(val))
+						//						fmt.Printf("Reindex will put doc %d value %v on key %d\n", docID, val, htKey)
 						if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_PUT, htIDBytes, Buint64(htKey), docIDBytes); err != nil {
 							return err
 						}

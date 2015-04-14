@@ -20,7 +20,7 @@ type Partition struct {
 
 // Open a collection partition.
 func OpenPartition(colPath, lookupPath string) (part *Partition, err error) {
-	part = &Partition{}
+	part = &Partition{locks: make(map[uint64]struct{})}
 	if part.col, err = OpenCollection(colPath); err != nil {
 		return
 	} else if part.lookup, err = OpenHashTable(lookupPath); err != nil {

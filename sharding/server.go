@@ -19,14 +19,14 @@ const (
 
 // Bin protocol server opens a database of its rank, and listens on a Unix domain socket.
 type ShardServer struct {
-	rank, nProcs                int
-	workspace, dbPath, sockPath string
-	srvSock                     net.Listener
-	clientIDSeq, maintByClient  uint64
-	opLock                      *sync.Mutex
-	shutdown                    bool
-	pendingTransactions         int64
-	dbo                         *data.DBObjects
+	rank, nProcs                  int
+	dbPath, dbShardPath, sockPath string
+	srvSock                       net.Listener
+	clientIDSeq, maintByClient    uint64
+	opLock                        *sync.Mutex
+	shutdown                      bool
+	pendingTransactions           int64
+	dbo                           *data.DBObjects
 }
 
 // Serve incoming connection.
@@ -42,13 +42,13 @@ type ShardServerWorker struct {
 }
 
 // Create a server, but do not yet start serving incoming connections.
-func NewServer(rank, nProcs int, workspace string) (srv *ShardServer) {
+func NewServer(rank, nProcs int, dbPath string) (srv *ShardServer) {
 	return &ShardServer{
 		rank:                rank,
 		nProcs:              nProcs,
-		workspace:           workspace,
-		dbPath:              path.Join(workspace, strconv.Itoa(rank)),
-		sockPath:            path.Join(workspace, strconv.Itoa(rank)+SOCK_FILE_SUFFIX),
+		dbPath:              dbPath,
+		dbShardPath:         path.Join(dbPath, strconv.Itoa(rank)),
+		sockPath:            path.Join(dbPath, strconv.Itoa(rank)+SOCK_FILE_SUFFIX),
 		clientIDSeq:         0,
 		maintByClient:       0,
 		opLock:              new(sync.Mutex),
@@ -59,11 +59,13 @@ func NewServer(rank, nProcs int, workspace string) (srv *ShardServer) {
 // Serve incoming connections. Block until server is told to shutdown.
 func (srv *ShardServer) Run() (err error) {
 	os.Remove(srv.sockPath)
-	srv.reload()
-	if srv.srvSock, err = net.Listen("unix", srv.sockPath); err != nil {
+	if err = data.DBNewDir(srv.dbPath, srv.nProcs); err != nil {
+		return
+	} else if srv.srvSock, err = net.Listen("unix", srv.sockPath); err != nil {
 		return
 	}
 	tdlog.Noticef("Server %d: is listening on %s", srv.rank, srv.sockPath)
+	srv.dbo = data.DBObjectsLoad(srv.dbPath, srv.rank)
 	for {
 		conn, err := srv.srvSock.Accept()
 		if err != nil {
@@ -84,9 +86,7 @@ func (srv *ShardServer) Run() (err error) {
 
 // Close and reopen database.
 func (srv *ShardServer) reload() {
-	if err := srv.dbo.Reload(); err != nil {
-		panic(err)
-	}
+	srv.dbo.Reload()
 	tdlog.Infof("Server %d: schema reloaded to revision %d", srv.rank, srv.dbo.GetCurrentRev())
 }
 

@@ -2,9 +2,9 @@ package sharding
 
 import (
 	"fmt"
+	"github.com/HouzuoGuo/tiedot/data"
 	"os"
 	"os/signal"
-	"path"
 	"reflect"
 	"runtime/pprof"
 	"strconv"
@@ -165,69 +165,56 @@ func TestPingMaintShutdown(t *testing.T) {
 	}
 }
 
-func schemaIdentical(s1 *Schema, s2 *Schema, numCols, numHTs int) error {
+func schemaIdentical(s1 *data.DBObjects, s2 *data.DBObjects, numCols, numHTs int) error {
 	// rev
-	if s1.rev != s2.rev {
-		return fmt.Errorf("rev mismatch %d - %d", s1.rev, s2.rev)
+	if s1.GetCurrentRev() != s2.GetCurrentRev() {
+		return fmt.Errorf("rev mismatch %d - %d", s1.GetCurrentRev(), s2.GetCurrentRev())
 	}
+
 	// colLookup
-	if len(s1.colLookup) != len(s2.colLookup) {
-		return fmt.Errorf("colLookup %v - %v", s1.colLookup, s2.colLookup)
+	if !reflect.DeepEqual(s1.GetAllColNames(), s2.GetAllColNames()) {
+		return fmt.Errorf("colNames mismatch %v - %v", s1.GetAllColNames(), s2.GetAllColNames())
 	}
-	for id, _ := range s1.colLookup {
-		if _, exists := s2.colLookup[id]; !exists {
-			return fmt.Errorf("colLookup id %d mismatch", id)
+	if len(s1.GetAllColNames()) != numCols {
+		return fmt.Errorf("Incorrect number of collections - %v", len(s1.GetAllColNames()))
+	}
+	for _, name := range s1.GetAllColNames() {
+		id1, exists1 := s1.GetColIDByName(name)
+		id2, exists2 := s2.GetColIDByName(name)
+		if !(exists1 && exists2) || id1 != id2 {
+			return fmt.Errorf("colID mismatch - %v %v %v %v", id1, exists1, id2, exists2)
 		}
 	}
-	// colNameLookup
-	s1ColNameLookup := fmt.Sprint(s1.colNameLookup)
-	s2ColNameLookup := fmt.Sprint(s2.colNameLookup)
-	if !reflect.DeepEqual(s1.colNameLookup, s2.colNameLookup) {
-		return fmt.Errorf("colNameLookup %v - %v", s1ColNameLookup, s2ColNameLookup)
-	}
-	if len(s1.colNameLookup) != numCols || len(s1.colLookup) != numCols {
-		return fmt.Errorf("col count mismatch")
-	}
+
 	// htLookup
-	if len(s1.htLookup) != len(s2.htLookup) {
-		return fmt.Errorf("htLookup %v - %v", s1.htLookup, s2.htLookup)
-	}
-	for id, _ := range s1.htLookup {
-		if _, exists := s2.htLookup[id]; !exists {
-			return fmt.Errorf("htLookup id %d mismatch", id)
+	htCount1, htCount2 := 0, 0
+	for _, name := range s1.GetAllColNames() {
+		colID, _ := s1.GetColIDByName(name)
+		allIndexes1, err1 := s1.GetAllIndexPaths(name)
+		allIndexes2, err2 := s2.GetAllIndexPaths(name)
+		if !reflect.DeepEqual(allIndexes1, allIndexes2) || err1 != nil || err2 != nil {
+			return fmt.Errorf("ht mismatch - %v %v", allIndexes1, allIndexes2)
+		}
+		indexMapping1 := s1.GetIndexesJointPathByColID(colID)
+		htCount1 += len(indexMapping1)
+		indexMapping2 := s2.GetIndexesJointPathByColID(colID)
+		htCount2 += len(indexMapping2)
+		if !reflect.DeepEqual(indexMapping1, indexMapping2) {
+			return fmt.Errorf("index mismatch %v - %v", indexMapping1, indexMapping2)
+		}
+		indexPaths1 := s1.GetIndexesByColID(colID)
+		indexPaths2 := s2.GetIndexesByColID(colID)
+		if !reflect.DeepEqual(indexPaths1, indexPaths2) {
+			return fmt.Errorf("index mismatch %v - %v", indexPaths1, indexPaths2)
+		}
+		if len(indexMapping1) != len(indexPaths1) || len(indexMapping2) != len(indexPaths2) {
+			return fmt.Errorf("index mapping mismatch %v - %v, %v - %v", indexMapping1, indexPaths2, indexMapping2, indexPaths2)
 		}
 	}
-	// indexPaths
-	s1IndexPaths := fmt.Sprint(s1.indexPaths)
-	s2IndexPaths := fmt.Sprint(s2.indexPaths)
-	if !reflect.DeepEqual(s1.indexPaths, s2.indexPaths) {
-		return fmt.Errorf("indexPaths %v - %v", s1IndexPaths, s2IndexPaths)
-	}
-	if len(s1.indexPaths) != numCols || len(s2.indexPaths) != numCols {
-		return fmt.Errorf("col count mismatch")
-	}
-	// indexPathsJoint
-	s1IndexPathsJoint := fmt.Sprint(s1.indexPathsJoint)
-	s2IndexPathsJoint := fmt.Sprint(s2.indexPathsJoint)
-	if !reflect.DeepEqual(s1.indexPathsJoint, s2.indexPathsJoint) {
-		return fmt.Errorf("indexPathsJoint %v - %v", s1IndexPathsJoint, s2IndexPathsJoint)
-	}
-	if len(s1.indexPathsJoint) != numCols || len(s2.indexPathsJoint) != numCols {
-		return fmt.Errorf("col count mismatch")
+	if htCount1 != htCount2 || htCount1 != numHTs {
+		return fmt.Errorf("Incorrect number of indexes")
 	}
 	return nil
-}
-
-func createEmptyFile(dir, filename string) {
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		panic(err)
-	}
-	if filename != "" {
-		_, err := os.Create(path.Join(dir, filename))
-		if err != nil {
-			panic(err)
-		}
-	}
 }
 
 func TestSchemaLookup(t *testing.T) {
@@ -235,29 +222,34 @@ func TestSchemaLookup(t *testing.T) {
 	defer os.RemoveAll(ws)
 	var err error
 	// Manually create a DB collection called A and an index on attr "1"
-	createEmptyFile(path.Join(ws, "0", "A"), "dat")
-	createEmptyFile(path.Join(ws, "0", "A"), "id")
-	createEmptyFile(path.Join(ws, "0", "A"), "1")
-	createEmptyFile(path.Join(ws, "1", "A"), "dat")
-	createEmptyFile(path.Join(ws, "1", "A"), "id")
-	createEmptyFile(path.Join(ws, "1", "A"), "1")
+	if err = data.DBNewDir(ws, 2); err != nil {
+		t.Fatal(err)
+	}
+	dbfs, err := data.DBReadDir(ws)
+	if err != nil {
+		t.Fatal(err)
+	} else if err = dbfs.CreateCollection("A"); err != nil {
+		t.Fatal(err)
+	} else if err = dbfs.CreateIndex("A", "1"); err != nil {
+		t.Fatal(err)
+	}
 	// Run two ordinary servers/clients
 	servers, clients := mkServersClientsReuseWS(ws, 2)
 	// Check schema
-	if len(servers[0].schema.colLookup) != 1 || len(servers[1].schema.colLookup) != 1 || len(servers[0].schema.htLookup) != 1 || len(servers[1].schema.htLookup) != 1 {
-		t.Fatal(servers[0].schema.htLookup, servers[1].schema.htLookup)
-	}
-	if len(clients[0].schema.colLookup) != 1 || len(clients[1].schema.colLookup) != 1 ||
-		len(clients[0].schema.htLookup) != 1 || len(clients[1].schema.htLookup) != 1 {
-		t.Fatal(clients[0].schema, clients[1].schema)
+	if err = schemaIdentical(servers[0].dbo, servers[1].dbo, 1, 1); err != nil {
+		t.Fatal(err)
+	} else if err = schemaIdentical(servers[0].dbo, clients[0].dbo, 1, 1); err != nil {
+		t.Fatal(err)
+	} else if err = schemaIdentical(clients[0].dbo, clients[1].dbo, 1, 1); err != nil {
+		t.Fatal(err)
 	}
 	// Emulate a server maintenance event - create a collection B with an index "2"
-	createEmptyFile(path.Join(ws, "0", "B"), "dat")
-	createEmptyFile(path.Join(ws, "0", "B"), "id")
-	createEmptyFile(path.Join(ws, "0", "B"), "2")
-	createEmptyFile(path.Join(ws, "1", "B"), "dat")
-	createEmptyFile(path.Join(ws, "1", "B"), "id")
-	createEmptyFile(path.Join(ws, "1", "B"), "2")
+	if err = dbfs.CreateCollection("B"); err != nil {
+		t.Fatal(err)
+	} else if err = dbfs.CreateIndex("B", "2"); err != nil {
+		t.Fatal(err)
+	}
+
 	if _, err = clients[0].goMaintTest(); err != nil {
 		t.Fatal(err)
 	} else if err = clients[0].leaveMaintTest(); err != nil {
@@ -270,13 +262,11 @@ func TestSchemaLookup(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Check consistency between server and client schema
-	if err := schemaIdentical(servers[0].schema, servers[1].schema, 2, 2); err != nil {
+	if err = schemaIdentical(servers[0].dbo, servers[1].dbo, 2, 2); err != nil {
 		t.Fatal(err)
-	}
-	if err := schemaIdentical(servers[0].schema, clients[0].schema, 2, 2); err != nil {
+	} else if err = schemaIdentical(servers[0].dbo, clients[0].dbo, 2, 2); err != nil {
 		t.Fatal(err)
-	}
-	if err := schemaIdentical(clients[0].schema, clients[1].schema, 2, 2); err != nil {
+	} else if err = schemaIdentical(clients[0].dbo, clients[1].dbo, 2, 2); err != nil {
 		t.Fatal(err)
 	}
 	fmt.Println("Manual reload")
@@ -295,46 +285,12 @@ func TestSchemaLookup(t *testing.T) {
 	} else if err := clients[1].Ping(); err != nil {
 		t.Fatal(err)
 	}
-	// Check schema
-	if len(servers[0].schema.colLookup) != 2 || len(servers[1].schema.colLookup) != 2 ||
-		len(servers[0].schema.htLookup) != 2 || len(servers[1].schema.htLookup) != 2 {
-		t.Fatal(servers[0], servers[1])
-	}
-	if len(clients[0].schema.colLookup) != 2 || len(clients[1].schema.colNameLookup) != 2 ||
-		len(clients[0].schema.colNameLookup) != 2 || len(clients[1].schema.colLookup) != 2 ||
-		len(clients[0].schema.htLookup) != 2 || len(clients[1].schema.htLookup) != 2 {
-		t.Fatal(clients[0], clients[1])
-	}
-	for i := 0; i < 2; i++ {
-		for htID, idxPathSegs := range clients[i].schema.indexPaths[clients[i].schema.colNameLookup["A"]] {
-			if len(idxPathSegs) != 1 || idxPathSegs[0] != "1" {
-				t.Fatal(htID, idxPathSegs)
-			}
-			if servers[i].schema.htLookup[htID] == nil {
-				t.Fatal(servers[i].schema.htLookup)
-			} else if servers[i].schema.htLookup[htID] == nil {
-				t.Fatal(servers[i].schema.htLookup)
-			}
-		}
-		for htID, idxPathSegs := range clients[i].schema.indexPaths[clients[i].schema.colNameLookup["B"]] {
-			if len(idxPathSegs) != 1 || idxPathSegs[0] != "2" {
-				t.Fatal(htID, idxPathSegs)
-			}
-			if servers[i].schema.htLookup[htID] == nil {
-				t.Fatal(servers[i].schema.htLookup)
-			} else if servers[i].schema.htLookup[htID] == nil {
-				t.Fatal(servers[i].schema.htLookup)
-			}
-		}
-	}
-	// Make sure that both clients and servers see identical schema
-	if err := schemaIdentical(servers[0].schema, servers[1].schema, 2, 2); err != nil {
+	// Check schema consistency again
+	if err = schemaIdentical(servers[0].dbo, servers[1].dbo, 2, 2); err != nil {
 		t.Fatal(err)
-	}
-	if err := schemaIdentical(servers[0].schema, clients[0].schema, 2, 2); err != nil {
+	} else if err = schemaIdentical(servers[0].dbo, clients[0].dbo, 2, 2); err != nil {
 		t.Fatal(err)
-	}
-	if err := schemaIdentical(clients[0].schema, clients[1].schema, 2, 2); err != nil {
+	} else if err = schemaIdentical(clients[0].dbo, clients[1].dbo, 2, 2); err != nil {
 		t.Fatal(err)
 	}
 	clients[0].Shutdown()

@@ -34,12 +34,8 @@ func NewClient(dbdir string) (client *RouterClient, err error) {
 		sock:   make([]net.Conn, 0, 8),
 		in:     make([]*bufio.Reader, 0, 8),
 		out:    make([]*bufio.Writer, 0, 8),
-		opLock: new(sync.Mutex)}
-	// Load DB object IDs without loading any collection/index files
-	client.dbo, err = data.DBObjectsLoad(dbdir, -1)
-	if err != nil {
-		return
-	}
+		opLock: new(sync.Mutex),
+		dbo:    data.DBObjectsNew(dbdir)}
 	// Connect to server 0, use retry mechanism with exponential back-off.
 	waitNextRetry := 10
 	for attempt := 0; attempt < 10; attempt++ {
@@ -84,6 +80,8 @@ func NewClient(dbdir string) (client *RouterClient, err error) {
 			return nil, fmt.Errorf("Client %d - failed to connect to server no.%d of %d", client.id, i, client.nProcs)
 		}
 	}
+	// Load DB object IDs without loading any collection/index files
+	client.dbo = data.DBObjectsLoad(dbdir, -1)
 	/*
 		Server spawns independent workers for each client, but it does not track every client in a central structure.
 		In order for server to initiate an orderly shutdown (when told by client), the server sets a flag to prevent
@@ -168,9 +166,7 @@ func (client *RouterClient) sendCmd(rank int, retryOnSchemaRefresh bool, cmd byt
 
 // Reload client's schema.
 func (client *RouterClient) reload(srvRev uint32) {
-	if err := client.dbo.ReloadAndSetRev(srvRev); err != nil {
-		panic(err)
-	}
+	client.dbo.ReloadAndSetRev(srvRev)
 	tdlog.Infof("Client %d - schema reloaded to revision %d", client.id, srvRev)
 	return
 }

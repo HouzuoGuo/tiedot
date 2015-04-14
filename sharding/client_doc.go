@@ -54,11 +54,11 @@ func (client *RouterClient) docID2RankBytes(id uint64) (rank int, idBytes []byte
 
 // Lookup collection ID by name. If the collection name is not found, ping the server once and retry.
 func (client *RouterClient) colName2IDBytes(colName string) (colID int32, idBytes []byte, err error) {
-	colID, exists := client.schema.colNameLookup[colName]
+	colID, exists := client.dbo.GetColIDByName(colName)
 	if !exists {
 		if err = client.ping(); err != nil {
 			return
-		} else if colID, exists = client.schema.colNameLookup[colName]; !exists {
+		} else if colID, exists = client.dbo.GetColIDByName(colName); !exists {
 			err = fmt.Errorf("Collection %s does not exist", colName)
 			return
 		}
@@ -70,9 +70,9 @@ func (client *RouterClient) colName2IDBytes(colName string) (colID int32, idByte
 // Put a document on all indexes.
 func (client *RouterClient) indexDoc(colID int32, docID uint64, doc interface{}) error {
 	docIDBytes := Buint64(docID)
-	for htID, path := range client.schema.indexPaths[colID] {
+	for htID, htPath := range client.dbo.GetIndexesByColID(colID) {
 		htIDBytes := Bint32(htID)
-		for _, val := range ResolveDocAttr(doc, path) {
+		for _, val := range ResolveDocAttr(doc, htPath) {
 			if val != nil {
 				htKey := StringHash(fmt.Sprint(val))
 				if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_PUT, htIDBytes, Buint64(htKey), docIDBytes); err != nil {
@@ -101,9 +101,9 @@ func (client *RouterClient) hashLookup(htID int32, limit uint64, strKey string) 
 // Remove a document from all indexes.
 func (client *RouterClient) unindexDoc(colID int32, docID uint64, doc interface{}) error {
 	docIDBytes := Buint64(docID)
-	for htID, path := range client.schema.indexPaths[colID] {
+	for htID, htPath := range client.dbo.GetIndexesByColID(colID) {
 		htIDBytes := Bint32(htID)
-		for _, val := range ResolveDocAttr(doc, path) {
+		for _, val := range ResolveDocAttr(doc, htPath) {
 			if val != nil {
 				htKey := StringHash(fmt.Sprint(val))
 				if _, _, err := client.sendCmd(int(htKey%uint64(client.nProcs)), false, C_HT_REMOVE, htIDBytes, Buint64(htKey), docIDBytes); err != nil {
@@ -264,28 +264,17 @@ func (client *RouterClient) valIsIndexed(colName string, idxPath []string, val i
 	if err != nil {
 		return err
 	}
-	for htID, htPath := range client.schema.indexPaths[colID] {
-		if len(htPath) != len(idxPath) {
-			continue
-		}
-		pathMatch := true
-		for i, seg := range idxPath {
-			if htPath[i] != seg {
-				pathMatch = false
-			}
-		}
-		if !pathMatch {
-			continue
-		}
-		vals, err := client.hashLookup(htID, 0, fmt.Sprint(val))
-		if err != nil {
-			return err
-		} else if len(vals) != 1 || vals[0] != docID {
-			return fmt.Errorf("Looking for %v docID %v in %v, but got result %v", val, docID, idxPath, vals)
-		}
-		return nil
+	htID := client.dbo.GetIndexIDBySplitPath(colID, idxPath)
+	if htID == -1 {
+		return fmt.Errorf("Index not found")
 	}
-	return fmt.Errorf("Index not found")
+	vals, err := client.hashLookup(htID, 0, fmt.Sprint(val))
+	if err != nil {
+		return err
+	} else if len(vals) != 1 || vals[0] != docID {
+		return fmt.Errorf("Looking for %v docID %v in %v, but got result %v", val, docID, idxPath, vals)
+	}
+	return nil
 }
 
 // (Test case only) return an error if value appears in the index.
@@ -296,31 +285,20 @@ func (client *RouterClient) valIsNotIndexed(colName string, idxPath []string, va
 	if err != nil {
 		return err
 	}
-	for htID, htPath := range client.schema.indexPaths[colID] {
-		if len(htPath) != len(idxPath) {
-			continue
-		}
-		pathMatch := true
-		for i, seg := range idxPath {
-			if htPath[i] != seg {
-				pathMatch = false
-			}
-		}
-		if !pathMatch {
-			continue
-		}
-		vals, err := client.hashLookup(htID, 0, fmt.Sprint(val))
-		if err != nil {
-			return err
-		}
-		for _, v := range vals {
-			if v == docID {
-				return fmt.Errorf("Looking for %v %v in %v (should not return any), but got result %v", val, docID, idxPath, vals)
-			}
-		}
-		return nil
+	htID := client.dbo.GetIndexIDBySplitPath(colID, idxPath)
+	if htID == -1 {
+		return fmt.Errorf("Index not found")
 	}
-	return fmt.Errorf("Index not found")
+	vals, err := client.hashLookup(htID, 0, fmt.Sprint(val))
+	if err != nil {
+		return err
+	}
+	for _, v := range vals {
+		if v == docID {
+			return fmt.Errorf("Looking for %v %v in %v (should not return any), but got result %v", val, docID, idxPath, vals)
+		}
+	}
+	return nil
 }
 
 func (client *RouterClient) approxDocCount(colName string) (count uint64, err error) {
@@ -328,6 +306,7 @@ func (client *RouterClient) approxDocCount(colName string) (count uint64, err er
 	if err != nil {
 		return
 	}
+	// Note that server returns approx. count of the documents belonging to that server only
 	_, resp, err := client.sendCmd(0, true, C_DOC_APPROX_COUNT, colIDBytes)
 	count = Uint64(resp[0]) * uint64(client.nProcs)
 	return

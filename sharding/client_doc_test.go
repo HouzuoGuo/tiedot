@@ -12,7 +12,7 @@ func TestStringHash(t *testing.T) {
 	hashes := []uint64{0, 32, 417419622498, 210861491250}
 	for i := range strings {
 		if StringHash(strings[i]) != hashes[i] {
-			t.Fatalf("Hash of %s equals to %d, it should equal to %d", strings[i], StrHash(strings[i]), hashes[i])
+			t.Fatalf("Hash of %s equals to %d, it should equal to %d", strings[i], StringHash(strings[i]), hashes[i])
 		}
 	}
 }
