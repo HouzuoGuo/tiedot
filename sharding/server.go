@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"path"
-	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -60,9 +59,6 @@ func NewServer(rank int, dbPath string) (srv *ShardServer) {
 // Serve incoming connections. Block until server is told to shutdown.
 func (srv *ShardServer) Run() (err error) {
 	os.Remove(srv.sockPath)
-	if err = data.DBNewDir(srv.dbPath, runtime.GOMAXPROCS(0)); err != nil {
-		return
-	}
 	srv.dbo = data.DBObjectsLoad(srv.dbPath, srv.rank)
 	srv.nProcs = srv.dbo.GetDBFS().NShards
 	if srv.srvSock, err = net.Listen("unix", srv.sockPath); err != nil {

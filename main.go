@@ -3,7 +3,9 @@ package main
 
 import (
 	"flag"
+	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/httpapi"
+	"github.com/HouzuoGuo/tiedot/sharding"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io/ioutil"
 	"os"
@@ -57,6 +59,20 @@ func main() {
 	flag.BoolVar(&profile, "profile", false, "Write profiler results to prof.out")
 	flag.BoolVar(&debug, "debug", false, "Dump goroutine stack traces upon receiving interrupt signal")
 
+	// IPC server supervisor
+	var ipcDBDir string
+	flag.StringVar(&ipcDBDir, "ipcdbdir", "", "(IPC server) Database directory")
+	// IPC server process params (internal use only)
+	var ipcServerRank int
+	flag.IntVar(&ipcServerRank, "ipcserverrank", 0, "(IPC internal use) Server process rank")
+	// IPC benchmark params
+	flag.IntVar(&benchSize, "benchsize", 400000, "(IPC benchmark) Benchmark sample size")
+	flag.BoolVar(&benchCleanup, "benchcleanup", true, "(IPC benchmark) Whether to clean up (delete benchmark DB) after benchmark")
+	flag.Parse()
+	// IPC benchmark process params (internal use only)
+	var ipcBenchProcNum int
+	flag.IntVar(&ipcBenchProcNum, "ipcbenchprocnum", 0, "(IPC internal use) The number of this benchmark process")
+
 	// HTTP mode params
 	var httpDBDir string
 	var httpPort int
@@ -70,11 +86,6 @@ func main() {
 	var jwtPubKey, jwtPrivateKey string
 	flag.StringVar(&jwtPubKey, "jwtpubkey", "", "(HTTP JWT server) Public key for signing tokens (empty to disable JWT)")
 	flag.StringVar(&jwtPrivateKey, "jwtprivatekey", "", "(HTTP JWT server) Private key for decoding tokens (empty to disable JWT)")
-
-	// Benchmark mode params
-	flag.IntVar(&benchSize, "benchsize", 400000, "Benchmark sample size")
-	flag.BoolVar(&benchCleanup, "benchcleanup", true, "Whether to clean up (delete benchmark DB) after benchmark")
-	flag.Parse()
 
 	// User must specify a mode to run
 	if mode == "" {
@@ -137,12 +148,18 @@ func main() {
 		benchmark2()
 	case "ipc-server":
 		// Serve a database by spawning and looking after a group of IPC server processes
+		db.RunIPCServerSupervisor(ipcDBDir)
 	case "ipc-server-process":
 		// Serve a database shard in this process
+		if err := sharding.NewServer(ipcServerRank, ipcDBDir).Run(); err != nil {
+			panic(err)
+		}
 	case "ipc-bench":
 		// Spawn benchmark client processes and collect benchmark results
+		db.RunBenchSupervisor(ipcDBDir)
 	case "ipc-bench-process":
 		// Run a benchmark client and return the result
+		db.RunBenchProcess(ipcDBDir, ipcBenchProcNum)
 	default:
 		flag.PrintDefaults()
 		return

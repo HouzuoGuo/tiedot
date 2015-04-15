@@ -23,44 +23,47 @@ func dumpGoroutineOnInterrupt() {
 	}()
 }
 
-func mkServersClientsReuseWS(ws string, n int) (servers []*ShardServer, clients []*RouterClient) {
-	runtime.GOMAXPROCS(n)
-	servers = make([]*ShardServer, n)
-	clients = make([]*RouterClient, n)
-	for i := 0; i < n; i++ {
-		servers[i] = NewServer(i, ws)
+func mkServersClientsReuseWS(dbdir string, nShards int) (servers []*ShardServer, clients []*RouterClient) {
+	runtime.GOMAXPROCS(nShards)
+	servers = make([]*ShardServer, nShards)
+	clients = make([]*RouterClient, nShards)
+	for i := 0; i < nShards; i++ {
+		servers[i] = NewServer(i, dbdir)
 		go func(i int) {
 			if err := servers[i].Run(); err != nil {
 				panic(err)
 			}
 		}(i)
 	}
-	for i := 0; i < n; i++ {
+	for i := 0; i < nShards; i++ {
 		var err error
-		if clients[i], err = NewClient(ws); err != nil {
+		if clients[i], err = NewClient(dbdir); err != nil {
 			panic(err)
 		}
 	}
 	return
 }
 
-func mkServersClients(n int) (ws string, servers []*ShardServer, clients []*RouterClient) {
-	runtime.GOMAXPROCS(n)
-	ws = "/tmp/tiedot_binprot_test" + strconv.FormatUint(uint64(time.Now().UnixNano()), 10)
-	os.RemoveAll(ws)
-	servers = make([]*ShardServer, n)
-	clients = make([]*RouterClient, n)
-	for i := 0; i < n; i++ {
-		servers[i] = NewServer(i, ws)
+func mkServersClients(nShards int) (dbdir string, servers []*ShardServer, clients []*RouterClient) {
+	runtime.GOMAXPROCS(nShards)
+	dbdir = "/tmp/tiedot_binprot_test" + strconv.FormatUint(uint64(time.Now().UnixNano()), 10)
+	os.RemoveAll(dbdir)
+	if err := data.DBNewDir(dbdir, nShards); err != nil {
+		panic(err)
+	}
+	servers = make([]*ShardServer, nShards)
+	clients = make([]*RouterClient, nShards)
+	for i := 0; i < nShards; i++ {
+		servers[i] = NewServer(i, dbdir)
 		go func(i int) {
 			if err := servers[i].Run(); err != nil {
 				panic(err)
 			}
 		}(i)
 	}
-	for i := 0; i < n; i++ {
+	for i := 0; i < nShards; i++ {
 		var err error
-		if clients[i], err = NewClient(ws); err != nil {
+		if clients[i], err = NewClient(dbdir); err != nil {
 			panic(err)
 		}
 	}
