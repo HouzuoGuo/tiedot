@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"strings"
@@ -114,6 +115,8 @@ func main() {
 			}
 		}()
 	}
+
+	runtime.GOMAXPROCS(maxprocs)
 
 	switch mode {
 	case "httpd":

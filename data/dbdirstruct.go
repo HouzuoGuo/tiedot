@@ -88,7 +88,7 @@ func DBNewDir(dir string, nShards int) error {
 		} else if err := ioutil.WriteFile(path.Join(dir, NSHARDS_FILE), []byte(strconv.Itoa(nShards)), 0600); err != nil {
 			return err
 		}
-		tdlog.Info("Database directory %s has been initialised with %d shards", dir, nShards)
+		tdlog.Noticef("Database directory %s has been initialised with %d shards", dir, nShards)
 	}
 	return nil
 }
