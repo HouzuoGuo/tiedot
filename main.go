@@ -48,7 +48,7 @@ func main() {
 	// General params
 	var mode string
 	var maxprocs int
-	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|example]")
+	flag.StringVar(&mode, "mode", "", "[httpd|ipc-server|ipc-bench|example]")
 	flag.IntVar(&maxprocs, "gomaxprocs", 1, "GOMAXPROCS")
 
 	// Debug params
@@ -108,7 +108,7 @@ func main() {
 
 	switch mode {
 	case "httpd":
-		// Run HTTP API server
+		// Run HTTP API server in an IPC setup
 		if httpDBDir == "" {
 			tdlog.Notice("Please specify database directory, for example -httpdbdir=/tmp/db")
 			os.Exit(1)
@@ -130,9 +130,19 @@ func main() {
 		// Run embedded usage examples
 		embeddedExample()
 	case "bench":
+		// Run benchmark scenario 1
 		benchmark()
 	case "bench2":
+		// Run benchmark scenario 2
 		benchmark2()
+	case "ipc-server":
+		// Serve a database by spawning and looking after a group of IPC server processes
+	case "ipc-server-process":
+		// Serve a database shard in this process
+	case "ipc-bench":
+		// Spawn benchmark client processes and collect benchmark results
+	case "ipc-bench-process":
+		// Run a benchmark client and return the result
 	default:
 		flag.PrintDefaults()
 		return

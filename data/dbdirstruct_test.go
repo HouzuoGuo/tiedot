@@ -116,8 +116,10 @@ func TestDBDirCrud(t *testing.T) {
 	} else if err := dbfs.CreateIndex("col1", JoinIndexPath([]string{"a", "b", "c"})); err == nil {
 		t.Fatal("did not error")
 	}
-	allIndexes := dbfs.GetIndexesSorted("col1")
-	if len(allIndexes) != 2 || allIndexes[0] != JoinIndexPath([]string{"a", "b", "c"}) || allIndexes[1] != JoinIndexPath([]string{"b", "c"}) {
+	allIndexes, err := dbfs.GetIndexesSorted("col1")
+	if err != nil {
+		t.Fatal(err)
+	} else if len(allIndexes) != 2 || allIndexes[0] != JoinIndexPath([]string{"a", "b", "c"}) || allIndexes[1] != JoinIndexPath([]string{"b", "c"}) {
 		t.Fatal(allIndexes)
 	} else if err := dbfs.DropIndex("col1", JoinIndexPath([]string{"b", "c", "d"})); err == nil {
 		t.Fatal("did not error")
@@ -126,8 +128,10 @@ func TestDBDirCrud(t *testing.T) {
 	} else if err := dbfs.DropIndex("col1", JoinIndexPath([]string{"b", "c"})); err != nil {
 		t.Fatal(err)
 	}
-	allIndexes = dbfs.GetIndexesSorted("col1")
-	if len(allIndexes) != 1 || allIndexes[0] != JoinIndexPath([]string{"a", "b", "c"}) {
+	allIndexes, err = dbfs.GetIndexesSorted("col1")
+	if err != nil {
+		t.Fatal(err)
+	} else if len(allIndexes) != 1 || allIndexes[0] != JoinIndexPath([]string{"a", "b", "c"}) {
 		t.Fatal(allIndexes)
 	}
 

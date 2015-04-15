@@ -5,16 +5,13 @@ Upon reload, the "revision number" increases by one automatically, and the colle
 */
 package data
 
-import (
-	"fmt"
-	"sort"
-)
-
 // Identify loaded collections and indexes using a unique integer ID.
 type DBObjects struct {
-	dbdir string
-	rank  int
-	rev   uint32
+	dbdir   string
+	rank    int
+	nShards int
+	rev     uint32
+	dbfs    *DBDirStruct
 
 	colIDByName  map[string]int32
 	htPathsByCol map[int32]map[int32][]string
@@ -24,7 +21,7 @@ type DBObjects struct {
 	hts   map[int32]*HashTable
 }
 
-// Initialise DBObjects without loading any objects (rank is set to -1).
+// Initialise DBObjects without loading any objects, and rank is set to -1.
 func DBObjectsNew(dbdir string) (dbo *DBObjects) {
 	dbo = &DBObjects{dbdir: dbdir, rank: -1, rev: 0,
 		colIDByName:  make(map[string]int32),
@@ -34,7 +31,7 @@ func DBObjectsNew(dbdir string) (dbo *DBObjects) {
 	return
 }
 
-// Load collections and indexes.
+// Load collections and indexes. If rank is -1, schema information will be loaded, but no file will be opened.
 func DBObjectsLoad(dbdir string, rank int) (dbo *DBObjects) {
 	dbo = &DBObjects{dbdir: dbdir, rank: rank, rev: 0,
 		colIDByName:  make(map[string]int32),
@@ -66,6 +63,7 @@ func (dbo *DBObjects) Reload() {
 	if err != nil {
 		panic(err)
 	}
+	dbo.dbfs = dbfs
 
 	dbo.colIDByName = make(map[string]int32)
 	dbo.htPathsByCol = make(map[int32]map[int32][]string)
@@ -80,7 +78,8 @@ func (dbo *DBObjects) Reload() {
 		dbo.htIDByPath[colID] = make(map[string]int32)
 
 		seq++
-		for _, jointPath := range dbfs.GetIndexesSorted(colName) {
+		indexJointPaths, _ := dbfs.GetIndexesSorted(colName)
+		for _, jointPath := range indexJointPaths {
 			indexID := seq
 			dbo.htIDByPath[colID][jointPath] = indexID
 			dbo.htPathsByCol[colID][indexID] = SplitIndexPath(jointPath)
@@ -140,37 +139,19 @@ func (dbo *DBObjects) GetColIDByName(name string) (id int32, exists bool) {
 	return
 }
 
-// Return all collection names, sorted alphabetically.
-func (dbo *DBObjects) GetAllColNames() (names []string) {
-	names = make([]string, 0, len(dbo.colIDByName))
-	for name, _ := range dbo.colIDByName {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return
-}
-
-// Return all indexes that belong to the collection, index paths are joint before return.
-func (dbo *DBObjects) GetAllIndexPaths(colName string) (jointPaths []string, err error) {
-	colID, found := dbo.colIDByName[colName]
-	if !found {
-		err = fmt.Errorf("Cannot find collection %s", colName)
-		return
-	}
-	jointPaths = make([]string, 0, len(dbo.htIDByPath[colID]))
-	for htPath, _ := range dbo.htIDByPath[colID] {
-		jointPaths = append(jointPaths, htPath)
-	}
-	return
-}
-
-// Return index ID vs index paths for collection specified by ID.
+// Return index ID vs index paths (joint) for the specified collection.
 func (dbo *DBObjects) GetIndexesJointPathByColID(colID int32) map[string]int32 {
 	return dbo.htIDByPath[colID]
 }
 
+// Return index ID vs index paths (split) for the specified collection.
 func (dbo *DBObjects) GetIndexesByColID(colID int32) map[int32][]string {
 	return dbo.htPathsByCol[colID]
+}
+
+// Return the latest DBDirStruct used for refreshing schema information.
+func (dbo *DBObjects) GetDBFS() *DBDirStruct {
+	return dbo.dbfs
 }
 
 // Close opened collection files and indexes.

@@ -88,6 +88,7 @@ func DBNewDir(dir string, nShards int) error {
 		} else if err := ioutil.WriteFile(path.Join(dir, NSHARDS_FILE), []byte(strconv.Itoa(nShards)), 0600); err != nil {
 			return err
 		}
+		tdlog.Info("Database directory %s has been initialised with %d shards", dir, nShards)
 	}
 	return nil
 }
@@ -145,9 +146,10 @@ func (dbfs *DBDirStruct) GetCollectionNamesSorted() (ret []string) {
 }
 
 // Return all indexes (paths are joint), sorted alphabetically.
-func (dbfs *DBDirStruct) GetIndexesSorted(colName string) (ret []string) {
+func (dbfs *DBDirStruct) GetIndexesSorted(colName string) (ret []string, err error) {
 	colIndexes := dbfs.Indexes[colName]
 	if colIndexes == nil {
+		err = fmt.Errorf("Collection %s does not exist", colName)
 		return
 	}
 	ret = make([]string, len(colIndexes))
@@ -167,19 +169,21 @@ func (dbfs *DBDirStruct) GetIndexFilePath(colName string, idxPath []string, shar
 	return path.Join(dbfs.DBDir, strconv.Itoa(shard), COLLECTION_DIR, colName, COLLECTION_INDEX_DIR, JoinIndexPath(idxPath))
 }
 
-// Return an error if collection is not found.
-func (dbfs *DBDirStruct) findCollection(colName string) (foundAt int, notFound error) {
-	foundAt = -1
+// Return the position of the collection name as appeared in the sorted name list; -1 if not found.
+func (dbfs *DBDirStruct) findCollection(colName string) int {
+	foundAt := -1
 	for i, existingCol := range dbfs.Collections {
 		if colName == existingCol {
 			foundAt = i
 			break
 		}
 	}
-	if foundAt == -1 {
-		notFound = fmt.Errorf("Collection %s does not exist", colName)
-	}
-	return
+	return foundAt
+}
+
+// Return true if the collection name is found, false otherwise.
+func (dbfs *DBDirStruct) HasCollection(colName string) bool {
+	return dbfs.findCollection(colName) != -1
 }
 
 // Create directories and empty data files for a new collection.
@@ -234,9 +238,9 @@ func (dbfs *DBDirStruct) RenameCollection(oldName, newName string) error {
 
 // Remove directories and data files of a collection.
 func (dbfs *DBDirStruct) DropCollection(colName string) error {
-	foundAt, notFound := dbfs.findCollection(colName)
-	if notFound != nil {
-		return notFound
+	foundAt := dbfs.findCollection(colName)
+	if foundAt == -1 {
+		return fmt.Errorf("Collection %s does not exist", colName)
 	}
 	for i := 0; i < dbfs.NShards; i++ {
 		if err := os.RemoveAll(path.Join(dbfs.DBDir, strconv.Itoa(i), COLLECTION_DIR, colName)); err != nil {
@@ -343,9 +347,8 @@ func (dbfs *DBDirStruct) Backup(destDir string) error {
 
 // Clear all data files that belong to the collection.
 func (dbfs *DBDirStruct) Truncate(colName string) error {
-	_, notFound := dbfs.findCollection(colName)
-	if notFound != nil {
-		return notFound
+	if !dbfs.HasCollection(colName) {
+		return fmt.Errorf("Collection %s does not exist", colName)
 	}
 	toBeCleared := make([]string, 0, 2)
 	// For each shard, these files have to be cleared: document data, ID lookup table, indexes

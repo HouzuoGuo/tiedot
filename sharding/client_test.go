@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
+	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"testing"
@@ -23,10 +24,11 @@ func dumpGoroutineOnInterrupt() {
 }
 
 func mkServersClientsReuseWS(ws string, n int) (servers []*ShardServer, clients []*RouterClient) {
+	runtime.GOMAXPROCS(n)
 	servers = make([]*ShardServer, n)
 	clients = make([]*RouterClient, n)
 	for i := 0; i < n; i++ {
-		servers[i] = NewServer(i, n, ws)
+		servers[i] = NewServer(i, ws)
 		go func(i int) {
 			if err := servers[i].Run(); err != nil {
 				panic(err)
@@ -43,12 +45,13 @@ func mkServersClientsReuseWS(ws string, n int) (servers []*ShardServer, clients 
 }
 
 func mkServersClients(n int) (ws string, servers []*ShardServer, clients []*RouterClient) {
+	runtime.GOMAXPROCS(n)
 	ws = "/tmp/tiedot_binprot_test" + strconv.FormatUint(uint64(time.Now().UnixNano()), 10)
 	os.RemoveAll(ws)
 	servers = make([]*ShardServer, n)
 	clients = make([]*RouterClient, n)
 	for i := 0; i < n; i++ {
-		servers[i] = NewServer(i, n, ws)
+		servers[i] = NewServer(i, ws)
 		go func(i int) {
 			if err := servers[i].Run(); err != nil {
 				panic(err)
@@ -172,13 +175,15 @@ func schemaIdentical(s1 *data.DBObjects, s2 *data.DBObjects, numCols, numHTs int
 	}
 
 	// colLookup
-	if !reflect.DeepEqual(s1.GetAllColNames(), s2.GetAllColNames()) {
-		return fmt.Errorf("colNames mismatch %v - %v", s1.GetAllColNames(), s2.GetAllColNames())
+	names1 := s1.GetDBFS().GetCollectionNamesSorted()
+	names2 := s2.GetDBFS().GetCollectionNamesSorted()
+	if !reflect.DeepEqual(names1, names2) {
+		return fmt.Errorf("colNames mismatch %v - %v", names1, names2)
 	}
-	if len(s1.GetAllColNames()) != numCols {
-		return fmt.Errorf("Incorrect number of collections - %v", len(s1.GetAllColNames()))
+	if len(names1) != numCols {
+		return fmt.Errorf("Incorrect number of collections - %v", len(names1))
 	}
-	for _, name := range s1.GetAllColNames() {
+	for _, name := range names1 {
 		id1, exists1 := s1.GetColIDByName(name)
 		id2, exists2 := s2.GetColIDByName(name)
 		if !(exists1 && exists2) || id1 != id2 {
@@ -188,10 +193,10 @@ func schemaIdentical(s1 *data.DBObjects, s2 *data.DBObjects, numCols, numHTs int
 
 	// htLookup
 	htCount1, htCount2 := 0, 0
-	for _, name := range s1.GetAllColNames() {
+	for _, name := range names1 {
 		colID, _ := s1.GetColIDByName(name)
-		allIndexes1, err1 := s1.GetAllIndexPaths(name)
-		allIndexes2, err2 := s2.GetAllIndexPaths(name)
+		allIndexes1, err1 := s1.GetDBFS().GetIndexesSorted(name)
+		allIndexes2, err2 := s2.GetDBFS().GetIndexesSorted(name)
 		if !reflect.DeepEqual(allIndexes1, allIndexes2) || err1 != nil || err2 != nil {
 			return fmt.Errorf("ht mismatch - %v %v", allIndexes1, allIndexes2)
 		}

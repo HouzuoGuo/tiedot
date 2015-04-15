@@ -12,11 +12,7 @@ import (
 // Create a new collection.
 func (client *RouterClient) Create(colName string) error {
 	return client.reqMaintAccess(func() error {
-		dbfs, err := data.DBReadDir(client.dbdir)
-		if err != nil {
-			return err
-		}
-		return dbfs.CreateCollection(colName)
+		return client.dbo.GetDBFS().CreateCollection(colName)
 	})
 }
 
@@ -26,7 +22,7 @@ func (client *RouterClient) AllCols() (names []string) {
 		tdlog.Noticef("Client %d: failed to ping before returning collection names - %v", client.id, err)
 	}
 	client.opLock.Lock()
-	names = client.dbo.GetAllColNames()
+	names = client.dbo.GetDBFS().GetCollectionNamesSorted()
 	client.opLock.Unlock()
 	return
 }
@@ -34,34 +30,22 @@ func (client *RouterClient) AllCols() (names []string) {
 // Rename a collection.
 func (client *RouterClient) Rename(oldName, newName string) error {
 	return client.reqMaintAccess(func() error {
-		dbfs, err := data.DBReadDir(client.dbdir)
-		if err != nil {
-			return err
-		}
-		return dbfs.RenameCollection(oldName, newName)
+		return client.dbo.GetDBFS().RenameCollection(oldName, newName)
 	})
 }
 
 // Truncate a collection - fast delete all documents and clear all indexes.
 func (client *RouterClient) Truncate(colName string) error {
 	return client.reqMaintAccess(func() error {
-		dbfs, err := data.DBReadDir(client.dbdir)
-		if err != nil {
-			return err
-		}
-		return dbfs.Truncate(colName)
+		return client.dbo.GetDBFS().Truncate(colName)
 	})
 }
 
 // De-fragment collection free-space and get rid of corrupted documents.
 func (client *RouterClient) Scrub(colName string) error {
 	return client.reqMaintAccess(func() (err error) {
-		dbfs, err := data.DBReadDir(client.dbdir)
-		if err != nil {
-			return
-		}
 		found := false
-		for _, name := range client.dbo.GetAllColNames() {
+		for _, name := range client.dbo.GetDBFS().GetCollectionNamesSorted() {
 			if name == colName {
 				found = true
 				break
@@ -71,15 +55,15 @@ func (client *RouterClient) Scrub(colName string) error {
 			return fmt.Errorf("Collection %s does not exist", colName)
 		}
 		// Remember existing indexes
-		existingIndexes := dbfs.GetIndexesSorted(colName)
+		existingIndexes, _ := client.dbo.GetDBFS().GetIndexesSorted(colName)
 		// Create a temporary collection for holding good&clean documents
 		tmpColName := fmt.Sprintf("scrub-%s-%d", colName, time.Now().UnixNano())
-		if err = dbfs.CreateCollection(tmpColName); err != nil {
+		if err = client.dbo.GetDBFS().CreateCollection(tmpColName); err != nil {
 			return
 		}
 		// Recreate all indexes
 		for _, existingIndex := range existingIndexes {
-			if err = dbfs.CreateIndex(tmpColName, existingIndex); err != nil {
+			if err = client.dbo.GetDBFS().CreateIndex(tmpColName, existingIndex); err != nil {
 				return
 			}
 		}
@@ -109,9 +93,9 @@ func (client *RouterClient) Scrub(colName string) error {
 			}
 		}
 		// Replace the original collection by the good&clean one
-		if err = dbfs.DropCollection(colName); err != nil {
+		if err = client.dbo.GetDBFS().DropCollection(colName); err != nil {
 			return
-		} else if err = dbfs.RenameCollection(tmpColName, colName); err != nil {
+		} else if err = client.dbo.GetDBFS().RenameCollection(tmpColName, colName); err != nil {
 			return
 		}
 		return client.reloadServer()
@@ -121,22 +105,14 @@ func (client *RouterClient) Scrub(colName string) error {
 // Drop a collection.
 func (client *RouterClient) Drop(colName string) error {
 	return client.reqMaintAccess(func() error {
-		dbfs, err := data.DBReadDir(client.dbdir)
-		if err != nil {
-			return err
-		}
-		return dbfs.DropCollection(colName)
+		return client.dbo.GetDBFS().DropCollection(colName)
 	})
 }
 
 // Copy database into destination directory (for backup).
 func (client *RouterClient) Backup(destDir string) error {
 	return client.reqMaintAccess(func() error {
-		dbfs, err := data.DBReadDir(client.dbdir)
-		if err != nil {
-			return err
-		}
-		return dbfs.Backup(destDir)
+		return client.dbo.GetDBFS().Backup(destDir)
 	})
 }
 
@@ -144,10 +120,7 @@ func (client *RouterClient) Backup(destDir string) error {
 func (client *RouterClient) Index(colName string, idxPath []string) error {
 	return client.reqMaintAccess(func() error {
 		// Create the new index
-		dbfs, err := data.DBReadDir(client.dbdir)
-		if err != nil {
-			return err
-		} else if err = dbfs.CreateIndex(colName, data.JoinIndexPath(idxPath)); err != nil {
+		if err := client.dbo.GetDBFS().CreateIndex(colName, data.JoinIndexPath(idxPath)); err != nil {
 			return err
 		}
 		// Refresh schema on server and myself
@@ -213,7 +186,7 @@ func (client *RouterClient) AllIndexesJointPaths(colName string) (paths []string
 		tdlog.Noticef("Client %d: failed to ping before returning index paths - %v", client.id, err)
 	}
 	client.opLock.Lock()
-	paths, err = client.dbo.GetAllIndexPaths(colName)
+	paths, err = client.dbo.GetDBFS().GetIndexesSorted(colName)
 	client.opLock.Unlock()
 	sort.Strings(paths)
 	return
@@ -222,10 +195,6 @@ func (client *RouterClient) AllIndexesJointPaths(colName string) (paths []string
 // Remove an index.
 func (client *RouterClient) Unindex(colName string, idxPath []string) error {
 	return client.reqMaintAccess(func() error {
-		dbfs, err := data.DBReadDir(client.dbdir)
-		if err != nil {
-			return err
-		}
-		return dbfs.DropIndex(colName, data.JoinIndexPath(idxPath))
+		return client.dbo.GetDBFS().DropIndex(colName, data.JoinIndexPath(idxPath))
 	})
 }

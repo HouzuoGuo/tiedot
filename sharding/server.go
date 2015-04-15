@@ -8,13 +8,14 @@ import (
 	"net"
 	"os"
 	"path"
+	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
 )
 
 const (
-	SOCK_FILE_SUFFIX = "_sock" // name of server rank's Unix socket file
+	SOCK_FILE_SUFFIX = "_sock" // suffix name of server process' socket file
 )
 
 // Bin protocol server opens a database of its rank, and listens on a Unix domain socket.
@@ -42,14 +43,14 @@ type ShardServerWorker struct {
 }
 
 // Create a server, but do not yet start serving incoming connections.
-func NewServer(rank, nProcs int, dbPath string) (srv *ShardServer) {
+func NewServer(rank int, dbPath string) (srv *ShardServer) {
 	return &ShardServer{
 		rank:                rank,
-		nProcs:              nProcs,
 		dbPath:              dbPath,
 		dbShardPath:         path.Join(dbPath, strconv.Itoa(rank)),
 		sockPath:            path.Join(dbPath, strconv.Itoa(rank)+SOCK_FILE_SUFFIX),
 		clientIDSeq:         0,
+		nProcs:              0,
 		maintByClient:       0,
 		opLock:              new(sync.Mutex),
 		shutdown:            false,
@@ -59,13 +60,15 @@ func NewServer(rank, nProcs int, dbPath string) (srv *ShardServer) {
 // Serve incoming connections. Block until server is told to shutdown.
 func (srv *ShardServer) Run() (err error) {
 	os.Remove(srv.sockPath)
-	if err = data.DBNewDir(srv.dbPath, srv.nProcs); err != nil {
+	if err = data.DBNewDir(srv.dbPath, runtime.GOMAXPROCS(0)); err != nil {
 		return
-	} else if srv.srvSock, err = net.Listen("unix", srv.sockPath); err != nil {
+	}
+	srv.dbo = data.DBObjectsLoad(srv.dbPath, srv.rank)
+	srv.nProcs = srv.dbo.GetDBFS().NShards
+	if srv.srvSock, err = net.Listen("unix", srv.sockPath); err != nil {
 		return
 	}
 	tdlog.Noticef("Server %d: is listening on %s", srv.rank, srv.sockPath)
-	srv.dbo = data.DBObjectsLoad(srv.dbPath, srv.rank)
 	for {
 		conn, err := srv.srvSock.Accept()
 		if err != nil {

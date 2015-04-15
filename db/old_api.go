@@ -27,11 +27,11 @@ type Col struct {
 	name string
 }
 
-// Run one IPC client, and a number of IPC servers, all in goroutines (emulate 3.x API).
+// Emulate 3.x API: run one IPC client, and a number of IPC servers - in goroutines.
 func OpenDB(dbdir string) (db *DB, err error) {
 	// Create the DB directory if it does not yet exist
-	// Initial number of shards = number of system CPUs
-	if err = data.DBNewDir(dbdir, runtime.NumCPU()); err != nil {
+	// Initial number of shards = number of GOMAXPROCS
+	if err = data.DBNewDir(dbdir, runtime.GOMAXPROCS(0)); err != nil {
 		return
 	}
 	db = &DB{dbdir: dbdir}
@@ -42,7 +42,7 @@ func OpenDB(dbdir string) (db *DB, err error) {
 	}
 	db.servers = make([]*sharding.ShardServer, dbfs.NShards)
 	for i := 0; i < dbfs.NShards; i++ {
-		db.servers[i] = sharding.NewServer(i, dbfs.NShards, dbdir)
+		db.servers[i] = sharding.NewServer(i, dbdir)
 		// Each server starts immediately
 		go func(i int) {
 			if err := db.servers[i].Run(); err != nil {
@@ -57,19 +57,8 @@ func OpenDB(dbdir string) (db *DB, err error) {
 
 // Close all database files. Do not use the DB afterwards!
 func (db *DB) Close() error {
-	if db.client != nil && db.servers != nil {
-		// Use the client to shutdown servers
-		db.client.Shutdown()
-	} else if db.client != nil {
-		// Close the client but do not shutdown servers
-		db.client.Close()
-	} else if db.servers != nil {
-		// Shut down the servers
-		// TODO: is this a use case? why?
-		for _, server := range db.servers {
-			server.Shutdown()
-		}
-	}
+	// Use the client to shutdown servers
+	db.client.Shutdown()
 	return nil
 }
 
