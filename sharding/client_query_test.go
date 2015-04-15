@@ -73,7 +73,7 @@ func TestQuery(t *testing.T) {
 		if err := json.Unmarshal([]byte(query), &jq); err != nil {
 			fmt.Println(err)
 		}
-		if err := clients[rand.Intn(2)].EvalQuery(jq, "col", &result); err != nil {
+		if err := clients[rand.Intn(2)].EvalQuery("col", jq, &result); err != nil {
 			return nil, err
 		}
 		return result, nil

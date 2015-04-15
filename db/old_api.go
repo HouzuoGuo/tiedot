@@ -55,7 +55,7 @@ func OpenDB(dbdir string) (db *DB, err error) {
 	return
 }
 
-// Close all database files. Do not use the DB afterwards!
+// Close the client.
 func (db *DB) Close() error {
 	// Use the client to shutdown servers
 	db.client.Shutdown()
@@ -155,7 +155,7 @@ func (col *Col) ForEachDocInPage(page, total uint64, fun func(id uint64, doc []b
 
 // Main entrance to query processor - evaluate a query and put result into result map (as map keys).
 func EvalQuery(q interface{}, src *Col, result *map[uint64]struct{}) (err error) {
-	return src.db.client.EvalQuery(q, src.name, result)
+	return src.db.client.EvalQuery(src.name, q, result)
 }
 
 // Insert a document into the collection.

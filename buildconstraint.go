@@ -1,7 +1,7 @@
-// +build !darwin,!freebsd,!linux,!netbsd,!openbsd
+// +build !linux
 
 package main
 
 func error() {
-	`You should build and run tiedot on Linux, BSD, or MacOS.`
+	`Sorry - please build and run tiedot on Linux.`
 }

@@ -19,7 +19,7 @@ type Query struct {
 }
 
 // Run a query (deserialized from JSON) on the specified collection, store result document IDs inside the keys of the map.
-func (client *RouterClient) EvalQuery(q interface{}, colName string, result *map[uint64]struct{}) (err error) {
+func (client *RouterClient) EvalQuery(colName string, q interface{}, result *map[uint64]struct{}) (err error) {
 	client.opLock.Lock()
 	colID, colIDBytes, err := client.colName2IDBytes(colName)
 	if err != nil {

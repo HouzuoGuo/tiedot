@@ -3,7 +3,6 @@ package main
 
 import (
 	"flag"
-	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/httpapi"
 	"github.com/HouzuoGuo/tiedot/sharding"
 	"github.com/HouzuoGuo/tiedot/tdlog"
@@ -46,6 +45,7 @@ func linuxPerfAdvice() {
 }
 
 func main() {
+
 	// Parse CLI parameters
 	// General params
 	var mode string
@@ -93,8 +93,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	linuxPerfAdvice()
-
 	// Start profiler if enabled
 	if profile {
 		resultFile, err := os.Create("perf.out")
@@ -136,30 +134,40 @@ func main() {
 			tdlog.Notice("To enable JWT, please specify RSA private and public key.")
 			os.Exit(1)
 		}
+		linuxPerfAdvice()
 		httpapi.Start(httpDBDir, httpPort, httpTLSCrt, httpTLSKey, jwtPubKey, jwtPrivateKey)
 	case "example":
 		// Run embedded usage examples
+		linuxPerfAdvice()
 		embeddedExample()
 	case "bench":
 		// Run benchmark scenario 1
+		linuxPerfAdvice()
 		benchmark()
 	case "bench2":
 		// Run benchmark scenario 2
+		linuxPerfAdvice()
 		benchmark2()
 	case "ipc-server":
 		// Serve a database by spawning and looking after a group of IPC server processes
-		db.RunIPCServerSupervisor(ipcDBDir)
+		if ipcDBDir == "" {
+			tdlog.Notice("Please specify database directory for the operation of IPC servers.")
+			os.Exit(1)
+		}
+		linuxPerfAdvice()
+		sharding.RunIPCServerSupervisor(ipcDBDir)
 	case "ipc-server-process":
-		// Serve a database shard in this process
+		// Serve a database shard in this process (for internal use only)
 		if err := sharding.NewServer(ipcServerRank, ipcDBDir).Run(); err != nil {
 			panic(err)
 		}
 	case "ipc-bench":
 		// Spawn benchmark client processes and collect benchmark results
-		db.RunBenchSupervisor(ipcDBDir)
+		linuxPerfAdvice()
+		sharding.RunBenchSupervisor(benchSize)
 	case "ipc-bench-process":
-		// Run a benchmark client and return the result
-		db.RunBenchProcess(ipcDBDir, ipcBenchProcNum)
+		// Run a benchmark client and return the result (for internal use only)
+		sharding.RunBenchProcess(ipcDBDir, benchSize)
 	default:
 		flag.PrintDefaults()
 		return
