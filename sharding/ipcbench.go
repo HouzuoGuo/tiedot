@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -62,8 +63,25 @@ func RunBenchSupervisor(benchSize int) {
 		newproc.Stderr = os.Stderr
 		procs[i] = newproc
 	}
+	// Decide how to pin the processes
+	pinToProcessor := runtime.NumCPU() >= dbfs.NShards
+	firstPinProcessor := 0
+	if runtime.NumCPU() >= dbfs.NShards*2 {
+		firstPinProcessor = dbfs.NShards
+	}
 	for i := 0; i < dbfs.NShards; i++ {
 		procs[i].Start()
+		if pinToProcessor {
+			tasksetOut, err := exec.Command("/usr/bin/taskset", "-c", "-p", strconv.Itoa(i+firstPinProcessor), strconv.Itoa(procs[i].Process.Pid)).CombinedOutput()
+			if err == nil {
+				tdlog.Noticef("Benchmark taskset - %s", string(tasksetOut))
+			} else {
+				tdlog.Noticef("Benchmark failed to taskset - %v : %s", err, string(tasksetOut))
+			}
+		}
+	}
+	if !pinToProcessor {
+		tdlog.Noticef("Benchmark will not run taskset due to insufficient number of processes")
 	}
 	for i := 0; i < dbfs.NShards; i++ {
 		procs[i].Wait()

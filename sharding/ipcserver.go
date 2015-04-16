@@ -40,17 +40,29 @@ func RunIPCServerSupervisor(dbdir string) {
 		newproc.Stderr = os.Stderr
 		procs[i] = newproc
 	}
+	pinToProcessor := runtime.NumCPU() >= dbfs.NShards
 	// Run server processes
 	abnormalExit := make(chan int, dbfs.NShards)
 	for i, proc := range procs {
 		if err := proc.Start(); err != nil {
 			tdlog.Panicf("IPC Supervisor: failed to start server process - %v", err)
 		}
+		if pinToProcessor {
+			tasksetOut, err := exec.Command("/usr/bin/taskset", "-c", "-p", strconv.Itoa(i), strconv.Itoa(proc.Process.Pid)).CombinedOutput()
+			if err == nil {
+				tdlog.Noticef("IPC Supervisor: taskset - %s", string(tasksetOut))
+			} else {
+				tdlog.Noticef("IPC Supervisor: failed to taskset - %v : %s", err, string(tasksetOut))
+			}
+		}
 		go func(i int, proc *exec.Cmd) {
 			if err := proc.Wait(); err != nil {
 				abnormalExit <- i
 			}
 		}(i, proc)
+	}
+	if !pinToProcessor {
+		tdlog.Noticef("IPC Supervisor: will not run taskset due to insufficient number of processes")
 	}
 	// If any process dies, kill the others too.
 	select {
@@ -61,7 +73,7 @@ func RunIPCServerSupervisor(dbdir string) {
 				continue
 			}
 			if err := procs[i].Process.Kill(); err != nil {
-				tdlog.Notice("IPC Supervisor: failed to kill server process %d - %v", procNum, err)
+				tdlog.Noticef("IPC Supervisor: failed to kill server process %d - %v", procNum, err)
 			}
 		}
 	}
