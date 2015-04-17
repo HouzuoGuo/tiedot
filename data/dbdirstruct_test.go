@@ -84,6 +84,8 @@ func TestDBDirCrud(t *testing.T) {
 	allCols = dbfs.GetCollectionNamesSorted()
 	if len(allCols) != 1 || allCols[0] != "col1" {
 		t.Fatal(allCols)
+	} else if !dbfs.HasCollection("col1") || dbfs.HasCollection("col2") {
+		t.Fatal("HasCollection wrong")
 	}
 	mustExist(path.Join(dir, "0", COLLECTION_DIR, "col1", COLLECTION_DOC_DATA_FILE), false, t)
 	mustExist(path.Join(dir, "1", COLLECTION_DIR, "col1", COLLECTION_DOC_DATA_FILE), false, t)
