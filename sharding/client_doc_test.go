@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
-	"time"
 )
 
 func TestStringHash(t *testing.T) {
@@ -22,88 +21,61 @@ func TestResolveDocAttr(t *testing.T) {
 	// Get inside a JSON object
 	json.Unmarshal([]byte(`{"a": {"b": {"c": 1}}}`), &obj)
 	if val, ok := ResolveDocAttr(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	// Get inside a JSON array
 	json.Unmarshal([]byte(`{"a": {"b": {"c": [1, 2, 3]}}}`), &obj)
 	if val, ok := ResolveDocAttr(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	if val, ok := ResolveDocAttr(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 2 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	if val, ok := ResolveDocAttr(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 3 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	// Get inside JSON objects contained in JSON array
 	json.Unmarshal([]byte(`{"a": [{"b": {"c": [1]}}, {"b": {"c": [2, 3]}}]}`), &obj)
 	if val, ok := ResolveDocAttr(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 1 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	if val, ok := ResolveDocAttr(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 2 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	if val, ok := ResolveDocAttr(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 3 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	// Get inside a JSON array and fetch attributes from array elements, which are JSON objects
 	json.Unmarshal([]byte(`{"a": [{"b": {"c": [4]}}, {"b": {"c": [5, 6]}}], "d": [0, 9]}`), &obj)
 	if val, ok := ResolveDocAttr(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 4 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	if val, ok := ResolveDocAttr(obj, []string{"a", "b", "c"})[1].(float64); !ok || val != 5 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	if val, ok := ResolveDocAttr(obj, []string{"a", "b", "c"})[2].(float64); !ok || val != 6 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	if len(ResolveDocAttr(obj, []string{"a", "b", "c"})) != 3 {
-		t.Fatal()
+		t.Fatal("Incorrect number of attrs")
 	}
 	if val, ok := ResolveDocAttr(obj, []string{"d"})[0].(float64); !ok || val != 0 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	if val, ok := ResolveDocAttr(obj, []string{"d"})[1].(float64); !ok || val != 9 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	if len(ResolveDocAttr(obj, []string{"d"})) != 2 {
-		t.Fatal()
+		t.Fatal("Incorrect number of attrs")
 	}
 	// Another example
 	json.Unmarshal([]byte(`{"a": {"b": [{"c": 2}]}, "d": 0}`), &obj)
 	if val, ok := ResolveDocAttr(obj, []string{"a", "b", "c"})[0].(float64); !ok || val != 2 {
-		t.Fatal()
+		t.Fatal(val)
 	}
 	if len(ResolveDocAttr(obj, []string{"a", "b", "c"})) != 1 {
-		t.Fatal()
+		t.Fatal("Incorrect number of attrs")
 	}
-}
-
-func TestDocInsertBench(t *testing.T) {
-	return
-	ws, _, clients := mkServersClients(2)
-	defer os.RemoveAll(ws)
-	if err := clients[0].Create("col"); err != nil {
-		t.Fatal(err)
-	} else if err := clients[0].Index("col", []string{"a"}); err != nil {
-		t.Fatal(err)
-	} else if err := clients[0].Index("col", []string{"b"}); err != nil {
-		t.Fatal(err)
-	} else if err := clients[0].Index("col", []string{"c"}); err != nil {
-		t.Fatal(err)
-	}
-	total := int64(100000)
-	start := time.Now().UnixNano()
-	for i := int64(0); i < total; i++ {
-		if _, err := clients[i%2].Insert("col", map[string]interface{}{"a": i, "b": i, "c": i}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	end := time.Now().UnixNano()
-	t.Log("avg latency ns", (end-start)/total)
-	t.Log("throughput/sec", float64(total)/(float64(end-start)/float64(1000000000)))
-	clients[0].Shutdown()
-	clients[1].Shutdown()
 }
 
 func TestDocCrud(t *testing.T) {

@@ -82,7 +82,6 @@ func OpenDataFile(path string, growth uint64) (file *DataFile, err error) {
 			mid = mid + (high-mid)/2
 		}
 	}
-	return
 }
 
 // Fill up portion of a file with 0s.

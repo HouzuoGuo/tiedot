@@ -70,22 +70,6 @@ func mkServersClients(nShards int) (dbdir string, servers []*ShardServer, client
 	return
 }
 
-func TestPingBench(t *testing.T) {
-	return
-	// Run one server and one client
-	ws, _, clients := mkServersClients(1)
-	defer os.RemoveAll(ws)
-	total := int64(1000000)
-	start := time.Now().UnixNano()
-	for i := int64(0); i < total; i++ {
-		clients[0].Ping()
-	}
-	end := time.Now().UnixNano()
-	t.Log("avg latency ns", (end-start)/total)
-	t.Log("throughput/sec", float64(total)/(float64(end-start)/float64(1000000000)))
-	clients[0].Shutdown()
-}
-
 func TestPingMaintShutdown(t *testing.T) {
 	ws, servers, clients := mkServersClients(2)
 	defer os.RemoveAll(ws)

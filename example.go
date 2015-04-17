@@ -91,8 +91,8 @@ func embeddedExample() {
 	// Process all documents (note that document order is undetermined)
 	feeds.ForEachDoc(func(id uint64, docContent []byte) (willMoveOn bool) {
 		fmt.Println("Document", id, "is", string(docContent))
-		return true  // move on to the next document OR
-		return false // do not move on to the next document
+		return true // move on to the next document OR
+		// return false // do not move on to the next document
 	})
 
 	// Delete document
