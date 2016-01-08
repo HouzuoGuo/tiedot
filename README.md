@@ -51,6 +51,9 @@ I love Go because it offers stable and predictable performance characteristics, 
 
 There are several other data structure servers/DB engines written in Go, namely "etcd", "leveldb-go" and "ql"; they emphasis on different usage scenarios, for example "etcd" is a data structure server designed for configuration management and service discovery, "leveldb-go" is a re-implementation of popular LevelDB in Go, and "ql" is an embeddable DB engine providing SQL capability. After all, when it comes to choosing a general purpose, embeddable NoSQL database engine, tiedot is perhaps the only choice so far (as far as I know).
 
+The Go gopher was designed by Renee French. (http://reneefrench.blogspot.com/).
+The Go gopher is covered by the [Creative Commons Attribution 3.0][Creative Commons Attribution 3.0] license.
+
 [Tutorial: tiedot in 10 minutes]: https://github.com/HouzuoGuo/tiedot/wiki/Tutorial
 [API reference and embedded usage]: https://github.com/HouzuoGuo/tiedot/wiki/API-reference-and-embedded-usage
 [Version History]: https://github.com/HouzuoGuo/tiedot/wiki/Version-History
@@ -64,3 +67,4 @@ There are several other data structure servers/DB engines written in Go, namely 
 [blog]: http://allstarnix.blogspot.com.au
 [Issues]: https://github.com/HouzuoGuo/tiedot/issues
 [Contributors and License]: https://github.com/HouzuoGuo/tiedot/wiki/Contributors-and-License
+[Creative Commons Attribution 3.0]: http://creativecommons.org/licenses/by/3.0
