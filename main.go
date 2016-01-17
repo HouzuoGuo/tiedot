@@ -51,9 +51,8 @@ func main() {
 	// General params
 	var mode string
 	var maxprocs int
-	flag.StringVar(&mode, "mode", "", "[httpd|ipc-server|ipc-bench|example]")
+	flag.StringVar(&mode, "mode", "", "Mandatory - specify the execution mode[httpd|ipc-server|ipc-bench|example]")
 	flag.IntVar(&maxprocs, "gomaxprocs", 1, "GOMAXPROCS")
-
 	// Debug params
 	var profile, debug bool
 	flag.BoolVar(&tdlog.VerboseLog, "verbose", false, "Turn verbose logging on/off")
@@ -75,13 +74,16 @@ func main() {
 	flag.IntVar(&ipcBenchProcNum, "ipcbenchprocnum", 0, "(IPC internal use) The number of this benchmark process")
 
 	// HTTP mode params
-	var httpDBDir string
+	var httpBindAddr, httpDBDir string
 	var httpPort int
 	var httpTLSCrt, httpTLSKey string
+	var httpAuthToken string
 	flag.StringVar(&httpDBDir, "httpdbdir", "", "(HTTP server) database directory")
 	flag.IntVar(&httpPort, "httpport", 8080, "(HTTP server) port number")
 	flag.StringVar(&httpTLSCrt, "httptlscrt", "", "(HTTP server) TLS certificate (empty to disable TLS).")
 	flag.StringVar(&httpTLSKey, "httptlskey", "", "(HTTP server) TLS certificate key (empty to disable TLS).")
+	flag.StringVar(&httpAuthToken, "httpauthtoken", "", "(HTTP server) Only authorize requests carrying this token in 'Authorization: token TOKEN' header (empty to disable).")
+	flag.StringVar(&httpBindAddr, "httpbindaddr", "", "(HTTP server) Bind address for the server (all interfaces by default).")
 
 	// HTTP + JWT params
 	var jwtPubKey, jwtPrivateKey string
@@ -138,7 +140,7 @@ func main() {
 			os.Exit(1)
 		}
 		linuxPerfAdvice()
-		httpapi.Start(httpDBDir, httpPort, httpTLSCrt, httpTLSKey, jwtPubKey, jwtPrivateKey)
+		httpapi.Start(httpDBDir, httpPort, httpTLSCrt, httpTLSKey, jwtPubKey, jwtPrivateKey, httpBindAddr, httpAuthToken)
 	case "example":
 		// Run embedded usage examples
 		linuxPerfAdvice()
