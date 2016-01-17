@@ -34,7 +34,6 @@ package httpapi
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -217,45 +216,4 @@ func sliceContainsStr(possibleSlice interface{}, str string) bool {
 		}
 	}
 	return false
-}
-
-func ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey string) {
-	var e error
-	if publicKey, e = ioutil.ReadFile(jwtPubKey); e != nil {
-		tdlog.Panicf("JWT: Failed to read public key file - %s", e)
-	} else if privateKey, e = ioutil.ReadFile(jwtPrivateKey); e != nil {
-		tdlog.Panicf("JWT: Failed to read private key file - %s", e)
-	}
-
-	jwtInitSetup()
-
-	// collection management (stop-the-world)
-	http.HandleFunc("/create", jwtWrap(Create))
-	http.HandleFunc("/rename", jwtWrap(Rename))
-	http.HandleFunc("/drop", jwtWrap(Drop))
-	http.HandleFunc("/all", jwtWrap(All))
-	http.HandleFunc("/scrub", jwtWrap(Scrub))
-	http.HandleFunc("/sync", jwtWrap(Sync))
-	// query
-	http.HandleFunc("/query", jwtWrap(Query))
-	http.HandleFunc("/count", jwtWrap(Count))
-	// document management
-	http.HandleFunc("/insert", jwtWrap(Insert))
-	http.HandleFunc("/get", jwtWrap(Get))
-	http.HandleFunc("/getpage", jwtWrap(GetPage))
-	http.HandleFunc("/update", jwtWrap(Update))
-	http.HandleFunc("/delete", jwtWrap(Delete))
-	http.HandleFunc("/approxdoccount", jwtWrap(ApproxDocCount))
-	// index management (stop-the-world)
-	http.HandleFunc("/index", jwtWrap(Index))
-	http.HandleFunc("/indexes", jwtWrap(Indexes))
-	http.HandleFunc("/unindex", jwtWrap(Unindex))
-	// misc
-	http.HandleFunc("/shutdown", jwtWrap(Shutdown))
-	http.HandleFunc("/dump", jwtWrap(Dump))
-	// does not require JWT auth
-	http.HandleFunc("/getjwt", getJWT)
-	http.HandleFunc("/checkjwt", checkJWT)
-
-	tdlog.Noticef("JWT is enabled. API endpoints require JWT authorization.")
 }

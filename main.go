@@ -56,7 +56,7 @@ func main() {
 	// General params
 	var mode string
 	var maxprocs int
-	flag.StringVar(&mode, "mode", "", "[httpd|bench|bench2|example]")
+	flag.StringVar(&mode, "mode", "", "Mandatory - specify the execution mode [httpd|bench|bench2|example]")
 	flag.IntVar(&maxprocs, "gomaxprocs", defaultMaxprocs, "GOMAXPROCS")
 	// Debug params
 	var profile, debug bool
@@ -71,10 +71,10 @@ func main() {
 	var tlsCrt, tlsKey string
 	flag.StringVar(&dir, "dir", "", "(HTTP server) database directory")
 	flag.StringVar(&bind, "bind", "", "(HTTP server) bind to IP address (all network interfaces by default)")
-	flag.StringVar(&authToken, "authtoken", "", "(HTTP server) auth token. Requests without this token in the 'Authorization: token TOKEN' request header will be rejected. (empty to disable)")
 	flag.IntVar(&port, "port", 8080, "(HTTP server) port number")
 	flag.StringVar(&tlsCrt, "tlscrt", "", "(HTTP server) TLS certificate (empty to disable TLS).")
 	flag.StringVar(&tlsKey, "tlskey", "", "(HTTP server) TLS certificate key (empty to disable TLS).")
+	flag.StringVar(&authToken, "authtoken", "", "(HTTP server) Only authorize requests carrying this token in 'Authorization: token TOKEN' header. (empty to disable)")
 
 	// HTTP + JWT params
 	var jwtPubKey, jwtPrivateKey string
