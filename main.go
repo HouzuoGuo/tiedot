@@ -65,9 +65,13 @@ func main() {
 	flag.BoolVar(&debug, "debug", false, "Dump goroutine stack traces upon receiving interrupt signal")
 	// HTTP mode params
 	var dir string
+	var bind string
 	var port int
+	var authToken string
 	var tlsCrt, tlsKey string
 	flag.StringVar(&dir, "dir", "", "(HTTP server) database directory")
+	flag.StringVar(&bind, "bind", "", "(HTTP server) bind to IP address (all network interfaces by default)")
+	flag.StringVar(&authToken, "authtoken", "", "(HTTP server) auth token. Requests without this token in the 'Authorization: token TOKEN' request header will be rejected. (empty to disable)")
 	flag.IntVar(&port, "port", 8080, "(HTTP server) port number")
 	flag.StringVar(&tlsCrt, "tlscrt", "", "(HTTP server) TLS certificate (empty to disable TLS).")
 	flag.StringVar(&tlsKey, "tlskey", "", "(HTTP server) TLS certificate key (empty to disable TLS).")
@@ -139,7 +143,7 @@ func main() {
 			tdlog.Notice("To enable JWT, please specify RSA private and public key.")
 			os.Exit(1)
 		}
-		httpapi.Start(dir, port, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey)
+		httpapi.Start(dir, port, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey, bind, authToken)
 	case "example":
 		// Run embedded usage examples
 		embeddedExample()

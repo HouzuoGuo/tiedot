@@ -22,14 +22,14 @@ func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bo
 	return true
 }
 
-func Start(dir string, port int, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey string) {
+func Start(dir string, port int, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey, bind, authToken string) {
 	var err error
 	HttpDB, err = db.OpenDB(dir)
 	if err != nil {
 		panic(err)
 	}
 
-	// These endpoints are always available and do not require JWT auth
+	// These endpoints are always available and do not require authentication
 	http.HandleFunc("/", Welcome)
 	http.HandleFunc("/version", Version)
 	http.HandleFunc("/memstats", MemStats)
@@ -37,19 +37,25 @@ func Start(dir string, port int, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey string
 	if jwtPrivateKey != "" {
 		// JWT support
 		ServeJWTEnabledEndpoints(jwtPubKey, jwtPrivateKey)
+	} else if authToken != "" {
+		// AuthToken support
+		ServeAuthTokenEndpoints(authToken)
 	} else {
 		// No JWT
 		ServeEndpoints()
 	}
 
+	iface := "all interfaces"
+	if bind != "" { iface = bind }
+
 	if tlsCrt != "" {
-		tdlog.Noticef("Will listen on all interfaces (HTTPS), port %d.", port)
-		if err := http.ListenAndServeTLS(fmt.Sprintf(":%d", port), tlsCrt, tlsKey, nil); err != nil {
+		tdlog.Noticef("Will listen on %s (HTTPS), port %d.", iface, port)
+		if err := http.ListenAndServeTLS(fmt.Sprintf("%s:%d", bind, port), tlsCrt, tlsKey, nil); err != nil {
 			tdlog.Panicf("Failed to start HTTPS service - %s", err)
 		}
 	} else {
-		tdlog.Noticef("Will listen on all interfaces (HTTP), port %d.", port)
-		http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+		tdlog.Noticef("Will listen on %s (HTTP), port %d.", iface, port)
+		http.ListenAndServe(fmt.Sprintf("%s:%d", bind, port), nil)
 	}
 }
 
