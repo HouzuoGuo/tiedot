@@ -1,4 +1,5 @@
-/* Document management handlers. */
+// Document management handlers.
+
 package httpapi
 
 import (

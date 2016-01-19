@@ -15,6 +15,7 @@ Access to specific endpoints are granted explicitly to each user.
 
 These API endpoints will never require authorization: / (root), /version, and /memstats
 */
+
 package httpapi
 
 import (

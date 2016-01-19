@@ -1,4 +1,5 @@
 // Common data file features - enlarge, close, close, etc.
+
 package data
 
 import (

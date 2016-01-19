@@ -1,8 +1,8 @@
-/*
-(Collection) Partition is a collection data file accompanied by a hash table in order to allow addressing of a
-document using an unchanging ID:
-The hash table stores the unchanging ID as entry key and the physical document location as entry value.
-*/
+// (Collection) Partition is a collection data file accompanied by a hash table
+// in order to allow addressing of a document using an unchanging ID:
+// The hash table stores the unchanging ID as entry key and the physical
+// document location as entry value.
+
 package data
 
 import (

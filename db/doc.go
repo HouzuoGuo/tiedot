@@ -1,4 +1,5 @@
-/* Document management and index maintenance. */
+// Document management and index maintenance.
+
 package db
 
 import (

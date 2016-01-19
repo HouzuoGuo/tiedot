@@ -1,4 +1,5 @@
-/* Miscellaneous function handlers. */
+// Miscellaneous function handlers.
+
 package httpapi
 
 import (

@@ -1,4 +1,5 @@
-/* Query handlers. */
+// Query handlers.
+
 package httpapi
 
 import (

@@ -1,4 +1,5 @@
-/* Collection schema and index management. */
+// Collection schema and index management.
+
 package db
 
 import (
