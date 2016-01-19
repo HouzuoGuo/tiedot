@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
 	"math/rand"
 	"os"
 	"runtime"
@@ -11,6 +10,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/HouzuoGuo/tiedot/db"
 )
 
 var benchTestSize = 100000

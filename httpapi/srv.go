@@ -20,10 +20,11 @@ package httpapi
 
 import (
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
 var (

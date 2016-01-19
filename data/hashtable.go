@@ -13,8 +13,9 @@ package data
 
 import (
 	"encoding/binary"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"sync"
+
+	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
 const (

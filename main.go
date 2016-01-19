@@ -3,8 +3,6 @@ package main
 
 import (
 	"flag"
-	"github.com/HouzuoGuo/tiedot/httpapi"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -12,6 +10,9 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
+
+	"github.com/HouzuoGuo/tiedot/httpapi"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
 // Read Linux system VM parameters and print performance configuration advice when necessary.

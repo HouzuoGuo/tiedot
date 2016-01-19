@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
 	"math/rand"
 	"os"
 	"runtime"
@@ -11,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/HouzuoGuo/tiedot/db"
 )
 
 // Whether to clean up (delete benchmark DB) after benchmark
