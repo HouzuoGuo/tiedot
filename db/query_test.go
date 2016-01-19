@@ -262,17 +262,17 @@ func TestQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 	// union of intersection
-	q, err = runQuery(`[{"n": [{"eq": 3, "in": ["c"]}]}, {"n": [{"eq": 2, "in": ["c"]}]}]`, col)
+	q, _ = runQuery(`[{"n": [{"eq": 3, "in": ["c"]}]}, {"n": [{"eq": 2, "in": ["c"]}]}]`, col)
 	if !ensureMapHasKeys(q, ids[2], ids[3]) {
 		t.Fatal(q)
 	}
 	// union of complement
-	q, err = runQuery(`[{"c": [{"eq": 3, "in": ["c"]}]}, {"c": [{"eq": 2, "in": ["c"]}]}]`, col)
+	q, _ = runQuery(`[{"c": [{"eq": 3, "in": ["c"]}]}, {"c": [{"eq": 2, "in": ["c"]}]}]`, col)
 	if !ensureMapHasKeys(q, ids[2], ids[3]) {
 		t.Fatal(q)
 	}
 	// union of complement of intersection
-	q, err = runQuery(`[{"c": [{"n": [{"eq": 1, "in": ["d"]},{"eq": 1, "in": ["c"]}]},{"eq": 1, "in": ["d"]}]},{"eq": 2, "in": ["c"]}]`, col)
+	q, _ = runQuery(`[{"c": [{"n": [{"eq": 1, "in": ["d"]},{"eq": 1, "in": ["c"]}]},{"eq": 1, "in": ["d"]}]},{"eq": 2, "in": ["c"]}]`, col)
 	if !ensureMapHasKeys(q, ids[2], ids[4], ids[5]) {
 		t.Fatal(q)
 	}
