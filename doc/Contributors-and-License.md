@@ -13,6 +13,7 @@ I sincerely appreciate the following individuals and organizations for their con
 - Freiheit.com
 - Gert Cuykens
 - "IFQ"
+- Mauro Toffanin
 - Nick Prestra
 - NoahShen
 - Omeid
