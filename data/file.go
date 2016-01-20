@@ -1,10 +1,12 @@
 // Common data file features - enlarge, close, close, etc.
+
 package data
 
 import (
+	"os"
+
 	"github.com/HouzuoGuo/tiedot/gommap"
 	"github.com/HouzuoGuo/tiedot/tdlog"
-	"os"
 )
 
 // Data file keeps track of the amount of total and used space.

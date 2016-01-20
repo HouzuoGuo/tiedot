@@ -1,4 +1,5 @@
-/* Index management handlers. */
+// Index management handlers.
+
 package httpapi
 
 import (

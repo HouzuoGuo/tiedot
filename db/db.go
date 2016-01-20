@@ -1,10 +1,10 @@
-/* Collection and DB storage management. */
+// Collection and DB storage management.
+
 package db
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
 const (
@@ -115,7 +117,7 @@ func (db *DB) AllCols() (ret []string) {
 	db.schemaLock.RLock()
 	defer db.schemaLock.RUnlock()
 	ret = make([]string, 0, len(db.cols))
-	for name, _ := range db.cols {
+	for name := range db.cols {
 		ret = append(ret, name)
 	}
 	return

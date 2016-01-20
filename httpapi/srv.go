@@ -15,14 +15,16 @@ Access to specific endpoints are granted explicitly to each user.
 
 These API endpoints will never require authorization: / (root), /version, and /memstats
 */
+
 package httpapi
 
 import (
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
 var (

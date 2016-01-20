@@ -1,10 +1,11 @@
 package main
 
 import (
-	jwt "github.com/dgrijalva/jwt-go"
 	"io/ioutil"
 	"testing"
 	"time"
+
+	jwt "github.com/dgrijalva/jwt-go"
 )
 
 var (

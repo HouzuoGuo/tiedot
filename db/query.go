@@ -1,4 +1,5 @@
-/* Query processor. */
+// Query processor.
+
 package db
 
 import (
@@ -145,7 +146,7 @@ func Intersect(subExprs interface{}, src *Col, result *map[int]struct{}) (err er
 				myResult = subResult
 				first = false
 			} else {
-				for k, _ := range subResult {
+				for k := range subResult {
 					if _, inBoth := myResult[k]; inBoth {
 						intersection[k] = struct{}{}
 					}
@@ -172,12 +173,12 @@ func Complement(subExprs interface{}, src *Col, result *map[int]struct{}) (err e
 			if err = evalQuery(subExpr, src, &subResult, false); err != nil {
 				return
 			}
-			for k, _ := range subResult {
+			for k := range subResult {
 				if _, inBoth := myResult[k]; !inBoth {
 					complement[k] = struct{}{}
 				}
 			}
-			for k, _ := range myResult {
+			for k := range myResult {
 				if _, inBoth := subResult[k]; !inBoth {
 					complement[k] = struct{}{}
 				}
@@ -273,7 +274,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 				if intLimit > 0 && counter == intLimit {
 					break
 				}
-				counter += 1
+				counter++
 				(*result)[docID] = struct{}{}
 			}
 		}
@@ -287,7 +288,7 @@ func IntRange(intFrom interface{}, expr map[string]interface{}, src *Col, result
 				if intLimit > 0 && counter == intLimit {
 					break
 				}
-				counter += 1
+				counter++
 				(*result)[docID] = struct{}{}
 			}
 		}
@@ -306,14 +307,13 @@ func evalQuery(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLoc
 	case string:
 		if expr == "all" {
 			return EvalAllIDs(src, result)
-		} else {
-			// Might be single document number
-			docID, err := strconv.ParseInt(expr, 10, 64)
-			if err != nil {
-				return dberr.New(dberr.ErrorExpectingInt, "Single Document ID", docID)
-			}
-			(*result)[int(docID)] = struct{}{}
 		}
+		// Might be single document number
+		docID, err := strconv.ParseInt(expr, 10, 64)
+		if err != nil {
+			return dberr.New(dberr.ErrorExpectingInt, "Single Document ID", docID)
+		}
+		(*result)[int(docID)] = struct{}{}
 	case map[string]interface{}:
 		if lookupValue, lookup := expr["eq"]; lookup { // eq - lookup
 			return Lookup(lookupValue, expr, src, result)

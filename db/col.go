@@ -1,15 +1,17 @@
-/* Collection schema and index management. */
+// Collection schema and index management.
+
 package db
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/data"
 	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/HouzuoGuo/tiedot/data"
 )
 
 const (

@@ -1,11 +1,13 @@
-/* Document management and index maintenance. */
+// Document management and index maintenance.
+
 package db
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"math/rand"
+
+	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
 // Resolve the attribute(s) in the document structure along the given path.

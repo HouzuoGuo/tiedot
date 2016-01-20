@@ -1,12 +1,14 @@
-/* Query handlers. */
+// Query handlers.
+
 package httpapi
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
 	"net/http"
 	"strconv"
+
+	"github.com/HouzuoGuo/tiedot/db"
 )
 
 // Execute a query and return documents from the result.

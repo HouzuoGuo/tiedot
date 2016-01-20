@@ -1,4 +1,5 @@
-/* Collection management handlers. */
+// Collection management handlers.
+
 package httpapi
 
 import (

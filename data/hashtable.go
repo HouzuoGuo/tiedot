@@ -1,16 +1,21 @@
-/*
-Hash table file contains binary content; it implements a static hash table made of hash buckets and integer entries.
-Every bucket has a fixed number of entries. When a bucket becomes full, a new bucket is chained to it in order to store
-more entries. Every entry has an integer key and value.
-An entry key may have multiple values assigned to it, however the combination of entry key and value must be unique
-across the entire hash table.
-*/
+// Hash table file contains binary content.
+//
+// This package implements a static hash table made of hash buckets and integer
+// entries.
+//
+// Every bucket has a fixed number of entries. When a bucket becomes full, a new
+// bucket is chained to it in order to store more entries. Every entry has an
+// integer key and value. An entry key may have multiple values assigned to it,
+// however the combination of entry key and value must be unique across the
+// entire hash table.
+
 package data
 
 import (
 	"encoding/binary"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"sync"
+
+	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
 const (
@@ -204,10 +209,10 @@ func GetPartitionRange(partNum, totalParts int) (start int, end int) {
 	start = partNum * perPart
 	if leftOver > 0 {
 		if partNum == 0 {
-			end += 1
+			end++
 		} else if partNum < leftOver {
 			start += partNum
-			end += 1
+			end++
 		} else {
 			start += leftOver
 		}

@@ -1,10 +1,17 @@
-/*
-Collection data file contains document data. Every document has a binary header and UTF-8 text content.
-Documents are inserted one after another, and occupies 2x original document size to leave room for future updates.
-Deleted documents are marked as deleted and the space is irrecoverable until a "scrub" action (in DB logic) is carried out.
-When update takes place, the new document may overwrite original document if there is enough space, otherwise the
-original document is marked as deleted and the updated document is inserted as a new document.
-*/
+// Collection data file contains document data.
+//
+// Every document has a binary header and UTF-8 text content.
+//
+// Documents are inserted one after another, and occupies 2x original document
+// size to leave room for future updates.
+//
+// Deleted documents are marked as deleted and the space is irrecoverable until
+// a "scrub" action (in DB logic) is carried out.
+//
+// When update takes place, the new document may overwrite original document if
+// there is enough space, otherwise the original document is marked as deleted
+// and the updated document is inserted as a new document.
+
 package data
 
 import (
@@ -104,11 +111,11 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 			copy(col.Buf[padding:padding+copySize], PADDING)
 		}
 		return id, nil
-	} else {
-		// No enough room - re-insert the document
-		col.Delete(id)
-		return col.Insert(data)
 	}
+
+	// No enough room - re-insert the document
+	col.Delete(id)
+	return col.Insert(data)
 }
 
 // Delete a document by ID.

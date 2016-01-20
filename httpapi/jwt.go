@@ -136,7 +136,7 @@ func getJWT(w http.ResponseWriter, r *http.Request) {
 	}
 	// Verify password
 	pass := r.FormValue(JWT_PASS_ATTR)
-	for recID, _ := range userQueryResult {
+	for recID := range userQueryResult {
 		rec, err := jwtCol.Read(recID)
 		if err != nil {
 			break
