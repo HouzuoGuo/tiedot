@@ -41,6 +41,50 @@ Here is the comprehensive list of all supported query operations:
 
 `limit` is optional. Sub-query may have arbitrary complexity.
 
+### Query example
+
+The following example demonstrates how to query on the basis of a native array and a JSON-string:
+
+```
+// Instantiate database
+DB := db.OpenDB("/path/to/your/db")
+DB.Create("Users")
+users := DB.Use("Users")
+
+// Add index
+err = users.Index([]string{"username"})
+if nil != err {
+    panic(err)
+}
+
+
+// Native Array
+query = map[string]interface{}{
+   "eq":    "JohnAppleseed",
+   "in":    []interface{}{"username"},
+   "limit": 1,
+}
+// OR JSON
+var query interface{}
+ffjson.Unmarshal([]byte(`[{"eq": "JohnAppleseed", "in": ["username"], "limit": 1}]`), &query)
+
+
+// Evaluate the query
+queryResult := make(map[int]struct{})
+if err := db.EvalQuery(query, users, &queryResult); nil != err {
+    panic(err)
+}
+
+// Fetch the results
+for id := range queryResult {
+    readBack, err := users.Read(id)
+    if nil != err {
+        panic(err)
+    }
+    fmt.Printf("Query returned document %v\n", readBack)
+}
+```
+
 ### Lookup queries
 
 Indexes works on a "path" - a series of attribute names locating the indexed value, for example, path `a,b,c` will locate value `1` in document `{"a": {"b": {"c": 1}}}`.

@@ -5,6 +5,7 @@ I sincerely appreciate the following individuals and organizations for their con
 - 2pi
 - Adrian Lanzafame
 - Alexandre Stein
+- Allendar
 - Bryce Nyeggen
 - Cristian Echeverria
 - David Corona
