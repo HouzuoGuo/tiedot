@@ -38,14 +38,16 @@ import (
 	"strings"
 	"time"
 
+	"crypto/rsa"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go/request"
 )
 
 var (
-	privateKey []byte //openssl genrsa -out rsa 1024
-	publicKey  []byte //openssl rsa -in rsa -pubout > rsa.pub
+	privateKey *rsa.PrivateKey //openssl genrsa -out rsa 1024
+	publicKey  *rsa.PublicKey  //openssl rsa -in rsa -pubout > rsa.pub
 )
 
 const (
@@ -147,10 +149,12 @@ func getJWT(w http.ResponseWriter, r *http.Request) {
 		}
 		// Successful password match
 		token := jwt.New(jwt.GetSigningMethod("RS256"))
-		token.Claims[JWT_USER_ATTR] = rec[JWT_USER_ATTR]
-		token.Claims[JWT_COLLECTIONS_ATTR] = rec[JWT_COLLECTIONS_ATTR]
-		token.Claims[JWT_ENDPOINTS_ATTR] = rec[JWT_ENDPOINTS_ATTR]
-		token.Claims[JWT_EXPIRY] = time.Now().Add(time.Hour * 72).Unix()
+		token.Claims = jwt.MapClaims{
+			JWT_USER_ATTR:        rec[JWT_USER_ATTR],
+			JWT_COLLECTIONS_ATTR: rec[JWT_COLLECTIONS_ATTR],
+			JWT_ENDPOINTS_ATTR:   rec[JWT_ENDPOINTS_ATTR],
+			JWT_EXPIRY:           time.Now().Add(time.Hour * 72).Unix(),
+		}
 		var tokenString string
 		var e error
 		if tokenString, e = token.SignedString(privateKey); e != nil {
@@ -164,14 +168,35 @@ func getJWT(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Invalid password", http.StatusUnauthorized)
 }
 
+// Extract JWT from Authorization header or "access_token" attribute.
+type TokenExtractor struct {
+}
+
+func (t TokenExtractor) ExtractToken(req *http.Request) (string, error) {
+	token := req.Header.Get("Authorization")
+	if token == "" {
+		token = req.FormValue("access_token")
+	}
+	if token == "" {
+		return "", request.ErrNoTokenInRequest
+	}
+	// For the sake of simplicity, extra spaces and type name Bearer are stripped.
+	return strings.TrimSpace(strings.TrimPrefix(token, "Bearer")), nil
+}
+
 // Verify user's JWT.
 func checkJWT(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	addCommonJwtRespHeaders(w, r)
-	t, err := jwt.ParseFromRequest(r, func(token *jwt.Token) (interface{}, error) {
+	// Look for JWT in both headers and request value "access_token".
+	token, err := request.ParseFromRequest(r, TokenExtractor{}, func(token *jwt.Token) (interface{}, error) {
+		// Token was signed with RSA method when it was initially granted
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
 		return publicKey, nil
 	})
-	if t == nil || !t.Valid {
+	if err != nil || !token.Valid {
 		http.Error(w, fmt.Sprintf("{\"error\": \"%s %s\"}", "JWT not valid,", err), http.StatusUnauthorized)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -182,22 +207,30 @@ func checkJWT(w http.ResponseWriter, r *http.Request) {
 func jwtWrap(originalHandler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		addCommonJwtRespHeaders(w, r)
-		t, _ := jwt.ParseFromRequest(r, func(token *jwt.Token) (interface{}, error) {
+		// Look for JWT in both headers and request value "access_token".
+		token, err := request.ParseFromRequest(r, TokenExtractor{}, func(token *jwt.Token) (interface{}, error) {
+			// Token was signed with RSA method when it was initially granted
+			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			}
 			return publicKey, nil
 		})
-		if t == nil || !t.Valid {
+		if err != nil || !token.Valid {
 			http.Error(w, "", http.StatusUnauthorized)
 			return
-		} else if t.Claims[JWT_USER_ATTR] == JWT_USER_ADMIN {
+		}
+		tokenClaims := token.Claims.(jwt.MapClaims)
+		var url = strings.TrimPrefix(r.URL.Path, "/")
+		var col = r.FormValue("col")
+		// Call the API endpoint handler if authorization allows
+		if tokenClaims[JWT_USER_ATTR] == JWT_USER_ADMIN {
 			originalHandler(w, r)
 			return
 		}
-		var url = strings.TrimPrefix(r.URL.Path, "/")
-		var col = r.FormValue("col")
-		if !sliceContainsStr(t.Claims[JWT_ENDPOINTS_ATTR], url) {
+		if !sliceContainsStr(tokenClaims[JWT_ENDPOINTS_ATTR], url) {
 			http.Error(w, "", http.StatusUnauthorized)
 			return
-		} else if col != "" && !sliceContainsStr(t.Claims[JWT_COLLECTIONS_ATTR], col) {
+		} else if col != "" && !sliceContainsStr(tokenClaims[JWT_COLLECTIONS_ATTR], col) {
 			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}

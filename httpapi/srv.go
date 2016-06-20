@@ -25,6 +25,7 @@ import (
 
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"github.com/dgrijalva/jwt-go"
 )
 
 var (
@@ -69,11 +70,15 @@ func Start(dir string, port int, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey, bind,
 		}
 	} else if jwtPubKey != "" && jwtPrivateKey != "" {
 		tdlog.Noticef("API endpoints now require JWT in Authorization header.")
-		var e error
-		if publicKey, e = ioutil.ReadFile(jwtPubKey); e != nil {
-			tdlog.Panicf("JWT: Failed to read public key file - %s", e)
-		} else if privateKey, e = ioutil.ReadFile(jwtPrivateKey); e != nil {
-			tdlog.Panicf("JWT: Failed to read private key file - %s", e)
+		var publicKeyContent, privateKeyContent []byte
+		if publicKeyContent, err = ioutil.ReadFile(jwtPubKey); err != nil {
+			panic(err)
+		} else if publicKey, err = jwt.ParseRSAPublicKeyFromPEM(publicKeyContent); err != nil {
+			panic(err)
+		} else if privateKeyContent, err = ioutil.ReadFile(jwtPrivateKey); err != nil {
+			panic(err)
+		} else if privateKey, err = jwt.ParseRSAPrivateKeyFromPEM(privateKeyContent); err != nil {
+			panic(err)
 		}
 		jwtInitSetup()
 		authWrap = jwtWrap
