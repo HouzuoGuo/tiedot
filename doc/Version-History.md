@@ -1,3 +1,11 @@
+### 3.3 (2016-07-01)
+
+Bug fix:
+- Fix missing int-range query result.
+- Catch up with the latest development on JWT library.
+- Rigorously check the parameter value of page numbers in GetPage API.
+- Tweak performance advises.
+
 ### 3.2 (2015-02-12)
 
 Bug fix:
