@@ -109,25 +109,21 @@ func (col *Col) Insert(doc map[string]interface{}) (id int, err error) {
 	partNum := id % col.db.numParts
 	col.db.schemaLock.RLock()
 	part := col.parts[partNum]
+
 	// Put document data into collection
 	part.Lock.Lock()
-	if _, err = part.Insert(id, []byte(docJS)); err != nil {
-		part.Lock.Unlock()
+	_, err = part.Insert(id, []byte(docJS))
+	part.Lock.Unlock()
+	if err != nil {
 		col.db.schemaLock.RUnlock()
 		return
 	}
-	// If another thread is updating the document in the meanwhile, let it take over index maintenance
-	if err = part.LockUpdate(id); err != nil {
-		part.Lock.Unlock()
-		col.db.schemaLock.RUnlock()
-		return id, nil
-	}
-	part.Lock.Unlock()
+
+	part.LockUpdate(id)
 	// Index the document
 	col.indexDoc(id, doc)
-	part.Lock.Lock()
 	part.UnlockUpdate(id)
-	part.Lock.Unlock()
+
 	col.db.schemaLock.RUnlock()
 	return
 }
@@ -137,6 +133,7 @@ func (col *Col) read(id int, placeSchemaLock bool) (doc map[string]interface{}, 
 		col.db.schemaLock.RLock()
 	}
 	part := col.parts[id%col.db.numParts]
+
 	part.Lock.RLock()
 	docB, err := part.Read(id)
 	part.Lock.RUnlock()
@@ -146,6 +143,7 @@ func (col *Col) read(id int, placeSchemaLock bool) (doc map[string]interface{}, 
 		}
 		return
 	}
+
 	err = json.Unmarshal(docB, &doc)
 	if placeSchemaLock {
 		col.db.schemaLock.RUnlock()
@@ -169,16 +167,11 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	}
 	col.db.schemaLock.RLock()
 	part := col.parts[id%col.db.numParts]
-	part.Lock.Lock()
+
 	// Place lock, read back original document and update
-	if err := part.LockUpdate(id); err != nil {
-		part.Lock.Unlock()
-		col.db.schemaLock.RUnlock()
-		return err
-	}
+	part.Lock.Lock()
 	originalB, err := part.Read(id)
 	if err != nil {
-		part.UnlockUpdate(id)
 		part.Lock.Unlock()
 		col.db.schemaLock.RUnlock()
 		return err
@@ -187,22 +180,22 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	if err = json.Unmarshal(originalB, &original); err != nil {
 		tdlog.Noticef("Will not attempt to unindex document %d during update", id)
 	}
-	if err = part.Update(id, []byte(docJS)); err != nil {
-		part.UnlockUpdate(id)
-		part.Lock.Unlock()
+	err = part.Update(id, []byte(docJS))
+	part.Lock.Unlock()
+	if err != nil {
 		col.db.schemaLock.RUnlock()
 		return err
 	}
+
 	// Done with the collection data, next is to maintain indexed values
-	part.Lock.Unlock()
+	part.LockUpdate(id)
 	if original != nil {
 		col.unindexDoc(id, original)
 	}
 	col.indexDoc(id, doc)
 	// Done with the document
-	part.Lock.Lock()
 	part.UnlockUpdate(id)
-	part.Lock.Unlock()
+
 	col.db.schemaLock.RUnlock()
 	return nil
 }
@@ -211,16 +204,11 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 func (col *Col) Delete(id int) error {
 	col.db.schemaLock.RLock()
 	part := col.parts[id%col.db.numParts]
-	part.Lock.Lock()
+
 	// Place lock, read back original document and delete document
-	if err := part.LockUpdate(id); err != nil {
-		part.Lock.Unlock()
-		col.db.schemaLock.RUnlock()
-		return err
-	}
+	part.Lock.Lock()
 	originalB, err := part.Read(id)
 	if err != nil {
-		part.UnlockUpdate(id)
 		part.Lock.Unlock()
 		col.db.schemaLock.RUnlock()
 		return err
@@ -229,20 +217,20 @@ func (col *Col) Delete(id int) error {
 	if err = json.Unmarshal(originalB, &original); err != nil {
 		tdlog.Noticef("Will not attempt to unindex document %d during delete", id)
 	}
-	if err = part.Delete(id); err != nil {
-		part.UnlockUpdate(id)
-		part.Lock.Unlock()
+	err = part.Delete(id)
+	part.Lock.Unlock()
+	if err != nil {
 		col.db.schemaLock.RUnlock()
 		return err
 	}
+
 	// Done with the collection data, next is to remove indexed values
-	part.Lock.Unlock()
 	if original != nil {
+		part.LockUpdate(id)
 		col.unindexDoc(id, original)
+		part.UnlockUpdate(id)
 	}
-	part.Lock.Lock()
-	part.UnlockUpdate(id)
-	part.Lock.Unlock()
+
 	col.db.schemaLock.RUnlock()
 	return nil
 }
