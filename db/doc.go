@@ -176,10 +176,6 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 		col.db.schemaLock.RUnlock()
 		return err
 	}
-	var original map[string]interface{}
-	if err = json.Unmarshal(originalB, &original); err != nil {
-		tdlog.Noticef("Will not attempt to unindex document %d during update", id)
-	}
 	err = part.Update(id, []byte(docJS))
 	part.DataLock.Unlock()
 	if err != nil {
@@ -188,12 +184,16 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	}
 
 	// Done with the collection data, next is to maintain indexed values
+	var original map[string]interface{}
+	json.Unmarshal(originalB, &original)
 	part.LockUpdate(id)
 	if original != nil {
 		col.unindexDoc(id, original)
+	} else {
+		tdlog.Noticef("Will not attempt to unindex document %d during update", id)
 	}
 	col.indexDoc(id, doc)
-	// Done with the document
+	// Done with the index
 	part.UnlockUpdate(id)
 
 	col.db.schemaLock.RUnlock()

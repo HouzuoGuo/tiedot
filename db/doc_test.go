@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -276,4 +277,46 @@ func TestDocCrudAndIdx(t *testing.T) {
 	if err = db.Close(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestUpdate(t *testing.T) {
+	fatalIf := func(err error) {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	err := os.MkdirAll(TEST_DATA_DIR, 0700)
+	fatalIf(err)
+	err = ioutil.WriteFile(TEST_DATA_DIR+"/number_of_partitions", []byte("2"), 0600)
+	fatalIf(err)
+	db, err := OpenDB(TEST_DATA_DIR)
+	fatalIf(err)
+	err = db.Create("col")
+	fatalIf(err)
+	col := db.Use("col")
+
+	id, err := col.Insert(map[string]interface{}{"a": "x"})
+	fatalIf(err)
+	const N = 1000
+	var wg sync.WaitGroup
+	wg.Add(N)
+	for i := 0; i < N; i++ {
+		go func() {
+			err := col.Update(id, map[string]interface{}{"a": "x"})
+			wg.Done()
+			fatalIf(err)
+		}()
+	}
+	wg.Wait()
+	doc, err := col.Read(id)
+	fatalIf(err)
+	if doc["a"] != "x" {
+		t.Fatal("unexpected result")
+	}
+
+	err = db.Close()
+	fatalIf(err)
 }
