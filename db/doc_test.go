@@ -259,7 +259,7 @@ func TestDocCrudAndIdx(t *testing.T) {
 		t.Fatal("Approximate is way off", col.ApproxDocCount())
 	}
 
-	// Read back all documents page by pabe
+	// Read back all documents page by page
 	totalPage := col.ApproxDocCount() / 100
 	collectedIDs := make(map[int]struct{})
 	for page := 0; page < totalPage; page++ {
