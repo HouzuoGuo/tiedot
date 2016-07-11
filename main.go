@@ -29,19 +29,13 @@ func linuxPerfAdvice() {
 	if err != nil {
 		tdlog.Notice("Non-fatal - unable to offer performance advice based on vm.swappiness.")
 	} else if swappiness > 30 {
-		tdlog.Noticef("System vm.swappiness is very high (%d), for optimium performance please lower it below 30.", swappiness)
+		tdlog.Noticef("System vm.swappiness is very high (%d), lower it below 30 for optimal burst performance.", swappiness)
 	}
 	dirtyRatio, err := readFileIntContent("/proc/sys/vm/dirty_ratio")
 	if err != nil {
 		tdlog.Notice("Non-fatal - unable to offer performance advice based on vm.dirty_ratio.")
-	} else if dirtyRatio < 50 {
-		tdlog.Noticef("System vm.dirty_ratio is very low (%d), for optimium performance please raise it above 50.", dirtyRatio)
-	}
-	dirtyBGRatio, err := readFileIntContent("/proc/sys/vm/dirty_background_ratio")
-	if err != nil {
-		tdlog.Notice("Non-fatal - unable to offer performance advice based on vm.dirty_background_ratio.")
-	} else if dirtyBGRatio > 20 {
-		tdlog.Noticef("System vm.dirty_background_ratio is very high (%d), for optimium performance please lower it below 20.", dirtyBGRatio)
+	} else if dirtyRatio < 40 {
+		tdlog.Noticef("System vm.dirty_ratio is very low (%d), raise it above 40 for optimal burst performance.", dirtyRatio)
 	}
 }
 
