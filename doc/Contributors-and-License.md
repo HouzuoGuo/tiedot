@@ -14,6 +14,7 @@ I sincerely appreciate the following individuals and organizations for their con
 - Freiheit.com
 - Gert Cuykens
 - "IFQ"
+- Komosa
 - Mauro Toffanin
 - Nick Prestra
 - NoahShen
