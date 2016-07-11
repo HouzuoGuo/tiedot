@@ -111,9 +111,9 @@ func (col *Col) Insert(doc map[string]interface{}) (id int, err error) {
 	part := col.parts[partNum]
 
 	// Put document data into collection
-	part.Lock.Lock()
+	part.DataLock.Lock()
 	_, err = part.Insert(id, []byte(docJS))
-	part.Lock.Unlock()
+	part.DataLock.Unlock()
 	if err != nil {
 		col.db.schemaLock.RUnlock()
 		return
@@ -134,9 +134,9 @@ func (col *Col) read(id int, placeSchemaLock bool) (doc map[string]interface{}, 
 	}
 	part := col.parts[id%col.db.numParts]
 
-	part.Lock.RLock()
+	part.DataLock.RLock()
 	docB, err := part.Read(id)
-	part.Lock.RUnlock()
+	part.DataLock.RUnlock()
 	if err != nil {
 		if placeSchemaLock {
 			col.db.schemaLock.RUnlock()
@@ -169,10 +169,10 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 	part := col.parts[id%col.db.numParts]
 
 	// Place lock, read back original document and update
-	part.Lock.Lock()
+	part.DataLock.Lock()
 	originalB, err := part.Read(id)
 	if err != nil {
-		part.Lock.Unlock()
+		part.DataLock.Unlock()
 		col.db.schemaLock.RUnlock()
 		return err
 	}
@@ -181,7 +181,7 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 		tdlog.Noticef("Will not attempt to unindex document %d during update", id)
 	}
 	err = part.Update(id, []byte(docJS))
-	part.Lock.Unlock()
+	part.DataLock.Unlock()
 	if err != nil {
 		col.db.schemaLock.RUnlock()
 		return err
@@ -206,10 +206,10 @@ func (col *Col) Delete(id int) error {
 	part := col.parts[id%col.db.numParts]
 
 	// Place lock, read back original document and delete document
-	part.Lock.Lock()
+	part.DataLock.Lock()
 	originalB, err := part.Read(id)
 	if err != nil {
-		part.Lock.Unlock()
+		part.DataLock.Unlock()
 		col.db.schemaLock.RUnlock()
 		return err
 	}
@@ -218,7 +218,7 @@ func (col *Col) Delete(id int) error {
 		tdlog.Noticef("Will not attempt to unindex document %d during delete", id)
 	}
 	err = part.Delete(id)
-	part.Lock.Unlock()
+	part.DataLock.Unlock()
 	if err != nil {
 		col.db.schemaLock.RUnlock()
 		return err

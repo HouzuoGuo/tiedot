@@ -85,7 +85,7 @@ func (col *Col) load() error {
 func (col *Col) close() error {
 	errs := make([]error, 0, 0)
 	for i := 0; i < col.db.numParts; i++ {
-		col.parts[i].Lock.Lock()
+		col.parts[i].DataLock.Lock()
 		if err := col.parts[i].Close(); err != nil {
 			errs = append(errs, err)
 		}
@@ -94,7 +94,7 @@ func (col *Col) close() error {
 				errs = append(errs, err)
 			}
 		}
-		col.parts[i].Lock.Unlock()
+		col.parts[i].DataLock.Unlock()
 	}
 	if len(errs) == 0 {
 		return nil
@@ -114,14 +114,14 @@ func (col *Col) forEachDoc(fun func(id int, doc []byte) (moveOn bool), placeSche
 	}
 	for iteratePart := 0; iteratePart < col.db.numParts; iteratePart++ {
 		part := col.parts[iteratePart]
-		part.Lock.RLock()
+		part.DataLock.RLock()
 		for i := 0; i < partDiv; i++ {
 			if !part.ForEachDoc(i, partDiv, fun) {
-				part.Lock.RUnlock()
+				part.DataLock.RUnlock()
 				return
 			}
 		}
-		part.Lock.RUnlock()
+		part.DataLock.RUnlock()
 	}
 }
 
@@ -207,9 +207,9 @@ func (col *Col) approxDocCount(placeSchemaLock bool) int {
 	}
 	total := 0
 	for _, part := range col.parts {
-		part.Lock.RLock()
+		part.DataLock.RLock()
 		total += part.ApproxDocCount()
-		part.Lock.RUnlock()
+		part.DataLock.RUnlock()
 	}
 	return total
 }
@@ -225,11 +225,11 @@ func (col *Col) ForEachDocInPage(page, total int, fun func(id int, doc []byte) b
 	defer col.db.schemaLock.RUnlock()
 	for iteratePart := 0; iteratePart < col.db.numParts; iteratePart++ {
 		part := col.parts[iteratePart]
-		part.Lock.RLock()
+		part.DataLock.RLock()
 		if !part.ForEachDoc(page, total, fun) {
-			part.Lock.RUnlock()
+			part.DataLock.RUnlock()
 			return
 		}
-		part.Lock.RUnlock()
+		part.DataLock.RUnlock()
 	}
 }

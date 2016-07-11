@@ -14,19 +14,19 @@ import (
 
 // Partition associates a hash table with collection documents, allowing addressing of a document using an unchanging ID.
 type Partition struct {
-	col    *Collection
-	lookup *HashTable
-	Lock   *sync.RWMutex
+	col      *Collection
+	lookup   *HashTable
+	DataLock *sync.RWMutex // guard against concurrent document updates
 
-	doneID map[int]chan struct{}
-	lockID *sync.Mutex
+	exclUpdate     map[int]chan struct{}
+	exclUpdateLock *sync.Mutex // guard against concurrent exclusive locking of documents
 }
 
 func newPartition() *Partition {
 	return &Partition{
-		lockID: new(sync.Mutex),
-		doneID: make(map[int]chan struct{}),
-		Lock:   new(sync.RWMutex),
+		exclUpdateLock: new(sync.Mutex),
+		exclUpdate:     make(map[int]chan struct{}),
+		DataLock:       new(sync.RWMutex),
 	}
 }
 
@@ -88,12 +88,12 @@ func (part *Partition) Update(id int, data []byte) (err error) {
 // Lock a document for exclusive update.
 func (part *Partition) LockUpdate(id int) {
 	for {
-		part.lockID.Lock()
-		ch, ok := part.doneID[id]
+		part.exclUpdateLock.Lock()
+		ch, ok := part.exclUpdate[id]
 		if !ok {
-			part.doneID[id] = make(chan struct{})
+			part.exclUpdate[id] = make(chan struct{})
 		}
-		part.lockID.Unlock()
+		part.exclUpdateLock.Unlock()
 		if ok {
 			<-ch
 		} else {
@@ -104,10 +104,10 @@ func (part *Partition) LockUpdate(id int) {
 
 // Unlock a document to make it ready for the next update.
 func (part *Partition) UnlockUpdate(id int) {
-	part.lockID.Lock()
-	ch := part.doneID[id]
-	delete(part.doneID, id)
-	part.lockID.Unlock()
+	part.exclUpdateLock.Lock()
+	ch := part.exclUpdate[id]
+	delete(part.exclUpdate, id)
+	part.exclUpdateLock.Unlock()
 	close(ch)
 }
 
