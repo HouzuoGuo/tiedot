@@ -14,7 +14,6 @@ const (
 
 	// Document errors
 	ErrorDocTooLarge errorType = "Document is too large. Max: `%d`, Given: `%d`"
-	ErrorDocLocked   errorType = "Document `%d` is locked for update - try again later"
 
 	// Query input errors
 	ErrorNeedIndex         errorType = "Please index %v and retry query %v."

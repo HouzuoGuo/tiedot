@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -54,17 +55,6 @@ func TestPartitionDocCRUD(t *testing.T) {
 	if err = part.Delete(123); dberr.Type(err) != dberr.ErrorNoDoc {
 		t.Fatal("Did not error")
 	}
-	// Lock & unlock
-	if err = part.LockUpdate(123); err != nil {
-		t.Fatal(err)
-	}
-	if err = part.LockUpdate(123); dberr.Type(err) != dberr.ErrorDocLocked {
-		t.Fatal("Did not error")
-	}
-	part.UnlockUpdate(123)
-	if err = part.LockUpdate(123); err != nil {
-		t.Fatal(err)
-	}
 	// Foreach
 	part.ForEachDoc(0, 1, func(id int, doc []byte) bool {
 		if id != 2 || string(doc) != "2 " {
@@ -78,6 +68,28 @@ func TestPartitionDocCRUD(t *testing.T) {
 	}
 	if err = part.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Lock & unlock
+func TestLock(t *testing.T) {
+	part := newPartition()
+	n := 400
+	m := map[int]int{}
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		i := i
+		go func() {
+			part.LockUpdate(123)
+			m[i] = i
+			part.UnlockUpdate(123)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	if len(m) != n {
+		t.Fatal("unexpected map content")
 	}
 }
 

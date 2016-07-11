@@ -14,15 +14,25 @@ import (
 
 // Partition associates a hash table with collection documents, allowing addressing of a document using an unchanging ID.
 type Partition struct {
-	col      *Collection
-	lookup   *HashTable
-	updating map[int]struct{}
-	Lock     *sync.RWMutex
+	col    *Collection
+	lookup *HashTable
+	Lock   *sync.RWMutex
+
+	doneID map[int]chan struct{}
+	lockID *sync.Mutex
+}
+
+func newPartition() *Partition {
+	return &Partition{
+		lockID: new(sync.Mutex),
+		doneID: make(map[int]chan struct{}),
+		Lock:   new(sync.RWMutex),
+	}
 }
 
 // Open a collection partition.
 func OpenPartition(colPath, lookupPath string) (part *Partition, err error) {
-	part = &Partition{updating: make(map[int]struct{}), Lock: new(sync.RWMutex)}
+	part = newPartition()
 	if part.col, err = OpenCollection(colPath); err != nil {
 		return
 	} else if part.lookup, err = OpenHashTable(lookupPath); err != nil {
@@ -76,17 +86,29 @@ func (part *Partition) Update(id int, data []byte) (err error) {
 }
 
 // Lock a document for exclusive update.
-func (part *Partition) LockUpdate(id int) (err error) {
-	if _, alreadyLocked := part.updating[id]; alreadyLocked {
-		return dberr.New(dberr.ErrorDocLocked, id)
+func (part *Partition) LockUpdate(id int) {
+	for {
+		part.lockID.Lock()
+		ch, ok := part.doneID[id]
+		if !ok {
+			part.doneID[id] = make(chan struct{})
+		}
+		part.lockID.Unlock()
+		if ok {
+			<-ch
+		} else {
+			break
+		}
 	}
-	part.updating[id] = struct{}{}
-	return
 }
 
 // Unlock a document to make it ready for the next update.
 func (part *Partition) UnlockUpdate(id int) {
-	delete(part.updating, id)
+	part.lockID.Lock()
+	ch := part.doneID[id]
+	delete(part.doneID, id)
+	part.lockID.Unlock()
+	close(ch)
 }
 
 // Delete a document.
