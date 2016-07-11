@@ -319,10 +319,6 @@ func (col *Col) Delete(id int) error {
 		col.db.schemaLock.RUnlock()
 		return err
 	}
-	var original map[string]interface{}
-	if err = json.Unmarshal(originalB, &original); err != nil {
-		tdlog.Noticef("Will not attempt to unindex document %d during delete", id)
-	}
 	err = part.Delete(id)
 	part.DataLock.Unlock()
 	if err != nil {
@@ -331,10 +327,14 @@ func (col *Col) Delete(id int) error {
 	}
 
 	// Done with the collection data, next is to remove indexed values
-	if original != nil {
+	var original map[string]interface{}
+	err = json.Unmarshal(originalB, &original)
+	if err == nil {
 		part.LockUpdate(id)
 		col.unindexDoc(id, original)
 		part.UnlockUpdate(id)
+	} else {
+		tdlog.Noticef("Will not attempt to unindex document %d during delete", id)
 	}
 
 	col.db.schemaLock.RUnlock()
