@@ -13,6 +13,6 @@ matrix:
     - go: tip
 install:
   - go get github.com/dgrijalva/jwt-go
-scritp:
+script:
  - go build
  - go test -v ./...
