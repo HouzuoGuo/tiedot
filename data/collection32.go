@@ -12,7 +12,7 @@
 // there is enough space, otherwise the original document is marked as deleted
 // and the updated document is inserted as a new document.
 
-// +build !386, !arm
+// +build 386 arm
 
 package data
 
@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	COL_FILE_GROWTH = 32 * 1048576 // Collection file initial size & size growth (32 MBytes)
+	COL_FILE_GROWTH = 8 * 1048576 // Collection file initial size & size growth (32 MBytes)
 	DOC_MAX_ROOM    = 2 * 1048576  // Max document size (2 MBytes)
 	DOC_HEADER      = 1 + 10       // Document header size - validity (single byte), document room (int 10 bytes)
 	// Pre-compiled document padding (128 spaces)
