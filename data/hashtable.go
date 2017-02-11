@@ -19,13 +19,13 @@ import (
 )
 
 const (
-	HT_FILE_GROWTH  = 32 * 1048576                          // Hash table file initial size & file growth
+	HT_FILE_GROWTH  = 8 * 1048576                          // Hash table file initial size & file growth
 	ENTRY_SIZE      = 1 + 10 + 10                           // Hash entry size: validity (single byte), key (int 10 bytes), value (int 10 bytes)
 	BUCKET_HEADER   = 10                                    // Bucket header size: next chained bucket number (int 10 bytes)
 	PER_BUCKET      = 16                                    // Entries per bucket
-	HASH_BITS       = 16                                    // Number of hash key bits
+	HASH_BITS       = 14                                    // Number of hash key bits
 	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE // Size of a bucket
-	INITIAL_BUCKETS = 65536                                 // Initial number of buckets == 2 ^ HASH_BITS
+	INITIAL_BUCKETS = 16384                                 // Initial number of buckets == 2 ^ HASH_BITS
 )
 
 // Hash table file is a binary file containing buckets of hash entries.
@@ -35,21 +35,6 @@ type HashTable struct {
 	Lock       *sync.RWMutex
 }
 
-// Smear the integer entry key and return the portion (first HASH_BITS bytes) used for allocating the entry.
-func HashKey(key int) int {
-	/*
-		tiedot should be compiled/run on x86-64 systems.
-		If you decide to compile tiedot on 32-bit systems, the following integer-smear algorithm will cause compilation failure
-		due to 32-bit interger overflow; therefore you must modify the algorithm.
-		Do not remove the integer-smear process, and remember to run test cases to verify your mods.
-	*/
-	// ========== Integer-smear start =======
-	key = key ^ (key >> 4)
-	key = (key ^ 0xdeadbeef) + (key << 5)
-	key = key ^ (key >> 11)
-	// ========== Integer-smear end =========
-	return key & ((1 << HASH_BITS) - 1) // Do not modify this line
-}
 
 // Open a hash table file.
 func OpenHashTable(path string) (ht *HashTable, err error) {
