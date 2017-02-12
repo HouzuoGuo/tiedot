@@ -12,8 +12,6 @@
 // there is enough space, otherwise the original document is marked as deleted
 // and the updated document is inserted as a new document.
 
-// +build !386, !arm
-
 package data
 
 import (
