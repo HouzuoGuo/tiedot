@@ -19,13 +19,10 @@ import (
 )
 
 const (
-	HT_FILE_GROWTH  = 8 * 1048576                          // Hash table file initial size & file growth
-	ENTRY_SIZE      = 1 + 10 + 10                           // Hash entry size: validity (single byte), key (int 10 bytes), value (int 10 bytes)
-	BUCKET_HEADER   = 10                                    // Bucket header size: next chained bucket number (int 10 bytes)
-	PER_BUCKET      = 16                                    // Entries per bucket
-	HASH_BITS       = 14                                    // Number of hash key bits
-	BUCKET_SIZE     = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE // Size of a bucket
-	INITIAL_BUCKETS = 16384                                 // Initial number of buckets == 2 ^ HASH_BITS
+	ENTRY_SIZE    = 1 + 10 + 10                           // Hash entry size: validity (single byte), key (int 10 bytes), value (int 10 bytes)
+	BUCKET_HEADER = 10                                    // Bucket header size: next chained bucket number (int 10 bytes)
+	PER_BUCKET    = 16                                    // Entries per bucket
+	BUCKET_SIZE   = BUCKET_HEADER + PER_BUCKET*ENTRY_SIZE // Size of a bucket
 )
 
 // Hash table file is a binary file containing buckets of hash entries.
@@ -34,7 +31,6 @@ type HashTable struct {
 	numBuckets int
 	Lock       *sync.RWMutex
 }
-
 
 // Open a hash table file.
 func OpenHashTable(path string) (ht *HashTable, err error) {

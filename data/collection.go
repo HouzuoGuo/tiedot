@@ -21,9 +21,8 @@ import (
 )
 
 const (
-	COL_FILE_GROWTH = 32 * 1048576 // Collection file initial size & size growth (32 MBytes)
-	DOC_MAX_ROOM    = 2 * 1048576  // Max document size (2 MBytes)
-	DOC_HEADER      = 1 + 10       // Document header size - validity (single byte), document room (int 10 bytes)
+	DOC_MAX_ROOM = 2 * 1048576 // Max document size (2 MBytes)
+	DOC_HEADER   = 1 + 10      // Document header size - validity (single byte), document room (int 10 bytes)
 	// Pre-compiled document padding (128 spaces)
 	PADDING     = "                                                                                                                                "
 	LEN_PADDING = len(PADDING)
