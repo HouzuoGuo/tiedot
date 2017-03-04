@@ -1,4 +1,4 @@
-// +build amd
+// +build !386,!arm
 
 package data
 
