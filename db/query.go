@@ -44,7 +44,7 @@ func Lookup(lookupValue interface{}, expr map[string]interface{}, src *Col, resu
 			vecPath = append(vecPath, fmt.Sprint(v))
 		}
 	} else {
-		return errors.New(fmt.Sprintf("Expecting vector lookup path `in`, but %v given", path))
+		return fmt.Errorf("Expecting vector lookup path `in`, but %v given", path)
 	}
 	// Figure out result number limit
 	intLimit := int(0)
