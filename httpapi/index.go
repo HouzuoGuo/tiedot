@@ -13,6 +13,8 @@ import (
 func Index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods","POST, GET, PUT, OPTIONS")
 	var col, path string
 	if !Require(w, r, "col", &col) {
 		return
@@ -36,6 +38,8 @@ func Index(w http.ResponseWriter, r *http.Request) {
 func Indexes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods","POST, GET, PUT, OPTIONS")
 	var col string
 	if !Require(w, r, "col", &col) {
 		return
@@ -61,6 +65,8 @@ func Indexes(w http.ResponseWriter, r *http.Request) {
 func Unindex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods","POST, GET, PUT, OPTIONS")
 	var col, path string
 	if !Require(w, r, "col", &col) {
 		return
