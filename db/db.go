@@ -151,6 +151,9 @@ func (db *DB) ForceUse(name string) *Col {
 
 // Check if collection exists
 func (db *DB) ColExists(name string) bool {
+	db.schemaLock.RLock()
+	defer db.schemaLock.RUnlock()
+
 	return db.cols[name] != nil
 }
 
