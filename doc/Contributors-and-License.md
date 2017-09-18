@@ -21,8 +21,10 @@ I sincerely appreciate the following individuals and organizations for their con
 - NoahShen
 - Omeid
 - Osman Bineev
+- Pedro Rodriguez
 - Ross Albertson
 - Stefan Richter
+- StephenMiracle
 - Suhail Abood
 - tjackiw
 - Thiago Jackiw

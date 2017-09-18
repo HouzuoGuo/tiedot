@@ -2,7 +2,7 @@
 
 You may use any HTTP methods (supported by Go HTTP server) to make API requests.
 
-Server response will always have `Cache-Control: must-revalidate` header. Most responses return `applicaton/json` content type, but there are exceptions. All API endpoints are safe for concurrent usage.
+Server response will always have `Cache-Control: must-revalidate` header. Most responses return `application/json` content type, but there are exceptions. All API endpoints are safe for concurrent usage.
 
 To start HTTP server, run tiedot with CLI parameters: `-mode=httpd -dir=path_to_db_directory -port=port_number`
 
