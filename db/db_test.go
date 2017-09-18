@@ -207,6 +207,19 @@ func TestColCrud(t *testing.T) {
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
+	// ForceUse and ColExists
+	if db.ForceUse("force-use-test") == nil {
+		t.Fatal("did not return collection pointer")
+	}
+	if !db.ColExists("force-use-test") {
+		t.Fatal("did not find newly created collection")
+	}
+	if db.ColExists("does-not-exist") {
+		t.Fatal("did not identify non-existing collection")
+	}
+	if id, err := db.ForceUse("force-use-test").Insert(map[string]interface{}{"a": 1}); err != nil || id == 0 {
+		t.Fatal(id, err)
+	}
 }
 
 func TestDumpDB(t *testing.T) {

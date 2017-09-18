@@ -13,7 +13,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods","POST, GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, OPTIONS")
 	var col string
 	if !Require(w, r, "col", &col) {
 		return
@@ -30,7 +30,7 @@ func All(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods","POST, GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, OPTIONS")
 	cols := make([]string, 0)
 	for _, v := range HttpDB.AllCols() {
 		cols = append(cols, v)
@@ -48,7 +48,7 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods","POST, GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, OPTIONS")
 	var oldName, newName string
 	if !Require(w, r, "old", &oldName) {
 		return
@@ -66,7 +66,7 @@ func Drop(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods","POST, GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, OPTIONS")
 	var col string
 	if !Require(w, r, "col", &col) {
 		return
@@ -81,7 +81,7 @@ func Scrub(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods","POST, GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, OPTIONS")
 	var col string
 	if !Require(w, r, "col", &col) {
 		return

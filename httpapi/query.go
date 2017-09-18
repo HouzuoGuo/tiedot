@@ -16,7 +16,7 @@ func Query(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods","POST, GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, OPTIONS")
 	var col, q string
 	if !Require(w, r, "col", &col) {
 		return
@@ -64,7 +64,7 @@ func Count(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "must-revalidate")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods","POST, GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, OPTIONS")
 	var col, q string
 	if !Require(w, r, "col", &col) {
 		return

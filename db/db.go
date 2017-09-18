@@ -98,10 +98,8 @@ func (db *DB) Close() error {
 	return fmt.Errorf("%v", errs)
 }
 
-// Create a new collection.
-func (db *DB) Create(name string) error {
-	db.schemaLock.Lock()
-	defer db.schemaLock.Unlock()
+// create creates collection files. The function does not place a schema lock.
+func (db *DB) create(name string) error {
 	if _, exists := db.cols[name]; exists {
 		return fmt.Errorf("Collection %s already exists", name)
 	} else if err := os.MkdirAll(path.Join(db.path, name), 0700); err != nil {
@@ -110,6 +108,13 @@ func (db *DB) Create(name string) error {
 		return err
 	}
 	return nil
+}
+
+// Create a new collection.
+func (db *DB) Create(name string) error {
+	db.schemaLock.Lock()
+	defer db.schemaLock.Unlock()
+	return db.create(name)
 }
 
 // Return all collection names.
@@ -286,4 +291,23 @@ func (db *DB) Dump(dest string) error {
 		return nil
 	}
 	return filepath.Walk(db.path, cpFun)
+}
+
+// ForceUse creates a collection if one does not yet exist. Returns collection handle. Panics on error.
+func (db *DB) ForceUse(name string) *Col {
+	db.schemaLock.RLock()
+	defer db.schemaLock.RUnlock()
+	if db.cols[name] == nil {
+		if err := db.create(name); err != nil {
+			tdlog.Panicf("ForceUse: failed to create collection - %v", err)
+		}
+	}
+	return db.cols[name]
+}
+
+// ColExists returns true only if the given collection name exists in the database.
+func (db *DB) ColExists(name string) bool {
+	db.schemaLock.RLock()
+	defer db.schemaLock.RUnlock()
+	return db.cols[name] != nil
 }
