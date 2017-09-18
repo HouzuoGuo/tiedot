@@ -51,6 +51,10 @@ func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 	if file.Buf == nil {
 		file.Buf, err = gommap.Map(file.Fh)
 	}
+	if err != nil {
+		log.Printf("OpenDataFile has failed to open file %s due to error %v", path, err)
+		return
+	}
 	defer tdlog.Infof("%s opened: %d of %d bytes in-use", file.Path, file.Used, file.Size)
 	// Bi-sect file buffer to find out how much space is in-use
 	log.Printf("Trying to determine %s (%d) 's usage", path, file.Size)
