@@ -53,6 +53,7 @@ func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 	}
 	defer tdlog.Infof("%s opened: %d of %d bytes in-use", file.Path, file.Used, file.Size)
 	// Bi-sect file buffer to find out how much space is in-use
+	log.Printf("Trying to determine %s (%d) 's usage", path, file.Size)
 	for low, mid, high := 0, file.Size/2, file.Size; ; {
 		log.Printf("before low\t%d\tmid\t%d\thigh\t%d\tlen\t%d", low, mid, high, len(file.Buf))
 		switch {
