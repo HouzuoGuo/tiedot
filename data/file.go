@@ -7,6 +7,7 @@ import (
 
 	"github.com/HouzuoGuo/tiedot/gommap"
 	"github.com/HouzuoGuo/tiedot/tdlog"
+	"log"
 )
 
 // Data file keeps track of the amount of total and used space.
@@ -53,6 +54,7 @@ func OpenDataFile(path string, growth int) (file *DataFile, err error) {
 	defer tdlog.Infof("%s opened: %d of %d bytes in-use", file.Path, file.Used, file.Size)
 	// Bi-sect file buffer to find out how much space is in-use
 	for low, mid, high := 0, file.Size/2, file.Size; ; {
+		log.Printf("low\t%d\tmid\t%d\thigh\t%d\tlen\t%d", low, mid, high, len(file.Buf))
 		switch {
 		case high-mid == 1:
 			if LooksEmpty(file.Buf[mid:]) {
