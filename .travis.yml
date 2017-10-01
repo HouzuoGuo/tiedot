@@ -2,7 +2,7 @@ language: go
 go_import_path: github.com/HouzuoGuo/tiedot
 sudo: false
 go:
-  - 1.7
+  - 1.9
   - 1.8
   - tip
 os:
