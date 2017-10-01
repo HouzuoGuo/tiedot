@@ -12,6 +12,21 @@ tiedot has fault-tolerant data structures that put your data safety *first*, whi
 
 > tiedot has very stable performance, even with millions of records! It consistently achieves high throughput - swallow more than 120k records or 80k complicated queries per second with confidence.
 
+### Running
+To run tiedot it's very simple, you can run tiedot with docker and docker-compose. Look:
+```
+$ docker-compose build
+$ docker-compose up -d
+```
+
+To view the logs:
+```
+$ docker-compose logs
+```
+#### How to intall docker and docker-compose
+ - Docker ([See how to install](https://docs.docker.com/engine/installation/))
+ - Docker Compose ([See how to install](https://docs.docker.com/compose/install/))
+
 ### Contributions welcome!
 
 tiedot is a very small project in the large open source community - it is growing fast thanks to the 800+ stars and watchers, as well as many contributors for their feedback, comments, ideas and code. Your contribution matters a lot!

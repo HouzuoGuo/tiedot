@@ -1,0 +1,27 @@
+version: "3"
+
+services:
+  tiedot:
+    build:
+      context: .
+    image: tiedot:latest
+    volumes:
+      - "tiedot-data:/data"
+    networks:
+      - tiedot
+    ports:
+      - "8080:8080"
+    deploy:
+      mode: replicated
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 1s
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  tiedot-data:
+
+networks:
+  tiedot:
