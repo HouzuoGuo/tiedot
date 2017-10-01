@@ -138,6 +138,30 @@ func (db *DB) Use(name string) *Col {
 	return nil
 }
 
+
+// Creates a collection if one doesn't exist and returns its use.
+func (db *DB) ForceUse(name string) *Col {
+	db.schemaLock.RLock()
+	defer db.schemaLock.RUnlock()
+
+	if !db.ColExists(name) {
+		db.Create(name)
+
+		return nil
+	}
+
+	return db.Use(name)
+}
+
+
+// Check if collection exists
+func (db *DB) ColExists(name string) bool {
+	db.schemaLock.RLock()
+	defer db.schemaLock.RUnlock()
+
+	return db.cols[name] != nil
+}
+
 // Rename a collection.
 func (db *DB) Rename(oldName, newName string) error {
 	db.schemaLock.Lock()
