@@ -5,6 +5,7 @@ package httpapi
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 )
@@ -19,7 +20,10 @@ func Insert(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "col", &col) {
 		return
 	}
-	if !Require(w, r, "doc", &doc) {
+	defer r.Body.Close()
+	bodyBytes, _ := ioutil.ReadAll(r.Body)
+	doc = string(bodyBytes)
+	if doc == "" && !Require(w, r, "doc", &doc) {
 		return
 	}
 	var jsonDoc map[string]interface{}
@@ -137,7 +141,10 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	if !Require(w, r, "id", &id) {
 		return
 	}
-	if !Require(w, r, "doc", &doc) {
+	defer r.Body.Close()
+	bodyBytes, _ := ioutil.ReadAll(r.Body)
+	doc = string(bodyBytes)
+	if doc == "" && !Require(w, r, "doc", &doc) {
 		return
 	}
 	docID, err := strconv.Atoi(id)
