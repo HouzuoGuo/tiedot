@@ -5,3 +5,7 @@ tiedot.exe
 
 # Project (Dev) Files
 .idea
+
+#Files test coverage
+cover.out
+cover.html
