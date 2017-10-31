@@ -23,7 +23,7 @@ To view the logs:
 ```
 $ docker-compose logs
 ```
-#### How to intall docker and docker-compose
+#### How to install docker and docker-compose
  - Docker ([See how to install](https://docs.docker.com/engine/installation/))
  - Docker Compose ([See how to install](https://docs.docker.com/compose/install/))
 
@@ -33,7 +33,7 @@ tiedot is a very small project in the large open source community - it is growin
 
 Pull requests/forks all welcome, and please share your thoughts, questions and feature requests in [Issues] section.
 
-Let me know what you think about tiedot, I love to hear from you! Please [Email me], follow my [Twitter] and [blog].
+Let me know what you think about tiedot, I'd love to hear from you! Please [Email me], follow my [Twitter] and [blog].
 
 ### References
 
