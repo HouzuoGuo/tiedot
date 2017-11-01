@@ -40,6 +40,10 @@ var (
 	requestUpdateNotDoc = "http://localhost:8080/update?col=%s&id=%s"
 	requestUpdate       = "http://localhost:8080/update?col=%s&id=%s"
 
+	requestDeleteNotCol = "http://localhost:8080/delete"
+	requestDeleteNotId  = "http://localhost:8080/delete?col=%s"
+	requestDelete	    = "http://localhost:8080/delete?col=%s&id=%s"
+
 	page  = "1"
 	total = 2
 )
@@ -584,7 +588,6 @@ func TestUpdate(t *testing.T) {
 	jsonStrForUpdate := "{\"a\":1,\"b\":3}"
 
 	b := &bytes.Buffer{}
-
 	b.WriteString(jsonStr)
 
 	b2 := &bytes.Buffer{}
@@ -641,5 +644,106 @@ func TestUpdateError(t *testing.T) {
 
 	if wUpdate.Code != 500 || strings.TrimSpace(wUpdate.Body.String()) != "Document `2` does not exist" {
 		t.Error("Expected code 500 and message error document not exist")
+	}
+}
+
+//Test Delete
+func TestDeleteNotCol(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqDelete := httptest.NewRequest("GET", requestDeleteNotCol, nil)
+	wDelete := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	Delete(wDelete, reqDelete)
+	if wDelete.Code != 400 || strings.TrimSpace(wDelete.Body.String()) != "Please pass POST/PUT/GET parameter value of 'col'." {
+		t.Error("Expected code 400 and message error value of 'col'")
+	}
+}
+func TestDeleteNotId(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqDelete := httptest.NewRequest("GET", fmt.Sprintf(requestDeleteNotId, collection), nil)
+	wDelete := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+	Delete(wDelete, reqDelete)
+
+	if wDelete.Code != 400 || strings.TrimSpace(wDelete.Body.String()) != "Please pass POST/PUT/GET parameter value of 'id'." {
+		t.Error("Expected code 400 and message error value of 'id'")
+	}
+}
+func TestDeleteInvalidId(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+	randId := RandStringBytes(5)
+	reqDelete := httptest.NewRequest("GET", fmt.Sprintf(requestDelete, collection, randId), nil)
+	wDelete := httptest.NewRecorder()
+
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+	Delete(wDelete, reqDelete)
+
+	if wDelete.Code != 400 || strings.TrimSpace(wDelete.Body.String()) != fmt.Sprintf("Invalid document ID '%s'.", randId) {
+		t.Error("Expected code 400 and message error invalid document id.")
+	}
+}
+func TestDeleteCollectionNotExist(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqDelete := httptest.NewRequest("GET", fmt.Sprintf(requestDelete, collection, "1"), nil)
+	wDelete := httptest.NewRecorder()
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+	Delete(wDelete, reqDelete)
+
+	if wDelete.Code != 400 || strings.TrimSpace(wDelete.Body.String()) != fmt.Sprintf("Collection '%s' does not exist.", collection) {
+		t.Error("Expected code 400 and message error collection does not exist.")
+	}
+}
+func TestDelete(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+	b := &bytes.Buffer{}
+	jsonStr := "{\"a\":1,\"b\":2}"
+	b.WriteString(jsonStr)
+
+	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
+	reqInsert := httptest.NewRequest("GET", requestInsertWithoutDoc, b)
+
+	wDelete := httptest.NewRecorder()
+	wCreate := httptest.NewRecorder()
+	wInsert := httptest.NewRecorder()
+	wGet := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+	Create(wCreate, reqCreate)
+	Insert(wInsert, reqInsert)
+	idRecord := strings.TrimSpace(wInsert.Body.String())
+	reqDelete := httptest.NewRequest("GET", fmt.Sprintf(requestDelete, collection, idRecord), nil)
+	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGet, collection, strings.TrimSpace(wInsert.Body.String())), nil)
+	Delete(wDelete, reqDelete)
+	Get(wGet, reqGet)
+
+	if wDelete.Code != 200 || wGet.Code != 404 || strings.TrimSpace(wGet.Body.String()) != fmt.Sprintf("No such document ID %s.", idRecord) {
+		t.Error("Expected code 200 and after delete message error not such document with the specified 'id'")
 	}
 }
