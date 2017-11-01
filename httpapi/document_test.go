@@ -21,6 +21,10 @@ func RandStringBytes(n int) string {
 	}
 	return string(b)
 }
+func RandMethodRequest() string {
+	methods := []string{"GET", "POST", "OPTIONS", "PUT"}
+	return methods[rand.Intn(len(methods))]
+}
 
 var (
 	requestInsertWithoutDoc = fmt.Sprintf("http://localhost:8080/insert?col=%s", collection)
@@ -42,7 +46,7 @@ var (
 
 	requestDeleteNotCol = "http://localhost:8080/delete"
 	requestDeleteNotId  = "http://localhost:8080/delete?col=%s"
-	requestDelete	    = "http://localhost:8080/delete?col=%s&id=%s"
+	requestDelete       = "http://localhost:8080/delete?col=%s&id=%s"
 
 	page  = "1"
 	total = 2
@@ -52,7 +56,7 @@ var (
 func TestInsertNotExistParamCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
-	req := httptest.NewRequest("POST", requestInsertWithoutCol, nil)
+	req := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutCol, nil)
 	w := httptest.NewRecorder()
 
 	var err error
@@ -71,8 +75,8 @@ func TestInsertEmptyDoc(t *testing.T) {
 
 	b := &bytes.Buffer{}
 	b.WriteString("")
-	reqCreate := httptest.NewRequest("POST", requestCreate, nil)
-	reqInsert := httptest.NewRequest("POST", requestInsertWithoutDoc, b)
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
 	wCreate := httptest.NewRecorder()
 	wInsert := httptest.NewRecorder()
 
@@ -93,8 +97,8 @@ func TestInsertErrorUnmarshal(t *testing.T) {
 
 	b := &bytes.Buffer{}
 	b.WriteString("doc='{\"a\": 1, \"b\": 2}'")
-	reqCreate := httptest.NewRequest("POST", requestCreate, nil)
-	reqInsert := httptest.NewRequest("POST", requestInsertWithoutDoc, b)
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
 	wCreate := httptest.NewRecorder()
 	wInsert := httptest.NewRecorder()
 
@@ -117,7 +121,7 @@ func TestInsert(t *testing.T) {
 	b.WriteString("{\"a\": 1, \"b\": 2}")
 
 	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
-	reqInsert := httptest.NewRequest("POST", requestInsertWithoutDoc, b)
+	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
 	wCreate := httptest.NewRecorder()
 	wInsert := httptest.NewRecorder()
 
@@ -141,7 +145,7 @@ func TestInsertCollectionNotExist(t *testing.T) {
 	b := &bytes.Buffer{}
 	b.WriteString("{\"a\": 1, \"b\": 2}")
 
-	reqInsert := httptest.NewRequest("POST", requestInsertWithoutDoc, b)
+	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
 	wInsert := httptest.NewRecorder()
 
 	var err error
@@ -161,8 +165,8 @@ func TestInsertError(t *testing.T) {
 	sizeByte := data.DOC_MAX_ROOM
 	stringJson := fmt.Sprintf("{\"a\": 1, \"b\": \"%s\"}", RandStringBytes(sizeByte))
 	b := bytes.NewBuffer([]byte(stringJson))
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
-	reqInsert := httptest.NewRequest("POST", requestInsertWithoutDoc, b)
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
 	wInsert := httptest.NewRecorder()
 	wCreate := httptest.NewRecorder()
 
@@ -191,8 +195,8 @@ func TestGet(t *testing.T) {
 	jsonStr := "{\"a\":1,\"b\":2}"
 	b.WriteString(jsonStr)
 
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
-	reqInsert := httptest.NewRequest("POST", requestInsertWithoutDoc, b)
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
 
 	wCreate := httptest.NewRecorder()
 	wInsert := httptest.NewRecorder()
@@ -201,7 +205,7 @@ func TestGet(t *testing.T) {
 	Create(wCreate, reqCreate)
 	Insert(wInsert, reqInsert)
 
-	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGet, collection, strings.TrimSpace(wInsert.Body.String())), nil)
+	reqGet := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGet, collection, strings.TrimSpace(wInsert.Body.String())), nil)
 
 	Get(wGet, reqGet)
 
@@ -224,7 +228,7 @@ func TestGetInvalidId(t *testing.T) {
 	wGet := httptest.NewRecorder()
 
 	randIntStr := RandStringBytes(5)
-	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGet, collection, randIntStr), b)
+	reqGet := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGet, collection, randIntStr), b)
 	Get(wGet, reqGet)
 
 	if wGet.Code != 400 || strings.TrimSpace(wGet.Body.String()) != fmt.Sprintf("Invalid document ID '%s'.", randIntStr) {
@@ -246,8 +250,8 @@ func TestGetCollectionNotExist(t *testing.T) {
 	jsonStr := "{\"a\":1,\"b\":2}"
 	b.WriteString(jsonStr)
 
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
-	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGet, collectionFake, randIntStr), b)
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqGet := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGet, collectionFake, randIntStr), b)
 	wCreate := httptest.NewRecorder()
 	wGet := httptest.NewRecorder()
 
@@ -273,8 +277,8 @@ func TestGetNoSuchDocument(t *testing.T) {
 	jsonStr := "{\"a\":1,\"b\":2}"
 	b.WriteString(jsonStr)
 
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
-	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGet, collection, randIntStr), b)
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqGet := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGet, collection, randIntStr), b)
 	wCreate := httptest.NewRecorder()
 	wGet := httptest.NewRecorder()
 
@@ -295,7 +299,7 @@ func TestGetNotParamCol(t *testing.T) {
 	if HttpDB, err = db.OpenDB(tempDir); err != nil {
 		panic(err)
 	}
-	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGetNotCol, randIntStr), nil)
+	reqGet := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGetNotCol, randIntStr), nil)
 	wGet := httptest.NewRecorder()
 
 	Get(wGet, reqGet)
@@ -312,7 +316,7 @@ func TestGetNotParamId(t *testing.T) {
 	if HttpDB, err = db.OpenDB(tempDir); err != nil {
 		panic(err)
 	}
-	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGetNotId, collection), nil)
+	reqGet := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGetNotId, collection), nil)
 	wGet := httptest.NewRecorder()
 	Get(wGet, reqGet)
 
@@ -326,7 +330,7 @@ func TestGetPageNotCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
-	reqGetPage := httptest.NewRequest("POST", requestGetPageNotCol, nil)
+	reqGetPage := httptest.NewRequest(RandMethodRequest(), requestGetPageNotCol, nil)
 	wGetPage := httptest.NewRecorder()
 
 	var err error
@@ -344,7 +348,7 @@ func TestGetPageNotPage(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
-	reqGetPage := httptest.NewRequest("POST", fmt.Sprintf(requestGetPageNotPage, collection), nil)
+	reqGetPage := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGetPageNotPage, collection), nil)
 	wGetPage := httptest.NewRecorder()
 
 	var err error
@@ -362,7 +366,7 @@ func TestGetPageNotTotal(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
-	reqGetPage := httptest.NewRequest("POST", fmt.Sprintf(requestGetPageNotTotal, collection, page), nil)
+	reqGetPage := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGetPageNotTotal, collection, page), nil)
 	wGetPage := httptest.NewRecorder()
 
 	var err error
@@ -380,7 +384,7 @@ func TestGetPageErrorTotal(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
-	reqGetPage := httptest.NewRequest("POST", fmt.Sprintf(requestGetPage, collection, page, 0), nil)
+	reqGetPage := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGetPage, collection, page, 0), nil)
 	wGetPage := httptest.NewRecorder()
 
 	var err error
@@ -398,7 +402,7 @@ func TestGetPageErrorPage(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
-	reqGetPage := httptest.NewRequest("POST", fmt.Sprintf(requestGetPage, collection, "-1", total), nil)
+	reqGetPage := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGetPage, collection, "-1", total), nil)
 	wGetPage := httptest.NewRecorder()
 
 	var err error
@@ -419,7 +423,7 @@ func TestGetPageCollectionNotExist(t *testing.T) {
 	b := &bytes.Buffer{}
 	b.WriteString("{\"a\": 1, \"b\": 2}")
 
-	reqGetPage := httptest.NewRequest("GET", fmt.Sprintf(requestGetPage, collection, page, total), nil)
+	reqGetPage := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGetPage, collection, page, total), nil)
 	wGetPage := httptest.NewRecorder()
 
 	var err error
@@ -440,9 +444,9 @@ func TestGetPage(t *testing.T) {
 	b := &bytes.Buffer{}
 	b.WriteString("{\"a\": 1, \"b\": 2}")
 
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
-	reqInsert := httptest.NewRequest("GET", requestInsertWithoutDoc, b)
-	reqGetPage := httptest.NewRequest("GET", fmt.Sprintf(requestGetPage, collection, page, total), nil)
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
+	reqGetPage := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGetPage, collection, page, total), nil)
 
 	wCreate := httptest.NewRecorder()
 	wInsert := httptest.NewRecorder()
@@ -468,7 +472,7 @@ func TestUpdateNotCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
-	reqUpdate := httptest.NewRequest("POST", requestUpdateNotCol, nil)
+	reqUpdate := httptest.NewRequest(RandMethodRequest(), requestUpdateNotCol, nil)
 	wUpdate := httptest.NewRecorder()
 
 	var err error
@@ -485,7 +489,7 @@ func TestUpdateNotId(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
-	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdateNotId, collection), nil)
+	reqUpdate := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestUpdateNotId, collection), nil)
 	wUpdate := httptest.NewRecorder()
 
 	var err error
@@ -509,7 +513,7 @@ func TestUpdateNotDoc(t *testing.T) {
 		panic(err)
 	}
 
-	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdateNotDoc, collection, "1"), nil)
+	reqUpdate := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestUpdateNotDoc, collection, "1"), nil)
 	Update(wUpdate, reqUpdate)
 
 	if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != "Please pass POST/PUT/GET parameter value of 'doc'." {
@@ -532,7 +536,7 @@ func TestUpdateInvalidId(t *testing.T) {
 	b.WriteString(jsonStr)
 
 	randId := RandStringBytes(5)
-	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, randId), b)
+	reqUpdate := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestUpdate, collection, randId), b)
 	Update(wUpdate, reqUpdate)
 
 	if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != fmt.Sprintf("Invalid document ID '%s'.", randId) {
@@ -553,7 +557,7 @@ func TestUpdateJsonError(t *testing.T) {
 	jsonStr := "{\"a\":1,\"b\":asd}"
 	b.WriteString(jsonStr)
 
-	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, "1"), b)
+	reqUpdate := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestUpdate, collection, "1"), b)
 	Update(wUpdate, reqUpdate)
 
 	if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != "'map[]' is not valid JSON document." {
@@ -574,7 +578,7 @@ func TestUpdateCollectionNotExist(t *testing.T) {
 	jsonStr := "{\"a\":1,\"b\":2}"
 	b.WriteString(jsonStr)
 
-	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, "1"), b)
+	reqUpdate := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestUpdate, collection, "1"), b)
 	Update(wUpdate, reqUpdate)
 
 	if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != fmt.Sprintf("Collection '%s' does not exist.", collection) {
@@ -593,8 +597,8 @@ func TestUpdate(t *testing.T) {
 	b2 := &bytes.Buffer{}
 	b2.WriteString(jsonStrForUpdate)
 
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
-	reqInsert := httptest.NewRequest("GET", requestInsertWithoutDoc, b)
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
 
 	wCreate := httptest.NewRecorder()
 	wInsert := httptest.NewRecorder()
@@ -609,10 +613,10 @@ func TestUpdate(t *testing.T) {
 	Create(wCreate, reqCreate)
 	Insert(wInsert, reqInsert)
 
-	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, strings.TrimSpace(wInsert.Body.String())), b2)
+	reqUpdate := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestUpdate, collection, strings.TrimSpace(wInsert.Body.String())), b2)
 	Update(wUpdate, reqUpdate)
 
-	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGet, collection, strings.TrimSpace(wInsert.Body.String())), b)
+	reqGet := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGet, collection, strings.TrimSpace(wInsert.Body.String())), b)
 	Get(wGet, reqGet)
 
 	if wUpdate.Code != 200 || wGet.Code != 200 || strings.TrimSpace(wGet.Body.String()) != "{\"a\":1,\"b\":3}" {
@@ -628,7 +632,7 @@ func TestUpdateError(t *testing.T) {
 	b2 := &bytes.Buffer{}
 	b2.WriteString(jsonStrForUpdate)
 
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
 	wCreate := httptest.NewRecorder()
 	wUpdate := httptest.NewRecorder()
 
@@ -639,7 +643,7 @@ func TestUpdateError(t *testing.T) {
 
 	Create(wCreate, reqCreate)
 
-	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, "2"), b2)
+	reqUpdate := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestUpdate, collection, "2"), b2)
 	Update(wUpdate, reqUpdate)
 
 	if wUpdate.Code != 500 || strings.TrimSpace(wUpdate.Body.String()) != "Document `2` does not exist" {
@@ -652,7 +656,7 @@ func TestDeleteNotCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
-	reqDelete := httptest.NewRequest("GET", requestDeleteNotCol, nil)
+	reqDelete := httptest.NewRequest(RandMethodRequest(), requestDeleteNotCol, nil)
 	wDelete := httptest.NewRecorder()
 
 	var err error
@@ -669,7 +673,7 @@ func TestDeleteNotId(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
-	reqDelete := httptest.NewRequest("GET", fmt.Sprintf(requestDeleteNotId, collection), nil)
+	reqDelete := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestDeleteNotId, collection), nil)
 	wDelete := httptest.NewRecorder()
 
 	var err error
@@ -686,9 +690,8 @@ func TestDeleteInvalidId(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	randId := RandStringBytes(5)
-	reqDelete := httptest.NewRequest("GET", fmt.Sprintf(requestDelete, collection, randId), nil)
+	reqDelete := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestDelete, collection, randId), nil)
 	wDelete := httptest.NewRecorder()
-
 
 	var err error
 	if HttpDB, err = db.OpenDB(tempDir); err != nil {
@@ -704,7 +707,7 @@ func TestDeleteCollectionNotExist(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
-	reqDelete := httptest.NewRequest("GET", fmt.Sprintf(requestDelete, collection, "1"), nil)
+	reqDelete := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestDelete, collection, "1"), nil)
 	wDelete := httptest.NewRecorder()
 	var err error
 	if HttpDB, err = db.OpenDB(tempDir); err != nil {
@@ -723,8 +726,8 @@ func TestDelete(t *testing.T) {
 	jsonStr := "{\"a\":1,\"b\":2}"
 	b.WriteString(jsonStr)
 
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
-	reqInsert := httptest.NewRequest("GET", requestInsertWithoutDoc, b)
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
 
 	wDelete := httptest.NewRecorder()
 	wCreate := httptest.NewRecorder()
@@ -738,8 +741,8 @@ func TestDelete(t *testing.T) {
 	Create(wCreate, reqCreate)
 	Insert(wInsert, reqInsert)
 	idRecord := strings.TrimSpace(wInsert.Body.String())
-	reqDelete := httptest.NewRequest("GET", fmt.Sprintf(requestDelete, collection, idRecord), nil)
-	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGet, collection, strings.TrimSpace(wInsert.Body.String())), nil)
+	reqDelete := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestDelete, collection, idRecord), nil)
+	reqGet := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGet, collection, strings.TrimSpace(wInsert.Body.String())), nil)
 	Delete(wDelete, reqDelete)
 	Get(wGet, reqGet)
 
