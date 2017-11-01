@@ -197,7 +197,7 @@ func TestGet(t *testing.T) {
 	Create(wCreate, reqCreate)
 	Insert(wInsert, reqInsert)
 
-	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGet, collection, strings.TrimSpace(wInsert.Body.String())), b)
+	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGet, collection, strings.TrimSpace(wInsert.Body.String())), nil)
 
 	Get(wGet, reqGet)
 
@@ -580,10 +580,15 @@ func TestUpdateCollectionNotExist(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
+	jsonStr := "{\"a\":1,\"b\":2}"
+	jsonStrForUpdate := "{\"a\":1,\"b\":3}"
 
 	b := &bytes.Buffer{}
-	jsonStr := "{\"a\":1,\"b\":2}"
+
 	b.WriteString(jsonStr)
+
+	b2 := &bytes.Buffer{}
+	b2.WriteString(jsonStrForUpdate)
 
 	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
 	reqInsert := httptest.NewRequest("GET", requestInsertWithoutDoc, b)
@@ -591,6 +596,7 @@ func TestUpdate(t *testing.T) {
 	wCreate := httptest.NewRecorder()
 	wInsert := httptest.NewRecorder()
 	wUpdate := httptest.NewRecorder()
+	wGet := httptest.NewRecorder()
 
 	var err error
 	if HttpDB, err = db.OpenDB(tempDir); err != nil {
@@ -600,10 +606,40 @@ func TestUpdate(t *testing.T) {
 	Create(wCreate, reqCreate)
 	Insert(wInsert, reqInsert)
 
-	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, strings.TrimSpace(wInsert.Body.String())), b)
+	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, strings.TrimSpace(wInsert.Body.String())), b2)
 	Update(wUpdate, reqUpdate)
-	fmt.Println(wUpdate.Body.String(), wUpdate.Code)
-	//if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != "Please pass POST/PUT/GET parameter value of 'doc'." {
-	//	t.Error("Expected code 400 and message error value of 'doc'")
-	//}
+
+	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGet, collection, strings.TrimSpace(wInsert.Body.String())), b)
+	Get(wGet, reqGet)
+
+	if wUpdate.Code != 200 || wGet.Code != 200 || strings.TrimSpace(wGet.Body.String()) != "{\"a\":1,\"b\":3}" {
+		t.Error("Expected code 200 and get update document")
+	}
+}
+func TestUpdateError(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	jsonStrForUpdate := "{\"a\":1,\"b\":3}"
+
+	b2 := &bytes.Buffer{}
+	b2.WriteString(jsonStrForUpdate)
+
+	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
+	wCreate := httptest.NewRecorder()
+	wUpdate := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	Create(wCreate, reqCreate)
+
+	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, "2"), b2)
+	Update(wUpdate, reqUpdate)
+
+	if wUpdate.Code != 500 || strings.TrimSpace(wUpdate.Body.String()) != "Document `2` does not exist" {
+		t.Error("Expected code 500 and message error document not exist")
+	}
 }
