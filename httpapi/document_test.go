@@ -48,6 +48,9 @@ var (
 	requestDeleteNotId  = "http://localhost:8080/delete?col=%s"
 	requestDelete       = "http://localhost:8080/delete?col=%s&id=%s"
 
+	requestApproxDocCountNotCol = "http://localhost:8080/approxdoccount"
+	requestApproxDocCount       = "http://localhost:8080/approxdoccount?col=%s"
+
 	page  = "1"
 	total = 2
 )
@@ -748,5 +751,64 @@ func TestDelete(t *testing.T) {
 
 	if wDelete.Code != 200 || wGet.Code != 404 || strings.TrimSpace(wGet.Body.String()) != fmt.Sprintf("No such document ID %s.", idRecord) {
 		t.Error("Expected code 200 and after delete message error not such document with the specified 'id'")
+	}
+}
+
+// Test ApproxDocCount
+func TestApproxDocCountNotCol(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqApproxDocCount := httptest.NewRequest(RandMethodRequest(), requestApproxDocCountNotCol, nil)
+	wApproxDocCount := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	ApproxDocCount(wApproxDocCount, reqApproxDocCount)
+
+	if wApproxDocCount.Code != 400 || strings.TrimSpace(wApproxDocCount.Body.String()) != "Please pass POST/PUT/GET parameter value of 'col'." {
+		t.Error("Expected code 400 and message error value of 'col'")
+	}
+}
+func TestApproxDocCountColNotExist(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqApproxDocCount := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestApproxDocCount, collection), nil)
+	wApproxDocCount := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	ApproxDocCount(wApproxDocCount, reqApproxDocCount)
+
+	if wApproxDocCount.Code != 400 || strings.TrimSpace(wApproxDocCount.Body.String()) != fmt.Sprintf("Collection '%s' does not exist.", collection) {
+		t.Error("Expected code 400 and message error collection does not exist.")
+	}
+}
+func TestApproxDocCount(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqApproxDocCount := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestApproxDocCount, collection), nil)
+	wApproxDocCount := httptest.NewRecorder()
+	wCreate := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	Create(wCreate, reqCreate)
+	ApproxDocCount(wApproxDocCount, reqApproxDocCount)
+
+	if wApproxDocCount.Code != 200 || strings.TrimSpace(wApproxDocCount.Body.String()) != "0" {
+		t.Error("Expected code 200 and count 0")
 	}
 }
