@@ -31,8 +31,12 @@ var (
 	requestGetNotId  = "http://localhost:8080/get?col=%s"
 
 	requestGetPageNotCol   = "http://localhost:8080/getpage"
-	requestGetPageNotPage  = "http://localhost:8080/getpage?page=%s"
+	requestGetPageNotPage  = "http://localhost:8080/getpage?col=%s"
 	requestGetPageNotTotal = "http://localhost:8080/getpage?col=%s&page=%s"
+	requestGetPage         = "http://localhost:8080/getpage?col=%s&page=%s&total=%d"
+
+	page  = "1"
+	total = 2
 )
 
 // Test Insert
@@ -208,15 +212,9 @@ func TestGetInvalidId(t *testing.T) {
 	jsonStr := "{\"a\":1,\"b\":2}"
 	b.WriteString(jsonStr)
 
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
-
-	wCreate := httptest.NewRecorder()
 	wGet := httptest.NewRecorder()
 
-	Create(wCreate, reqCreate)
-
-	randIntStr := RandStringBytes(rand.Intn(5))
-
+	randIntStr := RandStringBytes(5)
 	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGet, collection, randIntStr), b)
 	Get(wGet, reqGet)
 
@@ -288,12 +286,9 @@ func TestGetNotParamCol(t *testing.T) {
 	if HttpDB, err = db.OpenDB(tempDir); err != nil {
 		panic(err)
 	}
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
 	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGetNotCol, randIntStr), nil)
-	wCreate := httptest.NewRecorder()
 	wGet := httptest.NewRecorder()
 
-	Create(wCreate, reqCreate)
 	Get(wGet, reqGet)
 
 	if wGet.Code != 400 || strings.TrimSpace(wGet.Body.String()) != "Please pass POST/PUT/GET parameter value of 'col'." {
@@ -308,13 +303,8 @@ func TestGetNotParamId(t *testing.T) {
 	if HttpDB, err = db.OpenDB(tempDir); err != nil {
 		panic(err)
 	}
-
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
 	reqGet := httptest.NewRequest("POST", fmt.Sprintf(requestGetNotId, collection), nil)
-	wCreate := httptest.NewRecorder()
 	wGet := httptest.NewRecorder()
-
-	Create(wCreate, reqCreate)
 	Get(wGet, reqGet)
 
 	if wGet.Code != 400 || strings.TrimSpace(wGet.Body.String()) != "Please pass POST/PUT/GET parameter value of 'id'." {
@@ -323,8 +313,118 @@ func TestGetNotParamId(t *testing.T) {
 }
 
 // Test GetPage
+func TestGetPageNotCol(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqGetPage := httptest.NewRequest("POST", requestGetPageNotCol, nil)
+	wGetPage := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	GetPage(wGetPage, reqGetPage)
+
+	if wGetPage.Code != 400 || strings.TrimSpace(wGetPage.Body.String()) != "Please pass POST/PUT/GET parameter value of 'col'." {
+		t.Error("Expected code 400 and message error value of 'col'")
+	}
+}
+func TestGetPageNotPage(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqGetPage := httptest.NewRequest("POST", fmt.Sprintf(requestGetPageNotPage, collection), nil)
+	wGetPage := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	GetPage(wGetPage, reqGetPage)
+
+	if wGetPage.Code != 400 || strings.TrimSpace(wGetPage.Body.String()) != "Please pass POST/PUT/GET parameter value of 'page'." {
+		t.Error("Expected code 400 and message error value of 'page'")
+	}
+}
+func TestGetPageNotTotal(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqGetPage := httptest.NewRequest("POST", fmt.Sprintf(requestGetPageNotTotal, collection, page), nil)
+	wGetPage := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	GetPage(wGetPage, reqGetPage)
+
+	if wGetPage.Code != 400 || strings.TrimSpace(wGetPage.Body.String()) != "Please pass POST/PUT/GET parameter value of 'total'." {
+		t.Error("Expected code 400 and message error value of 'total'")
+	}
+}
+func TestGetPageErrorTotal(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqGetPage := httptest.NewRequest("POST", fmt.Sprintf(requestGetPage, collection, page, 0), nil)
+	wGetPage := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	GetPage(wGetPage, reqGetPage)
+
+	if wGetPage.Code != 400 || strings.TrimSpace(wGetPage.Body.String()) != "Invalid total page number '0'." {
+		t.Error("Expected code 400 and message error invalid total page number 0")
+	}
+}
+func TestGetPageErrorPage(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqGetPage := httptest.NewRequest("POST", fmt.Sprintf(requestGetPage, collection, "-1", total), nil)
+	wGetPage := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	GetPage(wGetPage, reqGetPage)
+
+	if wGetPage.Code != 400 || strings.TrimSpace(wGetPage.Body.String()) != "Invalid page number '-1'." {
+		t.Error("Expected code 400 and message error invalid page number -1")
+	}
+}
+func TestGetPageCollectionNotExist(t *testing.T) {
+		setupTestCase()
+		defer tearDownTestCase()
+
+		b := &bytes.Buffer{}
+		b.WriteString("{\"a\": 1, \"b\": 2}")
+
+		reqGetPage := httptest.NewRequest("GET", fmt.Sprintf(requestGetPage, collection, page, total), nil)
+		wGetPage := httptest.NewRecorder()
+
+		var err error
+		if HttpDB, err = db.OpenDB(tempDir); err != nil {
+			panic(err)
+		}
+
+		GetPage(wGetPage, reqGetPage)
+
+		if wGetPage.Code != 400 || strings.TrimSpace(wGetPage.Body.String()) != fmt.Sprintf("Collection '%s' does not exist.", collection) {
+			t.Error("Expected code 400 and message error collection does not exist.")
+		}
+}
 func TestGetPage(t *testing.T) {
-	//requestGetPageNotCol
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -332,20 +432,26 @@ func TestGetPage(t *testing.T) {
 	b.WriteString("{\"a\": 1, \"b\": 2}")
 
 	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
-	reqInsert := httptest.NewRequest("POST", requestInsertWithoutDoc, b)
+	reqInsert := httptest.NewRequest("GET", requestInsertWithoutDoc, b)
+	reqGetPage := httptest.NewRequest("GET", fmt.Sprintf(requestGetPage, collection, page, total), nil)
+
 	wCreate := httptest.NewRecorder()
 	wInsert := httptest.NewRecorder()
+	wGetPage := httptest.NewRecorder()
 
 	var err error
 	if HttpDB, err = db.OpenDB(tempDir); err != nil {
 		panic(err)
 	}
+
 	Create(wCreate, reqCreate)
 	Insert(wInsert, reqInsert)
 
-	_, err = strconv.Atoi(strings.TrimSpace(wInsert.Body.String()))
+	GetPage(wGetPage, reqGetPage)
 
-	if wInsert.Code != 201 || err != nil {
-		t.Error("Expected code 201 and get id new record")
+	if wGetPage.Code != 200 {
+		t.Error("Expected code 200 and json data")
 	}
 }
+
+
