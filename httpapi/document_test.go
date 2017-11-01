@@ -35,6 +35,11 @@ var (
 	requestGetPageNotTotal = "http://localhost:8080/getpage?col=%s&page=%s"
 	requestGetPage         = "http://localhost:8080/getpage?col=%s&page=%s&total=%d"
 
+	requestUpdateNotCol = "http://localhost:8080/update"
+	requestUpdateNotId  = "http://localhost:8080/update?col=%s"
+	requestUpdateNotDoc = "http://localhost:8080/update?col=%s&id=%s"
+	requestUpdate       = "http://localhost:8080/update?col=%s&id=%s"
+
 	page  = "1"
 	total = 2
 )
@@ -404,25 +409,25 @@ func TestGetPageErrorPage(t *testing.T) {
 	}
 }
 func TestGetPageCollectionNotExist(t *testing.T) {
-		setupTestCase()
-		defer tearDownTestCase()
+	setupTestCase()
+	defer tearDownTestCase()
 
-		b := &bytes.Buffer{}
-		b.WriteString("{\"a\": 1, \"b\": 2}")
+	b := &bytes.Buffer{}
+	b.WriteString("{\"a\": 1, \"b\": 2}")
 
-		reqGetPage := httptest.NewRequest("GET", fmt.Sprintf(requestGetPage, collection, page, total), nil)
-		wGetPage := httptest.NewRecorder()
+	reqGetPage := httptest.NewRequest("GET", fmt.Sprintf(requestGetPage, collection, page, total), nil)
+	wGetPage := httptest.NewRecorder()
 
-		var err error
-		if HttpDB, err = db.OpenDB(tempDir); err != nil {
-			panic(err)
-		}
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
 
-		GetPage(wGetPage, reqGetPage)
+	GetPage(wGetPage, reqGetPage)
 
-		if wGetPage.Code != 400 || strings.TrimSpace(wGetPage.Body.String()) != fmt.Sprintf("Collection '%s' does not exist.", collection) {
-			t.Error("Expected code 400 and message error collection does not exist.")
-		}
+	if wGetPage.Code != 400 || strings.TrimSpace(wGetPage.Body.String()) != fmt.Sprintf("Collection '%s' does not exist.", collection) {
+		t.Error("Expected code 400 and message error collection does not exist.")
+	}
 }
 func TestGetPage(t *testing.T) {
 	setupTestCase()
@@ -454,4 +459,151 @@ func TestGetPage(t *testing.T) {
 	}
 }
 
+// Test Update
+func TestUpdateNotCol(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
 
+	reqUpdate := httptest.NewRequest("POST", requestUpdateNotCol, nil)
+	wUpdate := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	Update(wUpdate, reqUpdate)
+	if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != "Please pass POST/PUT/GET parameter value of 'col'." {
+		t.Error("Expected code 400 and message error value of 'col'")
+	}
+}
+func TestUpdateNotId(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdateNotId, collection), nil)
+	wUpdate := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	Update(wUpdate, reqUpdate)
+	if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != "Please pass POST/PUT/GET parameter value of 'id'." {
+		t.Error("Expected code 400 and message error value of 'id'")
+	}
+}
+func TestUpdateNotDoc(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	wUpdate := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdateNotDoc, collection, "1"), nil)
+	Update(wUpdate, reqUpdate)
+
+	if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != "Please pass POST/PUT/GET parameter value of 'doc'." {
+		t.Error("Expected code 400 and message error value of 'doc'")
+	}
+}
+func TestUpdateInvalidId(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	wUpdate := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	b := &bytes.Buffer{}
+	jsonStr := "{\"a\":1,\"b\":2}"
+	b.WriteString(jsonStr)
+
+	randId := RandStringBytes(5)
+	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, randId), b)
+	Update(wUpdate, reqUpdate)
+
+	if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != fmt.Sprintf("Invalid document ID '%s'.", randId) {
+		t.Error("Expected code 400 and message error invalid document id.")
+	}
+}
+func TestUpdateJsonError(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	wUpdate := httptest.NewRecorder()
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	b := &bytes.Buffer{}
+	jsonStr := "{\"a\":1,\"b\":asd}"
+	b.WriteString(jsonStr)
+
+	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, "1"), b)
+	Update(wUpdate, reqUpdate)
+
+	if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != "'map[]' is not valid JSON document." {
+		t.Error("Expected code 400 and message error is not valid json")
+	}
+}
+func TestUpdateCollectionNotExist(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	wUpdate := httptest.NewRecorder()
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	b := &bytes.Buffer{}
+	jsonStr := "{\"a\":1,\"b\":2}"
+	b.WriteString(jsonStr)
+
+	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, "1"), b)
+	Update(wUpdate, reqUpdate)
+
+	if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != fmt.Sprintf("Collection '%s' does not exist.", collection) {
+		t.Error("Expected code 400 and message error collection is not exist")
+	}
+}
+func TestUpdate(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	b := &bytes.Buffer{}
+	jsonStr := "{\"a\":1,\"b\":2}"
+	b.WriteString(jsonStr)
+
+	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
+	reqInsert := httptest.NewRequest("GET", requestInsertWithoutDoc, b)
+
+	wCreate := httptest.NewRecorder()
+	wInsert := httptest.NewRecorder()
+	wUpdate := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	Create(wCreate, reqCreate)
+	Insert(wInsert, reqInsert)
+
+	reqUpdate := httptest.NewRequest("POST", fmt.Sprintf(requestUpdate, collection, strings.TrimSpace(wInsert.Body.String())), b)
+	Update(wUpdate, reqUpdate)
+	fmt.Println(wUpdate.Body.String(), wUpdate.Code)
+	//if wUpdate.Code != 400 || strings.TrimSpace(wUpdate.Body.String()) != "Please pass POST/PUT/GET parameter value of 'doc'." {
+	//	t.Error("Expected code 400 and message error value of 'doc'")
+	//}
+}
