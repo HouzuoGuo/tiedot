@@ -13,6 +13,7 @@ matrix:
     - go: tip
 install:
   - go get github.com/dgrijalva/jwt-go
+  - go get github.com/bouk/monkey
 script:
  - go build
  - go test -v ./...
