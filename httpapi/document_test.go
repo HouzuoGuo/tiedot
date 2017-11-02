@@ -12,20 +12,6 @@ import (
 	"testing"
 )
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-func RandStringBytes(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
-}
-func RandMethodRequest() string {
-	methods := []string{"GET", "POST", "OPTIONS", "PUT"}
-	return methods[rand.Intn(len(methods))]
-}
-
 var (
 	requestInsertWithoutDoc = fmt.Sprintf("http://localhost:8080/insert?col=%s", collection)
 	requestInsertWithoutCol = "http://localhost:8080/insert"
@@ -55,8 +41,50 @@ var (
 	total = 2
 )
 
+// General function run tests document
+func TestDocument(t *testing.T) {
+	testsDocument := []func(t *testing.T){
+		TInsertNotExistParamCol,
+		TInsertEmptyDoc,
+		TInsertErrorUnmarshal,
+		TInsert,
+		TInsertCollectionNotExist,
+		TInsertError,
+		TGet,
+		TGetInvalidId,
+		TGetCollectionNotExist,
+		TGetNoSuchDocument,
+		TGetNotParamCol,
+		TGetNotParamId,
+		TGetPageNotCol,
+		TGetPageNotPage,
+		TGetPageNotTotal,
+		TGetPageErrorTotal,
+		TGetPageErrorPage,
+		TGetPageCollectionNotExist,
+		TGetPage,
+		TUpdateNotCol,
+		TUpdateNotId,
+		TUpdateNotDoc,
+		TUpdateInvalidId,
+		TUpdateJsonError,
+		TUpdateCollectionNotExist,
+		TUpdate,
+		TUpdateError,
+		TDeleteNotCol,
+		TDeleteNotId,
+		TDeleteInvalidId,
+		TDeleteCollectionNotExist,
+		TDelete,
+		TApproxDocCountNotCol,
+		TApproxDocCountColNotExist,
+		TApproxDocCount,
+	}
+	managerSubTests(testsDocument,"document_test", t)
+}
+
 // Test Insert
-func TestInsertNotExistParamCol(t *testing.T) {
+func TInsertNotExistParamCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	req := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutCol, nil)
@@ -72,7 +100,7 @@ func TestInsertNotExistParamCol(t *testing.T) {
 		t.Error("Expected code 400 and message error parameter col not exist")
 	}
 }
-func TestInsertEmptyDoc(t *testing.T) {
+func TInsertEmptyDoc(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -94,7 +122,7 @@ func TestInsertEmptyDoc(t *testing.T) {
 		t.Error("Expected code 400 and message error not exist parameter 'doc'")
 	}
 }
-func TestInsertErrorUnmarshal(t *testing.T) {
+func TInsertErrorUnmarshal(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -116,7 +144,7 @@ func TestInsertErrorUnmarshal(t *testing.T) {
 		t.Error("Expected code 400 and message error not valid json")
 	}
 }
-func TestInsert(t *testing.T) {
+func TInsert(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -141,7 +169,7 @@ func TestInsert(t *testing.T) {
 		t.Error("Expected code 201 and get id new record")
 	}
 }
-func TestInsertCollectionNotExist(t *testing.T) {
+func TInsertCollectionNotExist(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -161,7 +189,7 @@ func TestInsertCollectionNotExist(t *testing.T) {
 		t.Error("Expected code 400 and message error not exist is collection.")
 	}
 }
-func TestInsertError(t *testing.T) {
+func TInsertError(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -186,7 +214,7 @@ func TestInsertError(t *testing.T) {
 }
 
 // Test Get
-func TestGet(t *testing.T) {
+func TGet(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	var err error
@@ -216,7 +244,7 @@ func TestGet(t *testing.T) {
 		t.Error("Expected code 200 and get document from collection")
 	}
 }
-func TestGetInvalidId(t *testing.T) {
+func TGetInvalidId(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	var err error
@@ -238,7 +266,7 @@ func TestGetInvalidId(t *testing.T) {
 		t.Error("Expected code 404 and message error invalid document ID")
 	}
 }
-func TestGetCollectionNotExist(t *testing.T) {
+func TGetCollectionNotExist(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -265,7 +293,7 @@ func TestGetCollectionNotExist(t *testing.T) {
 		t.Error("Expected code 400 and message error not exist collection")
 	}
 }
-func TestGetNoSuchDocument(t *testing.T) {
+func TGetNoSuchDocument(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -292,7 +320,7 @@ func TestGetNoSuchDocument(t *testing.T) {
 		t.Error("Expected code 404 and message error not such document")
 	}
 }
-func TestGetNotParamCol(t *testing.T) {
+func TGetNotParamCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -311,7 +339,7 @@ func TestGetNotParamCol(t *testing.T) {
 		t.Error("Expected code 400 and message error not such param 'col'")
 	}
 }
-func TestGetNotParamId(t *testing.T) {
+func TGetNotParamId(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	var err error
@@ -329,7 +357,7 @@ func TestGetNotParamId(t *testing.T) {
 }
 
 // Test GetPage
-func TestGetPageNotCol(t *testing.T) {
+func TGetPageNotCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -347,7 +375,7 @@ func TestGetPageNotCol(t *testing.T) {
 		t.Error("Expected code 400 and message error value of 'col'")
 	}
 }
-func TestGetPageNotPage(t *testing.T) {
+func TGetPageNotPage(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -365,7 +393,7 @@ func TestGetPageNotPage(t *testing.T) {
 		t.Error("Expected code 400 and message error value of 'page'")
 	}
 }
-func TestGetPageNotTotal(t *testing.T) {
+func TGetPageNotTotal(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -383,7 +411,7 @@ func TestGetPageNotTotal(t *testing.T) {
 		t.Error("Expected code 400 and message error value of 'total'")
 	}
 }
-func TestGetPageErrorTotal(t *testing.T) {
+func TGetPageErrorTotal(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -401,7 +429,7 @@ func TestGetPageErrorTotal(t *testing.T) {
 		t.Error("Expected code 400 and message error invalid total page number 0")
 	}
 }
-func TestGetPageErrorPage(t *testing.T) {
+func TGetPageErrorPage(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -419,7 +447,7 @@ func TestGetPageErrorPage(t *testing.T) {
 		t.Error("Expected code 400 and message error invalid page number -1")
 	}
 }
-func TestGetPageCollectionNotExist(t *testing.T) {
+func TGetPageCollectionNotExist(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -440,7 +468,7 @@ func TestGetPageCollectionNotExist(t *testing.T) {
 		t.Error("Expected code 400 and message error collection does not exist.")
 	}
 }
-func TestGetPage(t *testing.T) {
+func TGetPage(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -471,7 +499,7 @@ func TestGetPage(t *testing.T) {
 }
 
 // Test Update
-func TestUpdateNotCol(t *testing.T) {
+func TUpdateNotCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -488,7 +516,7 @@ func TestUpdateNotCol(t *testing.T) {
 		t.Error("Expected code 400 and message error value of 'col'")
 	}
 }
-func TestUpdateNotId(t *testing.T) {
+func TUpdateNotId(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -505,7 +533,7 @@ func TestUpdateNotId(t *testing.T) {
 		t.Error("Expected code 400 and message error value of 'id'")
 	}
 }
-func TestUpdateNotDoc(t *testing.T) {
+func TUpdateNotDoc(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -523,7 +551,7 @@ func TestUpdateNotDoc(t *testing.T) {
 		t.Error("Expected code 400 and message error value of 'doc'")
 	}
 }
-func TestUpdateInvalidId(t *testing.T) {
+func TUpdateInvalidId(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -546,7 +574,7 @@ func TestUpdateInvalidId(t *testing.T) {
 		t.Error("Expected code 400 and message error invalid document id.")
 	}
 }
-func TestUpdateJsonError(t *testing.T) {
+func TUpdateJsonError(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -567,7 +595,7 @@ func TestUpdateJsonError(t *testing.T) {
 		t.Error("Expected code 400 and message error is not valid json")
 	}
 }
-func TestUpdateCollectionNotExist(t *testing.T) {
+func TUpdateCollectionNotExist(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -588,7 +616,7 @@ func TestUpdateCollectionNotExist(t *testing.T) {
 		t.Error("Expected code 400 and message error collection is not exist")
 	}
 }
-func TestUpdate(t *testing.T) {
+func TUpdate(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	jsonStr := "{\"a\":1,\"b\":2}"
@@ -626,7 +654,7 @@ func TestUpdate(t *testing.T) {
 		t.Error("Expected code 200 and get update document")
 	}
 }
-func TestUpdateError(t *testing.T) {
+func TUpdateError(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -655,7 +683,7 @@ func TestUpdateError(t *testing.T) {
 }
 
 //Test Delete
-func TestDeleteNotCol(t *testing.T) {
+func TDeleteNotCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -672,7 +700,7 @@ func TestDeleteNotCol(t *testing.T) {
 		t.Error("Expected code 400 and message error value of 'col'")
 	}
 }
-func TestDeleteNotId(t *testing.T) {
+func TDeleteNotId(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -689,7 +717,7 @@ func TestDeleteNotId(t *testing.T) {
 		t.Error("Expected code 400 and message error value of 'id'")
 	}
 }
-func TestDeleteInvalidId(t *testing.T) {
+func TDeleteInvalidId(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	randId := RandStringBytes(5)
@@ -706,7 +734,7 @@ func TestDeleteInvalidId(t *testing.T) {
 		t.Error("Expected code 400 and message error invalid document id.")
 	}
 }
-func TestDeleteCollectionNotExist(t *testing.T) {
+func TDeleteCollectionNotExist(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -722,7 +750,7 @@ func TestDeleteCollectionNotExist(t *testing.T) {
 		t.Error("Expected code 400 and message error collection does not exist.")
 	}
 }
-func TestDelete(t *testing.T) {
+func TDelete(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	b := &bytes.Buffer{}
@@ -755,7 +783,7 @@ func TestDelete(t *testing.T) {
 }
 
 // Test ApproxDocCount
-func TestApproxDocCountNotCol(t *testing.T) {
+func TApproxDocCountNotCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -773,7 +801,7 @@ func TestApproxDocCountNotCol(t *testing.T) {
 		t.Error("Expected code 400 and message error value of 'col'")
 	}
 }
-func TestApproxDocCountColNotExist(t *testing.T) {
+func TApproxDocCountColNotExist(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
@@ -791,7 +819,7 @@ func TestApproxDocCountColNotExist(t *testing.T) {
 		t.Error("Expected code 400 and message error collection does not exist.")
 	}
 }
-func TestApproxDocCount(t *testing.T) {
+func TApproxDocCount(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
