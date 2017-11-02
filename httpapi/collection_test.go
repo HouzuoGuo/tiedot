@@ -3,9 +3,7 @@ package httpapi
 import (
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
-	"log"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 )
@@ -29,18 +27,32 @@ var (
 	tempDir       = "./tmp"
 )
 
-// setUp and tearDown
-func setupTestCase() {
-	if err := os.MkdirAll(tempDir, 0700); err != nil {
-		log.Println(err)
+// General function run tests collection
+func TestCollection(t *testing.T) {
+
+	testsCollection := []func(t *testing.T){
+		TCreateError,
+		TCreateDuplicateCollection,
+		TCreate,
+		TAll,
+		TRename,
+		TRenameMissingOldParameter,
+		TRenameMissingNewParameter,
+		TRenameError,
+		TDrop,
+		TDropMissingParameterCol,
+		TDropMissingCol,
+		TScrubMissingCollectParam,
+		TScrubCollectionNotExist,
+		TScrub,
+		TSync,
 	}
-}
-func tearDownTestCase() {
-	os.RemoveAll(tempDir)
+	managerSubTests(testsCollection,"collection_test", t)
 }
 
 // Test Create
-func TestCreateError(t *testing.T) {
+func TCreateError(t *testing.T) {
+	t.Parallel()
 	setupTestCase()
 	defer tearDownTestCase()
 	req := httptest.NewRequest("GET", requestCreteError, nil)
@@ -50,7 +62,8 @@ func TestCreateError(t *testing.T) {
 		t.Error("Expected return code 400 and error message")
 	}
 }
-func TestCreateDuplicateCollection(t *testing.T) {
+
+func TCreateDuplicateCollection(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	req := httptest.NewRequest("GET", requestCreate, nil)
@@ -69,7 +82,7 @@ func TestCreateDuplicateCollection(t *testing.T) {
 	}
 }
 
-func TestCreate(t *testing.T) {
+func TCreate(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	req := httptest.NewRequest("GET", requestCreate, nil)
@@ -86,7 +99,7 @@ func TestCreate(t *testing.T) {
 }
 
 // Test All
-func TestAll(t *testing.T) {
+func TAll(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
@@ -105,7 +118,7 @@ func TestAll(t *testing.T) {
 }
 
 // Test Rename
-func TestRename(t *testing.T) {
+func TRename(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
@@ -128,7 +141,7 @@ func TestRename(t *testing.T) {
 		t.Error("Expected code 200 after rename and rename collection")
 	}
 }
-func TestRenameMissingOldParameter(t *testing.T) {
+func TRenameMissingOldParameter(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
@@ -148,7 +161,7 @@ func TestRenameMissingOldParameter(t *testing.T) {
 		t.Error("Expected error code 400 and message missing parameter old")
 	}
 }
-func TestRenameMissingNewParameter(t *testing.T) {
+func TRenameMissingNewParameter(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
@@ -168,7 +181,7 @@ func TestRenameMissingNewParameter(t *testing.T) {
 		t.Error("Expected error code 400 and message missing parameter new")
 	}
 }
-func TestRenameError(t *testing.T) {
+func TRenameError(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	reqRename := httptest.NewRequest("GET", requestRename, nil)
@@ -186,7 +199,7 @@ func TestRenameError(t *testing.T) {
 }
 
 // Test Drop
-func TestDrop(t *testing.T) {
+func TDrop(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
@@ -209,7 +222,7 @@ func TestDrop(t *testing.T) {
 		t.Error("Expected code 200 and empty collection after call drop method")
 	}
 }
-func TestDropMissingParameterCol(t *testing.T) {
+func TDropMissingParameterCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
@@ -229,7 +242,7 @@ func TestDropMissingParameterCol(t *testing.T) {
 		t.Error("Expected code 400 and error message missing parameter 'col'")
 	}
 }
-func TestDropMissingCol(t *testing.T) {
+func TDropMissingCol(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	reqDrop := httptest.NewRequest("GET", requestDrop, nil)
@@ -248,7 +261,7 @@ func TestDropMissingCol(t *testing.T) {
 }
 
 // Test Scrub
-func TestScrubMissingCollectParam(t *testing.T) {
+func TScrubMissingCollectParam(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	req := httptest.NewRequest("GET", requestScrubMissingColl, nil)
@@ -265,7 +278,7 @@ func TestScrubMissingCollectParam(t *testing.T) {
 		t.Error("Expected code 400 and error message missing collecion")
 	}
 }
-func TestScrubCollectionNotExist(t *testing.T) {
+func TScrubCollectionNotExist(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	req := httptest.NewRequest("GET", requestScrub, nil)
@@ -280,7 +293,7 @@ func TestScrubCollectionNotExist(t *testing.T) {
 		t.Error("Expected code 400 and error message collecion not exist")
 	}
 }
-func TestScrub(t *testing.T) {
+func TScrub(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
@@ -302,7 +315,7 @@ func TestScrub(t *testing.T) {
 }
 
 // Test Sync
-func TestSync(t *testing.T) {
+func TSync(t *testing.T) {
 	rSync := httptest.NewRequest("GET", requestSync, nil)
 	w := httptest.NewRecorder()
 	Sync(w, rSync)
