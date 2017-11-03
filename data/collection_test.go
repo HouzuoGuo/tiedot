@@ -4,8 +4,9 @@ import (
 	"os"
 	"strings"
 	"testing"
-
 	"github.com/HouzuoGuo/tiedot/dberr"
+	"github.com/bouk/monkey"
+	"encoding/binary"
 )
 
 func TestInsertRead(t *testing.T) {
@@ -34,6 +35,25 @@ func TestInsertRead(t *testing.T) {
 	if doc1 := col.Read(ids[1]); doc1 == nil || strings.TrimSpace(string(doc1)) != string(docs[1]) {
 		t.Fatalf("Failed to read")
 	}
+
+	patch := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
+		return int64(DOC_MAX_ROOM + 1), 0
+	})
+
+	if doc1 := col.Read(ids[1]); doc1 != nil {
+		t.Fatalf("Expected nill return if the buffer exceeds")
+	}
+	patch.Unpatch()
+
+	patch2 := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
+		return int64(DOC_MAX_ROOM), 0
+	})
+	col.Size = DOC_MAX_ROOM
+	if doc1 := col.Read(ids[1]); doc1 != nil {
+		t.Fatalf("Expected nill return if doc eof")
+	}
+	patch2.Unpatch()
+
 	// it shall not panic
 	col.Read(col.Size)
 }
