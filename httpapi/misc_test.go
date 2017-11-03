@@ -29,7 +29,18 @@ var (
 		"NextGC", "LastGC", "PauseTotalNs", "PauseNs"}
 )
 
-func TestShutdown(t *testing.T) {
+func TestMisc(t *testing.T) {
+	testsMisc := []func(t *testing.T){
+		TShutdown,
+		TDumpNotDest,
+		TDump,
+		TDumpError,
+		TMemStats,
+		TVersion,
+	}
+	managerSubTests(testsMisc, "misc_test", t)
+}
+func TShutdown(t *testing.T) {
 	var execute = false
 	patch := monkey.Patch(os.Exit, func(int) {
 		execute = true
@@ -50,8 +61,7 @@ func TestShutdown(t *testing.T) {
 		t.Error("Expected true execute os.Exit")
 	}
 }
-
-func TestDumpNotDest(t *testing.T) {
+func TDumpNotDest(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	var err error
@@ -67,7 +77,7 @@ func TestDumpNotDest(t *testing.T) {
 		t.Error("Expected code 400 and message error not such param 'dest'")
 	}
 }
-func TestDump(t *testing.T) {
+func TDump(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	var err error
@@ -87,7 +97,7 @@ func TestDump(t *testing.T) {
 	}
 	os.RemoveAll(tmp2)
 }
-func TestDumpError(t *testing.T) {
+func TDumpError(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	var err error
@@ -104,8 +114,7 @@ func TestDumpError(t *testing.T) {
 		t.Error("Expected code 500 and error message folder exists.")
 	}
 }
-
-func TestMemStats(t *testing.T) {
+func TMemStats(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	var err error
@@ -122,8 +131,7 @@ func TestMemStats(t *testing.T) {
 		t.Error("Expected code 200 and return json with stats memory.")
 	}
 }
-
-func TestVersion(t *testing.T) {
+func TVersion(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 	var err error
