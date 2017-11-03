@@ -19,9 +19,9 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := HttpDB.Create(col); err != nil {
-		http.Error(w, fmt.Sprint(err), 400)
+		http.Error(w, fmt.Sprint(err), http.StatusBadRequest)
 	} else {
-		w.WriteHeader(201)
+		w.WriteHeader(http.StatusCreated)
 	}
 }
 
@@ -37,7 +37,7 @@ func All(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := json.Marshal(cols)
 	if err != nil {
-		http.Error(w, fmt.Sprint(err), 500)
+		http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
 		return
 	}
 	w.Write(resp)
@@ -57,7 +57,7 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := HttpDB.Rename(oldName, newName); err != nil {
-		http.Error(w, fmt.Sprint(err), 400)
+		http.Error(w, fmt.Sprint(err), http.StatusBadRequest)
 	}
 }
 
@@ -72,7 +72,7 @@ func Drop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := HttpDB.Drop(col); err != nil {
-		http.Error(w, fmt.Sprint(err), 400)
+		http.Error(w, fmt.Sprint(err), http.StatusBadRequest)
 	}
 }
 
@@ -88,7 +88,7 @@ func Scrub(w http.ResponseWriter, r *http.Request) {
 	}
 	dbCol := HttpDB.Use(col)
 	if dbCol == nil {
-		http.Error(w, fmt.Sprintf("Collection %s does not exist", col), 400)
+		http.Error(w, fmt.Sprintf("Collection %s does not exist", col), http.StatusBadRequest)
 	} else {
 		HttpDB.Scrub(col)
 	}

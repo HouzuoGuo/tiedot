@@ -1,14 +1,14 @@
 package httpapi
 
 import (
-	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
-	"net/http/httptest"
-	"strings"
-	"github.com/bouk/monkey"
-	"testing"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/bouk/monkey"
+	"net/http/httptest"
+	"strings"
+	"testing"
 )
 
 var (
@@ -51,7 +51,7 @@ func TestCollection(t *testing.T) {
 		TSync,
 		TAllErrorMarshal,
 	}
-	managerSubTests(testsCollection,"collection_test", t)
+	managerSubTests(testsCollection, "collection_test", t)
 }
 
 // Test Create

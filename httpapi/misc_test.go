@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/bouk/monkey"
@@ -9,8 +11,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"encoding/json"
-	"errors"
 )
 
 var (

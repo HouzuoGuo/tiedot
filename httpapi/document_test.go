@@ -2,17 +2,17 @@ package httpapi
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/bouk/monkey"
 	"math/rand"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
-	"github.com/bouk/monkey"
-	"encoding/json"
-	"errors"
 )
 
 var (
@@ -85,7 +85,7 @@ func TestDocument(t *testing.T) {
 		TApproxDocCountColNotExist,
 		TApproxDocCount,
 	}
-	managerSubTests(testsDocument,"document_test", t)
+	managerSubTests(testsDocument, "document_test", t)
 }
 
 // Test Insert
