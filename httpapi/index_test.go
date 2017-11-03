@@ -2,19 +2,19 @@ package httpapi
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/bouk/monkey"
+	"github.com/pkg/errors"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"encoding/json"
-	"github.com/pkg/errors"
 )
 
 var (
-	requestIndex   = "http://localhost:8080/index?col=%s&path=%s"
-	requestIndexes = "http://localhost:8080/indexes?col=%s"
+	requestIndex     = "http://localhost:8080/index?col=%s&path=%s"
+	requestIndexes   = "http://localhost:8080/indexes?col=%s"
 	requestUnIndexes = "http://localhost:8080/unindex?col=%s&path=%s"
 
 	path = "a"
@@ -115,7 +115,6 @@ func TIndexError(t *testing.T) {
 	reqIndex := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestIndex, collection, path), nil)
 	reqIndexErr := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestIndex, collection, path), nil)
 
-
 	wCreate := httptest.NewRecorder()
 	wInsert := httptest.NewRecorder()
 	wIndex := httptest.NewRecorder()
@@ -128,7 +127,7 @@ func TIndexError(t *testing.T) {
 	Create(wCreate, reqCreate)
 	Insert(wInsert, reqInsert)
 	Index(wIndex, reqIndex)
-	Index(wIndexErr,reqIndexErr)
+	Index(wIndexErr, reqIndexErr)
 
 	if wIndexErr.Code != 400 || strings.TrimSpace(wIndexErr.Body.String()) != "Path [a] is already indexed" {
 		t.Error("Expected code 400 and message is already indexed.")
@@ -185,7 +184,7 @@ func TIndexesCollNotExist(t *testing.T) {
 		panic(err)
 	}
 	Indexes(wIndexes, reqIndexes)
-	if wIndexes.Code != 400 || strings.TrimSpace(wIndexes.Body.String()) !=  fmt.Sprintf("Collection '%s' does not exist.", collection) {
+	if wIndexes.Code != 400 || strings.TrimSpace(wIndexes.Body.String()) != fmt.Sprintf("Collection '%s' does not exist.", collection) {
 		t.Error("Expected code 400 and error message 'collection does not exist' .")
 	}
 }
@@ -213,7 +212,7 @@ func TIndexErrMarshalJson(t *testing.T) {
 	Insert(wInsert, reqInsert)
 	Index(wIndex, reqIndex)
 
-	patch := monkey.Patch(json.Marshal, func(interface{}) ([]byte, error){
+	patch := monkey.Patch(json.Marshal, func(interface{}) ([]byte, error) {
 		return nil, errors.New("Error json marshal")
 	})
 	defer patch.Unpatch()
@@ -271,7 +270,7 @@ func TUnIndexesColNotExist(t *testing.T) {
 	}
 	Unindex(wUnIndexes, reqUnIndexes)
 
-	if wUnIndexes.Code != 400 || strings.TrimSpace(wUnIndexes.Body.String()) !=  fmt.Sprintf("Collection '%s' does not exist.", collection) {
+	if wUnIndexes.Code != 400 || strings.TrimSpace(wUnIndexes.Body.String()) != fmt.Sprintf("Collection '%s' does not exist.", collection) {
 		t.Error("Expected code 400 and error message 'collection does not exist' .")
 	}
 }
@@ -321,7 +320,6 @@ func TUnIndexErrorNotHave(t *testing.T) {
 	wCreate := httptest.NewRecorder()
 	wInsert := httptest.NewRecorder()
 	wUnIndex := httptest.NewRecorder()
-
 
 	var err error
 	if HttpDB, err = db.OpenDB(tempDir); err != nil {

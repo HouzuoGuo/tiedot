@@ -14,6 +14,7 @@ matrix:
 install:
   - go get github.com/dgrijalva/jwt-go
   - go get github.com/bouk/monkey
+  - go get github.com/pkg/errors
 script:
  - go build
  - go test -v ./...

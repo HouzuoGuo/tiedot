@@ -10,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"github.com/bouk/monkey"
+	"encoding/json"
+	"errors"
 )
 
 var (
@@ -51,6 +54,7 @@ func TestDocument(t *testing.T) {
 		TInsertCollectionNotExist,
 		TInsertError,
 		TGet,
+		TGetMarshalError,
 		TGetInvalidId,
 		TGetCollectionNotExist,
 		TGetNoSuchDocument,
@@ -63,6 +67,7 @@ func TestDocument(t *testing.T) {
 		TGetPageErrorPage,
 		TGetPageCollectionNotExist,
 		TGetPage,
+		TGetPageErrMarshalJson,
 		TUpdateNotCol,
 		TUpdateNotId,
 		TUpdateNotDoc,
@@ -355,6 +360,40 @@ func TGetNotParamId(t *testing.T) {
 		t.Error("Expected code 400 and message error not such param 'id'")
 	}
 }
+func TGetMarshalError(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	b := &bytes.Buffer{}
+	jsonStr := "{\"a\":1,\"b\":2}"
+	b.WriteString(jsonStr)
+
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
+
+	wCreate := httptest.NewRecorder()
+	wInsert := httptest.NewRecorder()
+	wGet := httptest.NewRecorder()
+
+	Create(wCreate, reqCreate)
+	Insert(wInsert, reqInsert)
+
+	textError := "Json marshal error"
+	reqGet := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGet, collection, strings.TrimSpace(wInsert.Body.String())), nil)
+	patch := monkey.Patch(json.Marshal, func(interface{}) ([]byte, error) {
+		return nil, errors.New(textError)
+	})
+	defer patch.Unpatch()
+	Get(wGet, reqGet)
+
+	if wGet.Code != 500 || strings.TrimSpace(wGet.Body.String()) != textError {
+		t.Error("Expected code 500 and json marshal error.")
+	}
+}
 
 // Test GetPage
 func TGetPageNotCol(t *testing.T) {
@@ -495,6 +534,39 @@ func TGetPage(t *testing.T) {
 
 	if wGetPage.Code != 200 {
 		t.Error("Expected code 200 and json data")
+	}
+}
+func TGetPageErrMarshalJson(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	b := &bytes.Buffer{}
+	b.WriteString("{\"a\": 1, \"b\": 2}")
+
+	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
+	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
+	reqGetPage := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestGetPage, collection, page, total), nil)
+
+	wCreate := httptest.NewRecorder()
+	wInsert := httptest.NewRecorder()
+	wGetPage := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	Create(wCreate, reqCreate)
+	Insert(wInsert, reqInsert)
+	textError := "Json marshal error"
+	patch := monkey.Patch(json.Marshal, func(interface{}) ([]byte, error) {
+		return nil, errors.New(textError)
+	})
+	defer patch.Unpatch()
+	GetPage(wGetPage, reqGetPage)
+
+	if wGetPage.Code != 500 || strings.TrimSpace(wGetPage.Body.String()) != textError {
+		t.Error("Expected code 500 and message error json marshal.")
 	}
 }
 

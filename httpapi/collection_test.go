@@ -5,7 +5,10 @@ import (
 	"github.com/HouzuoGuo/tiedot/db"
 	"net/http/httptest"
 	"strings"
+	"github.com/bouk/monkey"
 	"testing"
+	"encoding/json"
+	"errors"
 )
 
 var (
@@ -46,6 +49,7 @@ func TestCollection(t *testing.T) {
 		TScrubCollectionNotExist,
 		TScrub,
 		TSync,
+		TAllErrorMarshal,
 	}
 	managerSubTests(testsCollection,"collection_test", t)
 }
@@ -114,6 +118,30 @@ func TAll(t *testing.T) {
 	All(w, reqAll)
 	if w.Code != 201 || w.Body.String() != fmt.Sprintf("[\"%s\"]", collection) {
 		t.Error("Expected lists collection and status 201")
+	}
+}
+func TAllErrorMarshal(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+
+	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
+	reqAll := httptest.NewRequest("GET", requestAll, nil)
+	w := httptest.NewRecorder()
+	wAll := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+	Create(w, reqCreate)
+	var textError = "Error json marshal"
+	patch := monkey.Patch(json.Marshal, func(interface{}) ([]byte, error) {
+		return nil, errors.New(textError)
+	})
+	defer patch.Unpatch()
+	All(wAll, reqAll)
+	if wAll.Code != 500 || strings.TrimSpace(wAll.Body.String()) != textError {
+		t.Error("Expected code 500 and message server error.")
 	}
 }
 

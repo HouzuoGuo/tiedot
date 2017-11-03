@@ -44,8 +44,7 @@ func MemStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, PUT, OPTIONS")
 	stats := new(runtime.MemStats)
 	runtime.ReadMemStats(stats)
-	// How to test?
-	// I think it is unlikely that the native structure can return an error..
+
 	resp, err := json.Marshal(stats)
 	if err != nil {
 		http.Error(w, "Cannot serialize MemStats to JSON.", 500)

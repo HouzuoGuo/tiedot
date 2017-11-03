@@ -36,8 +36,6 @@ func All(w http.ResponseWriter, r *http.Request) {
 		cols = append(cols, v)
 	}
 	resp, err := json.Marshal(cols)
-	// I couldn't test
-	// Any idea what could be the error?
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), 500)
 		return
