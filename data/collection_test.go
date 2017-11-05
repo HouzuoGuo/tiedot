@@ -1,13 +1,25 @@
 package data
 
 import (
-	"os"
-	"strings"
-	"testing"
+	"encoding/binary"
+	"errors"
 	"github.com/HouzuoGuo/tiedot/dberr"
 	"github.com/bouk/monkey"
-	"encoding/binary"
+	"math/rand"
+	"os"
+	"reflect"
+	"strings"
+	"testing"
 )
+
+func RandStringBytes(n int) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
 
 func TestInsertRead(t *testing.T) {
 	tmp := "/tmp/tiedot_test_col"
@@ -56,6 +68,23 @@ func TestInsertRead(t *testing.T) {
 
 	// it shall not panic
 	col.Read(col.Size)
+
+	zero, err := col.Insert([]byte(RandStringBytes(DOC_MAX_ROOM)))
+
+	if zero != 0 || err.Error() != "Document is too large. Max: `2097152`, Given: `4194304`" {
+		t.Fatalf("Expected error document to large.")
+	}
+
+	var d *DataFile
+	errEnsureSize := "test error from function EnsureSize"
+	patch3 := monkey.PatchInstanceMethod(reflect.TypeOf(d), "EnsureSize", func(_ *DataFile, more int) (err error) {
+		return errors.New(errEnsureSize)
+	})
+
+	if _, err := col.Insert(docs[0]); err.Error() != errEnsureSize {
+		t.Fatalf("Expected err from function EnsureSize")
+	}
+	patch3.Unpatch()
 }
 
 func TestInsertUpdateRead(t *testing.T) {
