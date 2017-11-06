@@ -3,6 +3,7 @@ package data
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/HouzuoGuo/tiedot/dberr"
 	"github.com/bouk/monkey"
 	"math/rand"
@@ -12,6 +13,7 @@ import (
 	"testing"
 )
 
+// helper function
 func RandStringBytes(n int) string {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	b := make([]byte, n)
@@ -21,8 +23,14 @@ func RandStringBytes(n int) string {
 	return string(b)
 }
 
+// setUp
+func setupTestCollection() (col *Collection, err error) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	return OpenCollection(tmp)
+}
+
 func TestInsertRead(t *testing.T) {
-	tmp := "/tmp/tiedot_test_col"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCollection(tmp)
@@ -86,9 +94,7 @@ func TestInsertRead(t *testing.T) {
 	}
 	patch3.Unpatch()
 }
-
 func TestInsertUpdateRead(t *testing.T) {
-	tmp := "/tmp/tiedot_test_col"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCollection(tmp)
@@ -120,12 +126,75 @@ func TestInsertUpdateRead(t *testing.T) {
 	if doc1 := col.Read(updated[1]); doc1 == nil || strings.TrimSpace(string(doc1)) != "longlonglonglonglonglonglong" {
 		t.Fatalf("Failed to read")
 	}
+
 	// it shall not panic
 	col.Update(col.Size, []byte("abcdef"))
 }
+func TestEndDocumentExceeded(t *testing.T) {
+	var id int
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	col, err := OpenCollection(tmp)
+	defer col.Close()
 
+	if id, err = col.Insert([]byte("test")); err != nil {
+		t.Fatalf("Failed to insert: %v", err)
+	}
+	patch := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
+		return int64(DOC_MAX_ROOM), 0
+	})
+	col.Size = 0
+
+	if _, err = col.Update(id, []byte("")); err != nil && err.Error() != dberr.New(dberr.ErrorNoDoc, id).Error() {
+		t.Fatalf("Expected return document does not exist")
+	}
+	patch.Unpatch()
+}
+
+func TestVariantRetuneMoreMaxDocument(t *testing.T) {
+	var id int
+	col, err := setupTestCollection()
+	defer col.Close()
+	if id, err = col.Insert([]byte("test")); err != nil {
+		t.Fatalf("Failed to insert: %v", err)
+	}
+
+	patch := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
+		return int64(DOC_MAX_ROOM + 1), 0
+	})
+	if _, err = col.Update(id, []byte("")); err != nil && err.Error() != dberr.New(dberr.ErrorNoDoc, id).Error() {
+		t.Fatalf("Expected return document does not exist")
+	}
+	patch.Unpatch()
+}
+func TestUpdateMoreThanMaxDocument(t *testing.T) {
+	col, err := setupTestCollection()
+	defer col.Close()
+	if err != nil {
+		t.Fatalf("Failed to open: %v", err)
+		return
+	}
+	if _, err = col.Update(10, []byte(RandStringBytes(DOC_MAX_ROOM+1))); err != nil && err.Error() != fmt.Sprintf("Document is too large. Max: `%d`, Given: `%d`", DOC_MAX_ROOM, DOC_MAX_ROOM+1) {
+		t.Fatal("Expected error document is too large")
+	}
+}
+func TestUpdate(t *testing.T) {
+	var id int
+	col, err := setupTestCollection()
+	defer col.Close()
+	if id, err = col.Insert([]byte("test")); err != nil {
+		t.Fatalf("Failed to insert: %v", err)
+	}
+
+	patch := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
+		return int64(160), 0
+	})
+	if _, err = col.Update(id, []byte("test")); err != nil && err.Error() != dberr.New(dberr.ErrorNoDoc, id).Error() {
+		t.Fatalf("Expected return document does not exist")
+	}
+	patch.Unpatch()
+}
 func TestInsertDeleteRead(t *testing.T) {
-	tmp := "/tmp/tiedot_test_col"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCollection(tmp)
@@ -165,9 +234,7 @@ func TestInsertDeleteRead(t *testing.T) {
 		t.Fatal("did not error")
 	}
 }
-
 func TestInsertReadAll(t *testing.T) {
-	tmp := "/tmp/tiedot_test_col"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCollection(tmp)
@@ -203,6 +270,10 @@ func TestInsertReadAll(t *testing.T) {
 		successfullyRead++
 		return true
 	})
+	// break
+	col.ForEachDoc(func(_ int, _ []byte) bool {
+		return false
+	})
 	if successfullyRead != 5 {
 		t.Fatalf("Should have read 5 documents, but only got %d", successfullyRead)
 	}
@@ -220,7 +291,6 @@ func TestInsertReadAll(t *testing.T) {
 }
 
 func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
-	tmp := "/tmp/tiedot_test_col"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	col, err := OpenCollection(tmp)

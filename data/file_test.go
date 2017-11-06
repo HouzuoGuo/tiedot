@@ -1,12 +1,17 @@
 package data
 
 import (
+	"errors"
+	"github.com/HouzuoGuo/tiedot/gommap"
+	"github.com/bouk/monkey"
 	"os"
+	"reflect"
 	"testing"
 )
 
+const tmp = "/tmp/tiedot_test_file"
+
 func TestOpenFlushClose(t *testing.T) {
-	tmp := "/tmp/tiedot_test_file"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	tmpFile, err := OpenDataFile(tmp, 999)
@@ -31,9 +36,7 @@ func TestOpenFlushClose(t *testing.T) {
 		t.Fatalf("Failed to close: %v", err)
 	}
 }
-
 func TestFindingAppendAndClear(t *testing.T) {
-	tmp := "/tmp/tiedot_test_file"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	// Open
@@ -83,9 +86,7 @@ func TestFindingAppendAndClear(t *testing.T) {
 	tmpFile.Buf[999] = 1
 	tmpFile.Close()
 }
-
 func TestFileGrow(t *testing.T) {
-	tmp := "/tmp/tiedot_test_file"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
 	// Open and write something
@@ -116,4 +117,62 @@ func TestFileGrow(t *testing.T) {
 	tmpFile.Buf[10] = 1
 	tmpFile.Buf[11] = 1
 	tmpFile.Close()
+}
+func TestCloseErr(t *testing.T) {
+	err := "Error close file"
+	var d *DataFile
+	tmpFile, _ := OpenDataFile(tmp, 1024)
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "Close", func(_ *DataFile) error {
+		return errors.New(err)
+	})
+	if tmpFile.Clear().Error() != err {
+		t.Error("Expected error when close file ")
+	}
+	patch.Unpatch()
+}
+func TestTruncateError(t *testing.T) {
+	err := "error truncate"
+	tmpFile, _ := OpenDataFile(tmp, 1024)
+	patch := monkey.Patch(os.Truncate, func(name string, size int64) error {
+		return errors.New(err)
+	})
+	if tmpFile.Clear().Error() != err {
+		t.Error("Expected error when call truncate function")
+	}
+	patch.Unpatch()
+}
+func TestFileOpenError(t *testing.T) {
+	err := "error open file"
+	tmpFile, _ := OpenDataFile(tmp, 1024)
+	patch := monkey.Patch(os.OpenFile, func(name string, flag int, perm os.FileMode) (*os.File, error) {
+		return nil, errors.New(err)
+	})
+	if tmpFile.Clear().Error() != err {
+		t.Error("Expected error when call new open file")
+	}
+	patch.Unpatch()
+}
+func TestFillEmptyByteFileError(t *testing.T) {
+	err := "error fill empty byte new file"
+	var f *os.File
+	tmpFile, _ := OpenDataFile(tmp, 1024)
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(f), "Seek", func(_ *os.File, offset int64, whence int) (int64, error) {
+		return 0, errors.New(err)
+	})
+
+	if tmpFile.Clear().Error() != err {
+		t.Error("Expected error when fill empty byte new file")
+	}
+	patch.Unpatch()
+}
+func TestMapErrorWhanCallClose(t *testing.T) {
+	err := "error create descriptor to mmap"
+	tmpFile, _ := OpenDataFile(tmp, 1024)
+	patch := monkey.Patch(gommap.Map, func(f *os.File) (gommap.MMap, error) {
+		return nil, errors.New(err)
+	})
+	if tmpFile.Clear().Error() != err {
+		t.Error("Expected error when call  mmap")
+	}
+	patch.Unpatch()
 }

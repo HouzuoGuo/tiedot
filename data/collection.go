@@ -16,7 +16,6 @@ package data
 
 import (
 	"encoding/binary"
-
 	"github.com/HouzuoGuo/tiedot/dberr"
 )
 
