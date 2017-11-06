@@ -17,4 +17,6 @@ install:
   - go get github.com/pkg/errors
 script:
  - go build
- - go test -v ./...
+ - go test -coverprofile=coverage.txt -covermode=atomic -v ./...
+after_success:
+ - bash <(curl -s https://codecov.io/bash)
