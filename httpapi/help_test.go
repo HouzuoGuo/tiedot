@@ -1,12 +1,14 @@
 package httpapi
 
 import (
-	"os"
 	"log"
 	"math/rand"
+	"os"
 	"testing"
 )
+
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
 // setUp and tearDown
 func setupTestCase() {
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
@@ -30,7 +32,7 @@ func RandMethodRequest() string {
 	return methods[rand.Intn(len(methods))]
 }
 
-func managerSubTests(tests []func(t *testing.T), nameGroup string, t *testing.T)  {
+func managerSubTests(tests []func(t *testing.T), nameGroup string, t *testing.T) {
 	for _, tc := range tests {
 		tc := tc // capture range variable
 		t.Run(nameGroup, tc)

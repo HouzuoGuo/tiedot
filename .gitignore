@@ -1,11 +1,4 @@
-
-# Binaries
-tiedot
-tiedot.exe
-
-# Project (Dev) Files
+coverage.txt
 .idea
-
-#Files test coverage
-cover.out
-cover.html
+pkgcoverage.txt
+tiedot
