@@ -9,6 +9,9 @@ import (
 // Controls whether INFO log messages are generated
 var VerboseLog = false
 
+// const limit crit message
+const limitCritHistory = 100
+
 // LVL 6
 func Infof(template string, params ...interface{}) {
 	if VerboseLog {
@@ -42,7 +45,7 @@ func CritNoRepeat(template string, params ...interface{}) {
 		log.Print(msg)
 		critHistory[msg] = struct{}{}
 	}
-	if len(critHistory) > 100 {
+	if len(critHistory) > limitCritHistory {
 		critHistory = make(map[string]struct{})
 	}
 	critLock.Unlock()
