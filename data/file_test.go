@@ -119,6 +119,8 @@ func TestFileGrow(t *testing.T) {
 	tmpFile.Close()
 }
 func TestCloseErr(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
 	err := "Error close file"
 	var d *DataFile
 	tmpFile, _ := OpenDataFile(tmp, 1024)
@@ -131,6 +133,8 @@ func TestCloseErr(t *testing.T) {
 	patch.Unpatch()
 }
 func TestTruncateError(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
 	err := "error truncate"
 	tmpFile, _ := OpenDataFile(tmp, 1024)
 	patch := monkey.Patch(os.Truncate, func(name string, size int64) error {
@@ -142,6 +146,8 @@ func TestTruncateError(t *testing.T) {
 	patch.Unpatch()
 }
 func TestFileOpenError(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
 	err := "error open file"
 	tmpFile, _ := OpenDataFile(tmp, 1024)
 	patch := monkey.Patch(os.OpenFile, func(name string, flag int, perm os.FileMode) (*os.File, error) {
@@ -153,6 +159,8 @@ func TestFileOpenError(t *testing.T) {
 	patch.Unpatch()
 }
 func TestFillEmptyByteFileError(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
 	err := "error fill empty byte new file"
 	var f *os.File
 	tmpFile, _ := OpenDataFile(tmp, 1024)
@@ -166,6 +174,8 @@ func TestFillEmptyByteFileError(t *testing.T) {
 	patch.Unpatch()
 }
 func TestMapErrorWhanCallClose(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
 	err := "error create descriptor to mmap"
 	tmpFile, _ := OpenDataFile(tmp, 1024)
 	patch := monkey.Patch(gommap.Map, func(f *os.File) (gommap.MMap, error) {
@@ -175,4 +185,111 @@ func TestMapErrorWhanCallClose(t *testing.T) {
 		t.Error("Expected error when call  mmap")
 	}
 	patch.Unpatch()
+}
+func TestOpenDataFileErrAfterOpen(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	errMessage := "error after open file"
+	patch := monkey.Patch(os.OpenFile, func(name string, flag int, perm os.FileMode) (*os.File, error) {
+		return nil, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if _, err := OpenDataFile(tmp, 1024);err.Error() != errMessage {
+		t.Error("Expected error when call OpenDataFile")
+	}
+}
+func TestOpenDataSeekErr(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	errMessage := "error after call Seek"
+	var fh *os.File
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(fh), "Seek", func(_ *os.File, offset int64, whence int) (ret int64, err error)  {
+		return 0, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if _, err := OpenDataFile(tmp, 1024);err.Error() != errMessage {
+		t.Error("Expected error when call Seek struct file ")
+	}
+}
+func TestFileSmallerThanGrowth(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	errMessage := "error not ensure size file"
+	var d *DataFile
+	var fh *os.File
+	patchSeek := monkey.PatchInstanceMethod(reflect.TypeOf(fh), "Seek", func(_ *os.File, offset int64, whence int) (ret int64, err error)  {
+		return 10, nil
+	})
+	defer patchSeek.Unpatch()
+
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "EnsureSize", func(_ *DataFile, more int) (err error)  {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if _, err := OpenDataFile(tmp, 1024);err.Error() != errMessage {
+		t.Error("Expected error when call EnsureSize function")
+	}
+}
+func TestOverWriteWithZeroErrorFileWrite(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	errMessage := "error write"
+	var fh *os.File
+	fd, _ := OpenDataFile(tmp, 1024)
+	patchWrite := monkey.PatchInstanceMethod(reflect.TypeOf(fh), "Write", func(_ *os.File, b []byte) (n int, err error)  {
+		return 0, errors.New(errMessage)
+	})
+	defer patchWrite.Unpatch()
+	fd.Clear()
+}
+func TestEnsureSizeUnmapErr(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	errMessage := "error unmap"
+	var m *gommap.MMap
+
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(m), "Unmap", func(_ *gommap.MMap) (err error)  {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	fd, _ := OpenDataFile(tmp, 1024)
+	fd.Used = 2000
+
+	if fd.EnsureSize(0).Error() != errMessage {
+		t.Error("Expected error unmap in inner function EnsureSize")
+	}
+}
+func TestEnsureSizeOverwriteWithZeroErr(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	errMessage := "error Overwrite"
+	var fh *os.File
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(fh), "Seek", func(_ *os.File, offset int64, whence int) (ret int64, err error)  {
+		return 0, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	fd, _ := OpenDataFile(tmp, 1024)
+	fd.Used = 2000
+
+	if fd.EnsureSize(0).Error() != errMessage {
+		t.Error("Expected error `overWriteWithZero` in inner function `EnsureSize`")
+	}
+}
+func TestEnsureSizeMapErr(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	errMessage := "error map bufer"
+	fd, _ := OpenDataFile(tmp, 1024)
+	patch := monkey.Patch(gommap.Map, func(f *os.File) (gommap.MMap, error) {
+		return nil, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	fd.Size = 500
+	if fd.EnsureSize(1200).Error() != errMessage {
+		t.Error("Expected error `gommap.Map` in inner function `EnsureSize`")
+	}
 }
