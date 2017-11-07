@@ -7,8 +7,11 @@ import (
 	"sync"
 	"testing"
 	"time"
-
+	"github.com/bouk/monkey"
 	"github.com/HouzuoGuo/tiedot/dberr"
+	"errors"
+	"reflect"
+	"fmt"
 )
 
 func TestPartitionDocCRUD(t *testing.T) {
@@ -145,5 +148,143 @@ func TestApproxDocCount(t *testing.T) {
 	t.Log("It took", timediff/1000000, "milliseconds")
 	if timediff/1000000 > 10000 {
 		t.Fatal("Algorithm is way too slow")
+	}
+}
+func TestOpenPartitionErrOpenCol(t *testing.T) {
+	errMessage := "error open collection"
+	patch := monkey.Patch(OpenCollection, func(path string) (col *Collection, err error){
+		return nil, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if _, err := OpenPartition("", ""); errMessage != err.Error() {
+		t.Error("Expected error after call `OpenCollection`")
+	}
+}
+func TestOpenPartitionOpenHashTable(t *testing.T) {
+	errMessage := "error open hash table"
+
+	patchCol := monkey.Patch(OpenCollection, func(path string) (col *Collection, err error){
+		return &Collection{}, nil
+	})
+	defer patchCol.Unpatch()
+
+	patch := monkey.Patch(OpenHashTable, func(path string) (col *HashTable, err error){
+		return nil, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if _, err := OpenPartition("", ""); errMessage != err.Error() {
+		t.Error("Expected error after call `OpenCollection`")
+	}
+}
+func TestInsertErr(t *testing.T) {
+	errMessage := "error insert in collection"
+	part := newPartition()
+	var col *Collection
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Insert", func(_ *Collection, data []byte) (id int, err error) {
+		return 0, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if _, err := part.Insert(1, []byte("")); errMessage != err.Error() {
+		t.Error("Expected error after call insert data in collection")
+	}
+
+}
+func TestReadErr(t *testing.T) {
+	var hash *HashTable
+	var col *Collection
+	patchHash := monkey.PatchInstanceMethod(reflect.TypeOf(hash), "Get", func(_ *HashTable, key, limit int) (vals []int) {
+		return []int{1,2,3}
+	})
+	defer patchHash.Unpatch()
+
+	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Read", func(_ *Collection, id int) []byte {
+		return nil
+	})
+	defer patchCol.Unpatch()
+	part := newPartition()
+	if _, err := part.Read(1); err.Error() != fmt.Sprintf(string(dberr.ErrorNoDoc), 1) {
+		t.Error("Expected error document does not exist")
+	}
+}
+func TestUpdateErr(t *testing.T) {
+	errMessage := "Error update collection"
+	var hash *HashTable
+	var col *Collection
+	patchHash := monkey.PatchInstanceMethod(reflect.TypeOf(hash), "Get", func(_ *HashTable, key, limit int) (vals []int) {
+		return []int{1,2,3}
+	})
+	defer patchHash.Unpatch()
+
+	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Update", func(_ *Collection, id int, data []byte) (newID int, err error)  {
+		return 0, errors.New(errMessage)
+	})
+	defer patchCol.Unpatch()
+	part := newPartition()
+	if part.Update(1, []byte("")).Error() != errMessage {
+		t.Error("Expected error when call update collection")
+	}
+}
+func TestForEachDocIfCallbackTrue(t *testing.T) {
+	var hash *HashTable
+	var col *Collection
+	patchHash := monkey.PatchInstanceMethod(reflect.TypeOf(hash), "GetPartition", func(_ *HashTable, partNum, partSize int) (keys, vals []int) {
+		return []int{1,2,3}, []int{1,2,3}
+	})
+	defer patchHash.Unpatch()
+	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Read", func(_ *Collection,id int) []byte {
+		return []byte{'q'}
+	})
+	defer patchCol.Unpatch()
+
+	part := newPartition()
+	res := part.ForEachDoc(0,0, func(id int, doc []byte) bool {
+		return false
+	})
+	if res != false {
+		t.Error("Expected bool false")
+	}
+}
+func TestApproxDocCountKeysEqualZero(t *testing.T) {
+	var hash *HashTable
+	patchHash := monkey.PatchInstanceMethod(reflect.TypeOf(hash), "GetPartition", func(_ *HashTable, partNum, partSize int) (keys, vals []int) {
+		return []int{}, []int{1,2,3}
+	})
+	defer patchHash.Unpatch()
+	part := newPartition()
+	if part.ApproxDocCount() != 0 {
+		t.Error("Expected doc count digit zero")
+	}
+}
+
+func TestClearError(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	var col *DataFile
+	errMessage := "Error Clear"
+
+	part, _ := OpenPartition(tmp, tmp)
+	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Clear", func(_ *DataFile) (err error) {
+		return errors.New(errMessage)
+	})
+	defer patchCol.Unpatch()
+	if part.Clear().Error() != string(dberr.ErrorIO) {
+		t.Error("Expected error after call clear")
+	}
+}
+func TestClose(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	var col *DataFile
+	errMessage := "Error Close"
+
+	part, _ := OpenPartition(tmp, tmp)
+	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Close", func(_ *DataFile) (err error) {
+		return errors.New(errMessage)
+	})
+	defer patchCol.Unpatch()
+	if part.Close().Error() != string(dberr.ErrorIO) {
+		t.Error("Expected error after call close")
 	}
 }
