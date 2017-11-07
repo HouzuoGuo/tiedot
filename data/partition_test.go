@@ -1,17 +1,17 @@
 package data
 
 import (
+	"errors"
+	"fmt"
+	"github.com/HouzuoGuo/tiedot/dberr"
+	"github.com/bouk/monkey"
 	"math/rand"
 	"os"
+	"reflect"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
-	"github.com/bouk/monkey"
-	"github.com/HouzuoGuo/tiedot/dberr"
-	"errors"
-	"reflect"
-	"fmt"
 )
 
 func TestPartitionDocCRUD(t *testing.T) {
@@ -152,7 +152,7 @@ func TestApproxDocCount(t *testing.T) {
 }
 func TestOpenPartitionErrOpenCol(t *testing.T) {
 	errMessage := "error open collection"
-	patch := monkey.Patch(OpenCollection, func(path string) (col *Collection, err error){
+	patch := monkey.Patch(OpenCollection, func(path string) (col *Collection, err error) {
 		return nil, errors.New(errMessage)
 	})
 	defer patch.Unpatch()
@@ -163,12 +163,12 @@ func TestOpenPartitionErrOpenCol(t *testing.T) {
 func TestOpenPartitionOpenHashTable(t *testing.T) {
 	errMessage := "error open hash table"
 
-	patchCol := monkey.Patch(OpenCollection, func(path string) (col *Collection, err error){
+	patchCol := monkey.Patch(OpenCollection, func(path string) (col *Collection, err error) {
 		return &Collection{}, nil
 	})
 	defer patchCol.Unpatch()
 
-	patch := monkey.Patch(OpenHashTable, func(path string) (col *HashTable, err error){
+	patch := monkey.Patch(OpenHashTable, func(path string) (col *HashTable, err error) {
 		return nil, errors.New(errMessage)
 	})
 	defer patch.Unpatch()
@@ -195,7 +195,7 @@ func TestReadErr(t *testing.T) {
 	var hash *HashTable
 	var col *Collection
 	patchHash := monkey.PatchInstanceMethod(reflect.TypeOf(hash), "Get", func(_ *HashTable, key, limit int) (vals []int) {
-		return []int{1,2,3}
+		return []int{1, 2, 3}
 	})
 	defer patchHash.Unpatch()
 
@@ -213,11 +213,11 @@ func TestUpdateErr(t *testing.T) {
 	var hash *HashTable
 	var col *Collection
 	patchHash := monkey.PatchInstanceMethod(reflect.TypeOf(hash), "Get", func(_ *HashTable, key, limit int) (vals []int) {
-		return []int{1,2,3}
+		return []int{1, 2, 3}
 	})
 	defer patchHash.Unpatch()
 
-	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Update", func(_ *Collection, id int, data []byte) (newID int, err error)  {
+	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Update", func(_ *Collection, id int, data []byte) (newID int, err error) {
 		return 0, errors.New(errMessage)
 	})
 	defer patchCol.Unpatch()
@@ -230,16 +230,16 @@ func TestForEachDocIfCallbackTrue(t *testing.T) {
 	var hash *HashTable
 	var col *Collection
 	patchHash := monkey.PatchInstanceMethod(reflect.TypeOf(hash), "GetPartition", func(_ *HashTable, partNum, partSize int) (keys, vals []int) {
-		return []int{1,2,3}, []int{1,2,3}
+		return []int{1, 2, 3}, []int{1, 2, 3}
 	})
 	defer patchHash.Unpatch()
-	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Read", func(_ *Collection,id int) []byte {
+	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Read", func(_ *Collection, id int) []byte {
 		return []byte{'q'}
 	})
 	defer patchCol.Unpatch()
 
 	part := newPartition()
-	res := part.ForEachDoc(0,0, func(id int, doc []byte) bool {
+	res := part.ForEachDoc(0, 0, func(id int, doc []byte) bool {
 		return false
 	})
 	if res != false {
@@ -249,7 +249,7 @@ func TestForEachDocIfCallbackTrue(t *testing.T) {
 func TestApproxDocCountKeysEqualZero(t *testing.T) {
 	var hash *HashTable
 	patchHash := monkey.PatchInstanceMethod(reflect.TypeOf(hash), "GetPartition", func(_ *HashTable, partNum, partSize int) (keys, vals []int) {
-		return []int{}, []int{1,2,3}
+		return []int{}, []int{1, 2, 3}
 	})
 	defer patchHash.Unpatch()
 	part := newPartition()

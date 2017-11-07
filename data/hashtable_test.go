@@ -1,6 +1,9 @@
 package data
 
 import (
+	"encoding/binary"
+	"github.com/bouk/monkey"
+	"github.com/pkg/errors"
 	"math"
 	"os"
 	"testing"
@@ -69,7 +72,6 @@ func TestPutGetReopenClear(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
 func TestPutGet2(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
@@ -95,7 +97,6 @@ func TestPutGet2(t *testing.T) {
 		t.Fatalf("Get failed, got %v", vals)
 	}
 }
-
 func TestPutRemove(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
@@ -123,7 +124,6 @@ func TestPutRemove(t *testing.T) {
 		t.Fatalf("Did not delete, still have %v", vals)
 	}
 }
-
 func TestPartitionEntries(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
@@ -169,4 +169,66 @@ func TestPartitionEntries(t *testing.T) {
 			}
 		}
 	}
+}
+func TestOpenHashTableErr(t *testing.T) {
+	errMessage := "Error open data file"
+	patch := monkey.Patch(OpenDataFile, func(path string, growth int) (file *DataFile, err error) {
+		return nil, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if _, err := OpenHashTable(""); err.Error() != errMessage {
+		t.Error("Expected error open data file")
+	}
+}
+func TestRemoveEntryKeyZero(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	hash, _ := OpenHashTable(tmp)
+
+	patch := monkey.Patch(HashKey, func(key int) int {
+		return 0
+	})
+	defer patch.Unpatch()
+	hash.Put(1, 1)
+	hash.Remove(2, 1)
+}
+func TestRemoveEqualZeroPerBucket(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	hash, _ := OpenHashTable(tmp)
+	hash.Put(1, 1)
+	patch := monkey.Patch(HashKey, func(key int) int {
+		return 0
+	})
+	defer patch.Unpatch()
+
+	patchVarint := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
+		return 1, 0
+	})
+	defer patchVarint.Unpatch()
+
+	hash.Remove(1, 0)
+}
+func TestCalculateNumBucketsSizeOver(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	patch := monkey.Patch(OpenDataFile, func(path string, growth int) (file *DataFile, err error) {
+		return &DataFile{
+			Path:   path,
+			Growth: growth,
+			Size:   0,
+		}, nil
+	})
+	defer patch.Unpatch()
+	OpenHashTable(tmp)
+}
+func TestNextBucketZero(t *testing.T) {
+	os.Remove(tmp)
+	defer os.Remove(tmp)
+	hash, _ := OpenHashTable(tmp)
+	if hash.nextBucket(hash.numBuckets+1) != 0 {
+		t.Error("Expected zero if bucket argument more hash numBuckets")
+	}
+
 }
