@@ -6,21 +6,22 @@ import (
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/bouk/monkey"
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go/request"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
-	"net/http"
-	"github.com/dgrijalva/jwt-go/request"
 )
+
 var (
-	urlJwt = "http://localhost:8080/"
-	jwtUrlAuth = "http://localhost:8080/getjwt?user=%s&pass=%s"
+	urlJwt          = "http://localhost:8080/"
+	jwtUrlAuth      = "http://localhost:8080/getjwt?user=%s&pass=%s"
 	jwtUrlWithToken = "http://localhost:8080/getjwt?access_token=%s"
 )
 
@@ -61,13 +62,20 @@ func TestJWTToken(t *testing.T) {
 	}
 }
 func TestJwtInitSetupErrorCreateError(t *testing.T) {
+	var (
+		database *db.DB
+		str      bytes.Buffer
+	)
+
 	defer tearDownTestCase()
 	defer func() {
-		if r := recover(); r == nil {
+		r := recover()
+		if r == nil || !strings.Contains(str.String(), "JWT: failed to create JWT identity collection") {
 			t.Errorf("Code not panic")
 		}
 	}()
-	var database *db.DB
+
+	log.SetOutput(&str)
 	errMessage := "Error create collection"
 	path := monkey.PatchInstanceMethod(reflect.TypeOf(database), "Create", func(_ *db.DB, name string) error {
 		return errors.New(errMessage)
@@ -186,7 +194,7 @@ func TestGetJWTNotUserParameter(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	getJWT(w, req)
-	if w.Code != http.StatusBadRequest || strings.TrimSpace(w.Body.String()) != "Please pass JWT 'user' parameter"{
+	if w.Code != http.StatusBadRequest || strings.TrimSpace(w.Body.String()) != "Please pass JWT 'user' parameter" {
 		t.Errorf("Expeceted code %d and error message.", http.StatusBadRequest)
 	}
 }
@@ -201,7 +209,7 @@ func TestGetJWTNotCollection(t *testing.T) {
 	}
 	getJWT(w, req)
 
-	if w.Code != http.StatusInternalServerError || strings.TrimSpace(w.Body.String()) != "Server is missing JWT identity collection, please restart the server."{
+	if w.Code != http.StatusInternalServerError || strings.TrimSpace(w.Body.String()) != "Server is missing JWT identity collection, please restart the server." {
 		t.Errorf("Expeceted code %d and error message : server is missing JWT.", http.StatusInternalServerError)
 	}
 }
@@ -211,7 +219,7 @@ func TestGetJWTQueryFailed(t *testing.T) {
 	w := httptest.NewRecorder()
 	var (
 		err error
-	    str bytes.Buffer
+		str bytes.Buffer
 	)
 	log.SetOutput(&str)
 
@@ -222,7 +230,7 @@ func TestGetJWTQueryFailed(t *testing.T) {
 	getJWT(w, req)
 	if w.Code != http.StatusInternalServerError ||
 		!strings.Contains(w.Body.String(), "Query failed in JWT identity collection") ||
-		!strings.Contains(str.String(),"Query failed in JWT identity collection"){
+		!strings.Contains(str.String(), "Query failed in JWT identity collection") {
 		t.Errorf("Expeceted code %d and error message : Query failed.", http.StatusInternalServerError)
 	}
 }
@@ -243,7 +251,7 @@ func TestGetJWTPasswordError(t *testing.T) {
 	jwtInitSetup()
 	getJWT(w, req)
 
-	if w.Code != http.StatusUnauthorized || strings.TrimSpace(w.Body.String()) != "Invalid password" || !strings.Contains(str.String(), "JWT: successfully initialized DB for JWT features. The default user 'admin' has been created."){
+	if w.Code != http.StatusUnauthorized || strings.TrimSpace(w.Body.String()) != "Invalid password" || !strings.Contains(str.String(), "JWT: successfully initialized DB for JWT features. The default user 'admin' has been created.") {
 		t.Error("Expected StatusUnauthorized and error message jwt verification")
 	}
 }
@@ -260,7 +268,7 @@ func TestGetJWT(t *testing.T) {
 	if HttpDB, err = db.OpenDB(tempDir); err != nil {
 		panic(err)
 	}
-	var privateKeyContent[]byte
+	var privateKeyContent []byte
 	if privateKeyContent, err = ioutil.ReadFile("jwt-test.key"); err != nil {
 		t.Fatal(err)
 	}
@@ -274,40 +282,18 @@ func TestGetJWT(t *testing.T) {
 		t.Error("Expected StatusOKn")
 	}
 }
-//func TestGetJWTPanicPrivateKey(t *testing.T) {
-//	defer tearDownTestCase()
-//	defer func() {
-//		if r := recover(); r == nil {
-//			t.Errorf("Code not panic")
-//		}
-//	}()
-//	req := httptest.NewRequest("GET", fmt.Sprintf(jwtUrlAuth, JWT_USER_ADMIN, ""), nil)
-//	w := httptest.NewRecorder()
-//	var (
-//		err error
-//		str bytes.Buffer
-//	)
-//	log.SetOutput(&str)
-//
-//	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-//		panic(err)
-//	}
-//
-//	jwtInitSetup()
-//	getJWT(w, req)
-//}
 func TestGetReadError(t *testing.T) {
 	defer tearDownTestCase()
 	req := httptest.NewRequest("GET", fmt.Sprintf(jwtUrlAuth, JWT_USER_ADMIN, ""), nil)
 	w := httptest.NewRecorder()
 	var (
-		err error
-		str bytes.Buffer
+		err      error
+		str      bytes.Buffer
 		database *db.Col
 	)
 	log.SetOutput(&str)
 
-	path := monkey.PatchInstanceMethod(reflect.TypeOf(database), "Read", func(_ *db.Col, id int) (doc map[string]interface{}, err error)  {
+	path := monkey.PatchInstanceMethod(reflect.TypeOf(database), "Read", func(_ *db.Col, id int) (doc map[string]interface{}, err error) {
 		return nil, errors.New("Error Read from collection")
 	})
 	defer path.Unpatch()
@@ -326,7 +312,7 @@ func TestExtractTokenErr(t *testing.T) {
 	req := httptest.NewRequest("GET", fmt.Sprintf(jwtUrlAuth, JWT_USER_ADMIN, ""), nil)
 	token := TokenExtractor{}
 	var err error
-	_,err = token.ExtractToken(req)
+	_, err = token.ExtractToken(req)
 	fmt.Println()
 	if err.Error() != request.ErrNoTokenInRequest.Error() {
 		t.Error("Expected error message no token")
@@ -334,12 +320,21 @@ func TestExtractTokenErr(t *testing.T) {
 }
 func TestExtractToken(t *testing.T) {
 	tokenChar := "2lm52p3m35p2m3"
-	req := httptest.NewRequest("GET", fmt.Sprintf(jwtUrlWithToken, tokenChar) , nil)
+	req := httptest.NewRequest("GET", fmt.Sprintf(jwtUrlWithToken, tokenChar), nil)
 	token := TokenExtractor{}
 	//var err error
 	r, _ := token.ExtractToken(req)
 
 	if r != tokenChar {
 		t.Error("Expected token")
+	}
+}
+func TestCheckJWTErrorJwt(t *testing.T) {
+	req := httptest.NewRequest("GET", urlJwt, nil)
+	w := httptest.NewRecorder()
+	checkJWT(w, req)
+
+	if w.Code != http.StatusUnauthorized || strings.TrimSpace(w.Body.String()) != `{"error": "JWT not valid, no token present in request"}` {
+		t.Error("Expected error jwt not valid")
 	}
 }
