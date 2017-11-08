@@ -1,4 +1,5 @@
-package main
+// +build test
+package examples
 
 import (
 	"encoding/json"
@@ -19,7 +20,7 @@ To compile and run the example:
 It may require as much as 1.5GB of free disk space in order to run the example.
 */
 
-func embeddedExample() {
+func EmbeddedExample() {
 	// ****************** Collection Management ******************
 
 	myDBDir := "/tmp/MyDatabase"

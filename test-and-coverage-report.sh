@@ -3,7 +3,7 @@
 set -e
 echo '' > coverage.txt
 
-for dir in $(go list ./... | grep -v vendor); do
+for dir in $(go list ./... | grep -v vendor | grep -v examples); do
     go test -race -coverprofile=pkgcoverage.txt -covermode=atomic "$dir"
     if [ -f pkgcoverage.txt ]; then
         cat pkgcoverage.txt >> coverage.txt

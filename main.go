@@ -10,8 +10,8 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
-
 	"github.com/HouzuoGuo/tiedot/httpapi"
+	"github.com/HouzuoGuo/tiedot/examples"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
@@ -141,7 +141,7 @@ func main() {
 		httpapi.Start(dir, port, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey, bind, authToken)
 	case "example":
 		// Run embedded usage examples
-		embeddedExample()
+		examples.EmbeddedExample()
 	case "bench":
 		// Benchmark scenarios
 		benchmark()
