@@ -87,7 +87,6 @@ func TestJwtInitSetupErrorCreateError(t *testing.T) {
 	}
 	jwtInitSetup()
 }
-
 func TestJwtInitSetup(t *testing.T) {
 	var err error
 	defer tearDownTestCase()
@@ -336,5 +335,179 @@ func TestCheckJWTErrorJwt(t *testing.T) {
 
 	if w.Code != http.StatusUnauthorized || strings.TrimSpace(w.Body.String()) != `{"error": "JWT not valid, no token present in request"}` {
 		t.Error("Expected error jwt not valid")
+	}
+}
+func TestCheckJWT(t *testing.T) {
+	var err error
+	var privateKeyContent, publicKeyContent []byte
+	if privateKeyContent, err = ioutil.ReadFile("jwt-test.key"); err != nil {
+		t.Fatal(err)
+	}
+	if publicKeyContent, err = ioutil.ReadFile("jwt-test.pub"); err != nil {
+		t.Fatal(err)
+	}
+	if privateKey, err = jwt.ParseRSAPrivateKeyFromPEM(privateKeyContent); err != nil {
+		t.Fatal(err)
+	}
+	if publicKey, err = jwt.ParseRSAPublicKeyFromPEM(publicKeyContent); err != nil {
+		t.Fatal(err)
+	}
+	token := jwt.New(jwt.GetSigningMethod("RS256"))
+	ts, err := token.SignedString(privateKey)
+
+	req := httptest.NewRequest("GET", fmt.Sprintf(jwtUrlWithToken, ts), nil)
+	w := httptest.NewRecorder()
+	checkJWT(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Error("Expected status 200 after check token")
+	}
+}
+func TestCheckJWTMethodErrorAccessType(t *testing.T) {
+	var err error
+	var privateKeyContent, publicKeyContent []byte
+	if privateKeyContent, err = ioutil.ReadFile("jwt-test.key"); err != nil {
+		t.Fatal(err)
+	}
+	if publicKeyContent, err = ioutil.ReadFile("jwt-test.pub"); err != nil {
+		t.Fatal(err)
+	}
+	if privateKey, err = jwt.ParseRSAPrivateKeyFromPEM(privateKeyContent); err != nil {
+		t.Fatal(err)
+	}
+	if publicKey, err = jwt.ParseRSAPublicKeyFromPEM(publicKeyContent); err != nil {
+		t.Fatal(err)
+	}
+	token := jwt.New(jwt.GetSigningMethod("PS256"))
+	ts, err := token.SignedString(privateKey)
+
+	req := httptest.NewRequest("GET", fmt.Sprintf(jwtUrlWithToken, ts), nil)
+	w := httptest.NewRecorder()
+	checkJWT(w, req)
+
+	if w.Code != http.StatusUnauthorized || strings.TrimSpace(w.Body.String()) != `{"error": "JWT not valid, Unexpected signing method: PS256"}` {
+		t.Error("Expected status 401 message error method")
+	}
+}
+func TestJwtWrapStatusUnauthorized(t *testing.T) {
+	req := httptest.NewRequest("GET", urlJwt, nil)
+	w := httptest.NewRecorder()
+	jwtWrap(func(w http.ResponseWriter, r *http.Request) {
+
+	})(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Error("Expected status StatusUnauthorized")
+	}
+}
+func TestJwtWrapMethodNotRsa(t *testing.T) {
+	var err error
+	var privateKeyContent, publicKeyContent []byte
+	if privateKeyContent, err = ioutil.ReadFile("jwt-test.key"); err != nil {
+		t.Fatal(err)
+	}
+	if publicKeyContent, err = ioutil.ReadFile("jwt-test.pub"); err != nil {
+		t.Fatal(err)
+	}
+	if privateKey, err = jwt.ParseRSAPrivateKeyFromPEM(privateKeyContent); err != nil {
+		t.Fatal(err)
+	}
+	if publicKey, err = jwt.ParseRSAPublicKeyFromPEM(publicKeyContent); err != nil {
+		t.Fatal(err)
+	}
+	token := jwt.New(jwt.GetSigningMethod("PS256"))
+
+	token.Claims = jwt.MapClaims{
+		"PERMISSION":       "admin@tiedot",
+		JWT_ENDPOINTS_ATTR:  []interface{}{},
+		"exp":              time.Now().Add(time.Hour * 72).Unix(),
+	}
+	ts, err := token.SignedString(privateKey)
+
+	req := httptest.NewRequest("GET", fmt.Sprintf(jwtUrlWithToken, ts), nil)
+	w := httptest.NewRecorder()
+	jwtWrap(func(w http.ResponseWriter, r *http.Request) {
+
+	})(w, req)
+
+	if w.Code != http.StatusUnauthorized{
+		t.Error("Expected status 401")
+	}
+}
+func TestJwtWrapMethodAdmin(t *testing.T) {
+	var err error
+	var privateKeyContent, publicKeyContent []byte
+	if privateKeyContent, err = ioutil.ReadFile("jwt-test.key"); err != nil {
+		t.Fatal(err)
+	}
+	if publicKeyContent, err = ioutil.ReadFile("jwt-test.pub"); err != nil {
+		t.Fatal(err)
+	}
+	if privateKey, err = jwt.ParseRSAPrivateKeyFromPEM(privateKeyContent); err != nil {
+		t.Fatal(err)
+	}
+	if publicKey, err = jwt.ParseRSAPublicKeyFromPEM(publicKeyContent); err != nil {
+		t.Fatal(err)
+	}
+	token := jwt.New(jwt.GetSigningMethod("RS256"))
+
+	token.Claims = jwt.MapClaims{
+		JWT_USER_ATTR:JWT_USER_ADMIN,
+		"PERMISSION":       "admin@tiedot",
+		"exp":              time.Now().Add(time.Hour * 72).Unix(),
+	}
+	ts, err := token.SignedString(privateKey)
+
+	req := httptest.NewRequest("GET", fmt.Sprintf(jwtUrlWithToken, ts), nil)
+	w := httptest.NewRecorder()
+	jwtWrap(func(w http.ResponseWriter, r *http.Request) {
+
+	})(w, req)
+
+	if w.Code != http.StatusOK{
+		t.Error("Expected status 200")
+	}
+}
+func TestJwtWrapNotSliceEndPoints(t *testing.T) {
+	var err error
+	var privateKeyContent, publicKeyContent []byte
+	if privateKeyContent, err = ioutil.ReadFile("jwt-test.key"); err != nil {
+		t.Fatal(err)
+	}
+	if publicKeyContent, err = ioutil.ReadFile("jwt-test.pub"); err != nil {
+		t.Fatal(err)
+	}
+	if privateKey, err = jwt.ParseRSAPrivateKeyFromPEM(privateKeyContent); err != nil {
+		t.Fatal(err)
+	}
+	if publicKey, err = jwt.ParseRSAPublicKeyFromPEM(publicKeyContent); err != nil {
+		t.Fatal(err)
+	}
+	token := jwt.New(jwt.GetSigningMethod("RS256"))
+
+	token.Claims = jwt.MapClaims{
+		"PERMISSION":       "admin@tiedot",
+		JWT_ENDPOINTS_ATTR:  []interface{}{},
+		"exp":              time.Now().Add(time.Hour * 72).Unix(),
+	}
+	ts, err := token.SignedString(privateKey)
+
+	req := httptest.NewRequest("GET", fmt.Sprintf(jwtUrlWithToken, ts), nil)
+	w := httptest.NewRecorder()
+	jwtWrap(func(w http.ResponseWriter, r *http.Request) {
+
+	})(w, req)
+
+	if w.Code != http.StatusUnauthorized{
+		t.Error("Expected status 401")
+	}
+}
+func TestSliceContainsStr(t *testing.T) {
+	if !sliceContainsStr([]string{"test"}, "test") {
+		t.Error("Expected true from function `sliceContainsStr`")
+	}
+
+	if sliceContainsStr("test", "test") {
+		t.Error("Expected false from function `sliceContainsStr`")
 	}
 }
