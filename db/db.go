@@ -146,8 +146,6 @@ func (db *DB) Rename(oldName, newName string) error {
 		return fmt.Errorf("Collection %s does not exist", oldName)
 	} else if _, exists := db.cols[newName]; exists {
 		return fmt.Errorf("Collection %s already exists", newName)
-	} else if newName == oldName {
-		return fmt.Errorf("Old and new names are the same")
 	} else if err := db.cols[oldName].close(); err != nil {
 		return err
 	} else if err := os.Rename(path.Join(db.path, oldName), path.Join(db.path, newName)); err != nil {
