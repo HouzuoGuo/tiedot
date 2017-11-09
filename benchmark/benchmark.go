@@ -1,52 +1,103 @@
-package main
+package benchmark
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
 	"runtime"
-	"strings"
+	"strconv"
 	"sync"
 	"sync/atomic"
-	"testing"
 	"time"
 
 	"github.com/HouzuoGuo/tiedot/db"
 )
 
-var benchTestSize = 100000
-
-func averageTest(name string, fun func()) {
+// Run the benchmark function a number of times across multiple goroutines, and print out performance data.
+func average(name string, fun func(), benchSize int) {
 	numThreads := runtime.GOMAXPROCS(-1)
 	wp := new(sync.WaitGroup)
-	iter := float64(benchTestSize)
+	iter := float64(benchSize)
 	start := float64(time.Now().UTC().UnixNano())
 	// Run function across multiple goroutines
-	for i := 0; i < benchTestSize; i += benchTestSize / numThreads {
+	for i := 0; i < benchSize; i += benchSize / numThreads {
 		wp.Add(1)
 		go func() {
 			defer wp.Done()
-			for j := 0; j < benchTestSize/numThreads; j++ {
+			for j := 0; j < benchSize/numThreads; j++ {
 				fun()
 			}
 		}()
 	}
 	wp.Wait()
 	end := float64(time.Now().UTC().UnixNano())
-	fmt.Printf("%s %d: %d ns/iter, %d iter/sec\n", name, int(benchTestSize), int((end-start)/iter), int(1000000000/((end-start)/iter)))
+	fmt.Printf("%s %d: %d ns/iter, %d iter/sec\n", name, int(benchSize), int((end-start)/iter), int(1000000000/((end-start)/iter)))
 }
 
-// benchmark(1) written in test case style
-func TestBenchmark1(t *testing.T) {
-	return
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	rand.Seed(time.Now().UnixNano())
+// Create a temporary database and collection for benchmark use.
+func mkTmpDBAndCol(dbPath string, colName string) (*db.DB, *db.Col) {
+	os.RemoveAll(dbPath)
+	tmpDB, err := db.OpenDB(dbPath)
+	if err != nil {
+		panic(err)
+	}
+	if err = tmpDB.Create(colName); err != nil {
+		panic(err)
+	}
+	return tmpDB, tmpDB.Use(colName)
+}
 
-	ids := make([]int, 0, benchTestSize)
+func sampleDoc(benchSize int) (js map[string]interface{}) {
+	doc := fmt.Sprintf(`
+{
+	"nested": {
+		"nested": {
+			"str": "%s",
+			"int": %d,
+			"float": %f
+		}
+	},
+	"strs": ["%s", "%s"],
+	"ints": [%d, %d],
+	"floats": [%f, %f]
+}
+`, strconv.FormatFloat(rand.Float64(), 'f', 6, 64), rand.Intn(benchSize), rand.Float64(),
+		strconv.FormatFloat(rand.Float64(), 'f', 6, 64), strconv.FormatFloat(rand.Float64(), 'f', 6, 64),
+		rand.Intn(benchSize), rand.Intn(benchSize),
+		rand.Float32(), rand.Float32())
+	if err := json.Unmarshal([]byte(doc), &js); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func sampleQuery(benchSize int) (js interface{}) {
+	rangeStart := rand.Intn(benchSize)
+	q := fmt.Sprintf(`
+[
+	{ "c": [
+		{"eq": %d, "in": ["nested", "nested", "int"]},
+		{"eq": %d, "in": ["ints"]}
+	] },
+	{ "int-from": %d, "int-to": %d, "in": ["ints"]}
+]
+`, rand.Intn(benchSize), rand.Intn(benchSize), rangeStart, rangeStart+2)
+	if err := json.Unmarshal([]byte(q), &js); err != nil {
+		panic(err)
+	}
+	return
+}
+
+// Document CRUD benchmark (insert/read/query/update/delete), intended for catching performance regressions.
+func Benchmark(benchSize int, benchCleanup bool) {
+	ids := make([]int, 0, benchSize)
 	// Prepare a collection with two indexes
-	tmp := "/tmp/tiedot_test_bench1"
+	tmp := "/tmp/tiedot_bench"
 	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
+	if benchCleanup {
+		defer os.RemoveAll(tmp)
+	}
 	benchDB, col := mkTmpDBAndCol(tmp, "tmp")
 	defer benchDB.Close()
 	col.Index([]string{"nested", "nested", "str"})
@@ -58,10 +109,10 @@ func TestBenchmark1(t *testing.T) {
 
 	// Benchmark document insert
 	average("insert", func() {
-		if _, err := col.Insert(sampleDoc()); err != nil {
-			panic(err)
+		if _, err := col.Insert(sampleDoc(benchSize)); err != nil {
+			fmt.Println("Insert error", err)
 		}
-	})
+	}, benchSize)
 
 	// Collect all document IDs and benchmark document read
 	col.ForEachDoc(func(id int, _ []byte) bool {
@@ -69,46 +120,40 @@ func TestBenchmark1(t *testing.T) {
 		return true
 	})
 	average("read", func() {
-		doc, err := col.Read(ids[rand.Intn(benchTestSize)])
+		doc, err := col.Read(ids[rand.Intn(benchSize)])
 		if doc == nil || err != nil {
-			panic(err)
+			fmt.Println("Read error", doc, err)
 		}
-	})
+	}, benchSize)
 
 	// Benchmark lookup query (two attributes)
 	average("lookup", func() {
 		result := make(map[int]struct{})
-		if err := db.EvalQuery(sampleQuery(), col, &result); err != nil {
-			panic(err)
+		if err := db.EvalQuery(sampleQuery(benchSize), col, &result); err != nil {
+			fmt.Println("Query error", err)
 		}
-	})
+	}, benchSize)
 
 	// Benchmark document update
 	average("update", func() {
-		if err := col.Update(ids[rand.Intn(benchTestSize)], sampleDoc()); err != nil && !strings.Contains(err.Error(), "locked") {
-			panic(err)
+		if err := col.Update(ids[rand.Intn(benchSize)], sampleDoc(benchSize)); err != nil {
+			fmt.Println("Update error", err)
 		}
-	})
+	}, benchSize)
 
 	// Benchmark document delete
 	var delCount int64
 	average("delete", func() {
-		if err := col.Delete(ids[rand.Intn(benchTestSize)]); err == nil {
+		if err := col.Delete(ids[rand.Intn(benchSize)]); err == nil {
 			atomic.AddInt64(&delCount, 1)
 		}
-	})
-	if delCount < int64(benchTestSize/2) {
-		t.Fatal("Did not delete enough")
-	}
+	}, benchSize)
+	fmt.Printf("Deleted %d documents\n", delCount)
 }
 
-// benchmark2 written in test case style
-func TestBenchmark2(t *testing.T) {
-	return
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	rand.Seed(time.Now().UnixNano())
-
-	docs := make([]int, 0, benchTestSize*2+1000)
+// Document CRUD operations running in parallel, intended for catching concurrency related bugs.
+func Benchmark2(benchSize int, benchCleanup bool) {
+	docs := make([]int, 0, benchSize*2+1000)
 	wp := new(sync.WaitGroup)
 	numThreads := runtime.GOMAXPROCS(-1)
 	// There are goroutines doing document operations: insert, read, query, update, delete
@@ -117,9 +162,11 @@ func TestBenchmark2(t *testing.T) {
 	wp.Add(1)
 
 	// Prepare a collection with two indexes
-	tmp := "/tmp/tiedot_test_bench2"
+	tmp := "/tmp/tiedot_bench2"
 	os.RemoveAll(tmp)
-	defer os.RemoveAll(tmp)
+	if benchCleanup {
+		defer os.RemoveAll(tmp)
+	}
 	benchdb, col := mkTmpDBAndCol(tmp, "tmp")
 	defer benchdb.Close()
 	col.Index([]string{"nested", "nested", "str"})
@@ -131,37 +178,37 @@ func TestBenchmark2(t *testing.T) {
 
 	// Insert 1000 documents to make a start
 	for j := 0; j < 1000; j++ {
-		if newID, err := col.Insert(sampleDoc()); err == nil {
+		if newID, err := col.Insert(sampleDoc(benchSize)); err == nil {
 			docs = append(docs, newID)
 		} else {
-			panic(err)
+			fmt.Println("Insert error", err)
 		}
 	}
 	start := float64(time.Now().UTC().UnixNano())
 
-	// Insert benchTestSize * 2 documents
+	// Insert benchSize * 2 documents
 	for i := 0; i < numThreads; i++ {
 		go func(i int) {
 			fmt.Printf("Insert thread %d starting\n", i)
 			defer wp.Done()
-			for j := 0; j < benchTestSize/numThreads*2; j++ {
-				if newID, err := col.Insert(sampleDoc()); err == nil {
+			for j := 0; j < benchSize/numThreads*2; j++ {
+				if newID, err := col.Insert(sampleDoc(benchSize)); err == nil {
 					docs = append(docs, newID)
 				} else {
-					panic(err)
+					fmt.Println("Insert error", err)
 				}
 			}
 			fmt.Printf("Insert thread %d completed\n", i)
 		}(i)
 	}
 
-	// Read benchTestSize * 2 documents
+	// Read benchSize * 2 documents
 	var readCount int64
 	for i := 0; i < numThreads; i++ {
 		go func(i int) {
 			fmt.Printf("Read thread %d starting\n", i)
 			defer wp.Done()
-			for j := 0; j < benchTestSize/numThreads*2; j++ {
+			for j := 0; j < benchSize/numThreads*2; j++ {
 				if _, err := col.Read(docs[rand.Intn(len(docs))]); err == nil {
 					atomic.AddInt64(&readCount, 1)
 				}
@@ -170,30 +217,30 @@ func TestBenchmark2(t *testing.T) {
 		}(i)
 	}
 
-	// Query benchTestSize times (lookup on two attributes)
+	// Query benchSize times (lookup on two attributes)
 	for i := 0; i < numThreads; i++ {
 		go func(i int) {
 			fmt.Printf("Query thread %d starting\n", i)
 			defer wp.Done()
 			var err error
-			for j := 0; j < benchTestSize/numThreads; j++ {
+			for j := 0; j < benchSize/numThreads; j++ {
 				result := make(map[int]struct{})
-				if err = db.EvalQuery(sampleQuery(), col, &result); err != nil {
-					panic(err)
+				if err = db.EvalQuery(sampleQuery(benchSize), col, &result); err != nil {
+					fmt.Println("Query error", err)
 				}
 			}
 			fmt.Printf("Query thread %d completed\n", i)
 		}(i)
 	}
 
-	// Update benchTestSize documents
+	// Update benchSize documents
 	var updateCount int64
 	for i := 0; i < numThreads; i++ {
 		go func(i int) {
 			fmt.Printf("Update thread %d starting\n", i)
 			defer wp.Done()
-			for j := 0; j < benchTestSize/numThreads; j++ {
-				if err := col.Update(docs[rand.Intn(len(docs))], sampleDoc()); err == nil {
+			for j := 0; j < benchSize/numThreads; j++ {
+				if err := col.Update(docs[rand.Intn(len(docs))], sampleDoc(benchSize)); err == nil {
 					atomic.AddInt64(&updateCount, 1)
 				}
 			}
@@ -201,13 +248,13 @@ func TestBenchmark2(t *testing.T) {
 		}(i)
 	}
 
-	// Delete benchTestSize documents
+	// Delete benchSize documents
 	var delCount int64
 	for i := 0; i < numThreads; i++ {
 		go func(i int) {
 			fmt.Printf("Delete thread %d starting\n", i)
 			defer wp.Done()
-			for j := 0; j < benchTestSize/numThreads; j++ {
+			for j := 0; j < benchSize/numThreads; j++ {
 				if err := col.Delete(docs[rand.Intn(len(docs))]); err == nil {
 					atomic.AddInt64(&delCount, 1)
 				}
@@ -218,7 +265,7 @@ func TestBenchmark2(t *testing.T) {
 
 	// This one does a bunch of schema-changing stuff, testing the engine while document operations are busy
 	go func() {
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(2 * time.Second)
 		if err := benchdb.Create("foo"); err != nil {
 			panic(err)
 		} else if err := benchdb.Rename("foo", "bar"); err != nil {
@@ -235,9 +282,8 @@ func TestBenchmark2(t *testing.T) {
 				panic("Wrong collections in benchmark db")
 			}
 		}
-		os.RemoveAll("/tmp/tiedot_test_bench2_dump")
-		defer os.RemoveAll("/tmp/tiedot_test_bench2_dump")
-		if err := benchdb.Dump("/tmp/tiedot_test_bench2_dump"); err != nil {
+		defer os.RemoveAll("/tmp/tiedot_bench2_dump")
+		if err := benchdb.Dump("/tmp/tiedot_bench2_dump"); err != nil {
 			panic(err)
 		} else if err := benchdb.Drop("bar"); err != nil {
 			panic(err)
@@ -248,17 +294,8 @@ func TestBenchmark2(t *testing.T) {
 	// Wait for all goroutines to finish, then print summary
 	wp.Wait()
 	end := float64(time.Now().UTC().UnixNano())
-	fmt.Printf("Total operations %d: %d ns/iter, %d iter/sec\n", benchTestSize*7, int((end-start)/float64(benchTestSize)/7), int(1000000000/((end-start)/float64(benchTestSize)/7)))
+	fmt.Printf("Total operations %d: %d ns/iter, %d iter/sec\n", benchSize*7, int((end-start)/float64(benchSize)/7), int(1000000000/((end-start)/float64(benchSize)/7)))
 	fmt.Printf("Read %d documents\n", readCount)
 	fmt.Printf("Updated %d documents\n", updateCount)
 	fmt.Printf("Deleted %d documents\n", delCount)
-	if readCount < int64(benchTestSize/3) {
-		t.Fatal("Did not read enough documents")
-	}
-	if updateCount < int64(benchTestSize/8) {
-		t.Fatal("Did not update enough documents")
-	}
-	if delCount < int64(benchTestSize/8) {
-		t.Fatal("Did not delete enough documents")
-	}
 }
