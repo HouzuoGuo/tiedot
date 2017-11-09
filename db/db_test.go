@@ -645,4 +645,29 @@ func TestScrubErrRename(t *testing.T) {
 		t.Errorf("Expected error : '%s'", errMessage)
 	}
 }
+func TestDropColNotExist(t *testing.T) {
+	testUp()
+	db, _ := OpenDB(TEST_DATA_DIR)
+	colName := "a"
+	if db.Drop(colName).Error() != fmt.Sprintf("Collection %s does not exist", colName) {
+		t.Errorf("Expected error : collection not exist")
+	}
+}
+func TestDropErrRemoveAll(t *testing.T) {
+	testUp()
+	collectName := "test"
+	errMessage := "Remove error"
+	database, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(database, collectName)
+	database.cols = map[string]*Col{collectName: col}
+
+	patch := monkey.Patch(os.RemoveAll, func(path string) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if database.Drop(collectName).Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
 
