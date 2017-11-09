@@ -1,12 +1,13 @@
 package db
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/bouk/monkey"
 	"github.com/pkg/errors"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"reflect"
@@ -14,8 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"bytes"
-	"log"
+	"encoding/json"
 )
 
 const (
@@ -31,12 +31,9 @@ func touchFile(dir, filename string) {
 	}
 }
 
-func testUp() {
+func TestOpenEmptyDB(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
-}
-func TestOpenEmptyDB(t *testing.T) {
-	testUp()
 	db, err := OpenDB(TEST_DATA_DIR)
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +52,8 @@ func TestOpenEmptyDB(t *testing.T) {
 	}
 }
 func TestOpenErrDB(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +66,8 @@ func TestOpenErrDB(t *testing.T) {
 	}
 }
 func TestOpenCloseDB(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +105,8 @@ func TestOpenCloseDB(t *testing.T) {
 	}
 }
 func TestColCrud(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,8 @@ func TestDumpDB(t *testing.T) {
 	}
 }
 func TestOpenErrorMDirAll(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	errMessage := "Make dir is unpossible"
 	patch := monkey.Patch(os.MkdirAll, func(path string, perm os.FileMode) error {
 		return errors.New(errMessage)
@@ -286,7 +287,8 @@ func TestOpenErrorMDirAll(t *testing.T) {
 	}
 }
 func TestOpenErrorWriteInFilePartsNum(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	errMessage := "Write in file is unpossible"
 	patch := monkey.Patch(ioutil.WriteFile, func(filename string, data []byte, perm os.FileMode) error {
 		return errors.New(errMessage)
@@ -297,12 +299,14 @@ func TestOpenErrorWriteInFilePartsNum(t *testing.T) {
 	}
 }
 func TestOpenNumPartsFilePathIsDir(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	touchFile(TEST_DATA_DIR+"/"+PART_NUM_FILE, "test")
 	OpenDB(TEST_DATA_DIR)
 }
 func TestOpenErrWhenReadFileNumParts(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	errMessage := "Error read file"
 	patch := monkey.Patch(ioutil.ReadFile, func(filename string) ([]byte, error) {
 		return []byte{}, errors.New(errMessage)
@@ -313,7 +317,8 @@ func TestOpenErrWhenReadFileNumParts(t *testing.T) {
 	}
 }
 func TestOpenErrorValidFromFileNumParts(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	errMessage := "Error atoi"
 	patch := monkey.Patch(strconv.Atoi, func(s string) (int, error) {
 		return 0, errors.New(errMessage)
@@ -324,7 +329,8 @@ func TestOpenErrorValidFromFileNumParts(t *testing.T) {
 	}
 }
 func TestOpenErrorListDir(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	errMessage := "Error read dir"
 	patch := monkey.Patch(ioutil.ReadDir, func(dirname string) ([]os.FileInfo, error) {
 		return nil, errors.New(errMessage)
@@ -335,7 +341,8 @@ func TestOpenErrorListDir(t *testing.T) {
 	}
 }
 func TestOpenColErr(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	errMessage := "Error open col"
 
 	db, err := OpenDB(TEST_DATA_DIR)
@@ -356,7 +363,8 @@ func TestOpenColErr(t *testing.T) {
 	}
 }
 func TestCreateErrorMkDir(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	db, _ := OpenDB(TEST_DATA_DIR)
 	errMessage := "Make dir is unpossible"
 	patch := monkey.Patch(os.MkdirAll, func(path string, perm os.FileMode) error {
@@ -368,7 +376,8 @@ func TestCreateErrorMkDir(t *testing.T) {
 	}
 }
 func TestCreateErrOpenCol(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	errMessage := "Error open col"
 
 	db, err := OpenDB(TEST_DATA_DIR)
@@ -389,7 +398,8 @@ func TestCreateErrOpenCol(t *testing.T) {
 	}
 }
 func TestRenameCloseError(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	db, _ := OpenDB(TEST_DATA_DIR)
 	col, _ := OpenCol(db, "test")
 	db.cols = map[string]*Col{"test": col}
@@ -401,7 +411,8 @@ func TestRenameCloseError(t *testing.T) {
 	db.Rename("test", "a")
 }
 func TestRenameOSErr(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	db, _ := OpenDB(TEST_DATA_DIR)
 	col, _ := OpenCol(db, "test")
 	db.cols = map[string]*Col{"test": col}
@@ -417,7 +428,8 @@ func TestRenameOSErr(t *testing.T) {
 }
 func TestRenameOpenColError(t *testing.T) {
 	errMessage := "Error open col"
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	db, _ := OpenDB(TEST_DATA_DIR)
 	col, _ := OpenCol(db, "test")
 	db.cols = map[string]*Col{"test": col}
@@ -430,7 +442,8 @@ func TestRenameOpenColError(t *testing.T) {
 	}
 }
 func TestTruncateColNotExist(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	db, _ := OpenDB(TEST_DATA_DIR)
 	colName := "a"
 	if db.Truncate(colName).Error() != fmt.Sprintf("Collection %s does not exist", colName) {
@@ -438,7 +451,8 @@ func TestTruncateColNotExist(t *testing.T) {
 	}
 }
 func TestTruncatePartitionClear(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	db, err := OpenDB(TEST_DATA_DIR)
 	col, _ := OpenCol(db, "test")
 	db.cols = map[string]*Col{"test": col}
@@ -463,8 +477,10 @@ func TestTruncatePartitionClear(t *testing.T) {
 		t.Errorf("Expected error : '%s'", errMessage)
 	}
 }
+
 func TestTruncateHashClearErr(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	errMessage := "Error clear hash"
 	collectName := "test"
 	db, _ := OpenDB(TEST_DATA_DIR)
@@ -491,7 +507,8 @@ func TestTruncateHashClearErr(t *testing.T) {
 	}
 }
 func TestScrubCollectNotExist(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	db, _ := OpenDB(TEST_DATA_DIR)
 	colName := "a"
 	if db.Scrub(colName).Error() != fmt.Sprintf("Collection %s does not exist", colName) {
@@ -499,7 +516,8 @@ func TestScrubCollectNotExist(t *testing.T) {
 	}
 }
 func TestScrubMkDirAllWhichIndex(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	collectName := "test"
 	errMessage := "Make dir is unpossible"
 
@@ -519,7 +537,8 @@ func TestScrubMkDirAllWhichIndex(t *testing.T) {
 	}
 }
 func TestScrubMDirAll(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	collectName := "test"
 	errMessage := "Make dir is unpossible"
 
@@ -536,7 +555,8 @@ func TestScrubMDirAll(t *testing.T) {
 	}
 }
 func TestScrubErrOpenCol(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	collectName := "test"
 	errMessage := "Error open col"
 	db, _ := OpenDB(TEST_DATA_DIR)
@@ -550,25 +570,27 @@ func TestScrubErrOpenCol(t *testing.T) {
 	if db.Scrub(collectName).Error() != errMessage {
 		t.Errorf("Expected error : '%s'", errMessage)
 	}
-
 }
+
 func TestScrubCorrupted(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	collectName := "test"
 	database, _ := OpenDB(TEST_DATA_DIR)
 	col, _ := OpenCol(database, collectName)
 	database.cols = map[string]*Col{collectName: col}
 
 	var Obj *data.Partition
-	monkey.PatchInstanceMethod(reflect.TypeOf(Obj), "ForEachDoc", func(_ *data.Partition, partNum, totalPart int, fun func(id int, doc []byte) bool) (moveOn bool) {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(Obj), "ForEachDoc", func(_ *data.Partition, partNum, totalPart int, fun func(id int, doc []byte) bool) (moveOn bool) {
 		fun(0, []byte{})
 		return
 	})
-	defer monkey.UnpatchInstanceMethod(reflect.TypeOf(Obj), "ForEachDoc")
+	defer patch.Unpatch()
 	database.Scrub(collectName)
 }
 func TestScrubInsertRecoveryErr(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	collectName := "test"
 	errMessage := "Error InsertRecovery"
 	database, _ := OpenDB(TEST_DATA_DIR)
@@ -581,11 +603,11 @@ func TestScrubInsertRecoveryErr(t *testing.T) {
 		str bytes.Buffer
 	)
 	log.SetOutput(&str)
-	monkey.PatchInstanceMethod(reflect.TypeOf(Obj), "ForEachDoc", func(_ *data.Partition, partNum, totalPart int, fun func(id int, doc []byte) bool) (moveOn bool) {
+	objPatch := monkey.PatchInstanceMethod(reflect.TypeOf(Obj), "ForEachDoc", func(_ *data.Partition, partNum, totalPart int, fun func(id int, doc []byte) bool) (moveOn bool) {
 		fun(0, []byte{})
 		return
 	})
-	monkey.PatchInstanceMethod(reflect.TypeOf(ObjCol), "InsertRecovery", func(_ *Col, id int, doc map[string]interface{}) (err error) {
+	objColPatch := monkey.PatchInstanceMethod(reflect.TypeOf(ObjCol), "InsertRecovery", func(_ *Col, id int, doc map[string]interface{}) (err error) {
 		return errors.New(errMessage)
 	})
 
@@ -593,8 +615,9 @@ func TestScrubInsertRecoveryErr(t *testing.T) {
 		return nil
 	})
 	defer patch.Unpatch()
-	defer monkey.UnpatchInstanceMethod(reflect.TypeOf(Obj), "ForEachDoc")
-	defer monkey.UnpatchInstanceMethod(reflect.TypeOf(ObjCol), "InsertRecovery")
+	defer objPatch.Unpatch()
+	defer objColPatch.Unpatch()
+
 
 	database.Scrub(collectName)
 	if !strings.Contains(str.String(), "Scrub test: failed to insert back document map") {
@@ -602,7 +625,8 @@ func TestScrubInsertRecoveryErr(t *testing.T) {
 	}
 }
 func TestScrubErrRemoveAll(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	collectName := "test"
 	errMessage := "Remove error"
 	database, _ := OpenDB(TEST_DATA_DIR)
@@ -619,7 +643,8 @@ func TestScrubErrRemoveAll(t *testing.T) {
 	}
 }
 func TestScrubErrRename(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	collectName := "test"
 	errMessage := "Rename error"
 	database, _ := OpenDB(TEST_DATA_DIR)
@@ -636,7 +661,8 @@ func TestScrubErrRename(t *testing.T) {
 	}
 }
 func TestDropColNotExist(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	db, _ := OpenDB(TEST_DATA_DIR)
 	colName := "a"
 	if db.Drop(colName).Error() != fmt.Sprintf("Collection %s does not exist", colName) {
@@ -644,7 +670,8 @@ func TestDropColNotExist(t *testing.T) {
 	}
 }
 func TestDropErrRemoveAll(t *testing.T) {
-	testUp()
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
 	collectName := "test"
 	errMessage := "Remove error"
 	database, _ := OpenDB(TEST_DATA_DIR)
@@ -660,4 +687,3 @@ func TestDropErrRemoveAll(t *testing.T) {
 		t.Errorf("Expected error : '%s'", errMessage)
 	}
 }
-
