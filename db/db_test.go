@@ -1,10 +1,16 @@
 package db
 
 import (
+	"fmt"
+	"github.com/HouzuoGuo/tiedot/data"
+	"github.com/bouk/monkey"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"path"
+	"reflect"
 	"runtime"
+	"strconv"
 	"testing"
 )
 
@@ -21,9 +27,12 @@ func touchFile(dir, filename string) {
 	}
 }
 
-func TestOpenEmptyDB(t *testing.T) {
+func testUp() {
 	os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
+}
+func TestOpenEmptyDB(t *testing.T) {
+	testUp()
 	db, err := OpenDB(TEST_DATA_DIR)
 	if err != nil {
 		t.Fatal(err)
@@ -41,10 +50,8 @@ func TestOpenEmptyDB(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
 func TestOpenErrDB(t *testing.T) {
-	os.RemoveAll(TEST_DATA_DIR)
-	defer os.RemoveAll(TEST_DATA_DIR)
+	testUp()
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -56,10 +63,8 @@ func TestOpenErrDB(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
 func TestOpenCloseDB(t *testing.T) {
-	os.RemoveAll(TEST_DATA_DIR)
-	defer os.RemoveAll(TEST_DATA_DIR)
+	testUp()
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -96,10 +101,8 @@ func TestOpenCloseDB(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
 func TestColCrud(t *testing.T) {
-	os.RemoveAll(TEST_DATA_DIR)
-	defer os.RemoveAll(TEST_DATA_DIR)
+	testUp()
 	if err := os.MkdirAll(TEST_DATA_DIR, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +224,6 @@ func TestColCrud(t *testing.T) {
 		t.Fatal(id, err)
 	}
 }
-
 func TestDumpDB(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
 	os.RemoveAll(TEST_DATA_DIR + "bak")
@@ -264,5 +266,233 @@ func TestDumpDB(t *testing.T) {
 	}
 	if err := db2.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+func TestOpenErrorMDirAll(t *testing.T) {
+	testUp()
+	errMessage := "Make dir is unpossible"
+	patch := monkey.Patch(os.MkdirAll, func(path string, perm os.FileMode) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if _, err := OpenDB(TEST_DATA_DIR); err.Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestOpenErrorWriteInFilePartsNum(t *testing.T) {
+	testUp()
+	errMessage := "Write in file is unpossible"
+	patch := monkey.Patch(ioutil.WriteFile, func(filename string, data []byte, perm os.FileMode) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if _, err := OpenDB(TEST_DATA_DIR); err.Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestOpenNumPartsFilePathIsDir(t *testing.T) {
+	testUp()
+	touchFile(TEST_DATA_DIR+"/"+PART_NUM_FILE, "test")
+	OpenDB(TEST_DATA_DIR)
+}
+func TestOpenErrWhenReadFileNumParts(t *testing.T) {
+	testUp()
+	errMessage := "Error read file"
+	patch := monkey.Patch(ioutil.ReadFile, func(filename string) ([]byte, error) {
+		return []byte{}, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if _, err := OpenDB(TEST_DATA_DIR); err.Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestOpenErrorValidFromFileNumParts(t *testing.T) {
+	testUp()
+	errMessage := "Error atoi"
+	patch := monkey.Patch(strconv.Atoi, func(s string) (int, error) {
+		return 0, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if _, err := OpenDB(TEST_DATA_DIR); err.Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestOpenErrorListDir(t *testing.T) {
+	testUp()
+	errMessage := "Error read dir"
+	patch := monkey.Patch(ioutil.ReadDir, func(dirname string) ([]os.FileInfo, error) {
+		return nil, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if _, err := OpenDB(TEST_DATA_DIR); err.Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestOpenColErr(t *testing.T) {
+	testUp()
+	errMessage := "Error open col"
+
+	db, err := OpenDB(TEST_DATA_DIR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create("a"); err != nil {
+		t.Fatal(err)
+	} else if err := db.Create("b"); err != nil {
+		t.Fatal(err)
+	}
+	patch := monkey.Patch(OpenCol, func(db *DB, name string) (*Col, error) {
+		return nil, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if _, err := OpenDB(TEST_DATA_DIR); err.Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestCloseWithError(t *testing.T) {
+	testUp()
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	db.cols = map[string]*Col{"test": col}
+	var c *data.DataFile
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(c), "Close", func(_ *data.DataFile) error {
+		return errors.New("")
+	})
+	defer patch.Unpatch()
+	db.Close()
+}
+func TestCreateErrorMkDir(t *testing.T) {
+	testUp()
+	db, _ := OpenDB(TEST_DATA_DIR)
+	errMessage := "Make dir is unpossible"
+	patch := monkey.Patch(os.MkdirAll, func(path string, perm os.FileMode) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if db.Create("test").Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestCreateErrOpenCol(t *testing.T) {
+	testUp()
+	errMessage := "Error open col"
+
+	db, err := OpenDB(TEST_DATA_DIR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create("a"); err != nil {
+		t.Fatal(err)
+	} else if err := db.Create("b"); err != nil {
+		t.Fatal(err)
+	}
+	patch := monkey.Patch(OpenCol, func(db *DB, name string) (*Col, error) {
+		return nil, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if db.Create("test").Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestRenameCloseError(t *testing.T) {
+	testUp()
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	db.cols = map[string]*Col{"test": col}
+	var c *data.DataFile
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(c), "Close", func(_ *data.DataFile) error {
+		return errors.New("")
+	})
+	defer patch.Unpatch()
+	db.Rename("test", "a")
+}
+func TestRenameOSErr(t *testing.T) {
+	testUp()
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	db.cols = map[string]*Col{"test": col}
+	errMessage := "Error rename file"
+	patch := monkey.Patch(os.Rename, func(oldpath, newpath string) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if db.Rename("test", "a").Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+
+}
+func TestRenameOpenColError(t *testing.T) {
+	errMessage := "Error open col"
+	testUp()
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	db.cols = map[string]*Col{"test": col}
+	patch := monkey.Patch(OpenCol, func(db *DB, name string) (*Col, error) {
+		return nil, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	if db.Rename("test", "a").Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestTruncateColNotExist(t *testing.T) {
+	testUp()
+	db, _ := OpenDB(TEST_DATA_DIR)
+	colName := "a"
+	if db.Truncate(colName).Error() != fmt.Sprintf("Collection %s does not exist", colName) {
+		t.Errorf("Expected error : collection not exist")
+	}
+}
+func TestTruncatePartitionClear(t *testing.T) {
+	testUp()
+	db, err := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	db.cols = map[string]*Col{"test": col}
+	col.parts = []*data.Partition{&data.Partition{}}
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create("a"); err != nil {
+		t.Fatal(err)
+	} else if err := db.Create("b"); err != nil {
+		t.Fatal(err)
+	}
+	errMessage := "Error clear partition"
+	var c *data.Partition
+	monkey.PatchInstanceMethod(reflect.TypeOf(c), "Clear", func(_ *data.Partition) error {
+		return errors.New(errMessage)
+	})
+	defer monkey.UnpatchInstanceMethod(reflect.TypeOf(c), "Clear")
+
+	if db.Truncate("a").Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestTruncateHashClearErr(t *testing.T) {
+	testUp()
+	errMessage := "Error clear hash"
+	collectName := "test"
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, collectName)
+	db.cols = map[string]*Col{collectName: col}
+	col.parts = []*data.Partition{&data.Partition{}}
+	col.hts = []map[string]*data.HashTable{map[string]*data.HashTable{collectName: &data.HashTable{}}}
+
+	var (
+		hash *data.HashTable
+		c    *data.Partition
+	)
+	monkey.PatchInstanceMethod(reflect.TypeOf(c), "Clear", func(_ *data.Partition) error {
+		return nil
+	})
+	monkey.PatchInstanceMethod(reflect.TypeOf(hash), "Clear", func(_ *data.HashTable) error {
+		return errors.New(errMessage)
+	})
+	defer monkey.UnpatchInstanceMethod(reflect.TypeOf(c), "Clear")
+	defer monkey.UnpatchInstanceMethod(reflect.TypeOf(hash), "Clear")
+
+	if db.Truncate(collectName).Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
 	}
 }
