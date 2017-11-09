@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/bouk/monkey"
@@ -11,7 +12,10 @@ import (
 	"reflect"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
+	"bytes"
+	"log"
 )
 
 const (
@@ -496,3 +500,149 @@ func TestTruncateHashClearErr(t *testing.T) {
 		t.Errorf("Expected error : '%s'", errMessage)
 	}
 }
+func TestScrubCollectNotExist(t *testing.T) {
+	testUp()
+	db, _ := OpenDB(TEST_DATA_DIR)
+	colName := "a"
+	if db.Scrub(colName).Error() != fmt.Sprintf("Collection %s does not exist", colName) {
+		t.Errorf("Expected error : collection not exist")
+	}
+}
+func TestScrubMkDirAllWhichIndex(t *testing.T) {
+	testUp()
+	collectName := "test"
+	errMessage := "Make dir is unpossible"
+
+	db, _ := OpenDB(TEST_DATA_DIR)
+	label := "label"
+	db.cols = map[string]*Col{collectName: &Col{name: collectName, db: db, indexPaths: map[string][]string{collectName: []string{label}}}}
+
+	patch := monkey.Patch(os.MkdirAll, func(path string, perm os.FileMode) error {
+		if strings.Contains(path, label) {
+			return errors.New(errMessage)
+		}
+		return nil
+	})
+	defer patch.Unpatch()
+	if db.Scrub("test").Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestScrubMDirAll(t *testing.T) {
+	testUp()
+	collectName := "test"
+	errMessage := "Make dir is unpossible"
+
+	db, _ := OpenDB(TEST_DATA_DIR)
+	db.cols = map[string]*Col{collectName: &Col{name: collectName, db: db, indexPaths: map[string][]string{collectName: []string{}}}}
+
+	patch := monkey.Patch(os.MkdirAll, func(path string, perm os.FileMode) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if db.Scrub(collectName).Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestScrubErrOpenCol(t *testing.T) {
+	testUp()
+	collectName := "test"
+	errMessage := "Error open col"
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, collectName)
+	db.cols = map[string]*Col{collectName: col}
+	patch := monkey.Patch(OpenCol, func(db *DB, name string) (*Col, error) {
+		return nil, errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if db.Scrub(collectName).Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+
+}
+func TestScrubCorrupted(t *testing.T) {
+	testUp()
+	collectName := "test"
+	database, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(database, collectName)
+	database.cols = map[string]*Col{collectName: col}
+
+	var Obj *data.Partition
+	monkey.PatchInstanceMethod(reflect.TypeOf(Obj), "ForEachDoc", func(_ *data.Partition, partNum, totalPart int, fun func(id int, doc []byte) bool) (moveOn bool) {
+		fun(0, []byte{})
+		return
+	})
+	defer monkey.UnpatchInstanceMethod(reflect.TypeOf(Obj), "ForEachDoc")
+	database.Scrub(collectName)
+}
+func TestScrubInsertRecoveryErr(t *testing.T) {
+	testUp()
+	collectName := "test"
+	errMessage := "Error InsertRecovery"
+	database, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(database, collectName)
+	database.cols = map[string]*Col{collectName: col}
+
+	var (
+		Obj *data.Partition
+		ObjCol *Col
+		str bytes.Buffer
+	)
+	log.SetOutput(&str)
+	monkey.PatchInstanceMethod(reflect.TypeOf(Obj), "ForEachDoc", func(_ *data.Partition, partNum, totalPart int, fun func(id int, doc []byte) bool) (moveOn bool) {
+		fun(0, []byte{})
+		return
+	})
+	monkey.PatchInstanceMethod(reflect.TypeOf(ObjCol), "InsertRecovery", func(_ *Col, id int, doc map[string]interface{}) (err error) {
+		return errors.New(errMessage)
+	})
+
+	patch := monkey.Patch(json.Unmarshal, func(data []byte, v interface{}) error {
+		return nil
+	})
+	defer patch.Unpatch()
+	defer monkey.UnpatchInstanceMethod(reflect.TypeOf(Obj), "ForEachDoc")
+	defer monkey.UnpatchInstanceMethod(reflect.TypeOf(ObjCol), "InsertRecovery")
+
+	database.Scrub(collectName)
+	if !strings.Contains(str.String(), "Scrub test: failed to insert back document map") {
+		t.Error("Expected failed insert back document map[]")
+	}
+}
+func TestScrubErrRemoveAll(t *testing.T) {
+	testUp()
+	collectName := "test"
+	errMessage := "Remove error"
+	database, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(database, collectName)
+	database.cols = map[string]*Col{collectName: col}
+
+	patch := monkey.Patch(os.RemoveAll, func(path string) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if database.Scrub(collectName).Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestScrubErrRename(t *testing.T) {
+	testUp()
+	collectName := "test"
+	errMessage := "Rename error"
+	database, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(database, collectName)
+	database.cols = map[string]*Col{collectName: col}
+
+	patch := monkey.Patch(os.Rename, func(oldpath, newpath string) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if database.Scrub(collectName).Error() != errMessage {
+		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+
