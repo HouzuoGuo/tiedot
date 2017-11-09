@@ -229,6 +229,8 @@ func TestColCrud(t *testing.T) {
 	}
 }
 func TestDumpDB(t *testing.T) {
+	var str bytes.Buffer
+	log.SetOutput(&str)
 	os.RemoveAll(TEST_DATA_DIR)
 	os.RemoveAll(TEST_DATA_DIR + "bak")
 	defer os.RemoveAll(TEST_DATA_DIR)
@@ -352,18 +354,6 @@ func TestOpenColErr(t *testing.T) {
 	if _, err := OpenDB(TEST_DATA_DIR); err.Error() != errMessage {
 		t.Errorf("Expected error : '%s'", errMessage)
 	}
-}
-func TestCloseWithError(t *testing.T) {
-	testUp()
-	db, _ := OpenDB(TEST_DATA_DIR)
-	col, _ := OpenCol(db, "test")
-	db.cols = map[string]*Col{"test": col}
-	var c *data.DataFile
-	patch := monkey.PatchInstanceMethod(reflect.TypeOf(c), "Close", func(_ *data.DataFile) error {
-		return errors.New("")
-	})
-	defer patch.Unpatch()
-	db.Close()
 }
 func TestCreateErrorMkDir(t *testing.T) {
 	testUp()
