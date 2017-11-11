@@ -2,6 +2,7 @@ package db
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/bouk/monkey"
@@ -10,12 +11,12 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
 	"testing"
-	"encoding/json"
 )
 
 const (
@@ -598,9 +599,9 @@ func TestScrubInsertRecoveryErr(t *testing.T) {
 	database.cols = map[string]*Col{collectName: col}
 
 	var (
-		Obj *data.Partition
+		Obj    *data.Partition
 		ObjCol *Col
-		str bytes.Buffer
+		str    bytes.Buffer
 	)
 	log.SetOutput(&str)
 	objPatch := monkey.PatchInstanceMethod(reflect.TypeOf(Obj), "ForEachDoc", func(_ *data.Partition, partNum, totalPart int, fun func(id int, doc []byte) bool) (moveOn bool) {
@@ -617,7 +618,6 @@ func TestScrubInsertRecoveryErr(t *testing.T) {
 	defer patch.Unpatch()
 	defer objPatch.Unpatch()
 	defer objColPatch.Unpatch()
-
 
 	database.Scrub(collectName)
 	if !strings.Contains(str.String(), "Scrub test: failed to insert back document map") {
@@ -685,5 +685,55 @@ func TestDropErrRemoveAll(t *testing.T) {
 
 	if database.Drop(collectName).Error() != errMessage {
 		t.Errorf("Expected error : '%s'", errMessage)
+	}
+}
+func TestCloseErrorCloseCol(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	errMessage := "Close error"
+	database, _ := OpenDB(TEST_DATA_DIR)
+	database.Create("test")
+
+	var part *data.Partition
+	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(part), "Close", func(_ *data.Partition) error {
+		return errors.New(errMessage)
+	})
+	defer patchCol.Unpatch()
+
+	if !strings.Contains(database.Close().Error(), errMessage) {
+		t.Error("Expexcted error message close db")
+	}
+
+}
+func TestDumpRelErr(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	database, _ := OpenDB(TEST_DATA_DIR)
+	database.Create("test")
+
+	errMessage := "error rel return"
+	patch := monkey.Patch(filepath.Rel, func(basepath, targpath string) (string, error) {
+		return "", errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if database.Dump("test").Error() != errMessage {
+		t.Error("Expected error message rel")
+	}
+}
+func TestDumpMkDirErr(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	database, _ := OpenDB(TEST_DATA_DIR)
+	database.Create("test")
+
+	errMessage := "error make dir"
+	patch := monkey.Patch(os.MkdirAll, func(path string, perm os.FileMode) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	if database.Dump("test").Error() != errMessage {
+		t.Error("Expected error make dir error")
 	}
 }
