@@ -144,3 +144,40 @@ func TestIndexErrorJsUnmarshal(t *testing.T) {
 	defer patchCol.Unpatch()
 	col.Index([]string{index})
 }
+func TestUnindex(t *testing.T) {
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+	index := "index_test"
+	errMessage := "error remove all"
+	col, _ := OpenCol(db, "test")
+
+	patch := monkey.Patch(os.RemoveAll, func(path string) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+
+	col.Index([]string{index})
+	if col.Unindex([]string{index}).Error() != errMessage {
+		t.Error("expected error remove all")
+	}
+}
+func TestForEachDocInPageForEachDocIsFalse(t *testing.T) {
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+
+	errMessage := "error remove all"
+	col, _ := OpenCol(db, "test")
+
+	patch := monkey.Patch(os.RemoveAll, func(path string) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	var part *data.Partition
+	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(part), "ForEachDoc", func(_ *data.Partition, partNum, totalPart int, fun func(id int, doc []byte) bool) (moveOn bool) {
+		return false
+	})
+	defer patchCol.Unpatch()
+	col.ForEachDocInPage(0, 0, func(id int, doc []byte) bool {
+		return true
+	})
+}
