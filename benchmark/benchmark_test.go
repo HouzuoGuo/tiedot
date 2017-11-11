@@ -57,8 +57,8 @@ func TestBenchmark1(t *testing.T) {
 	col.Index([]string{"floats"})
 
 	// Benchmark document insert
-	average("insert", func() {
-		if _, err := col.Insert(sampleDoc()); err != nil {
+	averageTest("insert", func() {
+		if _, err := col.Insert(sampleDoc(benchTestSize)); err != nil {
 			panic(err)
 		}
 	})
@@ -68,7 +68,7 @@ func TestBenchmark1(t *testing.T) {
 		ids = append(ids, id)
 		return true
 	})
-	average("read", func() {
+	averageTest("read", func() {
 		doc, err := col.Read(ids[rand.Intn(benchTestSize)])
 		if doc == nil || err != nil {
 			panic(err)
@@ -76,23 +76,23 @@ func TestBenchmark1(t *testing.T) {
 	})
 
 	// Benchmark lookup query (two attributes)
-	average("lookup", func() {
+	averageTest("lookup", func() {
 		result := make(map[int]struct{})
-		if err := db.EvalQuery(sampleQuery(), col, &result); err != nil {
+		if err := db.EvalQuery(sampleQuery(benchTestSize), col, &result); err != nil {
 			panic(err)
 		}
 	})
 
 	// Benchmark document update
-	average("update", func() {
-		if err := col.Update(ids[rand.Intn(benchTestSize)], sampleDoc()); err != nil && !strings.Contains(err.Error(), "locked") {
+	averageTest("update", func() {
+		if err := col.Update(ids[rand.Intn(benchTestSize)], sampleDoc(benchTestSize)); err != nil && !strings.Contains(err.Error(), "locked") {
 			panic(err)
 		}
 	})
 
 	// Benchmark document delete
 	var delCount int64
-	average("delete", func() {
+	averageTest("delete", func() {
 		if err := col.Delete(ids[rand.Intn(benchTestSize)]); err == nil {
 			atomic.AddInt64(&delCount, 1)
 		}
@@ -131,7 +131,7 @@ func TestBenchmark2(t *testing.T) {
 
 	// Insert 1000 documents to make a start
 	for j := 0; j < 1000; j++ {
-		if newID, err := col.Insert(sampleDoc()); err == nil {
+		if newID, err := col.Insert(sampleDoc(benchTestSize)); err == nil {
 			docs = append(docs, newID)
 		} else {
 			panic(err)
@@ -145,7 +145,7 @@ func TestBenchmark2(t *testing.T) {
 			fmt.Printf("Insert thread %d starting\n", i)
 			defer wp.Done()
 			for j := 0; j < benchTestSize/numThreads*2; j++ {
-				if newID, err := col.Insert(sampleDoc()); err == nil {
+				if newID, err := col.Insert(sampleDoc(benchTestSize)); err == nil {
 					docs = append(docs, newID)
 				} else {
 					panic(err)
@@ -178,7 +178,7 @@ func TestBenchmark2(t *testing.T) {
 			var err error
 			for j := 0; j < benchTestSize/numThreads; j++ {
 				result := make(map[int]struct{})
-				if err = db.EvalQuery(sampleQuery(), col, &result); err != nil {
+				if err = db.EvalQuery(sampleQuery(benchTestSize), col, &result); err != nil {
 					panic(err)
 				}
 			}
@@ -193,7 +193,7 @@ func TestBenchmark2(t *testing.T) {
 			fmt.Printf("Update thread %d starting\n", i)
 			defer wp.Done()
 			for j := 0; j < benchTestSize/numThreads; j++ {
-				if err := col.Update(docs[rand.Intn(len(docs))], sampleDoc()); err == nil {
+				if err := col.Update(docs[rand.Intn(len(docs))], sampleDoc(benchTestSize)); err == nil {
 					atomic.AddInt64(&updateCount, 1)
 				}
 			}
