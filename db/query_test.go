@@ -8,6 +8,9 @@ import (
 	"testing"
 
 	"github.com/HouzuoGuo/tiedot/dberr"
+	"github.com/bouk/monkey"
+	"github.com/pkg/errors"
+	"strings"
 )
 
 func ensureMapHasKeys(m map[int]struct{}, keys ...int) bool {
@@ -21,7 +24,6 @@ func ensureMapHasKeys(m map[int]struct{}, keys ...int) bool {
 	}
 	return true
 }
-
 func runQuery(query string, col *Col) (map[int]struct{}, error) {
 	result := make(map[int]struct{})
 	var jq interface{}
@@ -30,7 +32,6 @@ func runQuery(query string, col *Col) (map[int]struct{}, error) {
 	}
 	return result, EvalQuery(jq, col, &result)
 }
-
 func TestQuery(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
@@ -275,5 +276,125 @@ func TestQuery(t *testing.T) {
 	q, _ = runQuery(`[{"c": [{"n": [{"eq": 1, "in": ["d"]},{"eq": 1, "in": ["c"]}]},{"eq": 1, "in": ["d"]}]},{"eq": 2, "in": ["c"]}]`, col)
 	if !ensureMapHasKeys(q, ids[2], ids[4], ids[5]) {
 		t.Fatal(q)
+	}
+}
+func TestEvalUnionQueryErr(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	errMessage := "Error query"
+	patch := monkey.Patch(evalQuery, func(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLock bool) (err error) {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	result := map[int]struct{}{0: struct{}{}}
+	if EvalUnion([]interface{}{""}, col, &result).Error() != errMessage {
+		t.Error("Expected error query")
+	}
+}
+func TestLookupNotHasPat(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	result := map[int]struct{}{0: struct{}{}}
+
+	if Lookup(nil, map[string]interface{}{}, col, &result).Error() != "Missing lookup path `in`" {
+		t.Error("Expectded error missing path")
+	}
+}
+func TestLookupVektorLookupErr(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	result := map[int]struct{}{0: struct{}{}}
+
+	if Lookup(nil, map[string]interface{}{"in": []interface{}{"s"}, "limit": "error type"}, col, &result).Error() != "Expecting `limit` as an integer, but error type given." {
+		t.Error("Expectded error")
+	}
+}
+func TestPathExistenceVektorPAth(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	result := map[int]struct{}{0: struct{}{}}
+
+	if PathExistence(nil, map[string]interface{}{"in": []interface{}{"s"}}, col, &result).Error() != "Expecting vector path, but <nil> given" {
+		t.Error("Expectded error")
+	}
+}
+func TestPathExistenceLimitIsint(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	result := map[int]struct{}{0: struct{}{}}
+
+	PathExistence([]interface{}{}, map[string]interface{}{"in": []interface{}{"s"}, "limit": 0}, col, &result)
+}
+func TestIntersectEvalQueryErr(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	errMessage := "Error query"
+	patch := monkey.Patch(evalQuery, func(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLock bool) (err error) {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	result := map[int]struct{}{0: struct{}{}}
+	if Intersect([]interface{}{""}, col, &result).Error() != errMessage {
+		t.Error("Expected error query")
+	}
+}
+func TestIntersectSubExprsNotValidType(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+
+	result := map[int]struct{}{0: struct{}{}}
+	if !strings.Contains(Intersect(nil, col, &result).Error(), "Expecting a vector of sub-queries") {
+		t.Error("Expected error query")
+	}
+}
+func TestComplementEvalQueryErr(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+	errMessage := "Error query"
+	patch := monkey.Patch(evalQuery, func(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLock bool) (err error) {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	result := map[int]struct{}{0: struct{}{}}
+	if Complement([]interface{}{""}, col, &result).Error() != errMessage {
+		t.Error("Expected error query")
+	}
+}
+func TestNameIntRange(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+
+	result := map[int]struct{}{0: struct{}{}}
+	if !strings.Contains(IntRange(nil, map[string]interface{}{}, col, &result).Error(), "Missing path") {
+		t.Error("Expected error")
+	}
+}
+func TestNameIntExpInNotFormat(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	db, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(db, "test")
+
+	result := map[int]struct{}{0: struct{}{}}
+	if !strings.Contains(IntRange(nil, map[string]interface{}{"in": "error"}, col, &result).Error(), "Expecting vector path `in`, but ") {
+		t.Error("Expected error")
 	}
 }
