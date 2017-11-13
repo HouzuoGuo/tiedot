@@ -1,10 +1,18 @@
+
+<h1 align="center">tiedot</h1>
+<p align="center">
+<a href="https://travis-ci.org/HouzuoGuo/tiedot.svg?branch=master"><img src="https://travis-ci.org/HouzuoGuo/tiedot.svg?branch=master" alt="Build Status"></a>
+    <a href="https://codecov.io/gh/HouzuoGuo/tiedot"><img src="https://codecov.io/gh/HouzuoGuo/tiedot/branch/master/graph/badge.svg" alt="codecov"></a>
+      <a href="https://godoc.org/github.com/HouzuoGuo/tiedot"><img src="https://godoc.org/github.com/HouzuoGuo/tiedot?status.svg" alt="GoDoc"></a> 
+ </p>
+ 
+<p align="center"> <a href="http://tiedot.github.io"><strong>Documentation</strong></a> </p>
+
 Keywords: Golang, go, document database, NoSQL, JSON
 
 <img src="http://golang.org/doc/gopher/frontpage.png" alt="Golang logo" align="right"/>
 
 ### tiedot - Your NoSQL database powered by Golang
-
-[![Build Status](https://travis-ci.org/HouzuoGuo/tiedot.svg?branch=master)](https://travis-ci.org/HouzuoGuo/tiedot) [![codecov](https://codecov.io/gh/HouzuoGuo/tiedot/branch/master/graph/badge.svg)](https://codecov.io/gh/HouzuoGuo/tiedot) [![GoDoc](https://godoc.org/github.com/HouzuoGuo/tiedot?status.svg)](https://godoc.org/github.com/HouzuoGuo/tiedot)
 
 tiedot is a document database engine that uses __JSON__ as document notation; it has a powerful query processor that supports advanced set operations; it can be __embedded__ into your program, or run a stand-alone server using __HTTP__ for an API. It runs on *nix and Windows operating systems.
 
