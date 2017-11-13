@@ -64,3 +64,7 @@ The Go gopher is covered by the [Creative Commons Attribution 3.0][Creative Comm
 [Issues]: https://github.com/HouzuoGuo/tiedot/issues
 [Contributors and License]: https://github.com/HouzuoGuo/tiedot/wiki/Contributors-and-License
 [Creative Commons Attribution 3.0]: http://creativecommons.org/licenses/by/3.0
+
+<a target='_blank' rel='nofollow' href='https://app.codesponsor.io/link/Yr8nCWRKhqMPUaFVT3rW55eA/HouzuoGuo/tiedot'>
+  <img alt='Sponsor' width='888' height='68' src='https://app.codesponsor.io/embed/Yr8nCWRKhqMPUaFVT3rW55eA/HouzuoGuo/tiedot.svg' />
+</a>
