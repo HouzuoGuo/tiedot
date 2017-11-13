@@ -2,10 +2,13 @@ package httpapi
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"fmt"
 	"github.com/HouzuoGuo/tiedot/db"
 	"github.com/bouk/monkey"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/pkg/errors"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -176,4 +179,143 @@ func TestStartParseJwtKey(t *testing.T) {
 	}()
 
 	Start(tempDir, 8000, "tls", "", "jwt-test.pub", "jwt-test.key", "", "")
+}
+func TestStartAuthTokenErr(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+	var (
+		s   *http.Server
+		str bytes.Buffer
+	)
+	log.SetOutput(&str)
+	errMessage := "error start serve"
+
+	pathSever := monkey.PatchInstanceMethod(reflect.TypeOf(s), "ListenAndServeTLS", func(_ *http.Server, certFile, keyFile string) error {
+		return nil
+	})
+	defer pathSever.Unpatch()
+	defer func() {
+		r := recover()
+		if r == nil && r == fmt.Sprintf("Failed to start HTTPS service - %s", errMessage) {
+			t.Fatal("Did not catch Panicf")
+		}
+	}()
+	Start(tempDir, 8000, "tls", "", "", "", "", "ascasc")
+
+	req := httptest.NewRequest("GET", requestCreteError, nil)
+	w := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+	authWrap(Create)(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Error("Expected code 401")
+	}
+}
+func TestStartAuthToken(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+	var (
+		s   *http.Server
+		str bytes.Buffer
+	)
+	log.SetOutput(&str)
+	errMessage := "error start serve"
+	token := "some"
+	pathSever := monkey.PatchInstanceMethod(reflect.TypeOf(s), "ListenAndServeTLS", func(_ *http.Server, certFile, keyFile string) error {
+		return nil
+	})
+	defer pathSever.Unpatch()
+	defer func() {
+		r := recover()
+		if r == nil && r == fmt.Sprintf("Failed to start HTTPS service - %s", errMessage) {
+			t.Fatal("Did not catch Panicf")
+		}
+	}()
+	Start(tempDir, 8000, "tls", "", "", "", "", token)
+
+	req := httptest.NewRequest("GET", requestCreteError, nil)
+	w := httptest.NewRecorder()
+
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	req.Header["Authorization"] = []string{"token " + token}
+	authWrap(Create)(w, req)
+	if w.Code == http.StatusUnauthorized {
+		t.Error("Expected code not 401")
+	}
+}
+func TestStartJwtKeyReadErrPubKey(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+	var (
+		s   *http.Server
+		str bytes.Buffer
+	)
+	errMessage := "err read file pub key"
+	log.SetOutput(&str)
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	pathSever := monkey.PatchInstanceMethod(reflect.TypeOf(s), "ListenAndServeTLS", func(_ *http.Server, certFile, keyFile string) error {
+		return nil
+	})
+	defer pathSever.Unpatch()
+
+	pathReadFile := monkey.Patch(ioutil.ReadFile, func(filename string) ([]byte, error) {
+		if filename == "jwt-test.pub" {
+			return nil, errors.New(errMessage)
+		}
+		return []byte("4"), nil
+	})
+	defer pathReadFile.Unpatch()
+	defer func() {
+		recover()
+	}()
+
+	Start(tempDir, 8000, "tls", "", "jwt-test.pub", "jwt-test.key", "", "")
+	req := httptest.NewRequest("GET", requestCreteError, nil)
+	w := httptest.NewRecorder()
+
+	authWrap(Create)(w, req)
+}
+func TestStartJwtKeyParseRSA(t *testing.T) {
+	setupTestCase()
+	defer tearDownTestCase()
+	var (
+		s   *http.Server
+		str bytes.Buffer
+	)
+	errMessage := "err read file pub key"
+	log.SetOutput(&str)
+	var err error
+	if HttpDB, err = db.OpenDB(tempDir); err != nil {
+		panic(err)
+	}
+
+	pathSever := monkey.PatchInstanceMethod(reflect.TypeOf(s), "ListenAndServeTLS", func(_ *http.Server, certFile, keyFile string) error {
+		return nil
+	})
+	defer pathSever.Unpatch()
+
+	pathJwt := monkey.Patch(jwt.ParseRSAPublicKeyFromPEM, func(key []byte) (*rsa.PublicKey, error) {
+		return nil, errors.New(errMessage)
+	})
+	defer pathJwt.Unpatch()
+	defer func() {
+		recover()
+	}()
+
+	Start(tempDir, 8000, "tls", "", "jwt-test.pub", "jwt-test.key", "", "")
+	req := httptest.NewRequest("GET", requestCreteError, nil)
+	w := httptest.NewRecorder()
+
+	authWrap(Create)(w, req)
 }
