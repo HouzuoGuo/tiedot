@@ -660,6 +660,26 @@ func TestScrubErrRename(t *testing.T) {
 		t.Errorf("Expected error : '%s'", errMessage)
 	}
 }
+func TestScrubTmpColClose(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	collectName := "test"
+	errMessage := "tmp close error"
+	database, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(database, collectName)
+	database.cols = map[string]*Col{collectName: col}
+	
+	var (
+		dataFile *data.DataFile
+		str      bytes.Buffer
+	)
+	log.SetOutput(&str)
+	objPatch := monkey.PatchInstanceMethod(reflect.TypeOf(dataFile), "Close", func(_ *data.DataFile) (err error) {
+		return errors.New(errMessage)
+	})
+	defer objPatch.Unpatch()
+	database.Scrub(collectName)
+}
 func TestDropColNotExist(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
@@ -686,6 +706,29 @@ func TestDropErrRemoveAll(t *testing.T) {
 	if database.Drop(collectName).Error() != errMessage {
 		t.Errorf("Expected error : '%s'", errMessage)
 	}
+}
+func TestDropCloseColErr(t *testing.T) {
+	os.RemoveAll(TEST_DATA_DIR)
+	defer os.RemoveAll(TEST_DATA_DIR)
+	collectName := "test"
+	errMessage := "error"
+	database, _ := OpenDB(TEST_DATA_DIR)
+	col, _ := OpenCol(database, collectName)
+	database.cols = map[string]*Col{collectName: col}
+	var (
+		dataFile *data.DataFile
+		str      bytes.Buffer
+	)
+	log.SetOutput(&str)
+	objPatch := monkey.PatchInstanceMethod(reflect.TypeOf(dataFile), "Close", func(_ *data.DataFile) (err error) {
+		return errors.New(errMessage)
+	})
+	defer objPatch.Unpatch()
+	patch := monkey.Patch(os.RemoveAll, func(path string) error {
+		return errors.New(errMessage)
+	})
+	defer patch.Unpatch()
+	database.Drop(collectName)
 }
 func TestCloseErrorCloseCol(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
