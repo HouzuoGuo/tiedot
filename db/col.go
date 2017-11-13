@@ -69,9 +69,6 @@ func (col *Col) load() error {
 		idxPath := strings.Split(idxName, INDEX_PATH_SEP)
 		col.indexPaths[idxName] = idxPath
 		for i := 0; i < col.db.numParts; i++ {
-			if col.hts[i] == nil {
-				col.hts[i] = make(map[string]*data.HashTable)
-			}
 			if col.hts[i][idxName], err = data.OpenHashTable(
 				path.Join(col.db.path, col.name, idxName, strconv.Itoa(i))); err != nil {
 				return err
