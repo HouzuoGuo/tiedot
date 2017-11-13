@@ -32,9 +32,6 @@ var (
 	HttpDB *db.DB // HTTP API endpoints operate on this database
 )
 
-// Install API endpoint handlers that may require authorization
-var authWrap func(http.HandlerFunc) http.HandlerFunc
-
 // Store form parameter value of specified key to *val and return true; if key does not exist, set HTTP status 400 and return false.
 func Require(w http.ResponseWriter, r *http.Request, key string, val *string) bool {
 	*val = r.FormValue(key)
@@ -58,6 +55,8 @@ func Start(dir string, port int, tlsCrt, tlsKey, jwtPubKey, jwtPrivateKey, bind,
 	http.HandleFunc("/version", Version)
 	http.HandleFunc("/memstats", MemStats)
 
+	// Install API endpoint handlers that may require authorization
+	var authWrap func(http.HandlerFunc) http.HandlerFunc
 	if authToken != "" {
 		tdlog.Noticef("API endpoints now require the pre-shared token in Authorization header.")
 		authWrap = func(originalHandler http.HandlerFunc) http.HandlerFunc {
