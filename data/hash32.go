@@ -10,5 +10,5 @@ const (
 
 // Return the portion (first HASH_BITS bytes) used for allocating the entry. The integer smearing process does not apply to 32-bit system.
 func HashKey(key int) int {
-	return key & ((1 << HASH_BITS) - 1)
+	return key & ((1 << dataConf.HashBits) - 1)
 }

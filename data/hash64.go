@@ -15,5 +15,5 @@ func HashKey(key int) int {
 	key = (key ^ 0xdeadbeef) + (key << 5)
 	key = key ^ (key >> 11)
 	// ========== Integer-smear end =========
-	return key & ((1 << HASH_BITS) - 1)
+	return key & ((1 << dataConf.HashBits) - 1)
 }

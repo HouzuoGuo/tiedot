@@ -18,8 +18,8 @@ func TestPutGetReopenClear(t *testing.T) {
 		t.Fatalf("Failed to open: %v", err)
 	}
 	// Test initial size information
-	if !(ht.numBuckets == INITIAL_BUCKETS && ht.Used == INITIAL_BUCKETS*BUCKET_SIZE && ht.Size == HT_FILE_GROWTH) {
-		t.Fatal("Wrong size", ht.numBuckets, INITIAL_BUCKETS, ht.Used, INITIAL_BUCKETS*BUCKET_SIZE, ht.Size, HT_FILE_GROWTH)
+	if !(ht.numBuckets == dataConf.InitialBuckets && ht.Used == dataConf.InitialBuckets*dataConf.BucketSize && ht.Size == dataConf.HTFileGrowth) {
+		t.Fatal("Wrong size", ht.numBuckets, dataConf.InitialBuckets, ht.Used, dataConf.InitialBuckets*dataConf.BucketSize, ht.Size, dataConf.HTFileGrowth)
 	}
 	for i := int(0); i < 1024*1024; i++ {
 		ht.Put(i, i)
@@ -42,7 +42,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	if reopened.numBuckets != numBuckets {
 		t.Fatalf("Wrong.numBuckets")
 	}
-	if reopened.Used != numBuckets*BUCKET_SIZE {
+	if reopened.Used != numBuckets*dataConf.BucketSize {
 		t.Fatalf("Wrong UsedSize")
 	}
 	for i := int(0); i < 1024*1024; i++ {
@@ -55,7 +55,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	if err = reopened.Clear(); err != nil {
 		t.Fatal(err)
 	}
-	if !(reopened.numBuckets == INITIAL_BUCKETS && reopened.Used == INITIAL_BUCKETS*BUCKET_SIZE) {
+	if !(reopened.numBuckets == dataConf.InitialBuckets && reopened.Used == dataConf.InitialBuckets*dataConf.BucketSize) {
 		t.Fatal("Did not clear the hash table")
 	}
 	allKV := make(map[int]int)

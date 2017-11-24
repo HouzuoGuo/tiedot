@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/HouzuoGuo/tiedot/data"
 	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
@@ -35,6 +36,7 @@ type DB struct {
 // Open database and load all collections & indexes.
 func OpenDB(dbPath string) (*DB, error) {
 	rand.Seed(time.Now().UnixNano()) // document ID generation relies on this RNG
+	data.InitDataConfig(dbPath)
 	db := &DB{path: dbPath, schemaLock: new(sync.RWMutex)}
 	return db, db.load()
 }
