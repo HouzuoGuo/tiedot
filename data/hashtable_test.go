@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/bouk/monkey"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 )
 
@@ -195,7 +194,6 @@ func TestRemoveEntryKeyZero(t *testing.T) {
 	var d *Data
 
 	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "HashKey", func(_ *Data, key int) int {
-		spew.Dump("here2")
 		return 0
 	})
 	defer patch.Unpatch()
@@ -213,7 +211,6 @@ func TestRemoveEqualZeroPerBucket(t *testing.T) {
 	var d *Data
 
 	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "HashKey", func(_ *Data, key int) int {
-		spew.Dump("here")
 		return 0
 	})
 	defer patch.Unpatch()
