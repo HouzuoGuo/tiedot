@@ -8,10 +8,8 @@ import (
 	"strings"
 )
 
-var dataConf dataConfig
-
 // Collection config holds configuration data for Collections
-type dataConfig struct {
+type Data struct {
 	DocMaxRoom     int
 	DocHeader      int
 	Padding        string
@@ -26,29 +24,18 @@ type dataConfig struct {
 	InitialBuckets int
 }
 
-func InitDataConfig(path string) (err error) {
+func New(path string) (data *Data, err error) {
 	var file *os.File
 	var j []byte
 
-	if err := os.MkdirAll(path, 0700); err != nil {
-		return err
+	if err = os.MkdirAll(path, 0700); err != nil {
+		return
 	}
 
 	filePath := fmt.Sprintf("%s/data-config.json", path)
 
 	// set the default dataConfig
-	dataConf = dataConfig{
-		DocMaxRoom:     2 * 1048576,
-		DocHeader:      1 + 10,
-		Padding:        strings.Repeat(" ", 128),
-		ColFileGrowth:  COL_FILE_GROWTH,
-		EntrySize:      1 + 10 + 10,
-		BucketHeader:   10,
-		PerBucket:      16,
-		HTFileGrowth:   HT_FILE_GROWTH,
-		HashBits:       HASH_BITS,
-		InitialBuckets: INITIAL_BUCKETS,
-	}
+	data = defaultData()
 
 	// try to open the file
 	if file, err = os.OpenFile(filePath, os.O_RDONLY, 0644); err != nil {
@@ -61,7 +48,7 @@ func InitDataConfig(path string) (err error) {
 				return
 			}
 
-			j, err = json.MarshalIndent(&dataConf, "", "  ")
+			j, err = json.MarshalIndent(data, "", "  ")
 			if err != nil {
 				return
 			}
@@ -81,13 +68,33 @@ func InitDataConfig(path string) (err error) {
 			return
 		}
 
-		if err = json.Unmarshal(b, &dataConf); err != nil {
+		if err = json.Unmarshal(b, data); err != nil {
 			return
 		}
 	}
 
-	dataConf.LenPadding = len(dataConf.Padding)
-	dataConf.BucketSize = dataConf.BucketHeader + dataConf.PerBucket*dataConf.EntrySize
+	data.LenPadding = len(data.Padding)
+	data.BucketSize = data.BucketHeader + data.PerBucket*data.EntrySize
 
 	return
+}
+
+func defaultData() *Data {
+	data := &Data{
+		DocMaxRoom:     2 * 1048576,
+		DocHeader:      1 + 10,
+		Padding:        strings.Repeat(" ", 128),
+		ColFileGrowth:  COL_FILE_GROWTH,
+		EntrySize:      1 + 10 + 10,
+		BucketHeader:   10,
+		PerBucket:      16,
+		HTFileGrowth:   HT_FILE_GROWTH,
+		HashBits:       HASH_BITS,
+		InitialBuckets: INITIAL_BUCKETS,
+	}
+
+	data.LenPadding = len(data.Padding)
+	data.BucketSize = data.BucketHeader + data.PerBucket*data.EntrySize
+
+	return data
 }

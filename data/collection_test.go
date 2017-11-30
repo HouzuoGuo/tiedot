@@ -28,13 +28,15 @@ func RandStringBytes(n int) string {
 func setupTestCollection() (col *Collection, err error) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	return OpenCollection(tmp)
+	d := defaultData()
+	return d.OpenCollection(tmp)
 }
 
 func TestInsertRead(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	col, err := OpenCollection(tmp)
+	data := defaultData()
+	col, err := data.OpenCollection(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -58,7 +60,7 @@ func TestInsertRead(t *testing.T) {
 	}
 
 	patch := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
-		return int64(dataConf.DocMaxRoom + 1), 0
+		return int64(col.DocMaxRoom + 1), 0
 	})
 
 	if doc1 := col.Read(ids[1]); doc1 != nil {
@@ -67,9 +69,9 @@ func TestInsertRead(t *testing.T) {
 	patch.Unpatch()
 
 	patch2 := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
-		return int64(dataConf.DocMaxRoom), 0
+		return int64(col.DocMaxRoom), 0
 	})
-	col.Size = dataConf.DocMaxRoom
+	col.Size = col.DocMaxRoom
 	if doc1 := col.Read(ids[1]); doc1 != nil {
 		t.Fatalf("Expected nill return if doc eof")
 	}
@@ -78,7 +80,7 @@ func TestInsertRead(t *testing.T) {
 	// it shall not panic
 	col.Read(col.Size)
 
-	zero, err := col.Insert([]byte(RandStringBytes(dataConf.DocMaxRoom)))
+	zero, err := col.Insert([]byte(RandStringBytes(col.DocMaxRoom)))
 
 	if zero != 0 || err.Error() != "Document is too large. Max: `2097152`, Given: `4194304`" {
 		t.Fatalf("Expected error document to large.")
@@ -98,7 +100,8 @@ func TestInsertRead(t *testing.T) {
 func TestInsertUpdateRead(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	col, err := OpenCollection(tmp)
+	d := defaultData()
+	col, err := d.OpenCollection(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -135,14 +138,15 @@ func TestEndDocumentExceeded(t *testing.T) {
 	var id int
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	col, err := OpenCollection(tmp)
+	d := defaultData()
+	col, err := d.OpenCollection(tmp)
 	defer col.Close()
 
 	if id, err = col.Insert([]byte("test")); err != nil {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	patch := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
-		return int64(dataConf.DocMaxRoom), 0
+		return int64(col.DocMaxRoom), 0
 	})
 	col.Size = 0
 
@@ -161,7 +165,7 @@ func TestVariantRetuneMoreMaxDocument(t *testing.T) {
 	}
 
 	patch := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
-		return int64(dataConf.DocMaxRoom + 1), 0
+		return int64(col.DocMaxRoom + 1), 0
 	})
 	if _, err = col.Update(id, []byte("")); err != nil && err.Error() != dberr.New(dberr.ErrorNoDoc, id).Error() {
 		t.Fatalf("Expected return document does not exist")
@@ -175,7 +179,7 @@ func TestUpdateMoreThanMaxDocument(t *testing.T) {
 		t.Fatalf("Failed to open: %v", err)
 		return
 	}
-	if _, err = col.Update(10, []byte(RandStringBytes(dataConf.DocMaxRoom+1))); err != nil && err.Error() != fmt.Sprintf("Document is too large. Max: `%d`, Given: `%d`", dataConf.DocMaxRoom, dataConf.DocMaxRoom+1) {
+	if _, err = col.Update(10, []byte(RandStringBytes(col.DocMaxRoom+1))); err != nil && err.Error() != fmt.Sprintf("Document is too large. Max: `%d`, Given: `%d`", col.DocMaxRoom, col.DocMaxRoom+1) {
 		t.Fatal("Expected error document is too large")
 	}
 }
@@ -198,7 +202,8 @@ func TestUpdate(t *testing.T) {
 func TestInsertDeleteRead(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	col, err := OpenCollection(tmp)
+	d := defaultData()
+	col, err := d.OpenCollection(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -238,7 +243,8 @@ func TestInsertDeleteRead(t *testing.T) {
 func TestInsertReadAll(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	col, err := OpenCollection(tmp)
+	d := defaultData()
+	col, err := d.OpenCollection(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -294,7 +300,8 @@ func TestInsertReadAll(t *testing.T) {
 func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	col, err := OpenCollection(tmp)
+	d := defaultData()
+	col, err := d.OpenCollection(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -315,7 +322,7 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	// Test UsedSize
-	calculatedUsedSize := (dataConf.DocHeader + 3*2) + (dataConf.DocHeader+4*2)*2
+	calculatedUsedSize := (col.DocHeader + 3*2) + (col.DocHeader+4*2)*2
 	if col.Used != calculatedUsedSize {
 		t.Fatalf("Invalid UsedSize")
 	}
@@ -360,22 +367,22 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 	}
 	// Insert - not enough room
 	count := 0
-	for i := 0; i < dataConf.ColFileGrowth; i += dataConf.DocMaxRoom {
-		if _, err := col.Insert(make([]byte, dataConf.DocMaxRoom/2)); err != nil {
+	for i := 0; i < col.ColFileGrowth; i += col.DocMaxRoom {
+		if _, err := col.Insert(make([]byte, col.DocMaxRoom/2)); err != nil {
 			t.Fatal(err)
 		}
 		count++
 	}
-	if _, err := col.Insert(make([]byte, dataConf.DocMaxRoom/2)); err != nil {
+	if _, err := col.Insert(make([]byte, col.DocMaxRoom/2)); err != nil {
 		t.Fatal(err)
 	}
 	count++
-	calculatedUsedSize += count * (dataConf.DocHeader + dataConf.DocMaxRoom)
+	calculatedUsedSize += count * (col.DocHeader + col.DocMaxRoom)
 	if col.Used != calculatedUsedSize {
 		t.Fatalf("Wrong UsedSize %d %d", col.Used, calculatedUsedSize)
 	}
-	if col.Size != dataConf.ColFileGrowth+col.Growth {
-		t.Fatalf("Size changed?! %d %d %d", col.Size, dataConf.ColFileGrowth, col.Growth)
+	if col.Size != col.ColFileGrowth+col.Growth {
+		t.Fatalf("Size changed?! %d %d %d", col.Size, col.ColFileGrowth, col.Growth)
 	}
 	if err = col.Close(); err != nil {
 		t.Fatal(err)

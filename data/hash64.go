@@ -9,11 +9,11 @@ const (
 )
 
 // Smear the integer entry key and return the portion (first HASH_BITS bytes) used for allocating the entry.
-func HashKey(key int) int {
+func (data *Data) HashKey(key int) int {
 	// ========== Integer-smear start =======
 	key = key ^ (key >> 4)
 	key = (key ^ 0xdeadbeef) + (key << 5)
 	key = key ^ (key >> 11)
 	// ========== Integer-smear end =========
-	return key & ((1 << dataConf.HashBits) - 1)
+	return key & ((1 << data.HashBits) - 1)
 }

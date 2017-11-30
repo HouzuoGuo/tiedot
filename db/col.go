@@ -49,7 +49,7 @@ func (col *Col) load() error {
 	// Open collection document partitions
 	for i := 0; i < col.db.numParts; i++ {
 		var err error
-		if col.parts[i], err = data.OpenPartition(
+		if col.parts[i], err = col.db.Data.OpenPartition(
 			path.Join(col.db.path, col.name, DOC_DATA_FILE+strconv.Itoa(i)),
 			path.Join(col.db.path, col.name, DOC_LOOKUP_FILE+strconv.Itoa(i))); err != nil {
 			return err
@@ -69,7 +69,7 @@ func (col *Col) load() error {
 		idxPath := strings.Split(idxName, INDEX_PATH_SEP)
 		col.indexPaths[idxName] = idxPath
 		for i := 0; i < col.db.numParts; i++ {
-			if col.hts[i][idxName], err = data.OpenHashTable(
+			if col.hts[i][idxName], err = col.db.Data.OpenHashTable(
 				path.Join(col.db.path, col.name, idxName, strconv.Itoa(i))); err != nil {
 				return err
 			}
@@ -141,7 +141,7 @@ func (col *Col) Index(idxPath []string) (err error) {
 		return err
 	}
 	for i := 0; i < col.db.numParts; i++ {
-		if col.hts[i][idxName], err = data.OpenHashTable(path.Join(idxDir, strconv.Itoa(i))); err != nil {
+		if col.hts[i][idxName], err = col.db.Data.OpenHashTable(path.Join(idxDir, strconv.Itoa(i))); err != nil {
 			return err
 		}
 	}

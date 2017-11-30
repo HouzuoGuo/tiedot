@@ -3,8 +3,6 @@ package data
 import (
 	"errors"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/dberr"
-	"github.com/bouk/monkey"
 	"math/rand"
 	"os"
 	"reflect"
@@ -12,6 +10,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/HouzuoGuo/tiedot/dberr"
+	"github.com/bouk/monkey"
 )
 
 func TestPartitionDocCRUD(t *testing.T) {
@@ -21,7 +22,8 @@ func TestPartitionDocCRUD(t *testing.T) {
 	os.Remove(htPath)
 	defer os.Remove(colPath)
 	defer os.Remove(htPath)
-	part, err := OpenPartition(colPath, htPath)
+	d := defaultData()
+	part, err := d.OpenPartition(colPath, htPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +78,8 @@ func TestPartitionDocCRUD(t *testing.T) {
 
 // Lock & unlock
 func TestLock(t *testing.T) {
-	part := newPartition()
+	d := defaultData()
+	part := d.newPartition()
 	n := 400
 	m := map[int]int{}
 	var wg sync.WaitGroup
@@ -104,7 +107,8 @@ func TestApproxDocCount(t *testing.T) {
 	os.Remove(htPath)
 	defer os.Remove(colPath)
 	defer os.Remove(htPath)
-	part, err := OpenPartition(colPath, htPath)
+	d := defaultData()
+	part, err := d.OpenPartition(colPath, htPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,35 +155,41 @@ func TestApproxDocCount(t *testing.T) {
 	}
 }
 func TestOpenPartitionErrOpenCol(t *testing.T) {
+	var d *Data
 	errMessage := "error open collection"
-	patch := monkey.Patch(OpenCollection, func(path string) (col *Collection, err error) {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "OpenCollection", func(_ *Data, path string) (col *Collection, err error) {
 		return nil, errors.New(errMessage)
 	})
 	defer patch.Unpatch()
-	if _, err := OpenPartition("", ""); errMessage != err.Error() {
+
+	d = defaultData()
+	if _, err := d.OpenPartition("", ""); errMessage != err.Error() {
 		t.Error("Expected error after call `OpenCollection`")
 	}
 }
 func TestOpenPartitionOpenHashTable(t *testing.T) {
+	var d *Data
 	errMessage := "error open hash table"
 
-	patchCol := monkey.Patch(OpenCollection, func(path string) (col *Collection, err error) {
+	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(d), "OpenCollection", func(_ *Data, path string) (col *Collection, err error) {
 		return &Collection{}, nil
 	})
 	defer patchCol.Unpatch()
 
-	patch := monkey.Patch(OpenHashTable, func(path string) (col *HashTable, err error) {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "OpenHashTable", func(_ *Data, path string) (col *HashTable, err error) {
 		return nil, errors.New(errMessage)
 	})
 	defer patch.Unpatch()
 
-	if _, err := OpenPartition("", ""); errMessage != err.Error() {
+	d = defaultData()
+	if _, err := d.OpenPartition("", ""); errMessage != err.Error() {
 		t.Error("Expected error after call `OpenCollection`")
 	}
 }
 func TestInsertErr(t *testing.T) {
 	errMessage := "error insert in collection"
-	part := newPartition()
+	d := defaultData()
+	part := d.newPartition()
 	var col *Collection
 	patch := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Insert", func(_ *Collection, data []byte) (id int, err error) {
 		return 0, errors.New(errMessage)
@@ -192,6 +202,7 @@ func TestInsertErr(t *testing.T) {
 
 }
 func TestReadErr(t *testing.T) {
+	d := defaultData()
 	var hash *HashTable
 	var col *Collection
 	patchHash := monkey.PatchInstanceMethod(reflect.TypeOf(hash), "Get", func(_ *HashTable, key, limit int) (vals []int) {
@@ -203,7 +214,7 @@ func TestReadErr(t *testing.T) {
 		return nil
 	})
 	defer patchCol.Unpatch()
-	part := newPartition()
+	part := d.newPartition()
 	if _, err := part.Read(1); err.Error() != fmt.Sprintf(string(dberr.ErrorNoDoc), 1) {
 		t.Error("Expected error document does not exist")
 	}
@@ -221,7 +232,8 @@ func TestUpdateErr(t *testing.T) {
 		return 0, errors.New(errMessage)
 	})
 	defer patchCol.Unpatch()
-	part := newPartition()
+	d := defaultData()
+	part := d.newPartition()
 	if part.Update(1, []byte("")).Error() != errMessage {
 		t.Error("Expected error when call update collection")
 	}
@@ -238,7 +250,8 @@ func TestForEachDocIfCallbackTrue(t *testing.T) {
 	})
 	defer patchCol.Unpatch()
 
-	part := newPartition()
+	d := defaultData()
+	part := d.newPartition()
 	res := part.ForEachDoc(0, 0, func(id int, doc []byte) bool {
 		return false
 	})
@@ -252,7 +265,8 @@ func TestApproxDocCountKeysEqualZero(t *testing.T) {
 		return []int{}, []int{1, 2, 3}
 	})
 	defer patchHash.Unpatch()
-	part := newPartition()
+	d := defaultData()
+	part := d.newPartition()
 	if part.ApproxDocCount() != 0 {
 		t.Error("Expected doc count digit zero")
 	}
@@ -264,7 +278,8 @@ func TestClearError(t *testing.T) {
 	var col *DataFile
 	errMessage := "Error Clear"
 
-	part, _ := OpenPartition(tmp, tmp)
+	d := defaultData()
+	part, _ := d.OpenPartition(tmp, tmp)
 	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Clear", func(_ *DataFile) (err error) {
 		return errors.New(errMessage)
 	})
@@ -279,7 +294,8 @@ func TestClose(t *testing.T) {
 	var col *DataFile
 	errMessage := "Error Close"
 
-	part, _ := OpenPartition(tmp, tmp)
+	d := defaultData()
+	part, _ := d.OpenPartition(tmp, tmp)
 	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Close", func(_ *DataFile) (err error) {
 		return errors.New(errMessage)
 	})

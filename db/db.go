@@ -27,6 +27,7 @@ const (
 
 // Database structures.
 type DB struct {
+	Data       *data.Data
 	path       string          // Root path of database directory
 	numParts   int             // Total number of partitions
 	cols       map[string]*Col // All collections
@@ -36,8 +37,11 @@ type DB struct {
 // Open database and load all collections & indexes.
 func OpenDB(dbPath string) (*DB, error) {
 	rand.Seed(time.Now().UnixNano()) // document ID generation relies on this RNG
-	data.InitDataConfig(dbPath)
-	db := &DB{path: dbPath, schemaLock: new(sync.RWMutex)}
+	d, err := data.New(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	db := &DB{Data: d, path: dbPath, schemaLock: new(sync.RWMutex)}
 	return db, db.load()
 }
 
