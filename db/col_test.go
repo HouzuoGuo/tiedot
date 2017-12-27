@@ -2,14 +2,15 @@ package db
 
 import (
 	"encoding/json"
-	"github.com/HouzuoGuo/tiedot/data"
-	"github.com/bouk/monkey"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/HouzuoGuo/tiedot/data"
+	"github.com/bouk/monkey"
+	"github.com/pkg/errors"
 )
 
 func TestColMkDirErr(t *testing.T) {
@@ -27,7 +28,7 @@ func TestColMkDirErr(t *testing.T) {
 func TestOpenPartitionErr(t *testing.T) {
 	db, _ := OpenDB(TEST_DATA_DIR)
 	errMessage := "Error OpenPartition"
-	patch := monkey.Patch(data.OpenPartition, func(colPath, lookupPath string) (part *data.Partition, err error) {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(db.Data), "OpenPartition", func(_ *data.Data, colPath, lookupPath string) (part *data.Partition, err error) {
 		return nil, errors.New(errMessage)
 	})
 	defer patch.Unpatch()
@@ -58,7 +59,7 @@ func TestLoadErrorOpenHashTableWhenParseIndex(t *testing.T) {
 	for key, _ := range col.hts {
 		col.hts[key] = nil
 	}
-	patch := monkey.Patch(data.OpenHashTable, func(path string) (ht *data.HashTable, err error) {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(db.Data), "OpenHashTable", func(_ *data.Data, path string) (ht *data.HashTable, err error) {
 		if strings.Contains(path, index) {
 			return nil, errors.New(errMessage)
 		}
@@ -118,7 +119,7 @@ func TestIndexOpenHashTableError(t *testing.T) {
 	errMessage := "error open hash table"
 	col, _ := OpenCol(db, "test")
 
-	patch := monkey.Patch(data.OpenHashTable, func(path string) (ht *data.HashTable, err error) {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(db.Data), "OpenHashTable", func(_ *data.Data, path string) (ht *data.HashTable, err error) {
 		return nil, errors.New(errMessage)
 	})
 	defer patch.Unpatch()

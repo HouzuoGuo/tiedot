@@ -2,24 +2,27 @@ package data
 
 import (
 	"encoding/binary"
-	"github.com/bouk/monkey"
-	"github.com/pkg/errors"
 	"math"
 	"os"
+	"reflect"
 	"testing"
+
+	"github.com/bouk/monkey"
+	"github.com/pkg/errors"
 )
 
 func TestPutGetReopenClear(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	ht, err := OpenHashTable(tmp)
+	d := defaultData()
+	ht, err := d.OpenHashTable(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
 	// Test initial size information
-	if !(ht.numBuckets == INITIAL_BUCKETS && ht.Used == INITIAL_BUCKETS*BUCKET_SIZE && ht.Size == HT_FILE_GROWTH) {
-		t.Fatal("Wrong size", ht.numBuckets, INITIAL_BUCKETS, ht.Used, INITIAL_BUCKETS*BUCKET_SIZE, ht.Size, HT_FILE_GROWTH)
+	if !(ht.numBuckets == d.InitialBuckets && ht.Used == d.InitialBuckets*d.BucketSize && ht.Size == d.HTFileGrowth) {
+		t.Fatal("Wrong size", ht.numBuckets, d.InitialBuckets, ht.Used, d.InitialBuckets*d.BucketSize, ht.Size, d.HTFileGrowth)
 	}
 	for i := int(0); i < 1024*1024; i++ {
 		ht.Put(i, i)
@@ -35,14 +38,14 @@ func TestPutGetReopenClear(t *testing.T) {
 	if ht.Close(); err != nil {
 		panic(err)
 	}
-	reopened, err := OpenHashTable(tmp)
+	reopened, err := d.OpenHashTable(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 	}
 	if reopened.numBuckets != numBuckets {
 		t.Fatalf("Wrong.numBuckets")
 	}
-	if reopened.Used != numBuckets*BUCKET_SIZE {
+	if reopened.Used != numBuckets*d.BucketSize {
 		t.Fatalf("Wrong UsedSize")
 	}
 	for i := int(0); i < 1024*1024; i++ {
@@ -55,7 +58,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	if err = reopened.Clear(); err != nil {
 		t.Fatal(err)
 	}
-	if !(reopened.numBuckets == INITIAL_BUCKETS && reopened.Used == INITIAL_BUCKETS*BUCKET_SIZE) {
+	if !(reopened.numBuckets == d.InitialBuckets && reopened.Used == d.InitialBuckets*d.BucketSize) {
 		t.Fatal("Did not clear the hash table")
 	}
 	allKV := make(map[int]int)
@@ -76,7 +79,8 @@ func TestPutGet2(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	ht, err := OpenHashTable(tmp)
+	d := defaultData()
+	ht, err := d.OpenHashTable(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -101,7 +105,8 @@ func TestPutRemove(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	ht, err := OpenHashTable(tmp)
+	d := defaultData()
+	ht, err := d.OpenHashTable(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -128,7 +133,8 @@ func TestPartitionEntries(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	ht, err := OpenHashTable(tmp)
+	d := defaultData()
+	ht, err := d.OpenHashTable(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
 		return
@@ -146,7 +152,7 @@ func TestPartitionEntries(t *testing.T) {
 		allKV := make(map[int]int)
 		counter := 0
 		for i := 0; i < parts; i++ {
-			start, end := GetPartitionRange(i, parts)
+			start, end := d.GetPartitionRange(i, parts)
 			keys, vals := ht.GetPartition(i, parts)
 			t.Log("Between ", start, end, " there are ", len(keys))
 			sizeDev := math.Abs(float64(len(keys)-number/parts)) / float64(number/parts)
@@ -177,31 +183,42 @@ func TestOpenHashTableErr(t *testing.T) {
 	})
 	defer patch.Unpatch()
 
-	if _, err := OpenHashTable(""); err.Error() != errMessage {
+	d := defaultData()
+	if _, err := d.OpenHashTable(""); err.Error() != errMessage {
 		t.Error("Expected error open data file")
 	}
 }
 func TestRemoveEntryKeyZero(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	hash, _ := OpenHashTable(tmp)
+	var d *Data
 
-	patch := monkey.Patch(HashKey, func(key int) int {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "HashKey", func(_ *Data, key int) int {
 		return 0
 	})
 	defer patch.Unpatch()
+
+	d = defaultData()
+	hash, _ := d.OpenHashTable(tmp)
+	hash.HashKey(1)
+
 	hash.Put(1, 1)
 	hash.Remove(2, 1)
 }
 func TestRemoveEqualZeroPerBucket(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	hash, _ := OpenHashTable(tmp)
-	hash.Put(1, 1)
-	patch := monkey.Patch(HashKey, func(key int) int {
+	var d *Data
+
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "HashKey", func(_ *Data, key int) int {
 		return 0
 	})
 	defer patch.Unpatch()
+
+	d = defaultData()
+	hash, _ := d.OpenHashTable(tmp)
+	hash.HashKey(1)
+	hash.Put(1, 1)
 
 	patchVarint := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
 		return 1, 0
@@ -221,12 +238,14 @@ func TestCalculateNumBucketsSizeOver(t *testing.T) {
 		}, nil
 	})
 	defer patch.Unpatch()
-	OpenHashTable(tmp)
+	d := defaultData()
+	d.OpenHashTable(tmp)
 }
 func TestNextBucketZero(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	hash, _ := OpenHashTable(tmp)
+	d := defaultData()
+	hash, _ := d.OpenHashTable(tmp)
 	if hash.nextBucket(hash.numBuckets+1) != 0 {
 		t.Error("Expected zero if bucket argument more hash numBuckets")
 	}
