@@ -22,7 +22,7 @@ func TestPartitionDocCRUD(t *testing.T) {
 	os.Remove(htPath)
 	defer os.Remove(colPath)
 	defer os.Remove(htPath)
-	d := defaultData()
+	d := defaultConfig()
 	part, err := d.OpenPartition(colPath, htPath)
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func TestPartitionDocCRUD(t *testing.T) {
 
 // Lock & unlock
 func TestLock(t *testing.T) {
-	d := defaultData()
+	d := defaultConfig()
 	part := d.newPartition()
 	n := 400
 	m := map[int]int{}
@@ -107,7 +107,7 @@ func TestApproxDocCount(t *testing.T) {
 	os.Remove(htPath)
 	defer os.Remove(colPath)
 	defer os.Remove(htPath)
-	d := defaultData()
+	d := defaultConfig()
 	part, err := d.OpenPartition(colPath, htPath)
 	if err != nil {
 		t.Fatal(err)
@@ -155,40 +155,40 @@ func TestApproxDocCount(t *testing.T) {
 	}
 }
 func TestOpenPartitionErrOpenCol(t *testing.T) {
-	var d *Data
+	var d *Config
 	errMessage := "error open collection"
-	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "OpenCollection", func(_ *Data, path string) (col *Collection, err error) {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "OpenCollection", func(_ *Config, path string) (col *Collection, err error) {
 		return nil, errors.New(errMessage)
 	})
 	defer patch.Unpatch()
 
-	d = defaultData()
+	d = defaultConfig()
 	if _, err := d.OpenPartition("", ""); errMessage != err.Error() {
 		t.Error("Expected error after call `OpenCollection`")
 	}
 }
 func TestOpenPartitionOpenHashTable(t *testing.T) {
-	var d *Data
+	var d *Config
 	errMessage := "error open hash table"
 
-	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(d), "OpenCollection", func(_ *Data, path string) (col *Collection, err error) {
+	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(d), "OpenCollection", func(_ *Config, path string) (col *Collection, err error) {
 		return &Collection{}, nil
 	})
 	defer patchCol.Unpatch()
 
-	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "OpenHashTable", func(_ *Data, path string) (col *HashTable, err error) {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "OpenHashTable", func(_ *Config, path string) (col *HashTable, err error) {
 		return nil, errors.New(errMessage)
 	})
 	defer patch.Unpatch()
 
-	d = defaultData()
+	d = defaultConfig()
 	if _, err := d.OpenPartition("", ""); errMessage != err.Error() {
 		t.Error("Expected error after call `OpenCollection`")
 	}
 }
 func TestInsertErr(t *testing.T) {
 	errMessage := "error insert in collection"
-	d := defaultData()
+	d := defaultConfig()
 	part := d.newPartition()
 	var col *Collection
 	patch := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Insert", func(_ *Collection, data []byte) (id int, err error) {
@@ -202,7 +202,7 @@ func TestInsertErr(t *testing.T) {
 
 }
 func TestReadErr(t *testing.T) {
-	d := defaultData()
+	d := defaultConfig()
 	var hash *HashTable
 	var col *Collection
 	patchHash := monkey.PatchInstanceMethod(reflect.TypeOf(hash), "Get", func(_ *HashTable, key, limit int) (vals []int) {
@@ -232,7 +232,7 @@ func TestUpdateErr(t *testing.T) {
 		return 0, errors.New(errMessage)
 	})
 	defer patchCol.Unpatch()
-	d := defaultData()
+	d := defaultConfig()
 	part := d.newPartition()
 	if part.Update(1, []byte("")).Error() != errMessage {
 		t.Error("Expected error when call update collection")
@@ -250,7 +250,7 @@ func TestForEachDocIfCallbackTrue(t *testing.T) {
 	})
 	defer patchCol.Unpatch()
 
-	d := defaultData()
+	d := defaultConfig()
 	part := d.newPartition()
 	res := part.ForEachDoc(0, 0, func(id int, doc []byte) bool {
 		return false
@@ -265,7 +265,7 @@ func TestApproxDocCountKeysEqualZero(t *testing.T) {
 		return []int{}, []int{1, 2, 3}
 	})
 	defer patchHash.Unpatch()
-	d := defaultData()
+	d := defaultConfig()
 	part := d.newPartition()
 	if part.ApproxDocCount() != 0 {
 		t.Error("Expected doc count digit zero")
@@ -278,7 +278,7 @@ func TestClearError(t *testing.T) {
 	var col *DataFile
 	errMessage := "Error Clear"
 
-	d := defaultData()
+	d := defaultConfig()
 	part, _ := d.OpenPartition(tmp, tmp)
 	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Clear", func(_ *DataFile) (err error) {
 		return errors.New(errMessage)
@@ -294,7 +294,7 @@ func TestClose(t *testing.T) {
 	var col *DataFile
 	errMessage := "Error Close"
 
-	d := defaultData()
+	d := defaultConfig()
 	part, _ := d.OpenPartition(tmp, tmp)
 	patchCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Close", func(_ *DataFile) (err error) {
 		return errors.New(errMessage)

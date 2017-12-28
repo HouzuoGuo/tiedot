@@ -199,7 +199,7 @@ func TestCount(t *testing.T) {
 	}
 	Create(w, reqCreate)
 	Count(wCount, req)
-	if	wCount.Code != http.StatusOK || wCount.Body.String() != "0" {
+	if wCount.Code != http.StatusOK || wCount.Body.String() != "0" {
 		t.Errorf("Expected status %d and count '0' ", http.StatusOK)
 	}
 }
@@ -219,7 +219,7 @@ func TestCountJsonIsNotValid(t *testing.T) {
 	Create(w, reqCreate)
 	Count(wCount, req)
 
-	if	wCount.Code != http.StatusBadRequest || strings.TrimSpace(wCount.Body.String()) != fmt.Sprintf("'%s' is not valid JSON.", badJson) {
+	if wCount.Code != http.StatusBadRequest || strings.TrimSpace(wCount.Body.String()) != fmt.Sprintf("'%s' is not valid JSON.", badJson) {
 		t.Errorf("Expected status %d and json is not valid ", http.StatusBadRequest)
 	}
 }

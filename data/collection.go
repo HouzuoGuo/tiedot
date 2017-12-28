@@ -23,28 +23,29 @@ import (
 // Collection file contains document headers and document text data.
 type Collection struct {
 	*DataFile
-	*Data
+	*Config
 }
 
 // Open a collection file.
-func (data *Data) OpenCollection(path string) (col *Collection, err error) {
+func (conf *Config) OpenCollection(path string) (col *Collection, err error) {
 	col = new(Collection)
-	col.DataFile, err = OpenDataFile(path, data.ColFileGrowth)
-	col.Data = data
+	col.DataFile, err = OpenDataFile(path, conf.ColFileGrowth)
+	col.Config = conf
+	col.Config.CalculateConfigConstants()
 	return
 }
 
 // Find and retrieve a document by ID (physical document location). Return value is a copy of the document.
 func (col *Collection) Read(id int) []byte {
-	if id < 0 || id > col.Used-col.DocHeader || col.Buf[id] != 1 {
+	if id < 0 || id > col.Used-DocHeader || col.Buf[id] != 1 {
 		return nil
 	} else if room, _ := binary.Varint(col.Buf[id+1 : id+11]); room > int64(col.DocMaxRoom) {
 		return nil
-	} else if docEnd := id + col.DocHeader + int(room); docEnd >= col.Size {
+	} else if docEnd := id + DocHeader + int(room); docEnd >= col.Size {
 		return nil
 	} else {
 		docCopy := make([]byte, room)
-		copy(docCopy, col.Buf[id+col.DocHeader:docEnd])
+		copy(docCopy, col.Buf[id+DocHeader:docEnd])
 		return docCopy
 	}
 }
@@ -56,7 +57,7 @@ func (col *Collection) Insert(data []byte) (id int, err error) {
 		return 0, dberr.New(dberr.ErrorDocTooLarge, col.DocMaxRoom, room)
 	}
 	id = col.Used
-	docSize := col.DocHeader + room
+	docSize := DocHeader + room
 	if err = col.EnsureSize(docSize); err != nil {
 		return
 	}
@@ -64,8 +65,8 @@ func (col *Collection) Insert(data []byte) (id int, err error) {
 	// Write validity, room, document data and padding
 	col.Buf[id] = 1
 	binary.PutVarint(col.Buf[id+1:id+11], int64(room))
-	copy(col.Buf[id+col.DocHeader:col.Used], data)
-	for padding := id + col.DocHeader + len(data); padding < col.Used; padding += col.LenPadding {
+	copy(col.Buf[id+DocHeader:col.Used], data)
+	for padding := id + DocHeader + len(data); padding < col.Used; padding += col.LenPadding {
 		copySize := col.LenPadding
 		if padding+col.LenPadding >= col.Used {
 			copySize = col.Used - padding
@@ -81,21 +82,21 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 	if dataLen > col.DocMaxRoom {
 		return 0, dberr.New(dberr.ErrorDocTooLarge, col.DocMaxRoom, dataLen)
 	}
-	if id < 0 || id >= col.Used-col.DocHeader || col.Buf[id] != 1 {
+	if id < 0 || id >= col.Used-DocHeader || col.Buf[id] != 1 {
 		return 0, dberr.New(dberr.ErrorNoDoc, id)
 	}
 	currentDocRoom, _ := binary.Varint(col.Buf[id+1 : id+11])
 	if currentDocRoom > int64(col.DocMaxRoom) {
 		return 0, dberr.New(dberr.ErrorNoDoc, id)
 	}
-	if docEnd := id + col.DocHeader + int(currentDocRoom); docEnd >= col.Size {
+	if docEnd := id + DocHeader + int(currentDocRoom); docEnd >= col.Size {
 		return 0, dberr.New(dberr.ErrorNoDoc, id)
 	}
 	if dataLen <= int(currentDocRoom) {
-		padding := id + col.DocHeader + len(data)
-		paddingEnd := id + col.DocHeader + int(currentDocRoom)
+		padding := id + DocHeader + len(data)
+		paddingEnd := id + DocHeader + int(currentDocRoom)
 		// Overwrite data and then overwrite padding
-		copy(col.Buf[id+col.DocHeader:padding], data)
+		copy(col.Buf[id+DocHeader:padding], data)
 		for ; padding < paddingEnd; padding += col.LenPadding {
 			copySize := col.LenPadding
 			if padding+col.LenPadding >= paddingEnd {
@@ -114,7 +115,7 @@ func (col *Collection) Update(id int, data []byte) (newID int, err error) {
 // Delete a document by ID.
 func (col *Collection) Delete(id int) error {
 
-	if id < 0 || id > col.Used-col.DocHeader || col.Buf[id] != 1 {
+	if id < 0 || id > col.Used-DocHeader || col.Buf[id] != 1 {
 		return dberr.New(dberr.ErrorNoDoc, id)
 	}
 
@@ -127,12 +128,12 @@ func (col *Collection) Delete(id int) error {
 
 // Run the function on every document; stop when the function returns false.
 func (col *Collection) ForEachDoc(fun func(id int, doc []byte) bool) {
-	for id := 0; id < col.Used-col.DocHeader && id >= 0; {
+	for id := 0; id < col.Used-DocHeader && id >= 0; {
 		validity := col.Buf[id]
 		room, _ := binary.Varint(col.Buf[id+1 : id+11])
-		docEnd := id + col.DocHeader + int(room)
+		docEnd := id + DocHeader + int(room)
 		if (validity == 0 || validity == 1) && room <= int64(col.DocMaxRoom) && docEnd > 0 && docEnd <= col.Used {
-			if validity == 1 && !fun(id, col.Buf[id+col.DocHeader:docEnd]) {
+			if validity == 1 && !fun(id, col.Buf[id+DocHeader:docEnd]) {
 				break
 			}
 			id = docEnd

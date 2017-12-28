@@ -28,7 +28,7 @@ func TestColMkDirErr(t *testing.T) {
 func TestOpenPartitionErr(t *testing.T) {
 	db, _ := OpenDB(TEST_DATA_DIR)
 	errMessage := "Error OpenPartition"
-	patch := monkey.PatchInstanceMethod(reflect.TypeOf(db.Data), "OpenPartition", func(_ *data.Data, colPath, lookupPath string) (part *data.Partition, err error) {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(db.Config), "OpenPartition", func(_ *data.Config, colPath, lookupPath string) (part *data.Partition, err error) {
 		return nil, errors.New(errMessage)
 	})
 	defer patch.Unpatch()
@@ -59,7 +59,7 @@ func TestLoadErrorOpenHashTableWhenParseIndex(t *testing.T) {
 	for key, _ := range col.hts {
 		col.hts[key] = nil
 	}
-	patch := monkey.PatchInstanceMethod(reflect.TypeOf(db.Data), "OpenHashTable", func(_ *data.Data, path string) (ht *data.HashTable, err error) {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(db.Config), "OpenHashTable", func(_ *data.Config, path string) (ht *data.HashTable, err error) {
 		if strings.Contains(path, index) {
 			return nil, errors.New(errMessage)
 		}
@@ -119,7 +119,7 @@ func TestIndexOpenHashTableError(t *testing.T) {
 	errMessage := "error open hash table"
 	col, _ := OpenCol(db, "test")
 
-	patch := monkey.PatchInstanceMethod(reflect.TypeOf(db.Data), "OpenHashTable", func(_ *data.Data, path string) (ht *data.HashTable, err error) {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(db.Config), "OpenHashTable", func(_ *data.Config, path string) (ht *data.HashTable, err error) {
 		return nil, errors.New(errMessage)
 	})
 	defer patch.Unpatch()

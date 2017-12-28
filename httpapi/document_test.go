@@ -198,7 +198,7 @@ func TInsertError(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
 
-	sizeByte := data.DOC_MAX_ROOM
+	sizeByte := data.DefaultDocMaxRoom
 	stringJson := fmt.Sprintf("{\"a\": 1, \"b\": \"%s\"}", RandStringBytes(sizeByte))
 	b := bytes.NewBuffer([]byte(stringJson))
 	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)

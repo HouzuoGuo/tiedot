@@ -3,5 +3,5 @@
 package data
 
 const (
-	COL_FILE_GROWTH = 8 * 1048576 // Collection file initial size & size growth (8 MBytes)
+	COL_FILE_GROWTH = 8 * 1048576 // Default collection file initial size & size growth (8 MBytes)
 )

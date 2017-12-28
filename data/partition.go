@@ -14,7 +14,7 @@ import (
 
 // Partition associates a hash table with collection documents, allowing addressing of a document using an unchanging ID.
 type Partition struct {
-	*Data
+	*Config
 	col      *Collection
 	lookup   *HashTable
 	DataLock *sync.RWMutex // guard against concurrent document updates
@@ -23,9 +23,10 @@ type Partition struct {
 	exclUpdateLock *sync.Mutex // guard against concurrent exclusive locking of documents
 }
 
-func (data *Data) newPartition() *Partition {
+func (conf *Config) newPartition() *Partition {
+	conf.CalculateConfigConstants()
 	return &Partition{
-		Data:           data,
+		Config:         conf,
 		exclUpdateLock: new(sync.Mutex),
 		exclUpdate:     make(map[int]chan struct{}),
 		DataLock:       new(sync.RWMutex),
@@ -33,11 +34,12 @@ func (data *Data) newPartition() *Partition {
 }
 
 // Open a collection partition.
-func (data *Data) OpenPartition(colPath, lookupPath string) (part *Partition, err error) {
-	part = data.newPartition()
-	if part.col, err = data.OpenCollection(colPath); err != nil {
+func (conf *Config) OpenPartition(colPath, lookupPath string) (part *Partition, err error) {
+	part = conf.newPartition()
+	part.CalculateConfigConstants()
+	if part.col, err = conf.OpenCollection(colPath); err != nil {
 		return
-	} else if part.lookup, err = data.OpenHashTable(lookupPath); err != nil {
+	} else if part.lookup, err = conf.OpenHashTable(lookupPath); err != nil {
 		return
 	}
 	return

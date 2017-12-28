@@ -15,7 +15,7 @@ func TestPutGetReopenClear(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	d := defaultData()
+	d := defaultConfig()
 	ht, err := d.OpenHashTable(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
@@ -43,7 +43,7 @@ func TestPutGetReopenClear(t *testing.T) {
 		t.Fatalf("Failed to open: %v", err)
 	}
 	if reopened.numBuckets != numBuckets {
-		t.Fatalf("Wrong.numBuckets")
+		t.Fatalf("Wrong numBuckets %d, expected %d", reopened.numBuckets, numBuckets)
 	}
 	if reopened.Used != numBuckets*d.BucketSize {
 		t.Fatalf("Wrong UsedSize")
@@ -79,7 +79,7 @@ func TestPutGet2(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	d := defaultData()
+	d := defaultConfig()
 	ht, err := d.OpenHashTable(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
@@ -105,7 +105,7 @@ func TestPutRemove(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	d := defaultData()
+	d := defaultConfig()
 	ht, err := d.OpenHashTable(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
@@ -133,7 +133,7 @@ func TestPartitionEntries(t *testing.T) {
 	tmp := "/tmp/tiedot_test_hash"
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	d := defaultData()
+	d := defaultConfig()
 	ht, err := d.OpenHashTable(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
@@ -183,7 +183,7 @@ func TestOpenHashTableErr(t *testing.T) {
 	})
 	defer patch.Unpatch()
 
-	d := defaultData()
+	d := defaultConfig()
 	if _, err := d.OpenHashTable(""); err.Error() != errMessage {
 		t.Error("Expected error open data file")
 	}
@@ -191,14 +191,14 @@ func TestOpenHashTableErr(t *testing.T) {
 func TestRemoveEntryKeyZero(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	var d *Data
+	var d *Config
 
-	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "HashKey", func(_ *Data, key int) int {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "HashKey", func(_ *Config, key int) int {
 		return 0
 	})
 	defer patch.Unpatch()
 
-	d = defaultData()
+	d = defaultConfig()
 	hash, _ := d.OpenHashTable(tmp)
 	hash.HashKey(1)
 
@@ -208,14 +208,14 @@ func TestRemoveEntryKeyZero(t *testing.T) {
 func TestRemoveEqualZeroPerBucket(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	var d *Data
+	var d *Config
 
-	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "HashKey", func(_ *Data, key int) int {
+	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "HashKey", func(_ *Config, key int) int {
 		return 0
 	})
 	defer patch.Unpatch()
 
-	d = defaultData()
+	d = defaultConfig()
 	hash, _ := d.OpenHashTable(tmp)
 	hash.HashKey(1)
 	hash.Put(1, 1)
@@ -238,13 +238,13 @@ func TestCalculateNumBucketsSizeOver(t *testing.T) {
 		}, nil
 	})
 	defer patch.Unpatch()
-	d := defaultData()
+	d := defaultConfig()
 	d.OpenHashTable(tmp)
 }
 func TestNextBucketZero(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	d := defaultData()
+	d := defaultConfig()
 	hash, _ := d.OpenHashTable(tmp)
 	if hash.nextBucket(hash.numBuckets+1) != 0 {
 		t.Error("Expected zero if bucket argument more hash numBuckets")

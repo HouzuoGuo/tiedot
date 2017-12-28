@@ -668,7 +668,7 @@ func TestScrubTmpColClose(t *testing.T) {
 	database, _ := OpenDB(TEST_DATA_DIR)
 	col, _ := OpenCol(database, collectName)
 	database.cols = map[string]*Col{collectName: col}
-	
+
 	var (
 		dataFile *data.DataFile
 		str      bytes.Buffer

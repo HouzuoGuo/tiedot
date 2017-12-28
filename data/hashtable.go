@@ -20,18 +20,19 @@ import (
 
 // Hash table file is a binary file containing buckets of hash entries.
 type HashTable struct {
-	*Data
+	*Config
 	*DataFile
 	numBuckets int
 	Lock       *sync.RWMutex
 }
 
 // Open a hash table file.
-func (data *Data) OpenHashTable(path string) (ht *HashTable, err error) {
-	ht = &HashTable{Data: data, Lock: new(sync.RWMutex)}
+func (conf *Config) OpenHashTable(path string) (ht *HashTable, err error) {
+	ht = &HashTable{Config: conf, Lock: new(sync.RWMutex)}
 	if ht.DataFile, err = OpenDataFile(path, ht.HTFileGrowth); err != nil {
 		return
 	}
+	conf.CalculateConfigConstants()
 	ht.calculateNumBuckets()
 	return
 }
@@ -106,7 +107,7 @@ func (ht *HashTable) Clear() (err error) {
 // Store the entry into a vacant (invalidated or empty) place in the appropriate bucket.
 func (ht *HashTable) Put(key, val int) {
 	for bucket, entry := ht.HashKey(key), 0; ; {
-		entryAddr := bucket*ht.BucketSize + ht.BucketHeader + entry*ht.EntrySize
+		entryAddr := bucket*ht.BucketSize + BucketHeader + entry*EntrySize
 		if ht.Buf[entryAddr] != 1 {
 			ht.Buf[entryAddr] = 1
 			binary.PutVarint(ht.Buf[entryAddr+1:entryAddr+11], int64(key))
@@ -132,7 +133,7 @@ func (ht *HashTable) Get(key, limit int) (vals []int) {
 		vals = make([]int, 0, limit)
 	}
 	for count, entry, bucket := 0, 0, ht.HashKey(key); ; {
-		entryAddr := bucket*ht.BucketSize + ht.BucketHeader + entry*ht.EntrySize
+		entryAddr := bucket*ht.BucketSize + BucketHeader + entry*EntrySize
 		entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
 		if ht.Buf[entryAddr] == 1 {
@@ -157,7 +158,7 @@ func (ht *HashTable) Get(key, limit int) (vals []int) {
 // Flag an entry as invalid, so that Get will not return it later on.
 func (ht *HashTable) Remove(key, val int) {
 	for entry, bucket := 0, ht.HashKey(key); ; {
-		entryAddr := bucket*ht.BucketSize + ht.BucketHeader + entry*ht.EntrySize
+		entryAddr := bucket*ht.BucketSize + BucketHeader + entry*EntrySize
 		entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
 		if ht.Buf[entryAddr] == 1 {
@@ -178,9 +179,9 @@ func (ht *HashTable) Remove(key, val int) {
 }
 
 // Divide the entire hash table into roughly equally sized partitions, and return the start/end key range of the chosen partition.
-func (data *Data) GetPartitionRange(partNum, totalParts int) (start int, end int) {
-	perPart := data.InitialBuckets / totalParts
-	leftOver := data.InitialBuckets % totalParts
+func (conf *Config) GetPartitionRange(partNum, totalParts int) (start int, end int) {
+	perPart := conf.InitialBuckets / totalParts
+	leftOver := conf.InitialBuckets % totalParts
 	start = partNum * perPart
 	if leftOver > 0 {
 		if partNum == 0 {
@@ -194,7 +195,7 @@ func (data *Data) GetPartitionRange(partNum, totalParts int) (start int, end int
 	}
 	end += start + perPart
 	if partNum == totalParts-1 {
-		end = data.InitialBuckets
+		end = conf.InitialBuckets
 	}
 	return
 }
@@ -205,7 +206,7 @@ func (ht *HashTable) collectEntries(head int) (keys, vals []int) {
 	vals = make([]int, 0, ht.PerBucket)
 	var entry, bucket int = 0, head
 	for {
-		entryAddr := bucket*ht.BucketSize + ht.BucketHeader + entry*ht.EntrySize
+		entryAddr := bucket*ht.BucketSize + BucketHeader + entry*EntrySize
 		entryKey, _ := binary.Varint(ht.Buf[entryAddr+1 : entryAddr+11])
 		entryVal, _ := binary.Varint(ht.Buf[entryAddr+11 : entryAddr+21])
 		if ht.Buf[entryAddr] == 1 {

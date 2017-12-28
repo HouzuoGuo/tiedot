@@ -636,7 +636,7 @@ func TestUpdateBytesPartUpdateErr(t *testing.T) {
 func TestUpdateBytesFuncIsLog(t *testing.T) {
 	var (
 		part *data.Partition
-		str bytes.Buffer
+		str  bytes.Buffer
 	)
 	log.SetOutput(&str)
 
@@ -680,7 +680,7 @@ func TestUpdateFuncDocNotExistError(t *testing.T) {
 		return nil, nil
 	})
 
-	if 	err.Error() != "Document `0` does not exist" {
+	if err.Error() != "Document `0` does not exist" {
 		t.Error("Expected error document not exist")
 	}
 }
@@ -688,7 +688,7 @@ func TestUpdateFuncUnmarshalError(t *testing.T) {
 	db, _ := OpenDB(tempDir)
 	defer os.RemoveAll(tempDir)
 	col, _ := OpenCol(db, "test")
-	id, _ := col.Insert(map[string]interface{}{"test":"test"})
+	id, _ := col.Insert(map[string]interface{}{"test": "test"})
 
 	errMessage := "Error json marshal"
 	patchMarshal := monkey.Patch(json.Unmarshal, func(data []byte, v interface{}) error {
@@ -700,7 +700,7 @@ func TestUpdateFuncUnmarshalError(t *testing.T) {
 		return nil, nil
 	})
 
-	if 	err.Error() != errMessage {
+	if err.Error() != errMessage {
 		t.Error("Expected error json marshaling")
 	}
 }
@@ -708,7 +708,7 @@ func TestUpdateFuncMarshalError(t *testing.T) {
 	db, _ := OpenDB(tempDir)
 	defer os.RemoveAll(tempDir)
 	col, _ := OpenCol(db, "test")
-	id, _ := col.Insert(map[string]interface{}{"test":"test"})
+	id, _ := col.Insert(map[string]interface{}{"test": "test"})
 
 	errMessage := "Error json marshal"
 	patchMarshal := monkey.Patch(json.Marshal, func(v interface{}) ([]byte, error) {
@@ -720,7 +720,7 @@ func TestUpdateFuncMarshalError(t *testing.T) {
 		return nil, nil
 	})
 
-	if 	err.Error() != errMessage {
+	if err.Error() != errMessage {
 		t.Error("Expected error json marshaling")
 	}
 }
@@ -728,14 +728,14 @@ func TestUpdateFuncUpdateError(t *testing.T) {
 	db, _ := OpenDB(tempDir)
 	defer os.RemoveAll(tempDir)
 	col, _ := OpenCol(db, "test")
-	id, _ := col.Insert(map[string]interface{}{"test":"test"})
+	id, _ := col.Insert(map[string]interface{}{"test": "test"})
 
 	errMessage := "Error update"
 	err := col.UpdateFunc(id, func(origDoc map[string]interface{}) (newDoc map[string]interface{}, err error) {
 		return nil, errors.New(errMessage)
 	})
 
-	if 	err.Error() != errMessage {
+	if err.Error() != errMessage {
 		t.Errorf("Expected error: %s", errMessage)
 	}
 }
@@ -745,7 +745,7 @@ func TestUpdateFuncPartUpdateError(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 	errMessage := "Error update"
 	col, _ := OpenCol(db, "test")
-	id, _ := col.Insert(map[string]interface{}{"test":"test"})
+	id, _ := col.Insert(map[string]interface{}{"test": "test"})
 	patchUpdate := monkey.PatchInstanceMethod(reflect.TypeOf(part), "Update", func(_ *data.Partition, id int, data []byte) (err error) {
 		return nil
 	})
@@ -754,7 +754,7 @@ func TestUpdateFuncPartUpdateError(t *testing.T) {
 		return nil, errors.New(errMessage)
 	})
 
-	if 	err.Error() != errMessage {
+	if err.Error() != errMessage {
 		t.Errorf("Expected error: %s", errMessage)
 	}
 }
@@ -765,21 +765,21 @@ func TestDeleteError(t *testing.T) {
 	errMessage := "Error delete"
 	col, _ := OpenCol(db, "test")
 
-	id, _ := col.Insert(map[string]interface{}{"test":"test"})
+	id, _ := col.Insert(map[string]interface{}{"test": "test"})
 	patchUpdate := monkey.PatchInstanceMethod(reflect.TypeOf(part), "Delete", func(_ *data.Partition, id int) (err error) {
 		return errors.New(errMessage)
 	})
 	defer patchUpdate.Unpatch()
 	err := col.Delete(id)
 
-	if 	err.Error() != errMessage {
+	if err.Error() != errMessage {
 		t.Errorf("Expected error: %s", errMessage)
 	}
 }
 func TestDeleteMarshalJsError(t *testing.T) {
 	var (
 		part *data.Partition
-		str bytes.Buffer
+		str  bytes.Buffer
 	)
 	log.SetOutput(&str)
 	db, _ := OpenDB(tempDir)
@@ -787,7 +787,7 @@ func TestDeleteMarshalJsError(t *testing.T) {
 	errMessage := "Error json marshal"
 	col, _ := OpenCol(db, "test")
 
-	id, _ := col.Insert(map[string]interface{}{"test":"test"})
+	id, _ := col.Insert(map[string]interface{}{"test": "test"})
 	patchUpdate := monkey.PatchInstanceMethod(reflect.TypeOf(part), "Delete", func(_ *data.Partition, id int) (err error) {
 		return nil
 	})

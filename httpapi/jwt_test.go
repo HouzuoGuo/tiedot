@@ -419,7 +419,7 @@ func TestJwtWrapMethodNotRsa(t *testing.T) {
 
 	token.Claims = jwt.MapClaims{
 		"PERMISSION":       "admin@tiedot",
-		JWT_ENDPOINTS_ATTR:  []interface{}{},
+		JWT_ENDPOINTS_ATTR: []interface{}{},
 		"exp":              time.Now().Add(time.Hour * 72).Unix(),
 	}
 	ts, err := token.SignedString(privateKey)
@@ -430,7 +430,7 @@ func TestJwtWrapMethodNotRsa(t *testing.T) {
 
 	})(w, req)
 
-	if w.Code != http.StatusUnauthorized{
+	if w.Code != http.StatusUnauthorized {
 		t.Error("Expected status 401")
 	}
 }
@@ -452,9 +452,9 @@ func TestJwtWrapMethodAdmin(t *testing.T) {
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 
 	token.Claims = jwt.MapClaims{
-		JWT_USER_ATTR:JWT_USER_ADMIN,
-		"PERMISSION":       "admin@tiedot",
-		"exp":              time.Now().Add(time.Hour * 72).Unix(),
+		JWT_USER_ATTR: JWT_USER_ADMIN,
+		"PERMISSION":  "admin@tiedot",
+		"exp":         time.Now().Add(time.Hour * 72).Unix(),
 	}
 	ts, err := token.SignedString(privateKey)
 
@@ -464,7 +464,7 @@ func TestJwtWrapMethodAdmin(t *testing.T) {
 
 	})(w, req)
 
-	if w.Code != http.StatusOK{
+	if w.Code != http.StatusOK {
 		t.Error("Expected status 200")
 	}
 }
@@ -487,7 +487,7 @@ func TestJwtWrapNotSliceEndPoints(t *testing.T) {
 
 	token.Claims = jwt.MapClaims{
 		"PERMISSION":       "admin@tiedot",
-		JWT_ENDPOINTS_ATTR:  []interface{}{},
+		JWT_ENDPOINTS_ATTR: []interface{}{},
 		"exp":              time.Now().Add(time.Hour * 72).Unix(),
 	}
 	ts, err := token.SignedString(privateKey)
@@ -498,7 +498,7 @@ func TestJwtWrapNotSliceEndPoints(t *testing.T) {
 
 	})(w, req)
 
-	if w.Code != http.StatusUnauthorized{
+	if w.Code != http.StatusUnauthorized {
 		t.Error("Expected status 401")
 	}
 }

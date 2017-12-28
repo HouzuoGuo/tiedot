@@ -28,14 +28,14 @@ func RandStringBytes(n int) string {
 func setupTestCollection() (col *Collection, err error) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	d := defaultData()
+	d := defaultConfig()
 	return d.OpenCollection(tmp)
 }
 
 func TestInsertRead(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	data := defaultData()
+	data := defaultConfig()
 	col, err := data.OpenCollection(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
@@ -100,7 +100,7 @@ func TestInsertRead(t *testing.T) {
 func TestInsertUpdateRead(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	d := defaultData()
+	d := defaultConfig()
 	col, err := d.OpenCollection(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
@@ -138,7 +138,7 @@ func TestEndDocumentExceeded(t *testing.T) {
 	var id int
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	d := defaultData()
+	d := defaultConfig()
 	col, err := d.OpenCollection(tmp)
 	defer col.Close()
 
@@ -202,7 +202,7 @@ func TestUpdate(t *testing.T) {
 func TestInsertDeleteRead(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	d := defaultData()
+	d := defaultConfig()
 	col, err := d.OpenCollection(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
@@ -243,7 +243,7 @@ func TestInsertDeleteRead(t *testing.T) {
 func TestInsertReadAll(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	d := defaultData()
+	d := defaultConfig()
 	col, err := d.OpenCollection(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
@@ -300,7 +300,7 @@ func TestInsertReadAll(t *testing.T) {
 func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
-	d := defaultData()
+	d := defaultConfig()
 	col, err := d.OpenCollection(tmp)
 	if err != nil {
 		t.Fatalf("Failed to open: %v", err)
@@ -322,7 +322,7 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 		t.Fatalf("Failed to insert: %v", err)
 	}
 	// Test UsedSize
-	calculatedUsedSize := (col.DocHeader + 3*2) + (col.DocHeader+4*2)*2
+	calculatedUsedSize := (DocHeader + 3*2) + (DocHeader+4*2)*2
 	if col.Used != calculatedUsedSize {
 		t.Fatalf("Invalid UsedSize")
 	}
@@ -377,7 +377,7 @@ func TestCollectionGrowAndOutOfBoundAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	count++
-	calculatedUsedSize += count * (col.DocHeader + col.DocMaxRoom)
+	calculatedUsedSize += count * (DocHeader + col.DocMaxRoom)
 	if col.Used != calculatedUsedSize {
 		t.Fatalf("Wrong UsedSize %d %d", col.Used, calculatedUsedSize)
 	}
