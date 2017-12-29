@@ -131,11 +131,6 @@ func TestQueryErrEvalQuery(t *testing.T) {
 func TestQuerySerializeError(t *testing.T) {
 	setupTestCase()
 	defer tearDownTestCase()
-	errMessage := "error marshal"
-	path := monkey.Patch(json.Marshal, func(v interface{}) ([]byte, error) {
-		return nil, errors.New(errMessage)
-	})
-	defer path.Unpatch()
 
 	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
 	req := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestQueryWithAll, collection, "1"), nil)
@@ -145,6 +140,11 @@ func TestQuerySerializeError(t *testing.T) {
 	if HttpDB, err = db.OpenDB(tempDir); err != nil {
 		panic(err)
 	}
+
+	path := monkey.Patch(json.Marshal, func(v interface{}) ([]byte, error) {
+		return nil, errors.New("error marshal")
+	})
+	defer path.Unpatch()
 	Create(w, reqCreate)
 	Query(wQuery, req)
 	if wQuery.Code != http.StatusInternalServerError || strings.TrimSpace(wQuery.Body.String()) != "Server error: query returned invalid structure" {

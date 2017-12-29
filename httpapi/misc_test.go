@@ -113,8 +113,8 @@ func TDumpError(t *testing.T) {
 	reqDump := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestDump, tempDir), nil)
 
 	Dump(wDump, reqDump)
-	if wDump.Code != 500 || strings.TrimSpace(wDump.Body.String()) != "Destination file tmp/number_of_partitions already exists" {
-		t.Error("Expected code 500 and error message folder exists.")
+	if wDump.Code != 500 || strings.TrimSpace(wDump.Body.String()) != "Destination file tmp/data-config.json already exists" {
+		t.Error("Expected code 500 and error message folder exists.", wDump.Code, wDump.Body.String())
 	}
 }
 func TMemStats(t *testing.T) {
