@@ -52,9 +52,13 @@ func (col *Collection) Read(id int) []byte {
 
 // Insert a new document, return the new document ID.
 func (col *Collection) Insert(data []byte) (id int, err error) {
-	room := len(data) << 1
-	if room > col.DocMaxRoom {
-		return 0, dberr.New(dberr.ErrorDocTooLarge, col.DocMaxRoom, room)
+	if len(data) > col.DocMaxRoom {
+		return 0, dberr.New(dberr.ErrorDocTooLarge, col.DocMaxRoom, len(data))
+	}
+
+	room := col.DocMaxRoom
+	if dataLengthDouble := len(data) << 1; dataLengthDouble < col.DocMaxRoom {
+		room = dataLengthDouble
 	}
 	id = col.Used
 	docSize := DocHeader + room
