@@ -3,10 +3,6 @@ package main
 
 import (
 	"flag"
-	"github.com/HouzuoGuo/tiedot/benchmark"
-	"github.com/HouzuoGuo/tiedot/examples"
-	"github.com/HouzuoGuo/tiedot/httpapi"
-	"github.com/HouzuoGuo/tiedot/tdlog"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -14,6 +10,11 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
+
+	"github.com/HouzuoGuo/tiedot/benchmark"
+	"github.com/HouzuoGuo/tiedot/examples"
+	"github.com/HouzuoGuo/tiedot/httpapi"
+	"github.com/HouzuoGuo/tiedot/tdlog"
 )
 
 // Read Linux system VM parameters and print performance configuration advice when necessary.
@@ -108,7 +109,7 @@ func main() {
 	if profile {
 		resultFile, err := os.Create("perf.out")
 		if err != nil {
-			tdlog.Noticef("Cannot create profiler result file %s", resultFile)
+			tdlog.Noticef("Cannot create profiler result file %v", err)
 			os.Exit(1)
 		}
 		pprof.StartCPUProfile(resultFile)
