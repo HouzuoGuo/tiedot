@@ -2,11 +2,12 @@ package data
 
 import (
 	"errors"
-	"github.com/HouzuoGuo/tiedot/gommap"
-	"github.com/bouk/monkey"
 	"os"
 	"reflect"
 	"testing"
+
+	"bou.ke/monkey"
+	"github.com/HouzuoGuo/tiedot/gommap"
 )
 
 const tmp = "/tmp/tiedot_test_file"

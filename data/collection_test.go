@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"bou.ke/monkey"
 	"github.com/HouzuoGuo/tiedot/dberr"
-	"github.com/bouk/monkey"
 )
 
 // helper function
