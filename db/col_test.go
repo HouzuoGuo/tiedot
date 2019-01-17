@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"bou.ke/monkey"
 	"github.com/HouzuoGuo/tiedot/data"
-	"github.com/bouk/monkey"
 	"github.com/pkg/errors"
 )
 

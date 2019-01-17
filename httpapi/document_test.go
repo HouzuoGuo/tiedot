@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/data"
-	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/bouk/monkey"
 	"math/rand"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
+
+	"bou.ke/monkey"
+	"github.com/HouzuoGuo/tiedot/data"
+	"github.com/HouzuoGuo/tiedot/db"
 )
 
 var (

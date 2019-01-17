@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/bouk/monkey"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"bou.ke/monkey"
+	"github.com/HouzuoGuo/tiedot/db"
 )
 
 var (

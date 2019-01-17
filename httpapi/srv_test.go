@@ -3,9 +3,6 @@ package httpapi
 import (
 	"bytes"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/bouk/monkey"
-	"github.com/pkg/errors"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +10,10 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"bou.ke/monkey"
+	"github.com/HouzuoGuo/tiedot/db"
+	"github.com/pkg/errors"
 )
 
 var (

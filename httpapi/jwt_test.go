@@ -3,11 +3,6 @@ package httpapi
 import (
 	"bytes"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/bouk/monkey"
-	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/dgrijalva/jwt-go/request"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -17,6 +12,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"bou.ke/monkey"
+	"github.com/HouzuoGuo/tiedot/db"
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go/request"
+	"github.com/pkg/errors"
 )
 
 var (

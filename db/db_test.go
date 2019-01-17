@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/HouzuoGuo/tiedot/data"
-	"github.com/bouk/monkey"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -17,6 +14,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"bou.ke/monkey"
+	"github.com/HouzuoGuo/tiedot/data"
+	"github.com/pkg/errors"
 )
 
 const (

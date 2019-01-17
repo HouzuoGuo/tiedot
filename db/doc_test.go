@@ -14,11 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HouzuoGuo/tiedot/data"
-	"github.com/HouzuoGuo/tiedot/dberr"
-	"github.com/bouk/monkey"
 	"log"
 	"reflect"
+
+	"bou.ke/monkey"
+	"github.com/HouzuoGuo/tiedot/data"
+	"github.com/HouzuoGuo/tiedot/dberr"
 )
 
 var (

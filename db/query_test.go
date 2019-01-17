@@ -7,10 +7,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/HouzuoGuo/tiedot/dberr"
-	"github.com/bouk/monkey"
-	"github.com/pkg/errors"
 	"strings"
+
+	"bou.ke/monkey"
+	"github.com/HouzuoGuo/tiedot/dberr"
+	"github.com/pkg/errors"
 )
 
 func ensureMapHasKeys(m map[int]struct{}, keys ...int) bool {
