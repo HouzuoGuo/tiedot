@@ -75,6 +75,7 @@ func CreateOrReadConfig(path string) (conf *Config, err error) {
 				return
 			}
 
+			_ = file.Close()
 		} else {
 			return
 		}
@@ -89,6 +90,7 @@ func CreateOrReadConfig(path string) (conf *Config, err error) {
 		if err = json.Unmarshal(b, conf); err != nil {
 			return
 		}
+		_ = file.Close()
 	}
 
 	conf.CalculateConfigConstants()
