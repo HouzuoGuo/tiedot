@@ -6,7 +6,7 @@
       <a href="https://godoc.org/github.com/HouzuoGuo/tiedot"><img src="https://godoc.org/github.com/HouzuoGuo/tiedot?status.svg" alt="GoDoc"></a> 
  </p>
  
-<p align="center"> <a href="http://tiedot.github.io"><strong>Documentation</strong></a> </p>
+<p align="center"> <a href="https://github.com/HouzuoGuo/tiedot/wiki"><strong>Documentation</strong></a> </p>
 
 Keywords: Golang, go, document database, NoSQL, JSON
 
