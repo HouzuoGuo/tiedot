@@ -291,6 +291,8 @@ func (db *DB) Dump(dest string) error {
 			if err != nil {
 				return err
 			}
+			_ = destFile.Close()
+			_ = src.Close()
 			tdlog.Noticef("Dump: copied file %s, size is %d", destPath, written)
 		}
 		return nil
