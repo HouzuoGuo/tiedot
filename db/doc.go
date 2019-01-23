@@ -30,9 +30,9 @@ func GetIn(doc interface{}, path []string) (ret []interface{}) {
 			return nil
 		}
 	}
-	switch thing.(type) {
+	switch thing := thing.(type) {
 	case []interface{}:
-		return append(ret, thing.([]interface{})...)
+		return append(ret, thing...)
 	default:
 		return append(ret, thing)
 	}
