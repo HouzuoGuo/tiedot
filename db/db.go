@@ -49,7 +49,6 @@ func OpenDB(dbPath string) (*DB, error) {
 // Load all collection schema.
 func (db *DB) load() error {
 	// Create DB directory and PART_NUM_FILE if necessary
-	var numPartsAssumed = false
 	numPartsFilePath := path.Join(db.path, PART_NUM_FILE)
 	if err := os.MkdirAll(db.path, 0700); err != nil {
 		return err
@@ -59,7 +58,7 @@ func (db *DB) load() error {
 		if err := ioutil.WriteFile(numPartsFilePath, []byte(strconv.Itoa(runtime.NumCPU())), 0600); err != nil {
 			return err
 		}
-		numPartsAssumed = true
+		return fmt.Errorf("Please manually repair database partition number config file %s", numPartsFilePath)
 	} else if partNumFile.IsDir() {
 		return fmt.Errorf("Database config file %s is actually a directory, is database path correct?", PART_NUM_FILE)
 	}
@@ -78,9 +77,6 @@ func (db *DB) load() error {
 	for _, maybeColDir := range dirContent {
 		if !maybeColDir.IsDir() {
 			continue
-		}
-		if numPartsAssumed {
-			return fmt.Errorf("Please manually repair database partition number config file %s", numPartsFilePath)
 		}
 		if db.cols[maybeColDir.Name()], err = OpenCol(db, maybeColDir.Name()); err != nil {
 			return err
