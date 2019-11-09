@@ -185,7 +185,10 @@ func (col *Col) Update(id int, doc map[string]interface{}) error {
 
 	// Done with the collection data, next is to maintain indexed values
 	var original map[string]interface{}
-	json.Unmarshal(originalB, &original)
+	if err = json.Unmarshal(originalB, &original); err != nil {
+		col.db.schemaLock.RUnlock()
+		return err
+	}
 	part.LockUpdate(id)
 	if original != nil {
 		col.unindexDoc(id, original)
@@ -218,7 +221,12 @@ func (col *Col) UpdateBytesFunc(id int, update func(origDoc []byte) (newDoc []by
 		return err
 	}
 	var original map[string]interface{}
-	json.Unmarshal(originalB, &original) // Unmarshal originalB before passing it to update
+	// Unmarshal originalB before passing it to update
+	if err = json.Unmarshal(originalB, &original); err != nil {
+		part.DataLock.Unlock()
+		col.db.schemaLock.RUnlock()
+		return err
+	}
 	docB, err := update(originalB)
 	if err != nil {
 		part.DataLock.Unlock()
