@@ -578,7 +578,7 @@ func TestUpdateBytesCallbackError(t *testing.T) {
 	var part *data.Partition
 	db, _ := OpenDB(tempDir)
 	defer os.RemoveAll(tempDir)
-	errMessage := "error update"
+	errMessage := "unexpected end of JSON input"
 	col, _ := OpenCol(db, "test")
 	patchRead := monkey.PatchInstanceMethod(reflect.TypeOf(part), "Read", func(_ *data.Partition, id int) ([]byte, error) {
 		return nil, nil
@@ -587,7 +587,7 @@ func TestUpdateBytesCallbackError(t *testing.T) {
 	if err := col.UpdateBytesFunc(0, func(origDoc []byte) (newDoc []byte, err error) {
 		return []byte{}, errors.New(errMessage)
 	}); err.Error() != errMessage {
-		t.Errorf("expected error message %s, actual %s", errMessage, err.Error())
+		t.Errorf("expected error message |%s|, actual |%s|", errMessage, err.Error())
 	}
 }
 func TestUpdateBytesJsMarshalErr(t *testing.T) {
