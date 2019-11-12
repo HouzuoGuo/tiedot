@@ -584,10 +584,10 @@ func TestUpdateBytesCallbackError(t *testing.T) {
 		return nil, nil
 	})
 	defer patchRead.Unpatch()
-	if col.UpdateBytesFunc(0, func(origDoc []byte) (newDoc []byte, err error) {
+	if err := col.UpdateBytesFunc(0, func(origDoc []byte) (newDoc []byte, err error) {
 		return []byte{}, errors.New(errMessage)
-	}).Error() != errMessage {
-		t.Errorf("expected error message %s", errMessage)
+	}); err.Error() != errMessage {
+		t.Errorf("expected error message %s, actual %s", errMessage, err.Error())
 	}
 }
 func TestUpdateBytesJsMarshalErr(t *testing.T) {
