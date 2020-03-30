@@ -28,7 +28,6 @@ func TestIndex(t *testing.T) {
 		TIndexCollNotExist,
 		TIndexesNotCol,
 		TIndexesCollNotExist,
-		TIndexErrMarshalJson,
 		TUnIndexes,
 		TUnIndexesColNotExist,
 		TUnIndexNotCol,

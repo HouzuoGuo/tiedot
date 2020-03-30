@@ -47,7 +47,6 @@ func TestCollection(t *testing.T) {
 		TScrubCollectionNotExist,
 		TScrub,
 		TSync,
-		TAllErrorMarshal,
 	}
 	managerSubTests(testsCollection, "collection_test", t)
 }

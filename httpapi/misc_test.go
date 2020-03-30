@@ -31,13 +31,11 @@ var (
 
 func TestMisc(t *testing.T) {
 	testsMisc := []func(t *testing.T){
-		TShutdown,
 		TDumpNotDest,
 		TDump,
 		TDumpError,
 		TMemStats,
 		TVersion,
-		TMemStatsErrJsonMarshal,
 	}
 	managerSubTests(testsMisc, "misc_test", t)
 }
