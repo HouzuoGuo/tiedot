@@ -2,15 +2,12 @@ package httpapi
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"bou.ke/monkey"
 	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -187,40 +184,6 @@ func TIndexesCollNotExist(t *testing.T) {
 	Indexes(wIndexes, reqIndexes)
 	if wIndexes.Code != 400 || strings.TrimSpace(wIndexes.Body.String()) != fmt.Sprintf("Collection '%s' does not exist.", collection) {
 		t.Error("Expected code 400 and error message 'collection does not exist' .")
-	}
-}
-func TIndexErrMarshalJson(t *testing.T) {
-	setupTestCase()
-	defer tearDownTestCase()
-
-	b := &bytes.Buffer{}
-	b.WriteString("{\"a\": 1, \"b\": 2}")
-
-	reqCreate := httptest.NewRequest("GET", requestCreate, nil)
-	reqInsert := httptest.NewRequest(RandMethodRequest(), requestInsertWithoutDoc, b)
-	reqIndex := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestIndex, collection, path), nil)
-	reqIndexes := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestIndexes, collection), nil)
-
-	wCreate := httptest.NewRecorder()
-	wInsert := httptest.NewRecorder()
-	wIndex := httptest.NewRecorder()
-	wIndexes := httptest.NewRecorder()
-	var err error
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-	Create(wCreate, reqCreate)
-	Insert(wInsert, reqInsert)
-	Index(wIndex, reqIndex)
-
-	patch := monkey.Patch(json.Marshal, func(interface{}) ([]byte, error) {
-		return nil, errors.New("Error json marshal")
-	})
-	defer patch.Unpatch()
-
-	Indexes(wIndexes, reqIndexes)
-	if wIndexes.Code != 500 || strings.TrimSpace(wIndexes.Body.String()) != "Server error." {
-		t.Error("Expected code 500 and message server error.")
 	}
 }
 

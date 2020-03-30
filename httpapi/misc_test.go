@@ -1,8 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"math/rand"
 	"net/http/httptest"
@@ -10,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"bou.ke/monkey"
 	"github.com/HouzuoGuo/tiedot/db"
 )
 
@@ -43,27 +40,6 @@ func TestMisc(t *testing.T) {
 		TMemStatsErrJsonMarshal,
 	}
 	managerSubTests(testsMisc, "misc_test", t)
-}
-func TShutdown(t *testing.T) {
-	var execute = false
-	patch := monkey.Patch(os.Exit, func(int) {
-		execute = true
-	})
-	defer patch.Unpatch()
-	setupTestCase()
-	defer tearDownTestCase()
-	var err error
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-
-	wShutdown := httptest.NewRecorder()
-	reqShutdown := httptest.NewRequest(RandMethodRequest(), requestShutDown, nil)
-	Shutdown(wShutdown, reqShutdown)
-
-	if !execute {
-		t.Error("Expected true execute os.Exit")
-	}
 }
 func TDumpNotDest(t *testing.T) {
 	setupTestCase()
@@ -133,27 +109,6 @@ func TMemStats(t *testing.T) {
 
 	if wMemStats.Code != 200 || !strings.Contains(wMemStats.Body.String(), listStats[rand.Intn(len(listStats))]) {
 		t.Error("Expected code 200 and return json with stats memory.")
-	}
-}
-func TMemStatsErrJsonMarshal(t *testing.T) {
-	setupTestCase()
-	defer tearDownTestCase()
-	var err error
-
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-	wMemStats := httptest.NewRecorder()
-	reqMemStats := httptest.NewRequest(RandMethodRequest(), requestMemstats, nil)
-	var textError = "Error json marshal"
-	patch := monkey.Patch(json.Marshal, func(interface{}) ([]byte, error) {
-		return nil, errors.New(textError)
-	})
-	defer patch.Unpatch()
-	MemStats(wMemStats, reqMemStats)
-
-	if wMemStats.Code != 500 || strings.TrimSpace(wMemStats.Body.String()) != "Cannot serialize MemStats to JSON." {
-		t.Error("Expected code 500 and message error serialize json.")
 	}
 }
 func TVersion(t *testing.T) {

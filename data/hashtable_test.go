@@ -1,14 +1,9 @@
 package data
 
 import (
-	"encoding/binary"
 	"math"
 	"os"
-	"reflect"
 	"testing"
-
-	"bou.ke/monkey"
-	"github.com/pkg/errors"
 )
 
 func TestPutGetReopenClear(t *testing.T) {
@@ -176,71 +171,7 @@ func TestPartitionEntries(t *testing.T) {
 		}
 	}
 }
-func TestOpenHashTableErr(t *testing.T) {
-	errMessage := "Error open data file"
-	patch := monkey.Patch(OpenDataFile, func(path string, growth int) (file *DataFile, err error) {
-		return nil, errors.New(errMessage)
-	})
-	defer patch.Unpatch()
 
-	d := defaultConfig()
-	if _, err := d.OpenHashTable(""); err.Error() != errMessage {
-		t.Error("Expected error open data file")
-	}
-}
-func TestRemoveEntryKeyZero(t *testing.T) {
-	os.Remove(tmp)
-	defer os.Remove(tmp)
-	var d *Config
-
-	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "HashKey", func(_ *Config, key int) int {
-		return 0
-	})
-	defer patch.Unpatch()
-
-	d = defaultConfig()
-	hash, _ := d.OpenHashTable(tmp)
-	hash.HashKey(1)
-
-	hash.Put(1, 1)
-	hash.Remove(2, 1)
-}
-func TestRemoveEqualZeroPerBucket(t *testing.T) {
-	os.Remove(tmp)
-	defer os.Remove(tmp)
-	var d *Config
-
-	patch := monkey.PatchInstanceMethod(reflect.TypeOf(d), "HashKey", func(_ *Config, key int) int {
-		return 0
-	})
-	defer patch.Unpatch()
-
-	d = defaultConfig()
-	hash, _ := d.OpenHashTable(tmp)
-	hash.HashKey(1)
-	hash.Put(1, 1)
-
-	patchVarint := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
-		return 1, 0
-	})
-	defer patchVarint.Unpatch()
-
-	hash.Remove(1, 0)
-}
-func TestCalculateNumBucketsSizeOver(t *testing.T) {
-	os.Remove(tmp)
-	defer os.Remove(tmp)
-	patch := monkey.Patch(OpenDataFile, func(path string, growth int) (file *DataFile, err error) {
-		return &DataFile{
-			Path:   path,
-			Growth: growth,
-			Size:   0,
-		}, nil
-	})
-	defer patch.Unpatch()
-	d := defaultConfig()
-	d.OpenHashTable(tmp)
-}
 func TestNextBucketZero(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)

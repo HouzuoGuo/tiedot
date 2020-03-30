@@ -1,19 +1,13 @@
 package httpapi
 
 import (
-	"bytes"
 	"fmt"
-	"log"
-	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"reflect"
 	"strings"
 	"testing"
 
-	"bou.ke/monkey"
 	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -98,83 +92,4 @@ func TRequireTrue(t *testing.T) {
 	if Require(w, req, "test", &test) != true {
 		t.Error("Expected bool true from require function")
 	}
-}
-func TestStartListenAndServe(t *testing.T) {
-	setupTestCase()
-	defer tearDownTestCase()
-	var (
-		str bytes.Buffer
-		s   *http.Server
-	)
-	log.SetOutput(&str)
-	pathSever := monkey.PatchInstanceMethod(reflect.TypeOf(s), "ListenAndServe", func(_ *http.Server) error {
-		return errors.New("Error server")
-	})
-	defer pathSever.Unpatch()
-
-	Start(tempDir, 8000, "", "", "", "", "", "")
-}
-func TestStartListenAndServeTLS(t *testing.T) {
-	setupTestCase()
-	defer tearDownTestCase()
-	var (
-		s   *http.Server
-		str bytes.Buffer
-	)
-	log.SetOutput(&str)
-	errMessage := "error start serve"
-	pathSever := monkey.PatchInstanceMethod(reflect.TypeOf(s), "ListenAndServeTLS", func(_ *http.Server, certFile, keyFile string) error {
-		return errors.New(errMessage)
-	})
-	defer pathSever.Unpatch()
-	defer func() {
-		r := recover()
-		if r == nil && r == fmt.Sprintf("Failed to start HTTPS service - %s", errMessage) {
-			t.Fatal("Did not catch Panicf")
-		}
-	}()
-	Start(tempDir, 8000, "tls", "", "", "", "", "")
-}
-func TestStartNotAuthToken(t *testing.T) {
-	setupTestCase()
-	defer tearDownTestCase()
-	var (
-		s   *http.Server
-		str bytes.Buffer
-	)
-	log.SetOutput(&str)
-	errMessage := "error start serve"
-	pathSever := monkey.PatchInstanceMethod(reflect.TypeOf(s), "ListenAndServeTLS", func(_ *http.Server, certFile, keyFile string) error {
-		return errors.New(errMessage)
-	})
-	defer pathSever.Unpatch()
-	defer func() {
-		r := recover()
-		if r == nil && r == fmt.Sprintf("Failed to start HTTPS service - %s", errMessage) {
-			t.Fatal("Did not catch Panicf")
-		}
-	}()
-	Start(tempDir, 8000, "tls", "", "", "", "", "ascasc")
-}
-func TestStartParseJwtKey(t *testing.T) {
-	setupTestCase()
-	defer tearDownTestCase()
-	var (
-		s   *http.Server
-		str bytes.Buffer
-	)
-	log.SetOutput(&str)
-	errMessage := "error start serve"
-	pathSever := monkey.PatchInstanceMethod(reflect.TypeOf(s), "ListenAndServeTLS", func(_ *http.Server, certFile, keyFile string) error {
-		return errors.New(errMessage)
-	})
-	defer pathSever.Unpatch()
-	defer func() {
-		r := recover()
-		if r == nil && r == fmt.Sprintf("Failed to start HTTPS service - %s", errMessage) {
-			t.Fatal("Did not catch Panicf")
-		}
-	}()
-
-	Start(tempDir, 8000, "tls", "", "jwt-test.pub", "jwt-test.key", "", "")
 }

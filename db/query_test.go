@@ -9,9 +9,7 @@ import (
 
 	"strings"
 
-	"bou.ke/monkey"
 	"github.com/HouzuoGuo/tiedot/dberr"
-	"github.com/pkg/errors"
 )
 
 func ensureMapHasKeys(m map[int]struct{}, keys ...int) bool {
@@ -279,21 +277,6 @@ func TestQuery(t *testing.T) {
 		t.Fatal(q)
 	}
 }
-func TestEvalUnionQueryErr(t *testing.T) {
-	os.RemoveAll(TEST_DATA_DIR)
-	defer os.RemoveAll(TEST_DATA_DIR)
-	db, _ := OpenDB(TEST_DATA_DIR)
-	col, _ := OpenCol(db, "test")
-	errMessage := "Error query"
-	patch := monkey.Patch(evalQuery, func(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLock bool) (err error) {
-		return errors.New(errMessage)
-	})
-	defer patch.Unpatch()
-	result := map[int]struct{}{0: struct{}{}}
-	if EvalUnion([]interface{}{""}, col, &result).Error() != errMessage {
-		t.Error("Expected error query")
-	}
-}
 func TestLookupNotHasPat(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
@@ -336,21 +319,6 @@ func TestPathExistenceLimitIsint(t *testing.T) {
 
 	PathExistence([]interface{}{}, map[string]interface{}{"in": []interface{}{"s"}, "limit": 0}, col, &result)
 }
-func TestIntersectEvalQueryErr(t *testing.T) {
-	os.RemoveAll(TEST_DATA_DIR)
-	defer os.RemoveAll(TEST_DATA_DIR)
-	db, _ := OpenDB(TEST_DATA_DIR)
-	col, _ := OpenCol(db, "test")
-	errMessage := "Error query"
-	patch := monkey.Patch(evalQuery, func(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLock bool) (err error) {
-		return errors.New(errMessage)
-	})
-	defer patch.Unpatch()
-	result := map[int]struct{}{0: struct{}{}}
-	if Intersect([]interface{}{""}, col, &result).Error() != errMessage {
-		t.Error("Expected error query")
-	}
-}
 func TestIntersectSubExprsNotValidType(t *testing.T) {
 	os.RemoveAll(TEST_DATA_DIR)
 	defer os.RemoveAll(TEST_DATA_DIR)
@@ -359,21 +327,6 @@ func TestIntersectSubExprsNotValidType(t *testing.T) {
 
 	result := map[int]struct{}{0: struct{}{}}
 	if !strings.Contains(Intersect(nil, col, &result).Error(), "Expecting a vector of sub-queries") {
-		t.Error("Expected error query")
-	}
-}
-func TestComplementEvalQueryErr(t *testing.T) {
-	os.RemoveAll(TEST_DATA_DIR)
-	defer os.RemoveAll(TEST_DATA_DIR)
-	db, _ := OpenDB(TEST_DATA_DIR)
-	col, _ := OpenCol(db, "test")
-	errMessage := "Error query"
-	patch := monkey.Patch(evalQuery, func(q interface{}, src *Col, result *map[int]struct{}, placeSchemaLock bool) (err error) {
-		return errors.New(errMessage)
-	})
-	defer patch.Unpatch()
-	result := map[int]struct{}{0: struct{}{}}
-	if Complement([]interface{}{""}, col, &result).Error() != errMessage {
 		t.Error("Expected error query")
 	}
 }

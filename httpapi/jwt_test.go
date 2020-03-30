@@ -8,16 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"bou.ke/monkey"
 	"github.com/HouzuoGuo/tiedot/db"
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/dgrijalva/jwt-go/request"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -62,32 +59,6 @@ func TestJWTToken(t *testing.T) {
 		t.Fail()
 	}
 }
-func TestJwtInitSetupErrorCreateError(t *testing.T) {
-	var (
-		database *db.DB
-		str      bytes.Buffer
-	)
-
-	defer tearDownTestCase()
-	defer func() {
-		r := recover()
-		if r == nil || !strings.Contains(str.String(), "JWT: failed to create JWT identity collection") {
-			t.Errorf("Code not panic")
-		}
-	}()
-
-	log.SetOutput(&str)
-	errMessage := "Error create collection"
-	path := monkey.PatchInstanceMethod(reflect.TypeOf(database), "Create", func(_ *db.DB, name string) error {
-		return errors.New(errMessage)
-	})
-	defer path.Unpatch()
-	var err error
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-	jwtInitSetup()
-}
 func TestJwtInitSetup(t *testing.T) {
 	var err error
 	defer tearDownTestCase()
@@ -101,78 +72,6 @@ func TestJwtInitSetup(t *testing.T) {
 	if _, err := os.Stat(tempDir); err != nil {
 		t.Error("Expected folder jwt not exist Error:" + err.Error())
 	}
-}
-func TestJwtInitSetupErrorInsert(t *testing.T) {
-	var err error
-	defer tearDownTestCase()
-	var str bytes.Buffer
-	errMessage := "Error when insert in collection"
-	log.SetOutput(&str)
-	defer func() {
-		if r := recover(); r == nil || !strings.Contains(str.String(), fmt.Sprintf("JWT: failed to create default admin user - %v", errMessage)) {
-			t.Errorf("Code not panic")
-		}
-	}()
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-
-	var database *db.Col
-	path := monkey.PatchInstanceMethod(reflect.TypeOf(database), "Insert", func(_ *db.Col, doc map[string]interface{}) (id int, err error) {
-		return 0, errors.New(errMessage)
-	})
-	defer path.Unpatch()
-	jwtInitSetup()
-}
-func TestJwtInitSetupEvalQueryErr(t *testing.T) {
-	var err error
-	defer tearDownTestCase()
-	var str bytes.Buffer
-	errMessage := "Error EvalQuery"
-	log.SetOutput(&str)
-	defer func() {
-		if r := recover(); r == nil || !strings.Contains(str.String(), fmt.Sprintf("JWT: failed to query admin user ID - %v", errMessage)) {
-			t.Errorf("Code not panic")
-		}
-	}()
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-
-	path := monkey.Patch(db.EvalQuery, func(q interface{}, src *db.Col, result *map[int]struct{}) (err error) {
-		return errors.New(errMessage)
-	})
-	defer path.Unpatch()
-	jwtInitSetup()
-}
-func TestJwtInitSetupSetIndex(t *testing.T) {
-	var (
-		err error
-		str bytes.Buffer
-		col *db.Col
-	)
-	defer tearDownTestCase()
-
-	errMessage := "Insert index in collection"
-	log.SetOutput(&str)
-	defer func() {
-		if r := recover(); r == nil || !strings.Contains(str.String(), fmt.Sprintf("JWT: failed to create collection index - %v", errMessage)) {
-			t.Errorf("Code not panic")
-		}
-	}()
-
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-	HttpDB.Create(JWT_COL_NAME)
-	jwtCol := HttpDB.Use(JWT_COL_NAME)
-	jwtCol.Index([]string{strings.Join([]string{JWT_PASS_ATTR}, db.INDEX_PATH_SEP)})
-
-	path := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Index", func(_ *db.Col, idxPath []string) (err error) {
-		return errors.New(errMessage)
-	})
-	defer path.Unpatch()
-	jwtInitSetup()
 }
 func TestAddCommonJwtRespHeadersSetOrigin(t *testing.T) {
 	req := httptest.NewRequest("GET", urlJwt, nil)
@@ -280,32 +179,6 @@ func TestGetJWT(t *testing.T) {
 	getJWT(w, req)
 	if w.Code != http.StatusOK {
 		t.Error("Expected StatusOKn")
-	}
-}
-func TestGetReadError(t *testing.T) {
-	defer tearDownTestCase()
-	req := httptest.NewRequest("GET", fmt.Sprintf(jwtUrlAuth, JWT_USER_ADMIN, ""), nil)
-	w := httptest.NewRecorder()
-	var (
-		err      error
-		str      bytes.Buffer
-		database *db.Col
-	)
-	log.SetOutput(&str)
-
-	path := monkey.PatchInstanceMethod(reflect.TypeOf(database), "Read", func(_ *db.Col, id int) (doc map[string]interface{}, err error) {
-		return nil, errors.New("Error Read from collection")
-	})
-	defer path.Unpatch()
-
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-
-	jwtInitSetup()
-	getJWT(w, req)
-	if w.Code != http.StatusUnauthorized {
-		t.Error("Expected status unauthirized")
 	}
 }
 func TestExtractTokenErr(t *testing.T) {

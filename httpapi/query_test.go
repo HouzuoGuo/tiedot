@@ -1,17 +1,13 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
 
-	"bou.ke/monkey"
 	"github.com/HouzuoGuo/tiedot/db"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -38,35 +34,6 @@ func TestQueryNotQ(t *testing.T) {
 	Query(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status %d", http.StatusBadRequest)
-	}
-}
-func TestQuery(t *testing.T) {
-	setupTestCase()
-	defer tearDownTestCase()
-
-	path := monkey.Patch(db.EvalQuery, func(q interface{}, src *db.Col, result *map[int]struct{}) (err error) {
-		*result = map[int]struct{}{2: struct{}{}}
-		return nil
-	})
-	defer path.Unpatch()
-	var col *db.Col
-	pathCol := monkey.PatchInstanceMethod(reflect.TypeOf(col), "Read", func(_ *db.Col, id int) (doc map[string]interface{}, err error) {
-		return map[string]interface{}{"34234234": struct{}{}}, nil
-	})
-	defer pathCol.Unpatch()
-
-	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
-	req := httptest.NewRequest("POST", fmt.Sprintf(requestQueryWithAll, collection, "1"), nil)
-	w := httptest.NewRecorder()
-	wQuery := httptest.NewRecorder()
-	var err error
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-	Create(w, reqCreate)
-	Query(wQuery, req)
-	if wQuery.Code != http.StatusOK {
-		t.Errorf("Expected status %d", http.StatusOK)
 	}
 }
 func TestQueryCollectionNot(t *testing.T) {
@@ -103,53 +70,6 @@ func TestQueryJsonIsNotValid(t *testing.T) {
 	Query(wQuery, req)
 	if wQuery.Code != http.StatusBadRequest || strings.TrimSpace(wQuery.Body.String()) != fmt.Sprintf("'%s' is not valid JSON.", badJson) {
 		t.Errorf("Expected status %d and error message json is not valid", http.StatusOK)
-	}
-}
-func TestQueryErrEvalQuery(t *testing.T) {
-	errMessage := "Error eval query"
-	path := monkey.Patch(db.EvalQuery, func(q interface{}, src *db.Col, result *map[int]struct{}) (err error) {
-		return errors.New(errMessage)
-	})
-	defer path.Unpatch()
-	setupTestCase()
-	defer tearDownTestCase()
-
-	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
-	req := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestQueryWithAll, collection, "1"), nil)
-	w := httptest.NewRecorder()
-	wQuery := httptest.NewRecorder()
-	var err error
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-	Create(w, reqCreate)
-	Query(wQuery, req)
-
-	if wQuery.Code != http.StatusBadRequest || strings.TrimSpace(wQuery.Body.String()) != errMessage {
-		t.Errorf("Expected status %d and error message eval query", http.StatusBadRequest)
-	}
-}
-func TestQuerySerializeError(t *testing.T) {
-	setupTestCase()
-	defer tearDownTestCase()
-
-	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
-	req := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestQueryWithAll, collection, "1"), nil)
-	w := httptest.NewRecorder()
-	wQuery := httptest.NewRecorder()
-	var err error
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-
-	path := monkey.Patch(json.Marshal, func(v interface{}) ([]byte, error) {
-		return nil, errors.New("error marshal")
-	})
-	defer path.Unpatch()
-	Create(w, reqCreate)
-	Query(wQuery, req)
-	if wQuery.Code != http.StatusInternalServerError || strings.TrimSpace(wQuery.Body.String()) != "Server error: query returned invalid structure" {
-		t.Errorf("Expected status %d and error message invalid structure", http.StatusInternalServerError)
 	}
 }
 
@@ -222,28 +142,5 @@ func TestCountJsonIsNotValid(t *testing.T) {
 
 	if wCount.Code != http.StatusBadRequest || strings.TrimSpace(wCount.Body.String()) != fmt.Sprintf("'%s' is not valid JSON.", badJson) {
 		t.Errorf("Expected status %d and json is not valid ", http.StatusBadRequest)
-	}
-}
-func TestCountErrEvalQuery(t *testing.T) {
-	setupTestCase()
-	defer tearDownTestCase()
-	errMessage := "Error eval query"
-	path := monkey.Patch(db.EvalQuery, func(q interface{}, src *db.Col, result *map[int]struct{}) (err error) {
-		return errors.New(errMessage)
-	})
-	defer path.Unpatch()
-	reqCreate := httptest.NewRequest(RandMethodRequest(), requestCreate, nil)
-	req := httptest.NewRequest(RandMethodRequest(), fmt.Sprintf(requestCountWithAll, collection, "1"), nil)
-	w := httptest.NewRecorder()
-	wCount := httptest.NewRecorder()
-
-	var err error
-	if HttpDB, err = db.OpenDB(tempDir); err != nil {
-		panic(err)
-	}
-	Create(w, reqCreate)
-	Count(wCount, req)
-	if wCount.Code != http.StatusBadRequest || strings.TrimSpace(wCount.Body.String()) != errMessage {
-		t.Errorf("Expected status %d and error message eval query", http.StatusBadRequest)
 	}
 }

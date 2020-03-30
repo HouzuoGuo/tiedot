@@ -1,16 +1,12 @@
 package data
 
 import (
-	"encoding/binary"
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 
-	"bou.ke/monkey"
 	"github.com/HouzuoGuo/tiedot/dberr"
 )
 
@@ -58,45 +54,8 @@ func TestInsertRead(t *testing.T) {
 	if doc1 := col.Read(ids[1]); doc1 == nil || strings.TrimSpace(string(doc1)) != string(docs[1]) {
 		t.Fatalf("Failed to read")
 	}
-
-	patch := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
-		return int64(col.DocMaxRoom + 1), 0
-	})
-
-	if doc1 := col.Read(ids[1]); doc1 != nil {
-		t.Fatalf("Expected nill return if the buffer exceeds")
-	}
-	patch.Unpatch()
-
-	patch2 := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
-		return int64(col.DocMaxRoom), 0
-	})
-	col.Size = col.DocMaxRoom
-	if doc1 := col.Read(ids[1]); doc1 != nil {
-		t.Fatalf("Expected nill return if doc eof")
-	}
-	patch2.Unpatch()
-
-	// it shall not panic
-	col.Read(col.Size)
-
-	zero, err := col.Insert([]byte(RandStringBytes(col.DocMaxRoom)))
-
-	if zero != 0 || err.Error() != "Document is too large. Max: `2097152`, Given: `4194304`" {
-		t.Fatalf("Expected error document to large.")
-	}
-
-	var d *DataFile
-	errEnsureSize := "test error from function EnsureSize"
-	patch3 := monkey.PatchInstanceMethod(reflect.TypeOf(d), "EnsureSize", func(_ *DataFile, more int) (err error) {
-		return errors.New(errEnsureSize)
-	})
-
-	if _, err := col.Insert(docs[0]); err.Error() != errEnsureSize {
-		t.Fatalf("Expected err from function EnsureSize")
-	}
-	patch3.Unpatch()
 }
+
 func TestInsertUpdateRead(t *testing.T) {
 	os.Remove(tmp)
 	defer os.Remove(tmp)
@@ -134,44 +93,7 @@ func TestInsertUpdateRead(t *testing.T) {
 	// it shall not panic
 	col.Update(col.Size, []byte("abcdef"))
 }
-func TestEndDocumentExceeded(t *testing.T) {
-	var id int
-	os.Remove(tmp)
-	defer os.Remove(tmp)
-	d := defaultConfig()
-	col, err := d.OpenCollection(tmp)
-	defer col.Close()
 
-	if id, err = col.Insert([]byte("test")); err != nil {
-		t.Fatalf("Failed to insert: %v", err)
-	}
-	patch := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
-		return int64(col.DocMaxRoom), 0
-	})
-	col.Size = 0
-
-	if _, err = col.Update(id, []byte("")); err != nil && err.Error() != dberr.New(dberr.ErrorNoDoc, id).Error() {
-		t.Fatalf("Expected return document does not exist")
-	}
-	patch.Unpatch()
-}
-
-func TestVariantRetuneMoreMaxDocument(t *testing.T) {
-	var id int
-	col, err := setupTestCollection()
-	defer col.Close()
-	if id, err = col.Insert([]byte("test")); err != nil {
-		t.Fatalf("Failed to insert: %v", err)
-	}
-
-	patch := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
-		return int64(col.DocMaxRoom + 1), 0
-	})
-	if _, err = col.Update(id, []byte("")); err != nil && err.Error() != dberr.New(dberr.ErrorNoDoc, id).Error() {
-		t.Fatalf("Expected return document does not exist")
-	}
-	patch.Unpatch()
-}
 func TestUpdateMoreThanMaxDocument(t *testing.T) {
 	col, err := setupTestCollection()
 	defer col.Close()
@@ -182,22 +104,6 @@ func TestUpdateMoreThanMaxDocument(t *testing.T) {
 	if _, err = col.Update(10, []byte(RandStringBytes(col.DocMaxRoom+1))); err != nil && err.Error() != fmt.Sprintf("Document is too large. Max: `%d`, Given: `%d`", col.DocMaxRoom, col.DocMaxRoom+1) {
 		t.Fatal("Expected error document is too large")
 	}
-}
-func TestUpdate(t *testing.T) {
-	var id int
-	col, err := setupTestCollection()
-	defer col.Close()
-	if id, err = col.Insert([]byte("test")); err != nil {
-		t.Fatalf("Failed to insert: %v", err)
-	}
-
-	patch := monkey.Patch(binary.Varint, func(buf []byte) (int64, int) {
-		return int64(160), 0
-	})
-	if _, err = col.Update(id, []byte("test")); err != nil && err.Error() != dberr.New(dberr.ErrorNoDoc, id).Error() {
-		t.Fatalf("Expected return document does not exist")
-	}
-	patch.Unpatch()
 }
 func TestInsertDeleteRead(t *testing.T) {
 	os.Remove(tmp)
