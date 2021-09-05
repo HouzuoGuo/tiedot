@@ -1,3 +1,4 @@
+<p>2021-09-05: thanks for evaluating tiedot! The project started as a short programming exercise and I am very grateful for the small user base it has received. I am afraid the project has been dormant since 2016, the feature set is minimal and lacking for a modern application. Please consider other embedded DB engine alternatives. In the meanwhile, check out this actively maintained open source project of mine: <a href="https://github.com/HouzuoGuo/laitos">laitos - Top geek's chindogu</a>.</p>
 
 <h1 align="center">tiedot</h1>
 <p align="center">
